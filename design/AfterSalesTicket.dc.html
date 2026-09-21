@@ -1,0 +1,251 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; color: #1c2129; -webkit-font-smoothing: antialiased; }
+    a { color: #3d5fc4; } a:hover { color: #2f4aa0; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; background: #f6f7f9; display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- 顶栏 -->
+  <div style="height: 56px; box-sizing: border-box; background: #ffffff; border-bottom: 1px solid #e3e6eb; display: flex; align-items: center; justify-content: space-between; padding: 0px 20px;">
+    <div style="display: flex; align-items: center; gap: 28px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 26px; height: 26px; border-radius: 7px; background: #3d5fc4; display: flex; align-items: center; justify-content: center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v9a2 2 0 0 1-2 2H9l-5 4z"></path></svg>
+        </div>
+        <div style="font-size: 15px; font-weight: 600;">Forcome Support</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">收件箱</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">工单</div>
+        <div style="font-size: 13px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 6px; padding: 6px 12px;">售后</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">动作审批</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">知识库</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">报表</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">设置</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="width: 260px; height: 34px; box-sizing: border-box; background: #f6f7f9; border: 1px solid #e3e6eb; border-radius: 6px; display: flex; align-items: center; gap: 8px; padding: 0px 10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#98a2b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <div style="font-size: 13px; color: #98a2b3;">搜索工单、订单号、客户邮箱</div>
+      </div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475467" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10 21h4"></path></svg>
+      <div style="width: 30px; height: 30px; border-radius: 999px; background: #d1fadf; color: #067647; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">婷</div>
+    </div>
+  </div>
+
+  <!-- 头部 -->
+  <div style="background: #ffffff; border-bottom: 1px solid #e3e6eb; padding: 12px 28px 14px 28px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-size: 12px; color: #667085;">售后 / 流程中 / S-20260911-0018</div>
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="font-size: 18px; font-weight: 600;">HEPA 滤芯组件补发 · Laura Bennett</div>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <div style="font-size: 11px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 3px 8px;">寄配件 · 良仓无货</div>
+          <div style="font-size: 11px; font-weight: 600; color: #5b21b6; background: #ede9fe; border-radius: 4px; padding: 3px 8px;">责任：产品质量问题 · 已确认</div>
+          <div style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 3px 8px;">当前：报备审批 · 快递费用</div>
+          <div style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">亚马逊 US</div>
+          <div style="font-size: 12px; color: #667085;">原工单 T-20260910-0201</div>
+          <div style="font-size: 12px; color: #667085;">订单 111-2233445-5566778</div>
+          <div style="font-size: 12px; color: #667085;">负责人 王磊</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="font-size: 12px; font-weight: 500; color: #475467; border: 1px solid #e3e6eb; border-radius: 6px; padding: 6px 10px; background: #ffffff;">查看原工单</div>
+        <div style="font-size: 12px; font-weight: 500; color: #475467; border: 1px solid #e3e6eb; border-radius: 6px; padding: 6px 10px; background: #ffffff;">改处理方式</div>
+        <div style="font-size: 12px; font-weight: 500; color: #475467; border: 1px solid #e3e6eb; border-radius: 6px; padding: 6px 10px; background: #ffffff;">改为良仓分支</div>
+        <div style="font-size: 12px; font-weight: 500; color: #475467; border: 1px solid #e3e6eb; border-radius: 6px; padding: 6px 10px; background: #ffffff;">终止流程</div>
+      </div>
+    </div>
+
+    <!-- 步骤条 -->
+    <div style="display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 0px; margin-top: 2px;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+        <div style="width: 22px; height: 22px; border-radius: 999px; background: #067647; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg></div>
+        <div style="font-size: 12px; font-weight: 500; color: #1c2129;">责任与方式确认</div>
+        <div style="font-size: 11px; color: #98a2b3;">09-11 08:20</div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+        <div style="width: 22px; height: 22px; border-radius: 999px; background: #067647; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg></div>
+        <div style="font-size: 12px; font-weight: 500; color: #1c2129;">工厂工作台询价</div>
+        <div style="font-size: 11px; color: #98a2b3;">09-11 08:21</div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+        <div style="width: 22px; height: 22px; border-radius: 999px; background: #067647; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg></div>
+        <div style="font-size: 12px; font-weight: 500; color: #1c2129;">工厂报价</div>
+        <div style="font-size: 11px; color: #98a2b3;">09-11 09:40</div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+        <div style="width: 22px; height: 22px; border-radius: 999px; background: #3d5fc4; border: 4px solid #e8edfa; box-sizing: border-box;"></div>
+        <div style="font-size: 12px; font-weight: 600; color: #2f4aa0;">报备：快递费用</div>
+        <div style="font-size: 11px; color: #b54708;">等客服主管</div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+        <div style="width: 22px; height: 22px; border-radius: 999px; background: #ffffff; border: 2px solid #d0d5dd; box-sizing: border-box;"></div>
+        <div style="font-size: 12px; font-weight: 500; color: #98a2b3;">通知工厂寄出</div>
+        <div style="font-size: 11px; color: #98a2b3;">自动</div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+        <div style="width: 22px; height: 22px; border-radius: 999px; background: #ffffff; border: 2px solid #d0d5dd; box-sizing: border-box;"></div>
+        <div style="font-size: 12px; font-weight: 500; color: #98a2b3;">收到快递单号</div>
+        <div style="font-size: 11px; color: #98a2b3;">等工厂</div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+        <div style="width: 22px; height: 22px; border-radius: 999px; background: #ffffff; border: 2px solid #d0d5dd; box-sizing: border-box;"></div>
+        <div style="font-size: 12px; font-weight: 500; color: #98a2b3;">单号回复客户</div>
+        <div style="font-size: 11px; color: #98a2b3;">待审草稿</div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+        <div style="width: 22px; height: 22px; border-radius: 999px; background: #ffffff; border: 2px solid #d0d5dd; box-sizing: border-box;"></div>
+        <div style="font-size: 12px; font-weight: 500; color: #98a2b3;">登记完成</div>
+        <div style="font-size: 11px; color: #98a2b3;">自动</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; background: #f6f2ff; border: 1px solid #e4dcfb; border-radius: 6px; padding: 6px 10px;">
+      <div style="font-size: 11px; font-weight: 600; color: #5b21b6; background: #ede9fe; border-radius: 4px; padding: 2px 6px;">并行</div>
+      <div style="font-size: 12px; color: #475467;">承担比例协商：建议工厂 100%（责任为产品质量问题）· 报备通过后在工厂工作台发起提案 · 不阻塞寄件</div>
+    </div>
+  </div>
+
+  <!-- 主体 -->
+  <div style="flex: 1; display: flex; flex-direction: row; gap: 20px; padding: 16px 28px; min-height: 0px;">
+
+    <!-- 执行记录 -->
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 9px; min-width: 0px;">
+      <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">执行记录</div>
+
+      <div style="display: flex; flex-direction: row; gap: 12px; align-items: flex-start;">
+        <div style="width: 92px; flex-shrink: 0; font-size: 12px; color: #98a2b3; padding-top: 2px;">09-11 08:05</div>
+        <div style="flex: 1; display: flex; align-items: flex-start; gap: 8px;">
+          <div style="font-size: 11px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px; flex-shrink: 0;">自动</div>
+          <div style="font-size: 13px; color: #1c2129; line-height: 1.5;">排查未解决。识别配件 HEPA 滤芯组件 FC-V2-HF01 ×1，订单 111-2233445-5566778，购买于 08-02，保修内；良仓 US 库存 0。</div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: row; gap: 12px; align-items: flex-start;">
+        <div style="width: 92px; flex-shrink: 0; font-size: 12px; color: #98a2b3; padding-top: 2px;">09-11 08:05</div>
+        <div style="flex: 1; display: flex; align-items: flex-start; gap: 8px;">
+          <div style="font-size: 11px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px; flex-shrink: 0;">自动</div>
+          <div style="font-size: 13px; color: #1c2129; line-height: 1.5;">AI 建议：处理方式「寄配件」；责任「产品质量问题」，依据：保修内 40 天滤芯发黄发硬，照片与已知批次缺陷一致。</div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: row; gap: 12px; align-items: flex-start;">
+        <div style="width: 92px; flex-shrink: 0; font-size: 12px; color: #98a2b3; padding-top: 2px;">09-11 08:20</div>
+        <div style="flex: 1; display: flex; align-items: flex-start; gap: 8px;">
+          <div style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px; flex-shrink: 0;">人工</div>
+          <div style="font-size: 13px; color: #1c2129; line-height: 1.5;">王磊确认责任类型「产品质量问题」与处理方式「寄配件」，创建售后单 S-20260911-0018。</div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: row; gap: 12px; align-items: flex-start;">
+        <div style="width: 92px; flex-shrink: 0; font-size: 12px; color: #98a2b3; padding-top: 2px;">09-11 08:21</div>
+        <div style="flex: 1; display: flex; align-items: flex-start; gap: 8px;">
+          <div style="font-size: 11px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px; flex-shrink: 0;">自动</div>
+          <div style="font-size: 13px; color: #1c2129; line-height: 1.5;">在工厂工作台向东莞工厂派发询价单：配件号、数量、目的国与邮编，并推送即时消息。<span style="color: #3d5fc4;">查看询价单</span></div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: row; gap: 12px; align-items: flex-start;">
+        <div style="width: 92px; flex-shrink: 0; font-size: 12px; color: #98a2b3; padding-top: 2px;">09-11 09:40</div>
+        <div style="flex: 1; display: flex; align-items: flex-start; gap: 8px;">
+          <div style="font-size: 11px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 2px 6px; flex-shrink: 0;">工厂</div>
+          <div style="font-size: 13px; color: #1c2129; line-height: 1.5;">东莞生产厂陈工在工厂工作台提交报价：产品成本 $3.20，运费 $11.50，云途专线，09-14 可寄。已直接写入登记表。</div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: row; gap: 12px; align-items: flex-start;">
+        <div style="width: 92px; flex-shrink: 0; font-size: 12px; color: #98a2b3; padding-top: 2px;">09-11 09:41</div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: flex-start; gap: 8px;">
+            <div style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px; flex-shrink: 0;">人工</div>
+            <div style="font-size: 13px; font-weight: 600; color: #1c2129; line-height: 1.5;">报备待审批 · 快递费用 · 审批人客服主管，时限 4 小时</div>
+          </div>
+          <div style="background: #ffffff; border: 1px solid #fedf89; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px;">
+              <div style="display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 11px; color: #98a2b3;">报备金额</div><div style="font-size: 13px; font-weight: 500;">运费 $11.50，FSH 先付</div></div>
+              <div style="display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 11px; color: #98a2b3;">费用合计</div><div style="font-size: 13px; font-weight: 500;">$14.70 = 产品 $3.20 + 运费 $11.50</div></div>
+              <div style="display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 11px; color: #98a2b3;">责任类型</div><div style="font-size: 13px; font-weight: 500;">产品质量问题 · 王磊已确认</div></div>
+              <div style="display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 11px; color: #98a2b3;">建议承担比例</div><div style="font-size: 13px; font-weight: 500;">工厂 100% · 待协商</div></div>
+            </div>
+            <div style="font-size: 12px; color: #667085; line-height: 1.5;">批准后工厂工作台生成寄件任务并向工厂发起比例协商；驳回需填原因，退回改金额、责任类型或处理方式后重新报备。</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="height: 34px; box-sizing: border-box; display: flex; align-items: center; font-size: 13px; font-weight: 600; color: #ffffff; background: #3d5fc4; border-radius: 6px; padding: 0px 16px;">批准并通知工厂寄出</div>
+              <div style="height: 34px; box-sizing: border-box; display: flex; align-items: center; font-size: 13px; font-weight: 500; color: #2f4aa0; background: #ffffff; border: 1px solid #c7d2f2; border-radius: 6px; padding: 0px 14px;">改建议比例后批准</div>
+              <div style="height: 34px; box-sizing: border-box; display: flex; align-items: center; font-size: 13px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 6px; padding: 0px 14px;">驳回</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: row; gap: 12px; align-items: flex-start;">
+        <div style="width: 92px; flex-shrink: 0; font-size: 12px; color: #98a2b3; padding-top: 2px;">待执行</div>
+        <div style="flex: 1; font-size: 12px; color: #98a2b3; line-height: 1.6;">工厂工作台生成寄件任务 + 发起比例协商 → 等工厂回填单号（超 3 个工作日催）→ 单号回复客户（待审草稿）→ 登记完成；协商：等工厂在工厂工作台答复（超 3 个工作日催）→ 确认比例 → 月度对账结算</div>
+      </div>
+    </div>
+
+    <!-- 右栏 -->
+    <div style="width: 400px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px;">
+      <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">登记信息</div>
+          <div style="font-size: 11px; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px;">自动填写中 · 12 / 16</div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 16px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">售后单号</div><div style="font-weight: 500;">S-20260911-0018</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">处理方式</div><div style="font-weight: 500;">寄配件</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">责任类型</div><div style="font-weight: 500;">产品质量问题</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">判定方式</div><div style="font-weight: 500;">AI 建议，王磊确认</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">配件号</div><div style="font-weight: 500;">FC-V2-HF01 ×1</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">分支</div><div style="font-weight: 500;">良仓无货</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">快递单号</div><div style="font-weight: 500; color: #98a2b3;">待工厂回填</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">产品成本</div><div style="font-weight: 500;">$3.20</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">运费</div><div style="font-weight: 500;">$11.50</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">额外赔偿</div><div style="font-weight: 500;">$0</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">其他费用</div><div style="font-weight: 500;">$0</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">报备</div><div style="font-weight: 500; color: #b54708;">快递费用 · 待审批</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">承担比例</div><div style="font-weight: 500; color: #98a2b3;">建议工厂 100% · 待协商</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">协商状态</div><div style="font-weight: 500; color: #98a2b3;">未发起</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">结算状态</div><div style="font-weight: 500; color: #98a2b3;">待协商</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; gap: 8px;"><div style="color: #667085;">登记方式</div><div style="font-weight: 500;">自动</div></div>
+        </div>
+        <div style="font-size: 12px; color: #3d5fc4; border-top: 1px solid #f2f4f7; padding-top: 8px;">在登记台账中查看</div>
+      </div>
+
+      <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">客户与订单</div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <div style="font-size: 14px; font-weight: 600;">Laura Bennett</div>
+          <div style="font-size: 12px; color: #667085;">l.bennett.9q3f@marketplace.amazon.com · 亚马逊 US</div>
+        </div>
+        <div style="display: flex; flex-direction: row; gap: 10px; align-items: center; padding: 8px 10px; background: #f6f7f9; border-radius: 6px;">
+          <div style="width: 36px; height: 36px; border-radius: 6px; background: #e3e6eb; flex-shrink: 0;"></div>
+          <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0px;">
+            <div style="font-size: 13px; font-weight: 500;">Forcome 车载吸尘器 V2 · 黑色</div>
+            <div style="font-size: 12px; color: #667085;">111-2233445-5566778 · 购买 2026-08-02 · 保修内</div>
+          </div>
+        </div>
+        <div style="font-size: 12px; color: #475467; line-height: 1.5; background: #f6f7f9; border-radius: 6px; padding: 8px 10px;">客户原话：滤芯用了一个月发黄发硬，吸力明显下降，附了两张照片。情绪中性。</div>
+      </div>
+
+      <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">工厂协同 · 东莞生产厂</div><div style="font-size: 12px; color: #3d5fc4;">打开沟通</div></div>
+        <div style="font-size: 12px; color: #475467; line-height: 1.5;"><span style="color: #98a2b3;">陈工 09:38</span> 这批滤芯是 7 月那批料吗？如果是，直接按质量问题处理。</div>
+        <div style="font-size: 12px; color: #475467; line-height: 1.5;"><span style="color: #98a2b3;">王磊 09:52</span> 是，对应 7 月批次，照片已附。</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

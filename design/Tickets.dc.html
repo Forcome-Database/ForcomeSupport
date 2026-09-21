@@ -1,0 +1,216 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; color: #1c2129; -webkit-font-smoothing: antialiased; }
+    a { color: #3d5fc4; } a:hover { color: #2f4aa0; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; background: #f6f7f9; display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- 顶栏 -->
+  <div style="height: 56px; box-sizing: border-box; background: #ffffff; border-bottom: 1px solid #e3e6eb; display: flex; align-items: center; justify-content: space-between; padding: 0px 20px;">
+    <div style="display: flex; align-items: center; gap: 28px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 26px; height: 26px; border-radius: 7px; background: #3d5fc4; display: flex; align-items: center; justify-content: center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v9a2 2 0 0 1-2 2H9l-5 4z"></path></svg>
+        </div>
+        <div style="font-size: 15px; font-weight: 600;">Forcome Support</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">收件箱</div>
+        <div style="font-size: 13px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 6px; padding: 6px 12px;">工单</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">售后</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">动作审批</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">知识库</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">报表</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">设置</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="width: 260px; height: 34px; box-sizing: border-box; background: #f6f7f9; border: 1px solid #e3e6eb; border-radius: 6px; display: flex; align-items: center; gap: 8px; padding: 0px 10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#98a2b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <div style="font-size: 13px; color: #98a2b3;">搜索工单、订单号、客户邮箱</div>
+      </div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475467" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10 21h4"></path></svg>
+      <div style="width: 30px; height: 30px; border-radius: 999px; background: #d1fadf; color: #067647; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">婷</div>
+    </div>
+  </div>
+
+  <div style="flex: 1; padding: 24px 28px; display: flex; flex-direction: column; gap: 20px; min-height: 0px;">
+
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <div style="font-size: 20px; font-weight: 600;">工单</div>
+        <div style="font-size: 13px; color: #667085;">全部渠道 · 全部店铺 · 2026-09-11</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="height: 36px; box-sizing: border-box; display: flex; align-items: center; font-size: 13px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 6px; padding: 0px 14px;">导出</div>
+        <div style="height: 36px; box-sizing: border-box; display: flex; align-items: center; font-size: 13px; font-weight: 600; color: #ffffff; background: #3d5fc4; border-radius: 6px; padding: 0px 16px;">新建工单</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
+      <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px;">
+        <div style="font-size: 12px; color: #667085;">待处理</div>
+        <div style="font-size: 24px; font-weight: 600;">27</div>
+      </div>
+      <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px;">
+        <div style="font-size: 12px; color: #667085;">待审草稿</div>
+        <div style="font-size: 24px; font-weight: 600; color: #2f4aa0;">12</div>
+      </div>
+      <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px;">
+        <div style="font-size: 12px; color: #667085;">SLA 4 小时内到期</div>
+        <div style="font-size: 24px; font-weight: 600; color: #b42318;">5</div>
+      </div>
+      <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px;">
+        <div style="font-size: 12px; color: #667085;">今日已解决 · AI 草稿采纳率</div>
+        <div style="display: flex; align-items: baseline; gap: 8px;"><div style="font-size: 24px; font-weight: 600;">41</div><div style="font-size: 14px; font-weight: 500; color: #067647;">68%</div></div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="font-size: 12px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 999px; padding: 5px 12px;">状态：全部</div>
+      <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">渠道：全部</div>
+      <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">店铺：全部</div>
+      <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">意图：全部</div>
+      <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">情绪：全部</div>
+      <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">标签：全部</div>
+      <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">负责人：全部</div>
+      <div style="font-size: 12px; color: #667085; margin-left: 4px;">按 SLA 剩余时间排序</div>
+    </div>
+
+    <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column;">
+      <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) 96px 130px 110px 90px 100px 80px 110px 90px; gap: 12px; padding: 10px 16px; background: #f6f7f9; border-bottom: 1px solid #e3e6eb; font-size: 11px; font-weight: 600; color: #667085; letter-spacing: 0.04em;">
+        <div>工单号</div><div>主题</div><div>渠道</div><div>客户</div><div>意图</div><div>情绪</div><div>状态</div><div>负责人</div><div>SLA 剩余</div><div>更新</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) 96px 130px 110px 90px 100px 80px 110px 90px; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center;">
+        <div style="color: #667085;">T-20260910-0184</div>
+        <div style="display: flex; align-items: center; gap: 6px; min-width: 0px;"><div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Gerät funktioniert nach 2 Wochen nicht mehr</div><span style="font-size: 10px; font-weight: 500; color: #475467; background: #f2f4f7; border: 1px solid #e3e6eb; border-radius: 999px; padding: 1px 7px; white-space: nowrap;">差评风险</span></div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">亚马逊 DE</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Jonas Weber</div>
+        <div>退货与退款</div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #d92d20;"></div><div>负面</div></div>
+        <div><span style="font-size: 11px; font-weight: 600; color: #b42318; background: #fee4e2; border-radius: 4px; padding: 3px 8px;">转人工 · 风险</span></div>
+        <div>未分配</div>
+        <div style="font-weight: 600; color: #b42318;">0h 55m</div>
+        <div style="color: #667085;">昨天 11:15</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) 96px 130px 110px 90px 100px 80px 110px 90px; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center;">
+        <div style="color: #667085;">T-20260910-0192</div>
+        <div style="display: flex; align-items: center; gap: 6px; min-width: 0px;"><div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tracking hasn't updated since Sep 6</div><span style="font-size: 10px; font-weight: 500; color: #475467; background: #f2f4f7; border: 1px solid #e3e6eb; border-radius: 999px; padding: 1px 7px; white-space: nowrap;">路途急</span></div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">亚马逊 US</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Sarah Mitchell</div>
+        <div>未收到与异常</div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #d92d20;"></div><div>负面</div></div>
+        <div><span style="font-size: 11px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 3px 8px;">待审草稿</span></div>
+        <div>李婷</div>
+        <div style="font-weight: 600; color: #b54708;">5h 40m</div>
+        <div style="color: #667085;">昨天 16:01</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) 96px 130px 110px 90px 100px 80px 110px 90px; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center;">
+        <div style="color: #667085;">T-20260910-0195</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Received the wrong color, ordered black</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">亚马逊 US</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Marcus Lee</div>
+        <div>到货问题</div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #d92d20;"></div><div>负面</div></div>
+        <div><span style="font-size: 11px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 3px 8px;">待审草稿</span></div>
+        <div>王磊</div>
+        <div style="font-weight: 500;">11h 10m</div>
+        <div style="color: #667085;">昨天 21:30</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) 96px 130px 110px 90px 100px 80px 110px 90px; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center;">
+        <div style="color: #667085;">T-20260910-0181</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Thanks, the replacement arrived!</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">亚马逊 UK</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Oliver Grant</div>
+        <div>无需回复</div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #12b76a;"></div><div>正面</div></div>
+        <div><span style="font-size: 11px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 3px 8px;">建议关闭</span></div>
+        <div>李婷</div>
+        <div style="font-weight: 500;">22h 40m</div>
+        <div style="color: #667085;">09:00</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) 96px 130px 110px 90px 100px 80px 110px 90px; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center;">
+        <div style="color: #667085;">T-20260910-0176</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Does the V2 fit a Tesla Model Y 12V socket?</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px;">Shopify</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Emily Chen</div>
+        <div>产品咨询</div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #98a2b3;"></div><div>中性</div></div>
+        <div><span style="font-size: 11px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 3px 8px;">待审草稿</span></div>
+        <div>未分配</div>
+        <div style="color: #667085;">无 SLA</div>
+        <div style="color: #667085;">昨天 11:48</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) 96px 130px 110px 90px 100px 80px 110px 90px; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center;">
+        <div style="color: #667085;">T-20260910-0170</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Can I change my shipping address?</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px;">Shopify</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Priya Raman</div>
+        <div>修改订单</div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #98a2b3;"></div><div>中性</div></div>
+        <div><span style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 3px 8px;">等内部</span></div>
+        <div>王磊</div>
+        <div style="color: #667085;">无 SLA</div>
+        <div style="color: #667085;">昨天 10:05</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) 96px 130px 110px 90px 100px 80px 110px 90px; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center;">
+        <div style="color: #667085;">T-20260909-0142</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Wholesale pricing for 200 units?</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 2px 6px;">直邮</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Ana Souza</div>
+        <div>批发与合作</div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #98a2b3;"></div><div>中性</div></div>
+        <div><span style="font-size: 11px; font-weight: 600; color: #b42318; background: #fee4e2; border-radius: 4px; padding: 3px 8px;">转人工</span></div>
+        <div>陈晨</div>
+        <div style="color: #667085;">无 SLA</div>
+        <div style="color: #667085;">09-09</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) 96px 130px 110px 90px 100px 80px 110px 90px; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center;">
+        <div style="color: #667085;">T-20260909-0131</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Filter replacement schedule</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px;">Shopify</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">David Park</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">产品故障与使用问题</div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #98a2b3;"></div><div>中性</div></div>
+        <div><span style="font-size: 11px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 3px 8px;">已解决</span></div>
+        <div>李婷</div>
+        <div style="color: #667085;">无 SLA</div>
+        <div style="color: #667085;">09-09</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) 96px 130px 110px 90px 100px 80px 110px 90px; gap: 12px; padding: 12px 16px; font-size: 13px; align-items: center;">
+        <div style="color: #667085;">T-20260908-0097</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Refund not showing on my card yet</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">亚马逊 US</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Hannah Ross</div>
+        <div>退货与退款</div>
+        <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #d92d20;"></div><div>负面</div></div>
+        <div><span style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 3px 8px;">等内部</span></div>
+        <div>陈晨</div>
+        <div style="color: #667085;">无 SLA</div>
+        <div style="color: #667085;">09-08</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

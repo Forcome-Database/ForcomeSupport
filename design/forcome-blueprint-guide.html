@@ -1,0 +1,500 @@
+<title>Forcome Support 产品蓝图</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@500&amp;display=swap">
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #ffffff; --surface-2: #eef0f4; --line: #dfe3ea; --line-strong: #c9cfd8;
+    --ink: #1c2129; --ink-2: #4b5563; --ink-3: #66707f;
+    --accent: #3556b8; --accent-ink: #2a4494; --accent-bg: #e6ebf8; --accent-line: #c3cff0;
+    --ok: #0f7a4d; --ok-bg: #d8f3e4; --warn: #a35a0c; --warn-bg: #fbeccd; --bad: #b12a22; --bad-bg: #fbe1de; --flow: #5b21b6; --flow-bg: #ebe5fb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151b; --surface: #1a1e26; --surface-2: #222835; --line: #2c3340; --line-strong: #3a4353;
+      --ink: #e8ebf1; --ink-2: #b4bccb; --ink-3: #8c96a8;
+      --accent: #8ea6f2; --accent-ink: #b7c6f7; --accent-bg: #23305a; --accent-line: #34478a;
+      --ok: #6fd3a3; --ok-bg: #163527; --warn: #f0b76a; --warn-bg: #3d2c12; --bad: #f19b93; --bad-bg: #3f1f1c; --flow: #c4b0f5; --flow-bg: #2c2148;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151b; --surface: #1a1e26; --surface-2: #222835; --line: #2c3340; --line-strong: #3a4353;
+    --ink: #e8ebf1; --ink-2: #b4bccb; --ink-3: #8c96a8;
+    --accent: #8ea6f2; --accent-ink: #b7c6f7; --accent-bg: #23305a; --accent-line: #34478a;
+    --ok: #6fd3a3; --ok-bg: #163527; --warn: #f0b76a; --warn-bg: #3d2c12; --bad: #f19b93; --bad-bg: #3f1f1c; --flow: #c4b0f5; --flow-bg: #2c2148;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; font-size: 14.5px; line-height: 1.6; padding-inline: 20px; padding-block: 0 72px; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  header.doc { padding-block: 40px 20px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--ink-3); }
+  h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.2; margin: 0; text-wrap: balance; }
+  .docmeta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; font-size: 13px; }
+  .docmeta div { display: flex; flex-direction: column; gap: 2px; }
+  .docmeta b { font-size: 11.5px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.04em; }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; padding-block: 10px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 2; }
+  nav.toc a { color: var(--ink-2); } nav.toc a:hover { color: var(--accent); text-decoration: none; }
+  section { padding-block: 36px 4px; display: flex; flex-direction: column; gap: 12px; scroll-margin-top: 96px; }
+  h2 { font-size: 21px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  h2 small { font-size: 12.5px; font-weight: 500; color: var(--ink-3); margin-left: 10px; }
+  h3 { font-size: 14.5px; font-weight: 600; margin: 4px 0 0 0; }
+  p { margin: 0; max-width: 72ch; }
+  .muted { color: var(--ink-2); }
+  ul.plain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; max-width: 76ch; }
+  ul.plain li::marker { color: var(--ink-3); }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 11px; border-bottom: 1px solid var(--line); }
+  th { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink-3); background: var(--surface-2); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td.k { font-weight: 600; white-space: nowrap; }
+  td.num { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tag { display: inline-block; font-size: 11.5px; font-weight: 600; border-radius: 4px; padding: 2px 7px; white-space: nowrap; }
+  .tag.ok { color: var(--ok); background: var(--ok-bg); } .tag.draft { color: var(--accent-ink); background: var(--accent-bg); }
+  .tag.warn { color: var(--warn); background: var(--warn-bg); } .tag.bad { color: var(--bad); background: var(--bad-bg); }
+  .tag.flow { color: var(--flow); background: var(--flow-bg); } .tag.neutral { color: var(--ink-2); background: var(--surface-2); }
+  .tag.p0 { color: var(--bad); background: var(--bad-bg); } .tag.p1 { color: var(--warn); background: var(--warn-bg); } .tag.p2 { color: var(--ink-2); background: var(--surface-2); }
+  .strip { display: flex; align-items: stretch; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+  .strip .node { flex: 1; min-width: 140px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+  .strip .node b { font-size: 13px; } .strip .node span { font-size: 12px; color: var(--ink-2); line-height: 1.45; }
+  .strip .node.hi { background: var(--accent-bg); border-color: var(--accent-line); } .strip .node.hi b { color: var(--accent-ink); } .strip .node.hi span { color: var(--accent-ink); }
+  .strip .node.risk { border-color: var(--bad); }
+  .strip .arrow { display: flex; align-items: center; color: var(--ink-3); flex-shrink: 0; }
+  .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .card b { font-size: 13.5px; } .card span, .card p, .card li { font-size: 13px; color: var(--ink-2); }
+  .card ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+  .ref { font-size: 12.5px; color: var(--ink-3); }
+  .timeline { display: flex; flex-direction: column; border-left: 2px solid var(--line-strong); margin-left: 8px; }
+  .step { display: grid; grid-template-columns: 100px minmax(0, 1fr) 210px; gap: 14px; padding: 11px 0 11px 20px; position: relative; border-bottom: 1px solid var(--line); }
+  .step:last-child { border-bottom: none; }
+  .step::before { content: ""; position: absolute; left: -7px; top: 16px; width: 12px; height: 12px; border-radius: 999px; background: var(--accent); border: 2px solid var(--accent); }
+  .step.human::before { background: var(--warn-bg); border-color: var(--warn); }
+  .step .t { font-size: 12px; color: var(--ink-3); font-family: "IBM Plex Mono", monospace; padding-top: 2px; }
+  .step .what b { font-size: 13.5px; display: block; margin-bottom: 1px; } .step .what span { font-size: 13px; color: var(--ink-2); }
+  .step .where { font-size: 12.5px; color: var(--ink-2); }
+  .step .where b { display: block; font-size: 11.5px; color: var(--ink-3); font-weight: 600; letter-spacing: 0.04em; }
+  footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; }
+  @media (max-width: 760px) {
+    .docmeta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .two, .three { grid-template-columns: 1fr; }
+    .step { grid-template-columns: 1fr; gap: 6px; }
+    section { scroll-margin-top: 130px; }
+    h1 { font-size: 26px; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="doc">
+    <div class="eyebrow">产品需求文档 · PRD</div>
+    <h1>Forcome Support 智能客服系统</h1>
+    <div class="docmeta">
+      <div><b>版本</b><span>v1.3 评审稿 · 2026-09-21</span></div>
+      <div><b>状态</b><span>待客户确认第 12 节事项后定稿</span></div>
+      <div><b>读者</b><span>客户决策者、客服与流程负责人、IT</span></div>
+      <div><b>配套</b><span><a href="https://claude.ai/code/artifact/dda6d1a2-41b4-4c97-8ac6-491808a914b5">设计画布</a> · <a href="https://claude.ai/code/artifact/0a2277b6-0eb9-424a-8dca-011885168406">决策记录</a></span></div>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <a href="#s1">1 背景</a><a href="#s2">2 目标</a><a href="#s3">3 用户与场景</a><a href="#s4">4 范围</a><a href="#s5">5 核心流程</a><a href="#s6">6 规则</a><a href="#s7">7 一张工单的一天</a><a href="#s8">8 界面</a><a href="#s9">9 系统与集成</a><a href="#s10">10 非功能与合规</a><a href="#s11">11 里程碑</a><a href="#s12">12 风险与待确认</a>
+  </nav>
+
+  <section id="s1">
+    <h2>1 背景与问题</h2>
+    <div class="three">
+      <div class="card"><b>回信工具只能回信</b><span>现用海帆能起草邮件，不能改 Shopify 订单，不能在积加创建售后发货单。最耗时的操作仍是人工在多个后台之间切换。</span></div>
+      <div class="card"><b>售后流程靠手工推进和登记</b><span>配件补发要在邮件、工厂、良仓、积加之间来回，最后人工把单号、配件号、费用登记进表格，漏登与对账不上是常态。</span></div>
+      <div class="card"><b>报表靠人工导出</b><span>日常数据从积加导出再整理，管理层看不到实时的工单量、SLA 与售后成本。</span></div>
+    </div>
+    <p class="muted">业务范围：亚马逊 US / DE / UK 自发货与良仓海外仓、Shopify 独立站、工厂配件补发。亚马逊与 Shopify 均为多店铺。接入只有两条线：亚马逊站内信经积加收发，Shopify 客户来信与直邮走 Gmail 客服邮箱；订单、库存、发货、费用统一从积加读取。与工厂的衔接和沟通全部在系统内的工厂工作台完成，不走邮件。客户给出的优先级：报表先行，售后流程其次，AI 回信最后。FSH 是销售公司（总部运营团队），工厂是同一集团的生产厂，不是外部供应商；两者之间是内部协同与内部结算。</p>
+  </section>
+
+  <section id="s2">
+    <h2>2 目标与指标 <small>现状值待客户提供，目标值为建议</small></h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>指标</th><th>定义</th><th>现状</th><th>目标</th><th>达成阶段</th></tr></thead>
+      <tbody>
+        <tr><td class="k">报表时效</td><td>从数据产生到可查看</td><td>人工导出，按周</td><td class="num">T+1 自动</td><td>一</td></tr>
+        <tr><td class="k">售后登记完整率</td><td>登记台账字段齐全的售后单占比</td><td>待测</td><td class="num">≥ 98%</td><td>一</td></tr>
+        <tr><td class="k">售后单人工操作次数</td><td>从来信到寄出，人工点击的环节数</td><td>待测</td><td class="num">≤ 2 次</td><td>二</td></tr>
+        <tr><td class="k">售后单处理时长</td><td>来信到快递单号回复客户</td><td>待测</td><td class="num">缩短 50%</td><td>二</td></tr>
+        <tr><td class="k">亚马逊 24h SLA 达标率</td><td>24 小时内回复的买家消息占比</td><td>待测</td><td class="num">≥ 99%</td><td>二</td></tr>
+        <tr><td class="k">草稿采纳率</td><td>坐席未修改直接发送的 AI 草稿占比</td><td>无</td><td class="num">≥ 80%</td><td>三</td></tr>
+        <tr><td class="k">自动发送占比</td><td>无人工参与即发出的回复占比</td><td>无</td><td class="num">≥ 40%</td><td>三</td></tr>
+        <tr><td class="k">首响时长中位数</td><td>来信到第一次回复</td><td>待测</td><td class="num">≤ 2 小时</td><td>三</td></tr>
+      </tbody>
+    </table></div>
+    <h3>非目标</h3>
+    <ul class="plain">
+      <li>不做面向客户的自助聊天窗口或电话客服。</li>
+      <li>不替代积加的订单、库存、发货管理，只读写必要字段。</li>
+      <li>第一、二阶段不追求全自动回信；AI 回信在第三阶段替换海帆。</li>
+    </ul>
+  </section>
+
+  <section id="s3">
+    <h2>3 用户与场景</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>用户</th><th>核心场景</th><th>系统给他的东西</th></tr></thead>
+      <tbody>
+        <tr><td class="k">坐席</td><td>处理待审草稿、确认高风险动作、处理转人工工单、按操作清单在平台后台执行动作</td><td>收件箱、原文与译文切换、对话与客户摘要、3 版草稿可换、手工标签、动作审批</td></tr>
+        <tr><td class="k">客服主管</td><td>盯 SLA 与积压、分配工单、审批报备、决定哪些意图放开自动发送</td><td>工单列表、报表、报备队列、设置中的发送方式与售后规则</td></tr>
+        <tr><td class="k">售后与流程负责人</td><td>确认责任类型与处理方式、与工厂协商承担比例、跟进工厂与良仓、月度对账</td><td>售后工单详情、登记台账、待协商与待结算视图、导出</td></tr>
+        <tr><td class="k">工厂对接人</td><td>报价、确认寄出并回填单号、答复承担比例提案、确认月度对账、就单留言</td><td>工厂工作台：同一系统里的生产厂角色，只含本厂待办、结构化表单、本单沟通；企业即时通讯提醒</td></tr>
+        <tr><td class="k">知识库负责人</td><td>维护产品事实、政策、故障排查树、模板；处理知识缺口</td><td>知识库四层管理、缺口清单、沉淀审核</td></tr>
+        <tr><td class="k">管理层</td><td>看工单量、SLA、售后成本、自动化率</td><td>报表</td></tr>
+        <tr><td class="k">IT 与管理员</td><td>接入渠道、配置规则与权限、排查异常</td><td>设置、审计日志、执行日志</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="s4">
+    <h2>4 产品范围 <small>P0 必须、P1 应该、P2 可以</small></h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>模块</th><th>功能</th><th>优先级</th><th>阶段</th></tr></thead>
+      <tbody>
+        <tr><td class="k">报表</td><td>工单量、首响、SLA 达标率、采纳率；售后费用按配件、站点、责任类型与承担比例汇总；数据来自积加与工单</td><td><span class="tag p0">P0</span></td><td>一</td></tr>
+        <tr><td class="k">登记台账</td><td>售后单统一登记、导出、同步积加、待结算视图</td><td><span class="tag p0">P0</span></td><td>一</td></tr>
+        <tr><td class="k">渠道接入</td><td>积加：亚马逊多店铺站内信收发，各店铺订单、库存、发货、费用；Gmail：每个 Shopify 店铺的客服邮箱、直邮；进线即识别店铺</td><td><span class="tag p0">P0</span></td><td>一、二</td></tr>
+        <tr><td class="k">工单</td><td>跨渠道归并、状态机、SLA 计时、分配、合并、内部备注、客户档案；手工标签、原文与译文切换、对话与客户历史摘要</td><td><span class="tag p0">P0</span></td><td>二</td></tr>
+        <tr><td class="k">售后流程引擎</td><td>处理方式三类、责任判定、费用四项、报备两类、承担比例协商、两条寄件分支、催办超时、登记自动写入、例外路径</td><td><span class="tag p0">P0</span></td><td>二</td></tr>
+        <tr><td class="k">工厂工作台</td><td>工厂账号与数据隔离；询价、寄件、比例协商、月度对账四类任务；结构化表单直写台账；本单沟通留言与附件；企业即时通讯提醒与超时催办</td><td><span class="tag p0">P0</span></td><td>二</td></tr>
+        <tr><td class="k">动作执行与审批</td><td>统一动作接口加 MCP 适配器，第一阶段只接积加 MCP；三档风险分级，审批与报备队列；积加做不了的动作生成人工操作清单；审计日志</td><td><span class="tag p0">P0</span></td><td>二</td></tr>
+        <tr><td class="k">AI 回信</td><td>五步处理、12 条处理规则、草稿 3 版可换、依据、按客户语言回复、发送方式配置；邮件渠道草稿可插入素材库图片与白名单链接，亚马逊站内信按纯文字生成</td><td><span class="tag p0">P0</span></td><td>三</td></tr>
+        <tr><td class="k">知识库</td><td>四层结构、混合检索、缺口清单、工单沉淀审核</td><td><span class="tag p0">P0</span></td><td>三</td></tr>
+        <tr><td class="k">设置与权限</td><td>渠道、店铺管理与店铺级配置覆盖、发送方式与阈值、风险信号、售后规则、标签库、按店铺的数据范围权限</td><td><span class="tag p1">P1</span></td><td>二、三</td></tr>
+        <tr><td class="k">MCP 接入</td><td>亚马逊 MCP、Shopify MCP 接入统一动作接口，替换人工操作清单</td><td><span class="tag p2">P2</span></td><td>三</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="s5">
+    <h2>5 核心流程</h2>
+    <h3>5.1 每封来信的五步处理</h3>
+    <div class="strip">
+      <div class="node"><b>1 接收与关联</b><span>识别来源与店铺；按订单号、亚马逊匿名邮箱、Shopify 邮箱关联该店铺的积加订单；追加或新建工单</span></div>
+      <div class="arrow">→</div>
+      <div class="node risk"><b>2 风险拦截</b><span>对照风险信号清单，命中即转人工并标明原因</span></div>
+      <div class="arrow">→</div>
+      <div class="node hi"><b>3 理解与处理</b><span>识别意图与信息；按处理规则查数据、提出动作；草稿默认 3 版，按解决方案区分；缺信息一次问全</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>4 回复检查</b><span>事实有来源、不越政策、符合渠道内容能力、语言与客户一致、不泄露内部信息</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>5 发送方式</b><span>自动发送 / 待审草稿 / 动作审批后发 / 转人工，按意图配置</span></div>
+    </div>
+    <p class="muted">步骤固定，规则可配置。规则定义只在第 6 节，画布上的"AI Agent 决策逻辑"图与本节一致。</p>
+
+    <h3>5.2 售后流程</h3>
+    <div class="two">
+      <div class="card"><b>共同入口</b><p>产品故障先按故障排查树给步骤。排查不成，AI 建议处理方式（三选一）与责任类型（四选一）并附依据；售后负责人确认或改判后创建售后单，估算四项费用。定义见第 6.5 节。</p></div>
+      <div class="card"><b>统一登记台账</b><p>所有处理方式写同一张表：售后单号、原工单、客户与站点、处理方式、责任类型与依据、配件号与数量、分支、快递单号、产品成本、运费、额外赔偿、其他、报备类型与状态、承担比例、协商状态、结算状态、登记方式。字段在流程推进中自动填齐，人工只补缺失项。</p></div>
+      <div class="card"><b>调整安装方式</b><p>草稿给安装或使用指导（待审草稿）→ 等客户 7 天 → 解决则关闭并登记，责任默认客户使用问题、费用 0；未解决改为寄配件</p></div>
+      <div class="card"><b>退款 / 部分补偿</b><p>金额提案 → 报备额外赔偿 <span class="tag warn">客服主管</span> → 执行付款（MCP 接入前按操作清单人工完成并回填）→ 回复客户 → 登记 → 进承担比例协商。换新走寄配件线，配件换整机</p></div>
+      <div class="card"><b>寄配件 · 良仓无货，工厂直寄</b><p>工厂工作台派发询价单并推送即时消息 → 工厂在工厂工作台报价（超 2 个工作日催）→ 报备快递费用 <span class="tag warn">客服主管</span> → 工厂工作台生成寄件任务并显示完整收件信息，同时发起比例协商 → 工厂回填单号与实际运费（超 3 个工作日催）→ 单号回复客户 → 登记完成</p></div>
+      <div class="card"><b>寄配件 · 良仓有货，良仓发货</b><p>按积加费率估算运费 → 报备快递费用，附发货单参数 <span class="tag warn">客服主管</span> → 通过即经积加 MCP 创建售后发货单 → 良仓发出，实际运费从积加读取 → 单号回复客户 → 登记完成 → 进承担比例协商</p></div>
+      <div class="card"><b>承担比例协商，与寄件并行</b><p>系统按责任类型给建议比例 → 工厂工作台发起分摊提案，附依据与照片 → 工厂在工厂工作台接受、还价或拒绝（超 3 个工作日催）→ 接受即生效，还价由负责人确认 <span class="tag warn">人工</span> → 月度按比例对账 → 结算后标"已结算"。客户不等协商结果。</p></div>
+      <div class="card"><b>三个人工点之外，其余自动</b><p>责任与处理方式确认（售后负责人）、报备（客服主管）、协商比例录入（售后负责人）是人工；发货单由报备通过直接触发，不再单独确认；派发工厂工作台任务、催办、写台账、发起协商全部自动；工厂填的是结构化表单，不再解析邮件。谈不拢的比例升级双方负责人。</p></div>
+    </div>
+    <h3>5.3 例外路径</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>例外</th><th>系统动作</th><th>人工动作</th></tr></thead>
+      <tbody>
+        <tr><td class="k">工厂超时不回</td><td>工厂工作台与即时消息按 2 个工作日与 3 个工作日两级自动催办；第二次催办无果标"卡住"并提醒负责人</td><td>负责人电话或改走良仓分支</td></tr>
+        <tr><td class="k">报备被驳回</td><td>记录驳回原因，退回上一步改金额、责任类型或处理方式后重新报备</td><td>驳回时必须填原因</td></tr>
+        <tr><td class="k">工厂不接受承担比例</td><td>协商状态标"待升级"，寄件与结算登记照常</td><td>负责人升级双方负责人；期间可先按 FSH 垫付记账</td></tr>
+        <tr><td class="k">客户中途改地址</td><td>寄出前更新售后单地址并重新通知工厂或良仓；寄出后提示改派或补发</td><td>寄出后由负责人决定</td></tr>
+        <tr><td class="k">良仓库存在创建发货单时已用尽</td><td>发货单失败，自动切到无货分支，报备沿用，通知负责人</td><td>无</td></tr>
+        <tr><td class="k">客户在流程中再次来信</td><td>归并到同一工单，重复联系计数加一，第 2 次升优先级、第 3 次转人工</td><td>按优先级处理</td></tr>
+        <tr><td class="k">AI 回复被坐席判定为错</td><td>记录修改或拒绝原因，计入采纳率；连续错误的意图自动降回待审草稿</td><td>坐席可一键标记"知识错误"，进知识缺口清单</td></tr>
+      </tbody>
+    </table></div>
+    <div class="ref">流程图：画布"架构与流程"页的"售后流程"与"产品全生命周期"。</div>
+  </section>
+
+  <section id="s6">
+    <h2>6 规则 <small>本节是所有规则的唯一定义处</small></h2>
+    <h3>6.1 意图与处理规则（12 条）</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>意图</th><th>阶段</th><th>需要的信息</th><th>查什么</th><th>允许的动作</th><th>默认发送方式</th></tr></thead>
+      <tbody>
+        <tr><td class="k">产品咨询</td><td>售前</td><td>产品型号或链接</td><td>产品事实表、手册、兼容表</td><td>无</td><td><span class="tag draft">待审草稿</span></td></tr>
+        <tr><td class="k">购买咨询</td><td>售前</td><td>站点、目的国</td><td>促销与物流配置、积加库存</td><td>无；亚马逊只陈述事实</td><td><span class="tag draft">待审草稿</span></td></tr>
+        <tr><td class="k">批发与合作</td><td>售前</td><td>无</td><td>无</td><td>无</td><td><span class="tag bad">转销售</span></td></tr>
+        <tr><td class="k">订单查询</td><td>售后</td><td>订单号或收件邮箱</td><td>积加订单与物流</td><td>只读；仅在途且正常的订单</td><td><span class="tag ok">自动发送</span></td></tr>
+        <tr><td class="k">未收到与异常</td><td>售后</td><td>订单号；签收未收到需投递证明</td><td>物流轨迹；停滞满 5 天或超预计送达视为异常</td><td>查件（低）、补发（高）</td><td><span class="tag warn">承诺补发时审批后发</span></td></tr>
+        <tr><td class="k">修改订单</td><td>售后</td><td>新地址或取消原因</td><td>履约状态</td><td>改地址、取消（高），仅未发货</td><td><span class="tag warn">动作审批后发</span></td></tr>
+        <tr><td class="k">到货问题</td><td>售后</td><td>照片、实际收到的物品</td><td>订单明细、积加发货记录</td><td>补发或退款（高）</td><td><span class="tag warn">动作审批后发</span></td></tr>
+        <tr><td class="k">产品故障与使用问题</td><td>售后</td><td>症状、购买日期</td><td>故障排查树、保修期</td><td>排查步骤；未解决创建售后单</td><td><span class="tag flow">先排查，再进流程</span></td></tr>
+        <tr><td class="k">退货与退款</td><td>售后</td><td>订单号、原因</td><td>站点退货政策与窗口</td><td>退货指引（低）、退款（高）</td><td><span class="tag warn">退款审批后发</span></td></tr>
+        <tr><td class="k">保修与配件购买</td><td>售后</td><td>配件号或症状、购买日期</td><td>配件表、保修条款、报价</td><td>报价（低）；付款后创建售后单</td><td><span class="tag draft">待审草稿</span></td></tr>
+        <tr><td class="k">发票与收据</td><td>售后</td><td>订单号</td><td>平台发票或积加</td><td>生成并附发票（低）</td><td><span class="tag ok">自动发送</span></td></tr>
+        <tr><td class="k">评价与反馈</td><td>售后</td><td>无</td><td>无</td><td>无；亚马逊限制此类沟通</td><td><span class="tag bad">转人工</span></td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted">非业务消息：致谢与确认（标记无需回复、建议关闭）、其他供应商邮件（转人工；生产厂若仍发邮件，转人工并提醒改用工厂工作台）、通知与垃圾（归档）。多意图取主意图决定规则，次意图同一封回复顺带回答。新增意图门槛：占比超 3% 且解决路径不同。</p>
+
+    <h3>6.2 风险信号（第 2 步，命中即转人工）</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>信号</th><th>判定</th><th>优先级</th></tr></thead>
+      <tbody>
+        <tr><td class="k">安全事故</td><td>起火、冒烟、过热、烫伤、电池鼓包</td><td><span class="tag bad">最高</span> 人工处理并留档</td></tr>
+        <tr><td class="k">平台风险</td><td>提到 A-to-Z、拒付、差评或 feedback 威胁、投诉到平台、律师或法律</td><td><span class="tag bad">高</span></td></tr>
+        <tr><td class="k">重复联系</td><td>同一工单第 2 次来信未解决升一级；第 3 次强制人工</td><td><span class="tag warn">中</span></td></tr>
+        <tr><td class="k">高价值</td><td>订单金额或客户累计消费超阈值（阈值待定）</td><td><span class="tag warn">中</span></td></tr>
+        <tr><td class="k">要求真人</td><td>客户明确要求与人沟通</td><td><span class="tag warn">中</span></td></tr>
+        <tr><td class="k">无法处理的内容</td><td>不支持的语言、乱码、只有附件</td><td><span class="tag neutral">普通</span></td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted">情绪只保留负面、中性、正面三档，用于排序、报表和道歉程度，不做转人工依据。退款申请不在清单里，退款动作走审批。</p>
+
+    <h3>6.3 发送方式与动作分级</h3>
+    <div class="two">
+      <div class="card"><b>发送方式（第 5 步）</b><ul>
+        <li><span class="tag ok">自动发送</span> 置信度 ≥ 意图阈值、依据齐全、意图在白名单、回复不含承诺动作。起步白名单：订单查询、发票与收据。</li>
+        <li><span class="tag draft">待审草稿</span> 默认。坐席采纳、修改、拒绝的结果回流；连续 30 天采纳率高于 90% 的意图，由客服主管在设置页切换为自动发送，可随时切回。</li>
+        <li><span class="tag warn">动作审批后发</span> 回复承诺了补发、退款、改地址等高风险动作时，先过审批再发出。</li>
+        <li><span class="tag bad">转人工</span> 来自风险信号、规则本身、无法识别、检查不过且置信度极低。</li>
+        <li>亚马逊 SLA 保底：剩 4 小时未处理且无风险信号，自动发一条预审过的进展回复。是否启用待客户运营确认。</li>
+      </ul></div>
+      <div class="card"><b>动作分级</b><ul>
+        <li><span class="tag ok">只读</span> 查订单、库存、物流、费用。自动执行。</li>
+        <li><span class="tag draft">低风险写</span> 加备注、写登记台账、向工厂工作台派发任务与催办、向承运商查件。自动执行并留痕。</li>
+        <li><span class="tag warn">高风险写</span> 退款、改地址、取消进审批队列，审批人：客服主管或售后负责人；审批时限 4 小时，超时提醒并升级。创建发货单、通知工厂寄出涉及 FSH 快递费用，走报备（第 6.5 节），报备通过即触发，不再单独审批。</li>
+        <li><span class="tag neutral">人工操作清单</span> 统一动作接口里积加 MCP 做不了的动作（亚马逊与 Shopify 退款、Shopify 改地址、取消），审批通过后生成操作清单，坐席在平台后台完成并回填，第三阶段由 MCP 替换。</li>
+        <li>熔断：任一意图 24 小时内被拒绝或修改超过 30%，自动降回待审草稿并通知主管。</li>
+      </ul></div>
+    </div>
+    <h3>6.4 知识库四层</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>层</th><th>形态</th><th>内容</th><th>负责人</th></tr></thead>
+      <tbody>
+        <tr><td class="k">产品事实表</td><td>结构化</td><td>SKU 与变体、规格、兼容车型与电源、包装清单、配件号与适配、保修期</td><td>产品</td></tr>
+        <tr><td class="k">政策规则</td><td>结构化配置 + 说明文本</td><td>各站点退货窗口、运费承担、补发条件、责任类型与默认承担比例、亚马逊与 Shopify 差异</td><td>客服主管</td></tr>
+        <tr><td class="k">故障排查树</td><td>半结构化</td><td>症状 → 步骤 → 判定 → 配件号，先覆盖前十个高频症状</td><td>客服 + 工厂</td></tr>
+        <tr><td class="k">模板与沉淀</td><td>文本 + 素材</td><td>按意图 × 语言 × 渠道的模板；素材库（排查图示、安装视频与说明书链接，标明适用渠道与店铺）；已解决工单沉淀问答，审核后入库，带有效期</td><td>知识库负责人</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted">检索：关键词加向量混合，按产品、站点、语言过滤后重排，回复必须能指出来源。转人工与低置信工单自动进知识缺口清单，每周处理。</p>
+
+    <h3>6.5 售后责任、费用与报备</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>责任类型</th><th>AI 建议依据（人工确认才生效）</th><th>建议承担比例 FSH / 工厂</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td class="k">客户使用问题</td><td>按排查树调整安装或使用方式后解决；照片显示误用</td><td>100 / 0，或客户付费购买配件</td><td>无寄件时费用为 0</td></tr>
+        <tr><td class="k">产品质量问题</td><td>保修期内失效；照片与已知缺陷一致；排查不成</td><td>0 / 100</td><td>最常见，占多数售后单</td></tr>
+        <tr><td class="k">物流问题</td><td>轨迹丢失、破损签收、错发漏发由承运或仓端造成</td><td>100 / 0，FSH 向承运商或良仓索赔</td><td>不进工厂协商</td></tr>
+        <tr><td class="k">其他</td><td>无法归入以上三类</td><td>人工定，默认 50 / 50</td><td>逐单协商</td></tr>
+      </tbody>
+    </table></div>
+    <div class="two">
+      <div class="card"><b>处理方式与费用</b><ul>
+        <li>处理方式三选一：调整安装方式（指导解决，不寄东西）、寄配件（良仓有货或无货两条分支，换新走同一条线）、退款或部分补偿（现金，FSH 支付）。</li>
+        <li>费用四项：产品成本、运费、额外赔偿、其他。产品成本与运费来自工厂报价或积加费率，其余人工填。</li>
+        <li>责任由 AI 按上表给建议并附依据，售后负责人确认或改判后才写入售后单。</li>
+      </ul></div>
+      <div class="card"><b>报备与承担比例</b><ul>
+        <li>报备只有两类：快递费用、额外赔偿。只要由 FSH 支付就报备，与库存分支无关；审批人客服主管，时限 4 小时，无金额门槛；通过即视为该笔动作的审批。</li>
+        <li>承担比例由 FSH 与工厂逐单协商：系统按责任类型给建议比例，在工厂工作台发起分摊提案，工厂接受、还价或拒绝并写理由（超 3 个工作日自动催）；接受即生效，还价由负责人确认后写台账。</li>
+        <li>协商与寄件并行，客户不等协商结果；月度按确认比例向工厂对账，结算后台账标"已结算"。</li>
+      </ul></div>
+    </div>
+
+    <h3>6.6 渠道内容能力与富内容</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>渠道</th><th>图片</th><th>链接</th><th>生成与检查</th></tr></thead>
+      <tbody>
+        <tr><td class="k">邮件（Shopify 客户、直邮）</td><td><span class="tag ok">支持</span> 只用素材库图片</td><td><span class="tag ok">支持</span> 只用白名单域名</td><td>AI 在步骤旁插入图示，附说明书或视频链接；坐席可增删；第 4 步核对图片来自素材库、链接在白名单内且与店铺匹配</td></tr>
+        <tr><td class="k">亚马逊站内信</td><td><span class="tag bad">不支持</span></td><td><span class="tag bad">不支持</span></td><td>按纯文字生成，图示步骤改写成文字步骤；编辑器置灰插入按钮并提示原因；第 4 步发现图片或链接即判不通过，不发出</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted">渠道能力是一张配置表，生成前读取，不是发出前才删。同一份排查内容在素材库里同时有图文版与纯文字版，按渠道取用；新增渠道只加一行配置。链接白名单起步：各店铺域名、说明书与视频托管域名、承运商查询页。</p>
+  </section>
+
+  <section id="s7">
+    <h2>7 一张工单的一天 <small>示例数据，与画布原型一致</small></h2>
+    <div class="timeline">
+      <div class="step"><div class="t">09-10 16:00</div><div class="what"><b>来信经积加同步进入</b><span>关联订单 113-4567890-1234567，无未关闭工单，新建 T-20260910-0192，亚马逊 24 小时 SLA 开始计时。</span></div><div class="where"><b>第 1 步</b>接收与关联</div></div>
+      <div class="step"><div class="t">09-10 16:00</div><div class="what"><b>未命中风险信号</b><span>首次联系，无平台或安全风险。情绪负面，只用于排序。</span></div><div class="where"><b>第 2 步</b>风险拦截</div></div>
+      <div class="step"><div class="t">09-10 16:01</div><div class="what"><b>意图"未收到与异常"，执行规则</b><span>物流 9 月 6 日后无扫描且已超预计送达。自动向承运商发起查件（低风险），提出补发提案（高风险，含快递费用报备），生成 3 版回复（先补发、先查件再定、部分退款），推荐的先补发版置信度 82%，引用 3 条依据。</span></div><div class="where"><b>第 3 步</b>理解与处理</div></div>
+      <div class="step"><div class="t">09-10 16:01</div><div class="what"><b>检查通过，判为"动作审批后发"</b><span>回复承诺了补发，因此草稿进收件箱待审，补发提案进审批队列，两者绑定。</span></div><div class="where"><b>第 4、5 步</b>回复检查 · 发送方式</div></div>
+      <div class="step human"><div class="t">09-11 10:20</div><div class="what"><b>坐席审核并确认补发</b><span>李婷在收件箱对比 3 版草稿，采用「先补发」版并核对依据，在动作审批页确认补发。系统创建补发订单，草稿随即发出。</span></div><div class="where"><b>人工</b>界面 01 · 06</div></div>
+      <div class="step"><div class="t">09-11 10:21</div><div class="what"><b>工单转"已回复 · 等外部"</b><span>SLA 计时停止。采纳记录写入，计入该意图采纳率。补发物流开始跟踪。</span></div><div class="where"><b>系统</b>界面 02</div></div>
+      <div class="step"><div class="t">09-14 周一</div><div class="what"><b>客户收到补发并致谢</b><span>回信归并到同一工单，识别为致谢类消息，标记亚马逊"无需回复"，工单转"已解决"。</span></div><div class="where"><b>系统</b>界面 03</div></div>
+      <div class="step"><div class="t">之后</div><div class="what"><b>沉淀</b><span>补发成本进报表；采纳记录进采纳率；该意图连续 30 天采纳率高于 90% 后，主管可切换为自动发送。</span></div><div class="where"><b>系统</b>界面 08 · 09</div></div>
+    </div>
+  </section>
+
+  <section id="s8">
+    <h2>8 界面 <small>中保真原型在画布"界面原型"页</small></h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>编号</th><th>页面</th><th>用户</th><th>解决什么</th></tr></thead>
+      <tbody>
+        <tr><td class="k">01</td><td>收件箱 · 工单处理</td><td>坐席</td><td>按 SLA 排序的待处理列表；工单带店铺标识；邮件渠道可插入图片与链接，亚马逊站内信置灰并提示；对话摘要、原文与中文译文切换、手工标签；草稿 3 版可换并按客户语言发出；依据、建议动作、客户历史摘要与订单上下文</td></tr>
+        <tr><td class="k">02</td><td>工单列表</td><td>坐席、主管</td><td>跨渠道总览，当天关键数字，按状态、渠道、店铺、意图、情绪、标签、负责人筛选</td></tr>
+        <tr><td class="k">03</td><td>客户档案</td><td>坐席</td><td>跨渠道身份合并，历史工单与订单，内部备注</td></tr>
+        <tr><td class="k">04</td><td>售后工单详情</td><td>售后负责人</td><td>责任与处理方式确认、步骤条、执行记录、报备审批、并行的承担比例协商、自动填写中的登记信息</td></tr>
+        <tr><td class="k">05</td><td>售后登记台账</td><td>售后负责人、财务</td><td>处理方式、责任、四项费用、报备、承担比例；导出、同步积加、待协商与待结算视图</td></tr>
+        <tr><td class="k">06</td><td>动作审批</td><td>坐席、主管</td><td>高风险动作与报备队列，确认或驳回；人工操作清单；执行日志</td></tr>
+        <tr><td class="k">07</td><td>知识库</td><td>知识库负责人</td><td>四层分类、文档上传、工单沉淀审核、命中统计</td></tr>
+        <tr><td class="k">08</td><td>报表</td><td>管理层</td><td>工单量、首响、SLA、采纳率；售后费用按配件、站点、责任类型与承担比例汇总</td></tr>
+        <tr><td class="k">10</td><td>工厂工作台</td><td>工厂对接人</td><td>本工厂待办；报价、回填单号、答复比例、确认对账；本单沟通留言</td></tr>
+        <tr><td class="k">09</td><td>设置</td><td>管理员、主管</td><td>渠道接入与动作映射，店铺管理，按意图的发送方式与阈值，风险信号，售后规则，标签库，角色权限</td></tr>
+      </tbody>
+    </table></div>
+    <h3>细节页 <small style="font-weight: 500; color: var(--ink-3);">画布"工单与售后细节页"</small></h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>编号</th><th>页面</th><th>用户</th><th>解决什么</th></tr></thead>
+      <tbody>
+        <tr><td class="k">T1</td><td>工单详情 · 全程记录</td><td>坐席、主管</td><td>来信、系统事件、采纳的草稿版本、审批与报备、内部备注、状态流转、SLA 结果，一条时间线看完</td></tr>
+        <tr><td class="k">T2</td><td>转人工工单</td><td>坐席</td><td>标明命中的风险信号与原文；原文译文并排；用中文写自动译成客户语言；关联售后单与待审批动作</td></tr>
+        <tr><td class="k">T3</td><td>邮件渠道工单</td><td>坐席</td><td>草稿内嵌素材库图片与白名单链接；回复检查显示渠道内容能力一项；排查树路径</td></tr>
+        <tr><td class="k">S1</td><td>售后单工作视图</td><td>售后负责人</td><td>每张售后单卡在哪一步、在等谁、等了多久；需处理的排最前</td></tr>
+        <tr><td class="k">S2</td><td>确认责任与处理方式</td><td>售后负责人</td><td>处理方式三选一、责任四选一，AI 建议与依据；库存分支与四项费用估算；确认后才创建售后单</td></tr>
+        <tr><td class="k">S3</td><td>售后单详情 · 良仓有货</td><td>售后负责人</td><td>报备通过即经积加创建发货单；并行的比例协商；16 个登记字段</td></tr>
+        <tr><td class="k">S4</td><td>售后单详情 · 部分补偿</td><td>售后负责人、坐席</td><td>金额提案、额外赔偿报备、人工操作清单的步骤与回填</td></tr>
+        <tr><td class="k">S5</td><td>承担比例协商</td><td>售后负责人</td><td>提案与工厂答复并排；接受、再次提案、升级三个选择及各自金额；本单沟通</td></tr>
+        <tr><td class="k">S6</td><td>内部结算</td><td>售后负责人、财务</td><td>按已结算、待结算、比例未定分组；只有比例已确认的才进批次</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted">高保真视觉方向有三稿待选定：精密工作台、暖色编辑、深色控制台。</p>
+  </section>
+
+  <section id="s9">
+    <h2>9 系统与集成</h2>
+    <div class="strip">
+      <div class="node"><b>渠道与接入</b><span>积加（站内信、订单）、Gmail</span></div>
+      <div class="arrow">→</div>
+      <div class="node hi"><b>处理流程</b><span>固定五步，规则可配置</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>动作执行</b><span>统一动作接口，MCP 适配器，先接积加</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>数据</b><span>工单为唯一事实来源</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><b>工作台</b><span>审核、确认、维护</span></div>
+    </div>
+    <h3>9.1 接口能力矩阵</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>系统</th><th>读</th><th>写</th><th>方式</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td class="k">积加 ERP（积加 MCP）</td><td>亚马逊站内信；亚马逊与 Shopify 订单、库存、发货、费用</td><td>回复亚马逊站内信、创建售后发货单、订单备注</td><td>自建 MCP 封装积加开放接口；无接口部分用浏览器自动化</td><td><span class="tag bad">待确认接口范围</span></td></tr>
+        <tr><td class="k">Gmail 客服邮箱</td><td>Shopify 客户来信、直邮、亚马逊转发备份、其他供应商邮件</td><td>发送客户回复</td><td>Gmail API 推送</td><td><span class="tag ok">可用</span></td></tr>
+        <tr><td class="k">工厂工作台</td><td>工厂提交的报价、单号与实际运费、比例答复、对账确认、留言</td><td>派发四类任务、催办、系统留言</td><td>同一系统内的生产厂角色工作台，手机可用；提醒走企业即时通讯，不走邮件</td><td><span class="tag ok">设计定</span></td></tr>
+        <tr><td class="k">统一动作接口</td><td colspan="2">查订单、物流、库存；发站内信；创建发货单；备注；退款；改地址；取消。每个动作映射到一个适配器</td><td>第一阶段 6 项映射积加 MCP；退款、改地址、取消映射"人工操作清单"</td><td><span class="tag ok">设计定</span></td></tr>
+        <tr><td class="k">Shopify MCP</td><td>订单、客户、履约、退款</td><td>退款、改地址、取消、补发草稿单</td><td>第三阶段接入统一动作接口，替换人工操作清单</td><td><span class="tag neutral">第三阶段</span></td></tr>
+        <tr><td class="k">亚马逊 MCP</td><td>订单状态、物流、受限买家信息</td><td>积加覆盖不到的动作</td><td>第三阶段接入统一动作接口</td><td><span class="tag neutral">第三阶段</span></td></tr>
+        <tr><td class="k">模型</td><td colspan="2">第 3 步理解与生成（3 版草稿）、第 4 步检查、来信译文、对话与客户摘要；每封来信 3 到 4 次调用；系统提示与知识库做缓存</td><td>Claude API</td><td><span class="tag ok">可用</span></td></tr>
+      </tbody>
+    </table></div>
+    <h3>9.2 核心数据对象</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>对象</th><th>关键字段</th><th>关系</th></tr></thead>
+      <tbody>
+        <tr><td class="k">店铺 Store</td><td>平台、店铺名、站点、积加店铺 ID、客服邮箱、签名与品牌名、默认语言、政策与模板覆盖项、负责团队、状态</td><td>1 店铺 : N 工单；动作按店铺取凭据</td></tr>
+        <tr><td class="k">工单 Ticket</td><td>编号、渠道、店铺、站点、客户、语言、主意图、次意图、情绪、优先级、状态、负责人、SLA 截止、重复联系次数、标签、对话摘要</td><td>1 客户 : N 工单</td></tr>
+        <tr><td class="k">消息 Message</td><td>来源、方向、原文、中文译文、解析正文、附件、外部 ID、时间</td><td>1 工单 : N 消息</td></tr>
+        <tr><td class="k">AI 输出 Draft</td><td>版本（默认 3 版，按解决方案区分，可续抽）、方案、语言、正文、富内容块（图片、链接，仅邮件渠道）、置信度、依据列表、检查结果、发送方式、采纳的版本与修改</td><td>1 消息 : N 草稿</td></tr>
+        <tr><td class="k">动作 Action</td><td>类型、目标系统、参数、风险档、状态、审批人、执行方式（MCP / 人工操作清单）、执行结果</td><td>1 草稿 : N 动作</td></tr>
+        <tr><td class="k">售后单 CaseRMA</td><td>原工单、处理方式、责任类型与依据、配件、数量、分支、当前步骤、四项费用、报备类型与状态、承担比例、协商状态、结算状态、工厂任务与留言、良仓往来</td><td>1 工单 : 0..1 售后单</td></tr>
+        <tr><td class="k">工厂任务 FactoryTask</td><td>工厂、售后单、类型（询价 / 寄件 / 比例协商 / 对账）、表单内容、截止时间、催办次数、状态、留言线程</td><td>1 售后单 : N 工厂任务</td></tr>
+        <tr><td class="k">登记台账 Ledger</td><td>第 5.2 节字段</td><td>1 售后单 : 1 台账行</td></tr>
+        <tr><td class="k">客户 Customer</td><td>渠道身份列表、合并记录、标签、累计消费、历史摘要</td><td>跨渠道合并需人工确认</td></tr>
+        <tr><td class="k">知识条目 Knowledge</td><td>层、内容、素材（图片、链接）、适用渠道、适用店铺（默认全部）、产品、站点、语言、负责人、有效期、命中数</td><td>草稿依据引用</td></tr>
+      </tbody>
+    </table></div>
+    <h3>9.3 角色与权限</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>角色</th><th>处理工单</th><th>审批高风险动作</th><th>切换发送方式</th><th>维护知识库</th><th>改风险信号与渠道</th></tr></thead>
+      <tbody>
+        <tr><td class="k">坐席</td><td>是</td><td>否</td><td>否</td><td>提交沉淀</td><td>否</td></tr>
+        <tr><td class="k">客服主管</td><td>是</td><td>是，含报备</td><td>是</td><td>审核</td><td>否</td></tr>
+        <tr><td class="k">售后负责人</td><td>售后单：确认责任与处理方式、协商比例</td><td>否</td><td>否</td><td>排查树</td><td>否</td></tr>
+        <tr><td class="k">知识库负责人</td><td>否</td><td>否</td><td>否</td><td>是</td><td>否</td></tr>
+        <tr><td class="k">工厂对接人</td><td>仅工厂工作台里本工厂的任务</td><td>否</td><td>否</td><td>否</td><td>否</td></tr>
+        <tr><td class="k">管理员</td><td>否</td><td>否</td><td>否</td><td>否</td><td>是</td></tr>
+      </tbody>
+    </table></div>
+  <p class="muted">坐席、主管、售后负责人的数据范围按店铺授权，默认全部店铺；报表与台账都可按店铺筛选。</p>
+    <h3>9.4 多店铺设计</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>环节</th><th>设计</th></tr></thead>
+      <tbody>
+        <tr><td class="k">原则</td><td>店铺是工单的一个维度，加一层配置覆盖；五步处理、售后流程、审批只有一套，不按店铺分叉</td></tr>
+        <tr><td class="k">进线识别</td><td>亚马逊消息用积加店铺 ID 加站点；邮件用收件地址对应店铺；识别不出的进"未归属店铺"队列由人工指定</td></tr>
+        <tr><td class="k">订单关联</td><td>只在该店铺的订单里匹配，避免不同店铺订单号或邮箱撞车</td></tr>
+        <tr><td class="k">回复与动作</td><td>回复从来信的同一店铺身份发出（积加店铺会话或该店铺邮箱），使用该店铺的签名与品牌名；动作带店铺 ID，由 MCP 适配器取该店铺凭据；禁止跨店铺发送</td></tr>
+        <tr><td class="k">客户档案</td><td>同一客户跨店铺可合并，需人工确认；对客户的回复不提及其在其他店铺的订单</td></tr>
+        <tr><td class="k">规则与知识</td><td>三层取值：全局默认 → 平台 → 店铺覆盖。可覆盖项限于签名、退货政策口径、模板、素材与链接白名单、SLA；意图、风险信号、动作分级不允许按店铺改</td></tr>
+        <tr><td class="k">发送方式与采纳率</td><td>按意图全局配置与统计，避免单店样本太少；可按店铺查看，个别店铺可单独降回待审草稿</td></tr>
+        <tr><td class="k">台账与报表</td><td>工单、售后单、台账都带店铺字段；报表默认汇总，可按店铺、站点下钻</td></tr>
+        <tr><td class="k">新增店铺</td><td>在设置页的店铺管理里登记并连通积加或邮箱即可，不需要改流程</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="s10">
+    <h2>10 非功能与合规</h2>
+    <div class="two">
+      <div class="card"><b>可用性与降级</b><ul>
+        <li>积加或 Gmail 不可用：来信暂存队列，恢复后按到达顺序处理，SLA 从原到达时间计。</li>
+        <li>模型不可用：跳过第 3、4 步，工单直接进收件箱由人工处理，标"AI 未处理"。</li>
+        <li>每一步独立任务可重试，失败不丢消息；处理链路目标 5 分钟内出草稿。</li>
+      </ul></div>
+      <div class="card"><b>数据与合规</b><ul>
+        <li>亚马逊数据保护政策对买家个人信息有保留期限要求，订单快照中的 PII 按政策期限清除，工单保留脱敏后的业务字段。</li>
+        <li>DE 与 UK 客户受 GDPR 约束：数据最小化、删除请求 30 天内响应、处理记录可导出。</li>
+        <li>亚马逊回复不含外链、营销、站外联系方式；模板由客户运营预审。</li>
+        <li>所有 AI 输出、人工操作、动作执行写审计日志，保留不少于 2 年。</li>
+        <li>生产厂是集团内部角色，按需可见：只见本厂任务与寄件所需的收件信息，不显示客户邮箱与售价。</li>
+      </ul></div>
+      <div class="card"><b>质量评估</b><ul>
+        <li>上线前：用至少 500 封历史来信标注意图，验证分布与分类准确率 ≥ 90%；用 100 封抽样人工评分草稿可用性 ≥ 80%。</li>
+        <li>上线后：每周抽检 50 封自动发送回复；采纳率、拒绝原因按意图看板。</li>
+      </ul></div>
+      <div class="card"><b>成本</b><ul>
+        <li>模型费用与来信量线性相关，按每封 2 到 3 次调用估算，缓存后单封成本可控在人工处理成本的 5% 以内（待按实际量核算）。</li>
+        <li>积加 MCP 自建，封装积加开放接口；没有接口的部分用浏览器自动化兜底，维护成本高，作为过渡方案。</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section id="s11">
+    <h2>11 里程碑与验收</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>阶段</th><th>交付物</th><th>验收标准</th><th>负责人</th></tr></thead>
+      <tbody>
+        <tr><td class="k">一 报表与台账</td><td>积加数据接入；登记台账与导出；日常报表</td><td>报表替代人工导出；当月售后单登记完整率 ≥ 98%</td><td>Leo 出工作版本，yuli 细化流程</td></tr>
+        <tr><td class="k">二 售后流程</td><td>工单与归并、标签、译文、摘要；积加 MCP 与统一动作接口；流程引擎：处理方式、责任、报备、协商、两条寄件分支；工厂工作台；动作审批、人工操作清单与审计</td><td>售后单人工操作 ≤ 2 次；处理时长缩短 50%；SLA 达标 ≥ 99%</td><td>待定</td></tr>
+        <tr><td class="k">三 AI 回信</td><td>五步处理与 12 条规则；草稿 3 版可换；知识库四层；发送方式配置；亚马逊与 Shopify MCP</td><td>采纳率 ≥ 80%；自动发送占比 ≥ 40%；首响中位数 ≤ 2 小时；差评率不高于替换前</td><td>待定</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="s12">
+    <h2>12 风险与待确认</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>事项</th><th>影响</th><th>需要谁</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td class="k">积加开放接口能覆盖哪些读写（站内信收发、发货单、费用）</td><td>决定积加 MCP 的范围和第二阶段能否全自动；无接口部分用浏览器自动化，稳定性下降</td><td>客户 IT、积加</td><td><span class="tag bad">阻塞</span></td></tr>
+        <tr><td class="k">各生产厂对接人名单；提醒用哪个企业即时通讯（钉钉或企业微信）</td><td>工厂角色开户与任务推送</td><td>FSH、生产厂</td><td><span class="tag warn">待提供</span></td></tr>
+        <tr><td class="k">各责任类型的默认承担比例</td><td>第 6.5 节建议值需客户与工厂确认</td><td>客户售后、工厂</td><td><span class="tag warn">待确认</span></td></tr>
+        <tr><td class="k">各站点退货退款政策的执行口径；部分补偿的金额规则</td><td>政策规则层与退款提案的依据</td><td>客户运营</td><td><span class="tag warn">待确认</span></td></tr>
+        <tr><td class="k">店铺清单：亚马逊账号数与站点、Shopify 店铺数、各店铺客服邮箱、是否同品牌同政策</td><td>店铺表初始数据，决定要不要做店铺级政策与模板覆盖</td><td>客户运营</td><td><span class="tag warn">待提供</span></td></tr>
+        <tr><td class="k">亚马逊站内信经积加能否带附件（图片、PDF）</td><td>当前按不支持设计；若支持，排查图示可作为附件发送</td><td>客户 IT、积加</td><td><span class="tag neutral">默认不支持</span></td></tr>
+        <tr><td class="k">标签库初始清单</td><td>手工标签与报表口径</td><td>客户客服</td><td><span class="tag warn">待提供</span></td></tr>
+        <tr><td class="k">500 封历史工单样本</td><td>验证意图分布与上线前评估</td><td>客户客服</td><td><span class="tag warn">待提供</span></td></tr>
+        <tr><td class="k">前十个高频故障症状</td><td>故障排查树的初始内容</td><td>客户客服、工厂</td><td><span class="tag warn">待提供</span></td></tr>
+        <tr><td class="k">高价值阈值、7 天自动关闭、30 天重开、报备无金额门槛</td><td>规则参数</td><td>客户主管</td><td><span class="tag neutral">默认值已设</span></td></tr>
+        <tr><td class="k">是否启用 SLA 保底进展回复</td><td>亚马逊回复质量风险</td><td>客户运营</td><td><span class="tag warn">待确认</span></td></tr>
+        <tr><td class="k">是否有过安全类投诉</td><td>安全事故信号的处理流程</td><td>客户售后</td><td><span class="tag warn">待确认</span></td></tr>
+        <tr><td class="k">高保真方向与原型形式</td><td>第二阶段界面开发输入</td><td>Leo</td><td><span class="tag warn">待选定</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <footer>
+    <div>设计画布：<a href="https://claude.ai/code/artifact/dda6d1a2-41b4-4c97-8ac6-491808a914b5">Forcome Support 智能客服蓝图</a>（架构、生命周期、售后流程、决策逻辑、邮件流转全链路、十张原型、九张工单与售后细节页、三个视觉方向）</div>
+    <div>决策记录：<a href="https://claude.ai/code/artifact/0a2277b6-0eb9-424a-8dca-011885168406">Forcome Support 决策记录</a>（十二项关键决策的备选、理由与影响）</div>
+    <div>本文数据除客户提供者外均为示例或建议值。</div>
+  </footer>
+</div>

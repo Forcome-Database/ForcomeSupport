@@ -1,0 +1,270 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; color: #1c2129; -webkit-font-smoothing: antialiased; }
+    a { color: #3d5fc4; } a:hover { color: #2f4aa0; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; background: #f6f7f9; display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- 顶栏 -->
+  <div style="height: 56px; box-sizing: border-box; background: #ffffff; border-bottom: 1px solid #e3e6eb; display: flex; align-items: center; justify-content: space-between; padding: 0px 20px;">
+    <div style="display: flex; align-items: center; gap: 28px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 26px; height: 26px; border-radius: 7px; background: #3d5fc4; display: flex; align-items: center; justify-content: center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v9a2 2 0 0 1-2 2H9l-5 4z"></path></svg>
+        </div>
+        <div style="font-size: 15px; font-weight: 600;">Forcome Support</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">收件箱</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">工单</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">售后</div>
+        <div style="font-size: 13px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 6px; padding: 6px 12px;">动作审批</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">知识库</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">报表</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">设置</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="width: 260px; height: 34px; box-sizing: border-box; background: #f6f7f9; border: 1px solid #e3e6eb; border-radius: 6px; display: flex; align-items: center; gap: 8px; padding: 0px 10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#98a2b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <div style="font-size: 13px; color: #98a2b3;">搜索工单、订单号、客户邮箱</div>
+      </div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475467" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10 21h4"></path></svg>
+      <div style="width: 30px; height: 30px; border-radius: 999px; background: #d1fadf; color: #067647; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">婷</div>
+    </div>
+  </div>
+
+  <!-- 主体 -->
+  <div style="flex: 1; padding: 20px 28px; display: flex; flex-direction: column; gap: 14px; min-height: 0px;">
+
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <div style="font-size: 20px; font-weight: 600;">动作审批</div>
+        <div style="font-size: 13px; color: #667085;">AI 只提出动作，高风险写操作与报备由人确认后才执行；积加 MCP 做不了的动作生成人工操作清单 · 2026-09-11</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="font-size: 12px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 999px; padding: 5px 12px;">待确认 5</div>
+        <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">今日已执行 23</div>
+        <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">已驳回 2</div>
+        <div style="font-size: 12px; font-weight: 500; color: #b42318; background: #fee4e2; border-radius: 999px; padding: 5px 12px;">执行失败 1</div>
+      </div>
+    </div>
+
+    <div style="flex: 1; display: flex; flex-direction: row; gap: 16px; min-height: 0px;">
+
+      <!-- 左：待确认动作 -->
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0px;">
+
+        <!-- 卡片 1：展开 -->
+        <div style="background: #ffffff; border: 1px solid #c7d2f2; border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; flex-direction: row; gap: 16px; align-items: center;">
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0px;">
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <div style="font-size: 11px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 3px 8px;">积加 · 补发订单 · 亚马逊 US</div>
+                <div style="font-size: 11px; font-weight: 600; color: #b42318; background: #fee4e2; border-radius: 4px; padding: 3px 8px;">高风险</div>
+                <div style="font-size: 12px; color: #667085;">T-20260910-0192 · Sarah Mitchell · 亚马逊 US</div>
+                <div style="font-size: 12px; color: #98a2b3;">提出于 昨天 16:01</div>
+              </div>
+              <div style="font-size: 13px; color: #1c2129;">AI 理由：UPS 自 09-06 无扫描且已超预计送达，客户 09-15 前需收货，符合补发政策。</div>
+              <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 16px; font-size: 12px;">
+                <div style="display: flex; gap: 6px;"><div style="color: #98a2b3;">订单</div><div style="color: #475467;">113-4567890-1234567</div></div>
+                <div style="display: flex; gap: 6px;"><div style="color: #98a2b3;">商品</div><div style="color: #475467;">车载吸尘器 V2 黑色 ×1</div></div>
+                <div style="display: flex; gap: 6px;"><div style="color: #98a2b3;">物流</div><div style="color: #475467;">UPS Next Day Air · 运费 $12.40，报备随本审批一并通过</div></div>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+              <div style="height: 34px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #ffffff; background: #3d5fc4; border-radius: 6px; padding: 0px 16px;">确认执行</div>
+              <div style="height: 34px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 6px; padding: 0px 16px;">驳回</div>
+            </div>
+          </div>
+          <div style="border-top: 1px solid #f2f4f7; padding-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <div style="font-size: 12px; color: #667085;">执行后将自动：</div>
+            <div style="font-size: 11px; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 3px 8px;">更新工单状态为 等客户</div>
+            <div style="font-size: 11px; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 3px 8px;">给客户发送已审核的回复草稿</div>
+            <div style="font-size: 11px; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 3px 8px;">写入登记表：单号、商品、费用</div>
+          </div>
+        </div>
+
+        <!-- 卡片 2 -->
+        <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: row; gap: 16px; align-items: center;">
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <div style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 3px 8px;">亚马逊 · 退款 · 人工操作清单</div>
+              <div style="font-size: 11px; font-weight: 600; color: #b42318; background: #fee4e2; border-radius: 4px; padding: 3px 8px;">高风险</div>
+              <div style="font-size: 12px; color: #667085;">T-20260910-0184 · Jonas Weber · 亚马逊 DE</div>
+              <div style="font-size: 12px; color: #98a2b3;">提出于 10:02 · 由 陈晨 发起</div>
+            </div>
+            <div style="font-size: 13px; color: #1c2129;">AI 理由：使用两周后故障，属保修期内商品缺陷，客户威胁留差评并要求退款，命中平台风险信号，坐席已核实照片。确认后生成操作清单，坐席在卖家后台退款并回填。</div>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 16px; font-size: 12px;">
+              <div style="display: flex; gap: 6px;"><div style="color: #98a2b3;">订单</div><div style="color: #475467;">302-8811234-9901122</div></div>
+              <div style="display: flex; gap: 6px;"><div style="color: #98a2b3;">金额</div><div style="color: #475467;">€44.90 全额</div></div>
+              <div style="display: flex; gap: 6px;"><div style="color: #98a2b3;">原因</div><div style="color: #475467;">商品缺陷，按保修政策免退货退款</div></div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+            <div style="height: 34px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #ffffff; background: #3d5fc4; border-radius: 6px; padding: 0px 16px;">确认，生成操作清单</div>
+            <div style="height: 34px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 6px; padding: 0px 16px;">驳回</div>
+          </div>
+        </div>
+
+        <!-- 卡片 3 -->
+        <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: row; gap: 16px; align-items: center;">
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <div style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 3px 8px;">Shopify · 修改收货地址 · 人工操作清单</div>
+              <div style="font-size: 11px; font-weight: 600; color: #b42318; background: #fee4e2; border-radius: 4px; padding: 3px 8px;">高风险</div>
+              <div style="font-size: 12px; color: #667085;">T-20260910-0170 · Priya Raman · Shopify</div>
+              <div style="font-size: 12px; color: #98a2b3;">提出于 09:48</div>
+            </div>
+            <div style="font-size: 13px; color: #1c2129;">AI 理由：订单尚未履约，客户在邮件中提供了完整新地址，与账户历史地址同城。接入 Shopify MCP 前，确认后生成操作清单，坐席在 Shopify 后台改地址并回填。</div>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 16px; font-size: 12px;">
+              <div style="display: flex; gap: 6px;"><div style="color: #98a2b3;">订单</div><div style="color: #475467;">#1057 · 未履约</div></div>
+              <div style="display: flex; gap: 6px; grid-column: span 2;"><div style="color: #98a2b3;">新地址</div><div style="color: #475467;">221 Bay St, Unit 1104, Toronto, ON M5J 2T3</div></div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+            <div style="height: 34px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #ffffff; background: #3d5fc4; border-radius: 6px; padding: 0px 16px;">确认，生成操作清单</div>
+            <div style="height: 34px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 6px; padding: 0px 16px;">驳回</div>
+          </div>
+        </div>
+
+        <!-- 卡片 4 -->
+        <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: row; gap: 16px; align-items: center;">
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <div style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 3px 8px;">报备 · 快递费用 · 附积加发货单参数</div>
+              <div style="font-size: 11px; font-weight: 600; color: #b42318; background: #fee4e2; border-radius: 4px; padding: 3px 8px;">高风险</div>
+              <div style="font-size: 12px; color: #667085;">T-20260910-0195 · Marcus Lee · 亚马逊 US</div>
+              <div style="font-size: 12px; color: #98a2b3;">提出于 09:35</div>
+            </div>
+            <div style="font-size: 13px; color: #1c2129;">AI 理由：客户收到灰色，订单为黑色，责任建议「物流问题」（良仓错发）；良仓 US 黑色现货 37 台，走有货分支。批准即自动创建发货单。</div>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 16px; font-size: 12px;">
+              <div style="display: flex; gap: 6px;"><div style="color: #98a2b3;">仓库</div><div style="color: #475467;">良仓 US · SKU FC-V2-BLK</div></div>
+              <div style="display: flex; gap: 6px;"><div style="color: #98a2b3;">数量</div><div style="color: #475467;">1 · 尾程 USPS Ground</div></div>
+              <div style="display: flex; gap: 6px;"><div style="color: #98a2b3;">预估运费</div><div style="color: #475467;">$8.40，FSH 先付，向良仓索赔</div></div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+            <div style="height: 34px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #ffffff; background: #3d5fc4; border-radius: 6px; padding: 0px 16px;">批准报备</div>
+            <div style="height: 34px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 6px; padding: 0px 16px;">驳回</div>
+          </div>
+        </div>
+
+        <!-- 卡片 5 -->
+        <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: row; gap: 16px; align-items: center;">
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <div style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 3px 8px;">报备 · 快递费用 · 审批人客服主管</div>
+              <div style="font-size: 11px; font-weight: 600; color: #b42318; background: #fee4e2; border-radius: 4px; padding: 3px 8px;">高风险</div>
+              <div style="font-size: 12px; color: #667085;">S-20260911-0018 · Laura Bennett · 亚马逊 US</div>
+              <div style="font-size: 12px; color: #98a2b3;">提出于 09:41</div>
+            </div>
+            <div style="font-size: 13px; color: #1c2129;">AI 理由：良仓无货分支，工厂报价已到；报备运费 $11.50 由 FSH 先付；责任产品质量问题，建议工厂 100% 承担。批准即在工厂工作台生成寄件任务并发起比例协商。</div>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 16px; font-size: 12px;">
+              <div style="display: flex; gap: 6px;"><div style="color: #98a2b3;">配件号</div><div style="color: #475467;">FC-V2-HF01 滤芯组件 ×1</div></div>
+              <div style="display: flex; gap: 6px;"><div style="color: #98a2b3;">费用</div><div style="color: #475467;">产品 $3.20 + 运费 $11.50</div></div>
+              <div style="display: flex; gap: 6px;"><div style="color: #98a2b3;">收件人</div><div style="color: #475467;">Laura Bennett · Austin, TX</div></div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+            <div style="height: 34px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #ffffff; background: #3d5fc4; border-radius: 6px; padding: 0px 16px;">批准报备</div>
+            <div style="height: 34px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 6px; padding: 0px 16px;">驳回</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右：执行日志 -->
+      <div style="width: 360px; box-sizing: border-box; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-size: 14px; font-weight: 600;">执行日志 · 今日</div>
+          <div style="font-size: 12px; color: #3d5fc4;">查看全部</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0px;">
+
+          <div style="display: flex; flex-direction: row; gap: 12px; padding: 8px 0px; border-bottom: 1px solid #f2f4f7;">
+            <div style="width: 40px; font-size: 12px; color: #98a2b3; flex-shrink: 0; padding-top: 2px;">10:12</div>
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #12b76a; flex-shrink: 0; margin-top: 5px;"></div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0px;">
+              <div style="font-size: 13px; font-weight: 500;">登记良仓实际运费</div>
+              <div style="font-size: 12px; color: #667085;">工单核心 · 自动 · 成功 · S-20260910-0017</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: row; gap: 12px; padding: 8px 0px; border-bottom: 1px solid #f2f4f7;">
+            <div style="width: 40px; font-size: 12px; color: #98a2b3; flex-shrink: 0; padding-top: 2px;">09:58</div>
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #12b76a; flex-shrink: 0; margin-top: 5px;"></div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0px;">
+              <div style="font-size: 13px; font-weight: 500;">给客户发送回复</div>
+              <div style="font-size: 12px; color: #667085;">邮件 · 李婷确认 · 成功 · T-20260911-0028</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: row; gap: 12px; padding: 8px 0px; border-bottom: 1px solid #f2f4f7;">
+            <div style="width: 40px; font-size: 12px; color: #98a2b3; flex-shrink: 0; padding-top: 2px;">09:40</div>
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #12b76a; flex-shrink: 0; margin-top: 5px;"></div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0px;">
+              <div style="font-size: 13px; font-weight: 500;">工厂提交报价，写入登记表</div>
+              <div style="font-size: 12px; color: #667085;">工厂工作台 · 东莞生产厂陈工 · S-20260911-0018</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: row; gap: 12px; padding: 8px 0px; border-bottom: 1px solid #f2f4f7;">
+            <div style="width: 40px; font-size: 12px; color: #98a2b3; flex-shrink: 0; padding-top: 2px;">09:30</div>
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #d92d20; flex-shrink: 0; margin-top: 5px;"></div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0px;">
+              <div style="font-size: 13px; font-weight: 500;">查询良仓库存</div>
+              <div style="font-size: 12px; color: #b42318;">积加 · 自动 · 失败：积加接口超时，已重试成功</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: row; gap: 12px; padding: 8px 0px; border-bottom: 1px solid #f2f4f7;">
+            <div style="width: 40px; font-size: 12px; color: #98a2b3; flex-shrink: 0; padding-top: 2px;">09:16</div>
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #12b76a; flex-shrink: 0; margin-top: 5px;"></div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0px;">
+              <div style="font-size: 13px; font-weight: 500;">添加订单备注</div>
+              <div style="font-size: 12px; color: #667085;">积加 · 自动 · 成功 · Shopify #1057</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: row; gap: 12px; padding: 8px 0px; border-bottom: 1px solid #f2f4f7;">
+            <div style="width: 40px; font-size: 12px; color: #98a2b3; flex-shrink: 0; padding-top: 2px;">08:07</div>
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #12b76a; flex-shrink: 0; margin-top: 5px;"></div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0px;">
+              <div style="font-size: 13px; font-weight: 500;">向工厂派发询价单</div>
+              <div style="font-size: 12px; color: #667085;">工厂工作台 · 自动 · 成功 · S-20260911-0018</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: row; gap: 12px; padding: 8px 0px;">
+            <div style="width: 40px; font-size: 12px; color: #98a2b3; flex-shrink: 0; padding-top: 2px;">08:02</div>
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #12b76a; flex-shrink: 0; margin-top: 5px;"></div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0px;">
+              <div style="font-size: 13px; font-weight: 500;">退款 €29.90</div>
+              <div style="font-size: 12px; color: #667085;">亚马逊 · 陈晨按操作清单执行并回填 · 成功 · T-20260909-0128</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px; background: #f6f7f9; border-radius: 6px; padding: 10px 12px;">
+          <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">风险分级</div>
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #12b76a; flex-shrink: 0;"></div><div style="color: #475467;">只读：查订单、库存、物流 · 自动</div></div>
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #3d5fc4; flex-shrink: 0;"></div><div style="color: #475467;">低风险写：备注、登记、模板邮件 · 自动留痕</div></div>
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #f79009; flex-shrink: 0;"></div><div style="color: #475467;">高风险写：退款、改地址、发货单 · 人工确认</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

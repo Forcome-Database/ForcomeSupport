@@ -1,0 +1,253 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; color: #1c2129; -webkit-font-smoothing: antialiased; }
+    a { color: #3d5fc4; } a:hover { color: #2f4aa0; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; background: #f6f7f9; display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- 顶栏 -->
+  <div style="height: 56px; box-sizing: border-box; background: #ffffff; border-bottom: 1px solid #e3e6eb; display: flex; align-items: center; justify-content: space-between; padding: 0px 20px;">
+    <div style="display: flex; align-items: center; gap: 28px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 26px; height: 26px; border-radius: 7px; background: #3d5fc4; display: flex; align-items: center; justify-content: center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v9a2 2 0 0 1-2 2H9l-5 4z"></path></svg>
+        </div>
+        <div style="font-size: 15px; font-weight: 600;">Forcome Support</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">收件箱</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">工单</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">售后</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">动作审批</div>
+        <div style="font-size: 13px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 6px; padding: 6px 12px;">知识库</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">报表</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">设置</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="width: 260px; height: 34px; box-sizing: border-box; background: #f6f7f9; border: 1px solid #e3e6eb; border-radius: 6px; display: flex; align-items: center; gap: 8px; padding: 0px 10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#98a2b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <div style="font-size: 13px; color: #98a2b3;">搜索工单、订单号、客户邮箱</div>
+      </div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475467" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10 21h4"></path></svg>
+      <div style="width: 30px; height: 30px; border-radius: 999px; background: #d1fadf; color: #067647; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">婷</div>
+    </div>
+  </div>
+
+  <!-- 主体 -->
+  <div style="flex: 1; display: flex; flex-direction: row; min-height: 0px;">
+
+    <!-- 左：分类树 -->
+    <div style="width: 300px; box-sizing: border-box; background: #ffffff; border-right: 1px solid #e3e6eb; display: flex; flex-direction: column; padding: 16px 12px; gap: 4px;">
+      <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085; padding: 0px 8px 8px 8px;">分类</div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 6px; background: #e8edfa;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2f4aa0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18"></path><path d="M3 12h18"></path><path d="M3 17h18"></path></svg>
+          <div style="font-size: 13px; font-weight: 600; color: #2f4aa0;">全部文档</div>
+        </div>
+        <div style="font-size: 12px; color: #2f4aa0;">214</div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 6px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667085" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12l4 4v12H4z"></path><path d="M16 4v4h4"></path></svg>
+          <div style="font-size: 13px; font-weight: 500; color: #1c2129;">产品事实与手册</div>
+        </div>
+        <div style="font-size: 12px; color: #98a2b3;">36</div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 6px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667085" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"></path></svg>
+          <div style="font-size: 13px; font-weight: 500; color: #1c2129;">政策规则</div>
+        </div>
+        <div style="font-size: 12px; color: #98a2b3;">22</div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 6px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667085" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v10H3z"></path><path d="M14 10h4l3 3v4h-7z"></path><circle cx="7" cy="18" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg>
+          <div style="font-size: 13px; font-weight: 500; color: #1c2129;">故障排查树</div>
+        </div>
+        <div style="font-size: 12px; color: #98a2b3;">18</div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 6px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667085" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"></path><path d="M8 9h8"></path><path d="M8 13h5"></path></svg>
+          <div style="font-size: 13px; font-weight: 500; color: #1c2129;">亚马逊规则</div>
+        </div>
+        <div style="font-size: 12px; color: #98a2b3;">15</div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 6px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667085" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5"></path><path d="M12 17h.01"></path></svg>
+          <div style="font-size: 13px; font-weight: 500; color: #1c2129;">回复模板与 FAQ</div>
+        </div>
+        <div style="font-size: 12px; color: #98a2b3;">64</div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 9px 10px; border-radius: 6px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667085" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path></svg>
+          <div style="font-size: 13px; font-weight: 500; color: #1c2129;">工单沉淀</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 999px; padding: 1px 7px;">3 待审</div>
+          <div style="font-size: 12px; color: #98a2b3;">59</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px; padding: 12px; background: #f6f7f9; border-radius: 6px; display: flex; flex-direction: column; gap: 4px;">
+        <div style="font-size: 12px; font-weight: 600;">检索状态</div>
+        <div style="font-size: 12px; color: #667085; line-height: 1.5;">214 篇文档，1,862 个分块，向量索引 08:00 已更新。近 30 天检索命中率 91%。</div>
+      </div>
+    </div>
+
+    <!-- 右：文档列表 -->
+    <div style="flex: 1; padding: 20px 28px; display: flex; flex-direction: column; gap: 12px; min-width: 0px;">
+
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; background: #fef0c7; border: 1px solid #f5d98a; border-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b54708" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"></path><path d="M12 17h.01"></path><circle cx="12" cy="12" r="9"></circle></svg>
+          <div style="font-size: 13px; color: #b54708;">3 条由已解决工单自动沉淀的 FAQ 待审核，审核通过后才会进入检索。</div>
+        </div>
+        <div style="font-size: 12px; font-weight: 600; color: #b54708;">查看待审核</div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+        <div style="width: 320px; height: 36px; box-sizing: border-box; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 6px; display: flex; align-items: center; gap: 8px; padding: 0px 10px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#98a2b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+          <div style="font-size: 13px; color: #98a2b3;">搜索文档标题或内容</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">来源：全部</div>
+          <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">状态：全部</div>
+          <div style="height: 36px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #ffffff; background: #3d5fc4; border-radius: 6px; padding: 0px 14px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="M7 9l5-5 5 5"></path><path d="M4 20h16"></path></svg>
+            <div>上传文档</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column;">
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 100px 110px 110px 110px 120px 72px; gap: 12px; padding: 10px 16px; background: #f6f7f9; border-bottom: 1px solid #e3e6eb; font-size: 11px; font-weight: 600; color: #667085; letter-spacing: 0.04em;">
+          <div>标题</div><div>分类</div><div>来源</div><div style="text-align: right;">近 30 天命中</div><div>最后更新</div><div>状态</div><div></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 100px 110px 110px 110px 120px 72px; gap: 12px; padding: 11px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center;">
+          <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;">物流停滞或超预计送达处理流程</div>
+          <div style="color: #475467;">政策规则</div>
+          <div style="color: #475467;">人工上传</div>
+          <div style="text-align: right; font-weight: 500;">128</div>
+          <div style="color: #667085;">2026-08-30</div>
+          <div><span style="font-size: 11px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 3px 8px;">已发布</span></div>
+          <div></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 100px 110px 110px 110px 120px 72px; gap: 12px; padding: 11px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center;">
+          <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;">亚马逊 FBM 丢件补发标准</div>
+          <div style="color: #475467;">政策规则</div>
+          <div style="color: #475467;">人工上传</div>
+          <div style="text-align: right; font-weight: 500;">96</div>
+          <div style="color: #667085;">2026-08-30</div>
+          <div><span style="font-size: 11px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 3px 8px;">已发布</span></div>
+          <div></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 100px 110px 110px 110px 120px 72px; gap: 12px; padding: 11px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center; background: #fffdf5;">
+          <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;">车载吸尘器 V2 在 Tesla Model Y 12V 接口的兼容性</div>
+          <div style="color: #475467;">回复模板与 FAQ</div>
+          <div style="color: #b54708;">工单沉淀</div>
+          <div style="text-align: right; color: #98a2b3;">0</div>
+          <div style="color: #667085;">2026-09-11</div>
+          <div><span style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 3px 8px;">待审核</span></div>
+          <div><div style="display: inline-flex; align-items: center; font-size: 12px; font-weight: 500; color: #2f4aa0; border: 1px solid #c7d2f2; border-radius: 6px; padding: 5px 10px; background: #ffffff;">审核</div></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 100px 110px 110px 110px 120px 72px; gap: 12px; padding: 11px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center;">
+          <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;">HEPA 滤芯组件更换周期与清洗方法</div>
+          <div style="color: #475467;">产品事实与手册</div>
+          <div style="color: #475467;">人工上传</div>
+          <div style="text-align: right; font-weight: 500;">74</div>
+          <div style="color: #667085;">2026-07-18</div>
+          <div><span style="font-size: 11px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 3px 8px;">已发布</span></div>
+          <div></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 100px 110px 110px 110px 120px 72px; gap: 12px; padding: 11px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center; background: #fffdf5;">
+          <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;">退款到账时间：亚马逊 3-5 个工作日，Shopify 5-10 个工作日</div>
+          <div style="color: #475467;">回复模板与 FAQ</div>
+          <div style="color: #b54708;">工单沉淀</div>
+          <div style="text-align: right; color: #98a2b3;">0</div>
+          <div style="color: #667085;">2026-09-10</div>
+          <div><span style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 3px 8px;">待审核</span></div>
+          <div><div style="display: inline-flex; align-items: center; font-size: 12px; font-weight: 500; color: #2f4aa0; border: 1px solid #c7d2f2; border-radius: 6px; padding: 5px 10px; background: #ffffff;">审核</div></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 100px 110px 110px 110px 120px 72px; gap: 12px; padding: 11px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center;">
+          <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;">亚马逊买家消息 24 小时回复与「无需回复」标记规则</div>
+          <div style="color: #475467;">亚马逊规则</div>
+          <div style="color: #475467;">人工上传</div>
+          <div style="text-align: right; font-weight: 500;">41</div>
+          <div style="color: #667085;">2026-08-12</div>
+          <div><span style="font-size: 11px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 3px 8px;">已发布</span></div>
+          <div></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 100px 110px 110px 110px 120px 72px; gap: 12px; padding: 11px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center;">
+          <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;">配件补发流程：良仓有货与无货两条分支</div>
+          <div style="color: #475467;">政策规则</div>
+          <div style="color: #475467;">人工上传</div>
+          <div style="text-align: right; font-weight: 500;">58</div>
+          <div style="color: #667085;">2026-09-02</div>
+          <div><span style="font-size: 11px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 3px 8px;">已发布</span></div>
+          <div></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 100px 110px 110px 110px 120px 72px; gap: 12px; padding: 11px 16px; border-bottom: 1px solid #f2f4f7; font-size: 13px; align-items: center; background: #fffdf5;">
+          <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;">德国站包装内缺少 EU 插头转换器的处理口径</div>
+          <div style="color: #475467;">回复模板与 FAQ</div>
+          <div style="color: #b54708;">工单沉淀</div>
+          <div style="text-align: right; color: #98a2b3;">0</div>
+          <div style="color: #667085;">2026-09-09</div>
+          <div><span style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 3px 8px;">待审核</span></div>
+          <div><div style="display: inline-flex; align-items: center; font-size: 12px; font-weight: 500; color: #2f4aa0; border: 1px solid #c7d2f2; border-radius: 6px; padding: 5px 10px; background: #ffffff;">审核</div></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 100px 110px 110px 110px 120px 72px; gap: 12px; padding: 11px 16px; font-size: 13px; align-items: center;">
+          <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;">电池安全与航空运输限制说明</div>
+          <div style="color: #475467;">产品事实与手册</div>
+          <div style="color: #475467;">人工上传</div>
+          <div style="text-align: right; font-weight: 500;">12</div>
+          <div style="color: #667085;">2026-06-25</div>
+          <div><span style="font-size: 11px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 3px 8px;">已发布</span></div>
+          <div></div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #667085;">
+        <div>显示 1-9 条，共 214 条</div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="border: 1px solid #e3e6eb; border-radius: 6px; padding: 4px 10px; background: #ffffff; color: #98a2b3;">上一页</div>
+          <div style="border: 1px solid #e3e6eb; border-radius: 6px; padding: 4px 10px; background: #ffffff; color: #475467;">下一页</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

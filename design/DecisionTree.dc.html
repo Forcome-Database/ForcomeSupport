@@ -1,0 +1,241 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; color: #1c2129; -webkit-font-smoothing: antialiased; }
+    a { color: #3d5fc4; } a:hover { color: #2f4aa0; }
+  </style>
+</helmet>
+<div style="width: 1440px; min-height: 1800px; box-sizing: border-box; padding: 48px 56px 56px 56px; background: #f6f7f9; display: flex; flex-direction: column; gap: 24px;">
+
+  <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <div style="font-size: 26px; font-weight: 600; letter-spacing: -0.01em;">AI Agent 决策逻辑</div>
+      <div style="font-size: 14px; color: #667085;">五步处理：接收与关联 → 风险拦截 → 理解与处理 → 回复检查 → 发送方式。步骤固定，处理规则可配置，业务改口径不用改系统</div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end;">
+      <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 12px; height: 12px; border-radius: 3px; background: #d1fadf;"></div><div style="font-size: 12px; color: #475467;">自动发送</div></div>
+      <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 12px; height: 12px; border-radius: 3px; background: #e8edfa;"></div><div style="font-size: 12px; color: #475467;">待审草稿</div></div>
+      <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 12px; height: 12px; border-radius: 3px; background: #fef0c7;"></div><div style="font-size: 12px; color: #475467;">动作审批后发</div></div>
+      <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 12px; height: 12px; border-radius: 3px; background: #fee4e2;"></div><div style="font-size: 12px; color: #475467;">转人工</div></div>
+      <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 12px; height: 12px; border-radius: 3px; background: #ede9fe;"></div><div style="font-size: 12px; color: #475467;">进入流程引擎</div></div>
+    </div>
+  </div>
+
+  <!-- 主链路：五步处理 -->
+  <div style="display: flex; flex-direction: row; align-items: stretch; gap: 8px;">
+    <div style="flex: 1; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="width: 22px; height: 22px; border-radius: 999px; background: #1c2129; color: #ffffff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center;">1</div>
+        <div style="font-size: 14px; font-weight: 600;">接收与关联</div>
+      </div>
+      <div style="font-size: 12px; color: #475467; line-height: 1.6;">来源识别：客户消息 / 通知与垃圾，工厂往来走工厂工作台不进来信流；按积加店铺 ID 或 Gmail 收件地址识别店铺<br>按订单号、亚马逊匿名邮箱、Shopify 邮箱关联积加订单<br>有未关闭工单则追加，否则新建<br>直邮来信核验订单归属前不透露订单详情</div>
+      <div style="margin-top: auto; font-size: 11px; color: #667085; background: #f6f7f9; border-radius: 6px; padding: 6px 8px;">关联不上且需要订单信息 → 草稿一次问全订单号与收件邮箱</div>
+    </div>
+    <div style="display: flex; align-items: center;"><svg width="16" height="16" viewBox="0 0 20 16" fill="none" stroke="#98a2b3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h14"></path><path d="M11 3l5 5-5 5"></path></svg></div>
+    <div style="flex: 1; background: #ffffff; border: 1px solid #fecdca; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="width: 22px; height: 22px; border-radius: 999px; background: #b42318; color: #ffffff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center;">2</div>
+        <div style="font-size: 14px; font-weight: 600;">风险拦截</div>
+      </div>
+      <div style="font-size: 12px; color: #475467; line-height: 1.6;">先于意图判断。对照下方风险信号清单，命中即转人工（重复联系第 2 次先升优先级，第 3 次转人工），标明命中原因，附 AI 分析与依据，不生成草稿。<br>情绪不在这一步里：负面情绪但无风险信号的来信照常进入处理，用道歉语气并默认人审。</div>
+      <div style="margin-top: auto; font-size: 11px; color: #b42318; background: #fee4e2; border-radius: 6px; padding: 6px 8px;">命中 → 转人工，按信号类型定优先级</div>
+    </div>
+    <div style="display: flex; align-items: center;"><svg width="16" height="16" viewBox="0 0 20 16" fill="none" stroke="#98a2b3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h14"></path><path d="M11 3l5 5-5 5"></path></svg></div>
+    <div style="flex: 1.15; background: #ffffff; border: 1px solid #c7d2f2; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="width: 22px; height: 22px; border-radius: 999px; background: #3d5fc4; color: #ffffff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center;">3</div>
+        <div style="font-size: 14px; font-weight: 600;">理解与处理</div>
+      </div>
+      <div style="font-size: 12px; color: #475467; line-height: 1.6;">一次调用输出：主意图、次意图、情绪三档、语言、实体<br>主意图决定用哪条处理规则；次意图在同一封草稿里顺带回答，不拆工单<br>处理规则规定：需要的信息、查什么数据、允许的动作、模板、升级条件<br>缺信息 → 一次问全；无法识别 → 转人工并标为新意图样本</div>
+      <div style="margin-top: auto; font-size: 11px; color: #2f4aa0; background: #e8edfa; border-radius: 6px; padding: 6px 8px;">12 条处理规则见下方；草稿默认 3 版按解决方案区分，坐席可换一版；配件补发交给流程引擎</div>
+    </div>
+    <div style="display: flex; align-items: center;"><svg width="16" height="16" viewBox="0 0 20 16" fill="none" stroke="#98a2b3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h14"></path><path d="M11 3l5 5-5 5"></path></svg></div>
+    <div style="flex: 1; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="width: 22px; height: 22px; border-radius: 999px; background: #1c2129; color: #ffffff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center;">4</div>
+        <div style="font-size: 14px; font-weight: 600;">回复检查</div>
+      </div>
+      <div style="font-size: 12px; color: #475467; line-height: 1.6;">事实溯源：每个事实来自订单数据或知识来源<br>政策一致：不承诺政策以外的东西<br>渠道内容能力：亚马逊纯文字，无链接、图片、营销、站外联系方式；邮件可带素材库图片与白名单链接<br>语言匹配客户，德语用正式称呼<br>不泄露成本、供应商、内部备注</div>
+      <div style="margin-top: auto; font-size: 11px; color: #667085; background: #f6f7f9; border-radius: 6px; padding: 6px 8px;">任一项不过 → 转人审并标明原因，不允许自动发送</div>
+    </div>
+    <div style="display: flex; align-items: center;"><svg width="16" height="16" viewBox="0 0 20 16" fill="none" stroke="#98a2b3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h14"></path><path d="M11 3l5 5-5 5"></path></svg></div>
+    <div style="flex: 1; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="width: 22px; height: 22px; border-radius: 999px; background: #1c2129; color: #ffffff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center;">5</div>
+        <div style="font-size: 14px; font-weight: 600;">发送方式</div>
+      </div>
+      <div style="font-size: 12px; color: #475467; line-height: 1.6;">按意图配置三种策略之一：<br><span style="color: #067647; font-weight: 600;">自动发送</span>：置信度达标且意图在白名单<br><span style="color: #2f4aa0; font-weight: 600;">待审草稿</span>：默认，坐席采纳 / 修改 / 拒绝<br><span style="color: #b54708; font-weight: 600;">动作审批后发</span>：草稿承诺了补发、退款等动作</div>
+      <div style="margin-top: auto; font-size: 11px; color: #667085; background: #f6f7f9; border-radius: 6px; padding: 6px 8px;">亚马逊 SLA 保底：剩 4 小时未处理且无风险信号，自动发预审过的进展回复</div>
+    </div>
+  </div>
+
+  <!-- 风险信号 + 情绪 -->
+  <div style="display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px;">
+    <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; align-items: baseline; gap: 10px;">
+        <div style="font-size: 14px; font-weight: 600;">风险信号清单（第 2 步）</div>
+        <div style="font-size: 12px; color: #667085;">每条可解释、可配置、可统计；在设置页维护</div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px;">
+        <div style="display: flex; gap: 8px; align-items: flex-start;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #d92d20; flex-shrink: 0; margin-top: 5px;"></div><div style="font-size: 12px; line-height: 1.5;"><span style="font-weight: 600;">安全事故</span>：起火、冒烟、过热、烫伤、电池鼓包。最高优先级，人工处理并留档。</div></div>
+        <div style="display: flex; gap: 8px; align-items: flex-start;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #d92d20; flex-shrink: 0; margin-top: 5px;"></div><div style="font-size: 12px; line-height: 1.5;"><span style="font-weight: 600;">平台风险</span>：提到 A-to-Z、拒付、差评或 feedback 威胁、投诉到平台、律师或法律。</div></div>
+        <div style="display: flex; gap: 8px; align-items: flex-start;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #f79009; flex-shrink: 0; margin-top: 5px;"></div><div style="font-size: 12px; line-height: 1.5;"><span style="font-weight: 600;">重复联系</span>：同一工单第 2 次来信未解决升一级优先；第 3 次强制人工。</div></div>
+        <div style="display: flex; gap: 8px; align-items: flex-start;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #f79009; flex-shrink: 0; margin-top: 5px;"></div><div style="font-size: 12px; line-height: 1.5;"><span style="font-weight: 600;">高价值</span>：订单金额或客户累计消费超过阈值，阈值可配。</div></div>
+        <div style="display: flex; gap: 8px; align-items: flex-start;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #f79009; flex-shrink: 0; margin-top: 5px;"></div><div style="font-size: 12px; line-height: 1.5;"><span style="font-weight: 600;">要求真人</span>：客户明确要求与人沟通。</div></div>
+        <div style="display: flex; gap: 8px; align-items: flex-start;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #98a2b3; flex-shrink: 0; margin-top: 5px;"></div><div style="font-size: 12px; line-height: 1.5;"><span style="font-weight: 600;">无法处理的内容</span>：不支持的语言、乱码、只有附件没有正文。</div></div>
+      </div>
+      <div style="font-size: 12px; color: #667085; line-height: 1.5; background: #f6f7f9; border-radius: 6px; padding: 8px 10px;">退货与退款不在清单里：退款是常规意图，退款动作走审批；只有同时命中风险信号才转人工。评价与反馈、批发与合作按意图处理规则本身转人工。</div>
+    </div>
+    <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; align-items: baseline; gap: 10px;">
+        <div style="font-size: 14px; font-weight: 600;">情绪与紧急度</div>
+        <div style="font-size: 12px; color: #667085;">不做路由依据</div>
+      </div>
+      <div style="display: flex; flex-direction: row; gap: 8px;">
+        <div style="flex: 1; background: #fee4e2; border-radius: 6px; padding: 8px 10px; font-size: 12px; color: #b42318; font-weight: 600; text-align: center;">负面</div>
+        <div style="flex: 1; background: #f2f4f7; border-radius: 6px; padding: 8px 10px; font-size: 12px; color: #475467; font-weight: 600; text-align: center;">中性</div>
+        <div style="flex: 1; background: #d1fadf; border-radius: 6px; padding: 8px 10px; font-size: 12px; color: #067647; font-weight: 600; text-align: center;">正面</div>
+      </div>
+      <div style="font-size: 12px; color: #475467; line-height: 1.6;">按客服语境校准：「我遇到一个问题」不算负面。<br>只用于三件事：待处理列表排序、报表、草稿的道歉程度。<br>紧急度不从情绪推，从事实推：客户给出的期限、SLA 剩余、超期天数。</div>
+    </div>
+  </div>
+
+  <!-- 意图处理规则 -->
+  <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+    <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px;">
+      <div style="display: flex; align-items: baseline; gap: 10px;">
+        <div style="font-size: 14px; font-weight: 600;">12 条处理规则（第 3 步）</div>
+        <div style="font-size: 12px; color: #667085;">按「解决路径不同」划分，每条是一段配置：需要的信息 · 查什么 · 允许动作 · 默认出口</div>
+      </div>
+      <div style="font-size: 12px; color: #667085;">新增意图门槛：占比超 3% 且解决路径不同；每月复盘「其他」样本</div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;">
+
+      <div style="border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 13px; font-weight: 600;">产品咨询</div><div style="font-size: 10px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 2px 6px;">售前</div></div>
+        <div style="font-size: 11px; color: #667085; line-height: 1.5;">需要：产品型号或链接<br>查：产品事实表、手册、兼容表<br>动作：无</div>
+        <div style="margin-top: auto; font-size: 11px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 4px 8px;">待审草稿 → 采纳率达标后自动发送</div>
+      </div>
+
+      <div style="border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 13px; font-weight: 600;">购买咨询</div><div style="font-size: 10px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 2px 6px;">售前</div></div>
+        <div style="font-size: 11px; color: #667085; line-height: 1.5;">需要：站点、目的国<br>查：促销与物流配置、积加库存<br>动作：无；亚马逊只陈述事实，不营销</div>
+        <div style="margin-top: auto; font-size: 11px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 4px 8px;">待审草稿</div>
+      </div>
+
+      <div style="border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 13px; font-weight: 600;">批发与合作</div><div style="font-size: 10px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 2px 6px;">售前</div></div>
+        <div style="font-size: 11px; color: #667085; line-height: 1.5;">需要：无<br>查：无<br>动作：无</div>
+        <div style="margin-top: auto; font-size: 11px; font-weight: 500; color: #b42318; background: #fee4e2; border-radius: 4px; padding: 4px 8px;">转销售，不生成草稿</div>
+      </div>
+
+      <div style="border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 13px; font-weight: 600;">订单查询</div><div style="font-size: 10px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px;">售后</div></div>
+        <div style="font-size: 11px; color: #667085; line-height: 1.5;">需要：订单号或收件邮箱<br>查：积加订单与物流轨迹<br>动作：只读；仅处理在途且正常的订单</div>
+        <div style="margin-top: auto; font-size: 11px; font-weight: 500; color: #067647; background: #d1fadf; border-radius: 4px; padding: 4px 8px;">第一批放开自动发送</div>
+      </div>
+
+      <div style="border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 13px; font-weight: 600;">未收到与异常</div><div style="font-size: 10px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px;">售后</div></div>
+        <div style="font-size: 11px; color: #667085; line-height: 1.5;">需要：订单号；已签收未收到需投递证明<br>查：物流轨迹；停滞满 5 天或超预计送达视为异常<br>动作：向承运商查件（低风险）、补发（高风险）</div>
+        <div style="margin-top: auto; font-size: 11px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 4px 8px;">待审草稿；承诺补发时审批后发</div>
+      </div>
+
+      <div style="border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 13px; font-weight: 600;">修改订单</div><div style="font-size: 10px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px;">售后</div></div>
+        <div style="font-size: 11px; color: #667085; line-height: 1.5;">需要：新地址或取消原因<br>查：履约状态<br>动作：改地址 / 取消（高风险），仅未发货时可做</div>
+        <div style="margin-top: auto; font-size: 11px; font-weight: 500; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 4px 8px;">未履约审批后发；已发货给替代方案，待审草稿</div>
+      </div>
+
+      <div style="border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 13px; font-weight: 600;">到货问题</div><div style="font-size: 10px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px;">售后</div></div>
+        <div style="font-size: 11px; color: #667085; line-height: 1.5;">破损、错发、漏发、缺配件<br>需要：照片、实际收到的物品<br>查：订单明细、积加发货记录<br>动作：补发或退款（高风险）</div>
+        <div style="margin-top: auto; font-size: 11px; font-weight: 500; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 4px 8px;">凭证齐全审批后发；不齐先追问</div>
+      </div>
+
+      <div style="border: 1px solid #c7d2f2; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; background: #fbfcff;">
+        <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 13px; font-weight: 600;">产品故障与使用问题</div><div style="font-size: 10px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px;">售后</div></div>
+        <div style="font-size: 11px; color: #667085; line-height: 1.5;">需要：症状、购买日期<br>查：故障排查树、保修期<br>动作：先给排查步骤；未解决 → 识别配件，创建售后单</div>
+        <div style="margin-top: auto; font-size: 11px; font-weight: 500; color: #5b21b6; background: #ede9fe; border-radius: 4px; padding: 4px 8px;">排查草稿待审；排查不成进流程引擎</div>
+      </div>
+
+      <div style="border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 13px; font-weight: 600;">退货与退款</div><div style="font-size: 10px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px;">售后</div></div>
+        <div style="font-size: 11px; color: #667085; line-height: 1.5;">需要：订单号、原因<br>查：站点退货政策与窗口；亚马逊走退货中心，Shopify 走自有流程<br>动作：退货指引（低风险）、退款（高风险）</div>
+        <div style="margin-top: auto; font-size: 11px; font-weight: 500; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 4px 8px;">指引待审草稿；退款审批后发；有风险信号才转人工</div>
+      </div>
+
+      <div style="border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 13px; font-weight: 600;">保修与配件购买</div><div style="font-size: 10px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px;">售后</div></div>
+        <div style="font-size: 11px; color: #667085; line-height: 1.5;">需要：配件号或症状、购买日期<br>查：配件表、保修条款、报价<br>动作：报价（低风险）；付款后创建售后单</div>
+        <div style="margin-top: auto; font-size: 11px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 4px 8px;">待审草稿</div>
+      </div>
+
+      <div style="border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 13px; font-weight: 600;">发票与收据</div><div style="font-size: 10px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px;">售后</div></div>
+        <div style="font-size: 11px; color: #667085; line-height: 1.5;">德国站高频<br>需要：订单号<br>查：平台发票或积加<br>动作：生成并附发票（低风险）</div>
+        <div style="margin-top: auto; font-size: 11px; font-weight: 500; color: #067647; background: #d1fadf; border-radius: 4px; padding: 4px 8px;">早期即可自动发送</div>
+      </div>
+
+      <div style="border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 13px; font-weight: 600;">评价与反馈</div><div style="font-size: 10px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px;">售后</div></div>
+        <div style="font-size: 11px; color: #667085; line-height: 1.5;">差评、要求撤评、feedback<br>亚马逊对此类沟通有严格限制<br>动作：无</div>
+        <div style="margin-top: auto; font-size: 11px; font-weight: 500; color: #b42318; background: #fee4e2; border-radius: 4px; padding: 4px 8px;">转人工，模板受限</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; border-top: 1px solid #f2f4f7; padding-top: 12px;">
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 12px;"><div style="font-weight: 600; white-space: nowrap;">致谢与确认</div><div style="color: #667085;">不是业务意图。亚马逊标记「无需回复」，建议关闭工单。</div></div>
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 12px;"><div style="font-weight: 600; white-space: nowrap;">其他供应商邮件</div><div style="color: #667085;">在第 1 步识别。匹配到售后单则解析报价或单号推进流程；匹配不到转人工。</div></div>
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 12px;"><div style="font-weight: 600; white-space: nowrap;">通知与垃圾</div><div style="color: #667085;">在第 1 步识别。归档，不建工单。</div></div>
+    </div>
+  </div>
+
+  <!-- 知识库四层 + 发送策略 -->
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px;">
+    <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; align-items: baseline; gap: 10px;">
+        <div style="font-size: 14px; font-weight: 600;">处理规则读取的知识库四层</div>
+        <div style="font-size: 12px; color: #667085;">产品和政策用结构化数据，不靠检索猜</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; gap: 10px; font-size: 12px; line-height: 1.5;"><div style="width: 96px; flex-shrink: 0; font-weight: 600;">产品事实表</div><div style="color: #475467;">结构化：SKU 与变体、规格、兼容车型与电源、包装清单、配件号与适配、保修期。兼容类问题查表。</div></div>
+        <div style="display: flex; gap: 10px; font-size: 12px; line-height: 1.5;"><div style="width: 96px; flex-shrink: 0; font-weight: 600;">政策规则</div><div style="color: #475467;">结构化配置给 agent 判断，说明文本给回复用：各站点退货窗口、运费承担、补发条件、责任类型与默认承担比例。</div></div>
+        <div style="display: flex; gap: 10px; font-size: 12px; line-height: 1.5;"><div style="width: 96px; flex-shrink: 0; font-weight: 600;">故障排查树</div><div style="color: #475467;">症状 → 步骤 → 判定 → 配件号。客服和工厂共同维护，先覆盖前十个高频症状。决定多少「坏了」不用补发。</div></div>
+        <div style="display: flex; gap: 10px; font-size: 12px; line-height: 1.5;"><div style="width: 96px; flex-shrink: 0; font-weight: 600;">模板与沉淀</div><div style="color: #475467;">按意图 × 语言 × 渠道的模板，亚马逊版无链接无营销；工单沉淀问答需审核，带负责人和有效期。</div></div>
+      </div>
+      <div style="font-size: 12px; color: #667085; line-height: 1.5; background: #f6f7f9; border-radius: 6px; padding: 8px 10px;">检索：关键词加向量混合，先按产品、站点、语言过滤再重排，回复必须能指出来源。转人工和低置信工单自动生成知识缺口清单，每周处理。</div>
+    </div>
+
+    <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; align-items: baseline; gap: 10px;">
+        <div style="font-size: 14px; font-weight: 600;">发送方式与动作分级（第 5 步）</div>
+        <div style="font-size: 12px; color: #667085;">在设置页按意图配置，按采纳率逐步放开</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 6px 12px; font-size: 12px; line-height: 1.5;">
+        <div style="font-weight: 600; color: #067647;">自动发送</div><div style="color: #475467;">置信度 ≥ 意图阈值、依据齐全、意图在白名单、草稿不含承诺动作。起步白名单：订单查询、发票与收据。</div>
+        <div style="font-weight: 600; color: #2f4aa0;">待审草稿</div><div style="color: #475467;">默认策略。坐席采纳 / 修改 / 拒绝的结果回流，连续 30 天采纳率高于 90% 的意图由主管切换为自动发送；24 小时内拒绝或修改超 30% 自动降回。</div>
+        <div style="font-weight: 600; color: #b54708;">动作审批后发</div><div style="color: #475467;">草稿承诺了补发、退款、改地址等高风险动作时，先过动作审批，再发草稿，避免承诺落空。</div>
+        <div style="font-weight: 600; color: #b42318;">转人工</div><div style="color: #475467;">来自第 2 步风险信号、处理规则本身（批发、评价）、无法识别、质检不过且置信度极低。</div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; border-top: 1px solid #f2f4f7; padding-top: 10px;">
+        <div style="background: #d1fadf; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #067647; line-height: 1.5;"><span style="font-weight: 600;">只读</span>：查订单、库存、物流、费用。自动执行。</div>
+        <div style="background: #e8edfa; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #2f4aa0; line-height: 1.5;"><span style="font-weight: 600;">低风险写</span>：加备注、写登记表、向工厂工作台派发询价单、查件。自动执行并留痕。</div>
+        <div style="background: #fef0c7; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #b54708; line-height: 1.5;"><span style="font-weight: 600;">高风险写</span>：退款、改地址、取消、创建发货单、通知工厂寄出。进动作审批队列，审批时限 4 小时，超时提醒并升级。</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

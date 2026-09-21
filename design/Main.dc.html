@@ -1,0 +1,366 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; color: #1c2129; -webkit-font-smoothing: antialiased; }
+    a { color: #3d5fc4; } a:hover { color: #2f4aa0; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; background: #f6f7f9; display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- 顶栏 -->
+  <div style="height: 56px; box-sizing: border-box; background: #ffffff; border-bottom: 1px solid #e3e6eb; display: flex; align-items: center; justify-content: space-between; padding: 0px 20px;">
+    <div style="display: flex; align-items: center; gap: 28px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 26px; height: 26px; border-radius: 7px; background: #3d5fc4; display: flex; align-items: center; justify-content: center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v9a2 2 0 0 1-2 2H9l-5 4z"></path></svg>
+        </div>
+        <div style="font-size: 15px; font-weight: 600;">Forcome Support</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <div style="font-size: 13px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 6px; padding: 6px 12px;">收件箱</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">工单</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">售后</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">动作审批</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">知识库</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">报表</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">设置</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="width: 260px; height: 34px; box-sizing: border-box; background: #f6f7f9; border: 1px solid #e3e6eb; border-radius: 6px; display: flex; align-items: center; gap: 8px; padding: 0px 10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#98a2b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <div style="font-size: 13px; color: #98a2b3;">搜索工单、订单号、客户邮箱</div>
+      </div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475467" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10 21h4"></path></svg>
+      <div style="width: 30px; height: 30px; border-radius: 999px; background: #d1fadf; color: #067647; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">婷</div>
+    </div>
+  </div>
+
+  <!-- 主体 -->
+  <div style="flex: 1; display: flex; flex-direction: row; min-height: 0px;">
+
+    <!-- 左：工单列表 -->
+    <div style="width: 300px; box-sizing: border-box; background: #ffffff; border-right: 1px solid #e3e6eb; display: flex; flex-direction: column; min-height: 0px;">
+      <div style="padding: 14px 16px 10px 16px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-size: 15px; font-weight: 600;">待处理</div>
+          <div style="font-size: 12px; color: #667085;">按 SLA 剩余排序</div>
+        </div>
+        <div style="display: flex; flex-direction: row; gap: 4px; flex-wrap: wrap;">
+          <div style="font-size: 12px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 999px; padding: 4px 8px;">待审草稿 12</div>
+          <div style="font-size: 12px; font-weight: 500; color: #b42318; background: #fee4e2; border-radius: 999px; padding: 4px 8px;">转人工 3</div>
+          <div style="font-size: 12px; font-weight: 500; color: #475467; background: #f2f4f7; border-radius: 999px; padding: 4px 8px;">我的 8</div>
+          <div style="font-size: 12px; font-weight: 500; color: #475467; background: #f2f4f7; border-radius: 999px; padding: 4px 8px;">全部</div>
+        </div>
+      </div>
+
+      <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+        <div style="padding: 12px 16px; border-top: 1px solid #f2f4f7; border-left: 3px solid transparent; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">亚马逊 DE</div>
+              <div style="font-size: 13px; font-weight: 600;">Jonas Weber</div>
+            </div>
+            <div style="font-size: 11px; font-weight: 600; color: #b42318;">0h 55m</div>
+          </div>
+          <div style="font-size: 13px; color: #1c2129; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Gerät funktioniert nach 2 Wochen nicht mehr</div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #d92d20;"></div>
+            <div style="font-size: 11px; color: #667085;">负面 · 退货与退款 · 转人工（差评威胁）</div>
+          </div>
+        </div>
+
+        <div style="padding: 12px 16px; border-top: 1px solid #f2f4f7; background: #f0f3fb; border-left: 3px solid #3d5fc4; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">亚马逊 US</div>
+              <div style="font-size: 13px; font-weight: 600;">Sarah Mitchell</div>
+            </div>
+            <div style="font-size: 11px; font-weight: 600; color: #b54708;">5h 40m</div>
+          </div>
+          <div style="font-size: 13px; color: #1c2129; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tracking hasn't updated since Sep 6</div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #d92d20;"></div>
+            <div style="font-size: 11px; color: #667085;">负面 · 未收到与异常 · 待审草稿</div>
+          </div>
+        </div>
+
+        <div style="padding: 12px 16px; border-top: 1px solid #f2f4f7; border-left: 3px solid transparent; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">亚马逊 US</div>
+              <div style="font-size: 13px; font-weight: 600;">Marcus Lee</div>
+            </div>
+            <div style="font-size: 11px; font-weight: 500; color: #475467;">11h 10m</div>
+          </div>
+          <div style="font-size: 13px; color: #1c2129; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Received the wrong color, ordered black</div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #d92d20;"></div>
+            <div style="font-size: 11px; color: #667085;">负面 · 到货问题 · 待审草稿</div>
+          </div>
+        </div>
+
+        <div style="padding: 12px 16px; border-top: 1px solid #f2f4f7; border-left: 3px solid transparent; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">亚马逊 UK</div>
+              <div style="font-size: 13px; font-weight: 600;">Oliver Grant</div>
+            </div>
+            <div style="font-size: 11px; font-weight: 500; color: #475467;">22h 40m</div>
+          </div>
+          <div style="font-size: 13px; color: #1c2129; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Thanks, the replacement arrived!</div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #12b76a;"></div>
+            <div style="font-size: 11px; color: #667085;">正面 · 无需回复 · 建议关闭</div>
+          </div>
+        </div>
+
+        <div style="padding: 12px 16px; border-top: 1px solid #f2f4f7; border-left: 3px solid transparent; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px;">Shopify</div>
+              <div style="font-size: 13px; font-weight: 600;">Emily Chen</div>
+            </div>
+            <div style="font-size: 11px; color: #667085;">昨天</div>
+          </div>
+          <div style="font-size: 13px; color: #1c2129; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Does the V2 fit a Tesla Model Y 12V socket?</div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #98a2b3;"></div>
+            <div style="font-size: 11px; color: #667085;">中性 · 产品咨询 · 待审草稿</div>
+          </div>
+        </div>
+
+        <div style="padding: 12px 16px; border-top: 1px solid #f2f4f7; border-left: 3px solid transparent; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px;">Shopify</div>
+              <div style="font-size: 13px; font-weight: 600;">Priya Raman</div>
+            </div>
+            <div style="font-size: 11px; color: #667085;">昨天</div>
+          </div>
+          <div style="font-size: 13px; color: #1c2129; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Can I change my shipping address?</div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #98a2b3;"></div>
+            <div style="font-size: 11px; color: #667085;">中性 · 修改订单 · 等内部</div>
+          </div>
+        </div>
+
+        <div style="padding: 12px 16px; border-top: 1px solid #f2f4f7; border-left: 3px solid transparent; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="font-size: 10px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 2px 6px;">直邮</div>
+              <div style="font-size: 13px; font-weight: 600;">Ana Souza</div>
+            </div>
+            <div style="font-size: 11px; color: #667085;">2 天前</div>
+          </div>
+          <div style="font-size: 13px; color: #1c2129; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Wholesale pricing for 200 units?</div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 8px; height: 8px; border-radius: 999px; background: #98a2b3;"></div>
+            <div style="font-size: 11px; color: #667085;">中性 · 批发与合作 · 转人工</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中：会话与草稿 -->
+    <div style="flex: 1; display: flex; flex-direction: column; min-width: 0px; min-height: 0px;">
+      <div style="background: #ffffff; border-bottom: 1px solid #e3e6eb; padding: 14px 24px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+          <div style="font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tracking hasn't updated since Sep 6</div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="font-size: 12px; font-weight: 500; color: #475467; border: 1px solid #e3e6eb; border-radius: 6px; padding: 6px 10px; background: #ffffff;">合并</div>
+            <div style="font-size: 12px; font-weight: 500; color: #475467; border: 1px solid #e3e6eb; border-radius: 6px; padding: 6px 10px; background: #ffffff;">内部备注</div>
+            <div style="font-size: 12px; font-weight: 500; color: #475467; border: 1px solid #e3e6eb; border-radius: 6px; padding: 6px 10px; background: #ffffff;">关闭工单</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <div style="font-size: 12px; color: #667085;">T-20260910-0192 · 亚马逊 US · 店铺 Forcome Direct</div>
+          <div style="font-size: 11px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 3px 8px;">待审草稿</div>
+          <div style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 3px 8px;">优先级 高</div>
+          <div style="font-size: 11px; font-weight: 500; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 3px 8px;">未收到与异常</div>
+          <div style="font-size: 12px; color: #667085;">负责人 李婷</div>
+          <div style="font-size: 12px; color: #b54708; font-weight: 500;">SLA 剩余 5h 40m</div>
+          <div style="width: 1px; height: 14px; background: #e3e6eb;"></div>
+          <div style="font-size: 11px; font-weight: 500; color: #475467; background: #f2f4f7; border: 1px solid #e3e6eb; border-radius: 999px; padding: 2px 8px;">路途急</div>
+          <div style="font-size: 11px; font-weight: 500; color: #475467; background: #f2f4f7; border: 1px solid #e3e6eb; border-radius: 999px; padding: 2px 8px;">物流停滞</div>
+          <div style="font-size: 12px; color: #3d5fc4;">+ 标签</div>
+        </div>
+      </div>
+
+      <div style="flex: 1; overflow: hidden; padding: 14px 24px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="background: #f6f7f9; border: 1px solid #e3e6eb; border-radius: 8px; padding: 8px 12px; display: flex; align-items: flex-start; gap: 10px;">
+          <div style="font-size: 11px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px; flex-shrink: 0; margin-top: 1px;">对话摘要</div>
+          <div style="font-size: 12px; color: #475467; line-height: 1.5;">9 月 3 日下单一台 V2 黑色，UPS 自 9 月 6 日无扫描且已超预计送达；客户 9 月 15 日前要用。首次来信，负面但无风险信号。</div>
+        </div>
+        <div style="display: flex; flex-direction: row; gap: 12px; align-items: flex-start;">
+          <div style="width: 32px; height: 32px; border-radius: 999px; background: #fef0c7; color: #b54708; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">SM</div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; align-items: baseline; gap: 8px;">
+              <div style="font-size: 13px; font-weight: 600;">Sarah Mitchell</div>
+              <div style="font-size: 12px; color: #667085;">经积加同步 · 2026-09-10 16:00</div>
+              <div style="display: flex; align-items: center; background: #f2f4f7; border-radius: 999px; padding: 2px; margin-left: 4px;"><div style="font-size: 11px; font-weight: 600; color: #1c2129; background: #ffffff; border-radius: 999px; padding: 1px 8px;">原文 EN</div><div style="font-size: 11px; font-weight: 500; color: #667085; padding: 1px 8px;">中文译文</div></div>
+            </div>
+            <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 14px; font-size: 13px; line-height: 1.6; color: #1c2129;">Hi, I ordered the car vacuum on Sep 3 and the tracking hasn't moved since Sep 6. It just says "In transit". Is the package lost? I really need it before my road trip next Tuesday. Order 113-4567890-1234567.</div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: row; gap: 12px; align-items: flex-start;">
+          <div style="width: 32px; height: 32px; border-radius: 999px; background: #e8edfa; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3d5fc4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path></svg>
+          </div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <div style="display: flex; align-items: baseline; gap: 8px;">
+                <div style="font-size: 13px; font-weight: 600;">AI 回复草稿</div>
+                <div style="font-size: 12px; color: #667085;">昨天 16:01 生成 · 3 版可换 · 当前 A 版置信度 82% · 3 条依据</div>
+              </div>
+              <div style="font-size: 12px; color: #3d5fc4;">查看依据</div>
+            </div>
+            <div style="background: #ffffff; border: 1px solid #c7d2f2; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #f2f4f7; padding-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <div style="font-size: 11px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 999px; padding: 3px 10px;">A · 先补发</div>
+                  <div style="font-size: 11px; font-weight: 500; color: #475467; border: 1px solid #e3e6eb; border-radius: 999px; padding: 3px 10px;">B · 先查件再定</div>
+                  <div style="font-size: 11px; font-weight: 500; color: #475467; border: 1px solid #e3e6eb; border-radius: 999px; padding: 3px 10px;">C · 部分退款</div>
+                  <div style="font-size: 11px; font-weight: 500; color: #3d5fc4; padding: 3px 6px;">换一版</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;"><div style="font-size: 11px; color: #667085;">English ▾ · 可中文修改</div><div style="font-size: 11px; font-weight: 500; color: #98a2b3; background: #f2f4f7; border: 1px dashed #d0d5dd; border-radius: 4px; padding: 2px 7px;">插入图片</div><div style="font-size: 11px; font-weight: 500; color: #98a2b3; background: #f2f4f7; border: 1px dashed #d0d5dd; border-radius: 4px; padding: 2px 7px;">插入链接</div></div>
+              </div>
+              <div style="font-size: 13px; line-height: 1.6; color: #1c2129; white-space: pre-line;">Hi Sarah,
+
+I'm sorry the tracking has been stuck. UPS shows order 113-4567890-1234567 left the Louisville hub on Sep 6 with no scan since, which usually means a delay rather than a loss.
+
+Since you need it before Tuesday, we won't wait on the carrier: a replacement ships Friday, Sep 11 via UPS Next Day Air at no cost to you and arrives Monday, Sep 14. I've also opened a trace with UPS on the original package.
+
+Best regards,
+Forcome Support</div>
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <div style="font-size: 11px; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 3px 8px;">政策 · 物流停滞或超预计送达处理流程</div>
+                <div style="font-size: 11px; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 3px 8px;">历史工单 · T-20260614-0117</div>
+                <div style="font-size: 11px; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 3px 8px;">政策 · FBM 补发标准</div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #f2f4f7; padding-top: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <div style="height: 36px; box-sizing: border-box; display: flex; align-items: center; font-size: 13px; font-weight: 600; color: #ffffff; background: #3d5fc4; border-radius: 6px; padding: 0px 16px;">发送</div>
+                  <div style="height: 36px; box-sizing: border-box; display: flex; align-items: center; font-size: 13px; font-weight: 500; color: #2f4aa0; background: #ffffff; border: 1px solid #c7d2f2; border-radius: 6px; padding: 0px 14px;">修改后发送</div>
+                  <div style="height: 36px; box-sizing: border-box; display: flex; align-items: center; font-size: 13px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 6px; padding: 0px 14px;">转人工</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px;"><div style="font-size: 11px; color: #b54708;">亚马逊站内信不支持图片与链接，已按纯文字生成；邮件渠道可插入</div><div style="font-size: 12px; color: #98a2b3;">拒绝草稿</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: row; gap: 12px; align-items: flex-start;">
+          <div style="width: 32px; height: 32px; border-radius: 999px; background: #fee4e2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b42318" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>
+          </div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; align-items: baseline; gap: 8px;">
+              <div style="font-size: 13px; font-weight: 600;">建议动作 · 需人工确认</div>
+              <div style="font-size: 12px; color: #b42318;">草稿已承诺补发，发送前先确认此动作</div>
+            </div>
+            <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+              <div style="font-size: 13px; color: #1c2129;">创建补发订单：车载吸尘器 V2 黑色 ×1，UPS Next Day Air，运费 $12.40 由 FSH 承担，报备随本审批一并通过</div>
+              <div style="height: 32px; box-sizing: border-box; display: flex; align-items: center; font-size: 12px; font-weight: 500; color: #2f4aa0; border: 1px solid #c7d2f2; border-radius: 6px; padding: 0px 12px; background: #ffffff; white-space: nowrap;">创建补发单</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右：上下文 -->
+    <div style="width: 340px; box-sizing: border-box; background: #ffffff; border-left: 1px solid #e3e6eb; display: flex; flex-direction: column; overflow: hidden;">
+
+      <div style="padding: 12px 20px; border-bottom: 1px solid #f2f4f7; display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">客户</div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 14px; font-weight: 600;">Sarah Mitchell</div>
+          <div style="font-size: 12px; color: #667085;">s.mitchell.4h2k@marketplace.amazon.com</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 11px; color: #98a2b3;">历史摘要 · AI 生成</div>
+          <div style="font-size: 12px; color: #475467; line-height: 1.5;">3 笔订单，2 个工单均已解决：6 月查过一次物流进度，8 月复购一台送人。无投诉、无退款记录，历史情绪中性偏正面。</div>
+        </div>
+      </div>
+
+      <div style="padding: 12px 20px; border-bottom: 1px solid #f2f4f7; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">关联订单</div>
+          <div style="font-size: 12px; color: #3d5fc4;">在积加中打开</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 13px; font-weight: 600;">113-4567890-1234567</div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">已发货 · 超预计送达</div>
+            <div style="font-size: 12px; color: #667085;">下单 09-03</div>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: row; gap: 10px; align-items: center; padding: 10px; background: #f6f7f9; border-radius: 6px;">
+          <div style="width: 40px; height: 40px; border-radius: 6px; background: #e3e6eb; flex-shrink: 0;"></div>
+          <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0px;">
+            <div style="font-size: 13px; font-weight: 500;">Forcome 车载吸尘器 V2 · 黑色</div>
+            <div style="font-size: 12px; color: #667085;">×1 · $49.99 · FBM</div>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12px;"><div style="color: #667085;">承运商</div><div style="font-weight: 500;">UPS 1Z 4R2 883 03 5822 9017</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px;"><div style="color: #667085;">最后扫描</div><div style="font-weight: 500;">09-06 Louisville, KY · In transit</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px;"><div style="color: #667085;">预计送达</div><div style="font-weight: 500; color: #b42318;">09-10，已超期 1 天</div></div>
+        </div>
+      </div>
+
+      <div style="padding: 12px 20px; border-bottom: 1px solid #f2f4f7; display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">AI 分析</div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="font-size: 11px; color: #98a2b3;">意图</div>
+            <div style="font-size: 13px; font-weight: 500;">未收到与异常</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="font-size: 11px; color: #98a2b3;">情绪</div>
+            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #d92d20;"></div><div style="font-size: 13px; font-weight: 500;">负面，无风险信号</div></div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="font-size: 11px; color: #98a2b3;">紧急度</div>
+            <div style="font-size: 13px; font-weight: 500;">高，有明确期限</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="font-size: 11px; color: #98a2b3;">语言</div>
+            <div style="font-size: 13px; font-weight: 500;">英语 · 回复用英语</div>
+          </div>
+        </div>
+        <div style="font-size: 12px; color: #475467; line-height: 1.5; background: #f6f7f9; border-radius: 6px; padding: 8px 10px;">未转人工原因：未命中风险信号（首次联系，无平台或安全风险），置信度高于 75%，检索到明确依据；补发动作审批通过后草稿才发出。</div>
+      </div>
+
+      <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">检索依据</div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid #e3e6eb; border-radius: 6px;">
+            <div style="font-size: 12px; font-weight: 500;">物流停滞或超预计送达处理流程</div>
+            <div style="font-size: 11px; color: #98a2b3;">政策文档 · 相关度 0.91</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid #e3e6eb; border-radius: 6px;">
+            <div style="font-size: 12px; font-weight: 500;">亚马逊 FBM 丢件补发标准</div>
+            <div style="font-size: 11px; color: #98a2b3;">政策文档 · 相关度 0.84</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid #e3e6eb; border-radius: 6px;">
+            <div style="font-size: 12px; font-weight: 500;">T-20260614-0117 · 同客户上次订单查询</div>
+            <div style="font-size: 11px; color: #98a2b3;">历史工单 · 相关度 0.72</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

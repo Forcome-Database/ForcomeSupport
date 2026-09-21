@@ -1,0 +1,238 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; color: #1c2129; -webkit-font-smoothing: antialiased; }
+    a { color: #3d5fc4; } a:hover { color: #2f4aa0; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; background: #f6f7f9; display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- 顶栏 -->
+  <div style="height: 56px; box-sizing: border-box; background: #ffffff; border-bottom: 1px solid #e3e6eb; display: flex; align-items: center; justify-content: space-between; padding: 0px 20px;">
+    <div style="display: flex; align-items: center; gap: 28px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 26px; height: 26px; border-radius: 7px; background: #3d5fc4; display: flex; align-items: center; justify-content: center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v9a2 2 0 0 1-2 2H9l-5 4z"></path></svg>
+        </div>
+        <div style="font-size: 15px; font-weight: 600;">Forcome Support</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">收件箱</div>
+        <div style="font-size: 13px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 6px; padding: 6px 12px;">工单</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">售后</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">动作审批</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">知识库</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">报表</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">设置</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="width: 260px; height: 34px; box-sizing: border-box; background: #f6f7f9; border: 1px solid #e3e6eb; border-radius: 6px; display: flex; align-items: center; gap: 8px; padding: 0px 10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#98a2b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <div style="font-size: 13px; color: #98a2b3;">搜索工单、订单号、客户邮箱</div>
+      </div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475467" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10 21h4"></path></svg>
+      <div style="width: 30px; height: 30px; border-radius: 999px; background: #d1fadf; color: #067647; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">婷</div>
+    </div>
+  </div>
+
+  <div style="flex: 1; padding: 20px 28px; display: flex; flex-direction: column; gap: 16px; min-height: 0px;">
+
+    <!-- 面包屑 -->
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+      <div style="color: #3d5fc4;">工单</div>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#98a2b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+      <div style="color: #3d5fc4;">T-20260910-0192</div>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#98a2b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+      <div style="color: #667085;">客户档案</div>
+    </div>
+
+    <!-- 客户头卡 -->
+    <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 20px 24px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 24px;">
+      <div style="display: flex; flex-direction: row; align-items: center; gap: 16px; min-width: 0px;">
+        <div style="width: 56px; height: 56px; border-radius: 999px; background: #fef0c7; color: #b54708; font-size: 18px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">SM</div>
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="font-size: 20px; font-weight: 600;">Sarah Mitchell</div>
+            <div style="font-size: 11px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 3px 8px;">复购客户</div>
+            <div style="font-size: 11px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 3px 8px;">历史情绪 中性偏正面</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #667085;">
+            <div style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">亚马逊 US</div>
+            <div>s.mitchell.4h2k@marketplace.amazon.com</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #475467;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3d5fc4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"></path><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"></path></svg>
+            <div>已合并身份：Shopify 账号 sarah.m@example.com（同名同收货地址，2026-06 人工确认合并）</div>
+          </div>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; width: 480px; flex-shrink: 0;">
+        <div style="display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: #f6f7f9; border-radius: 6px;">
+          <div style="font-size: 11px; color: #98a2b3;">订单</div>
+          <div style="font-size: 18px; font-weight: 600;">3</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: #f6f7f9; border-radius: 6px;">
+          <div style="font-size: 11px; color: #98a2b3;">工单</div>
+          <div style="font-size: 18px; font-weight: 600;">3</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: #f6f7f9; border-radius: 6px;">
+          <div style="font-size: 11px; color: #98a2b3;">累计消费</div>
+          <div style="font-size: 18px; font-weight: 600;">$148.97</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: #f6f7f9; border-radius: 6px;">
+          <div style="font-size: 11px; color: #98a2b3;">上次联系</div>
+          <div style="font-size: 15px; font-weight: 600; padding-top: 3px;">2026-09-10</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 两栏 -->
+    <div style="display: flex; flex-direction: row; gap: 16px; align-items: stretch;">
+
+      <!-- 工单历史 -->
+      <div style="flex: 1; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">工单历史</div>
+          <div style="font-size: 12px; color: #3d5fc4;">查看全部</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0px;">
+
+          <div style="display: flex; flex-direction: row; gap: 14px; align-items: stretch;">
+            <div style="display: flex; flex-direction: column; align-items: center; width: 12px; flex-shrink: 0;">
+              <div style="width: 10px; height: 10px; border-radius: 999px; background: #3d5fc4; margin-top: 5px; flex-shrink: 0;"></div>
+              <div style="width: 2px; flex: 1; background: #e3e6eb; margin-top: 4px;"></div>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px; padding-bottom: 18px; min-width: 0px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="font-size: 13px; font-weight: 600;">T-20260910-0192</div>
+                <div style="font-size: 11px; font-weight: 500; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 3px 8px;">未收到与异常</div>
+                <div style="font-size: 11px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 3px 8px;">待审草稿</div>
+                <div style="font-size: 12px; color: #98a2b3;">今天</div>
+              </div>
+              <div style="font-size: 13px; color: #475467;">Tracking hasn't updated since Sep 6 · 亚马逊 US · 负责人 李婷</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: row; gap: 14px; align-items: stretch;">
+            <div style="display: flex; flex-direction: column; align-items: center; width: 12px; flex-shrink: 0;">
+              <div style="width: 10px; height: 10px; border-radius: 999px; background: #12b76a; margin-top: 5px; flex-shrink: 0;"></div>
+              <div style="width: 2px; flex: 1; background: #e3e6eb; margin-top: 4px;"></div>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px; padding-bottom: 18px; min-width: 0px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="font-size: 13px; font-weight: 600;">T-20260614-0117</div>
+                <div style="font-size: 11px; font-weight: 500; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 3px 8px;">订单查询</div>
+                <div style="font-size: 11px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 3px 8px;">已解决</div>
+                <div style="font-size: 12px; color: #98a2b3;">2026-06-14</div>
+              </div>
+              <div style="font-size: 13px; color: #475467;">亚马逊 US · AI 草稿采纳，李婷一键发送</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: row; gap: 14px; align-items: stretch;">
+            <div style="display: flex; flex-direction: column; align-items: center; width: 12px; flex-shrink: 0;">
+              <div style="width: 10px; height: 10px; border-radius: 999px; background: #12b76a; margin-top: 5px; flex-shrink: 0;"></div>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="font-size: 13px; font-weight: 600;">T-20260302-0041</div>
+                <div style="font-size: 11px; font-weight: 500; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 3px 8px;">产品咨询</div>
+                <div style="font-size: 11px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 3px 8px;">已解决</div>
+                <div style="font-size: 12px; color: #98a2b3;">2026-03-02</div>
+              </div>
+              <div style="font-size: 13px; color: #475467;">Shopify · 人工回复，陈晨</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 订单 -->
+      <div style="width: 420px; flex-shrink: 0; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">订单</div>
+          <div style="font-size: 12px; color: #667085;">跨渠道合并，共 3 笔</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid #e3e6eb; border-radius: 6px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <div style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">亚马逊 US</div>
+                <div style="font-size: 13px; font-weight: 600;">113-4567890-1234567</div>
+              </div>
+              <div style="font-size: 12px; color: #3d5fc4; white-space: nowrap;">在积加中打开</div>
+            </div>
+            <div style="font-size: 13px; color: #1c2129;">车载吸尘器 V2 黑色 · $49.99</div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="font-size: 11px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">已发货 · 超预计送达</div>
+              <div style="font-size: 12px; color: #667085;">下单 2026-09-03</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid #e3e6eb; border-radius: 6px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <div style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px;">亚马逊 US</div>
+                <div style="font-size: 13px; font-weight: 600;">112-9988776-6655443</div>
+              </div>
+              <div style="font-size: 12px; color: #3d5fc4; white-space: nowrap;">在积加中打开</div>
+            </div>
+            <div style="font-size: 13px; color: #1c2129;">HEPA 滤芯组件 ×2 · $18.99</div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="font-size: 11px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px;">已送达</div>
+              <div style="font-size: 12px; color: #667085;">下单 2026-06-10</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid #e3e6eb; border-radius: 6px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <div style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px;">Shopify</div>
+                <div style="font-size: 13px; font-weight: 600;">#1042</div>
+              </div>
+              <div style="font-size: 12px; color: #3d5fc4; white-space: nowrap;">在积加中打开</div>
+            </div>
+            <div style="font-size: 13px; color: #1c2129;">车载吸尘器 V2 套装（含备用滤芯） · $79.99</div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="font-size: 11px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px;">已送达</div>
+              <div style="font-size: 12px; color: #667085;">下单 2026-02-27</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 内部备注 -->
+    <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">内部备注</div>
+        <div style="font-size: 12px; color: #3d5fc4;">添加备注</div>
+      </div>
+      <div style="display: flex; flex-direction: row; gap: 10px; align-items: flex-start;">
+        <div style="width: 28px; height: 28px; border-radius: 999px; background: #e8edfa; color: #2f4aa0; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">磊</div>
+        <div style="display: flex; flex-direction: column; gap: 3px;">
+          <div style="display: flex; align-items: baseline; gap: 8px;">
+            <div style="font-size: 13px; font-weight: 600;">王磊</div>
+            <div style="font-size: 12px; color: #98a2b3;">2026-06-14</div>
+          </div>
+          <div style="font-size: 13px; color: #1c2129; line-height: 1.5;">客户旅行多，物流时效敏感，优先加急。</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

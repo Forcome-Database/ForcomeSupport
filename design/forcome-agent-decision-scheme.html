@@ -1,0 +1,128 @@
+<title>Forcome Support 决策记录</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #ffffff; --surface-2: #eef0f4; --line: #dfe3ea;
+    --ink: #1c2129; --ink-2: #4b5563; --ink-3: #66707f;
+    --accent: #3556b8; --accent-ink: #2a4494; --accent-bg: #e6ebf8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151b; --surface: #1a1e26; --surface-2: #222835; --line: #2c3340;
+      --ink: #e8ebf1; --ink-2: #b4bccb; --ink-3: #8c96a8;
+      --accent: #8ea6f2; --accent-ink: #b7c6f7; --accent-bg: #23305a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151b; --surface: #1a1e26; --surface-2: #222835; --line: #2c3340;
+    --ink: #e8ebf1; --ink-2: #b4bccb; --ink-3: #8c96a8;
+    --accent: #8ea6f2; --accent-ink: #b7c6f7; --accent-bg: #23305a;
+  }
+  body { background: var(--bg); color: var(--ink); font-family: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; font-size: 14.5px; line-height: 1.6; padding-inline: 20px; padding-block: 40px 72px; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  .page { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+  header.top { display: flex; flex-direction: column; gap: 8px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--ink-3); }
+  h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; margin: 0; }
+  .lede { color: var(--ink-2); margin: 0; max-width: 68ch; }
+  .rec { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px 16px; }
+  .rec h2 { grid-column: 1 / -1; font-size: 16px; font-weight: 600; margin: 0 0 4px 0; }
+  .rec .k { font-size: 12px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.04em; padding-top: 2px; }
+  .rec .v { font-size: 14px; color: var(--ink-2); }
+  .rec .v b { color: var(--ink); font-weight: 600; }
+  .ref { font-size: 13px; color: var(--ink-3); }
+  .sources { font-size: 13px; color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; }
+  @media (max-width: 600px) { .rec { grid-template-columns: 1fr; } }
+</style>
+
+<div class="page">
+  <header class="top">
+    <div class="eyebrow">Forcome Support · 决策记录</div>
+    <h1>为什么这样设计：十二项关键决策</h1>
+    <p class="lede">本文只记录决策的备选、理由和影响，不复述规则。规则的唯一定义在 <a href="https://claude.ai/code/artifact/bcfc0cd4-fd9c-4857-b4e7-23f6c3278318">产品蓝图</a> 第 5、6 节；图纸在 <a href="https://claude.ai/code/artifact/dda6d1a2-41b4-4c97-8ac6-491808a914b5">设计画布</a>。2026-09-14 确认第 1 至 6 项；2026-09-16 按客户补充需求对齐后增补第 7 至 9 项；2026-09-21 增补第 10 至 12 项。</p>
+  </header>
+
+  <div class="rec">
+    <h2>决策 1 · 意图按解决路径划分，共 12 个</h2>
+    <div class="k">备选</div><div class="v">按话题划分（物流、退款、产品……），或按平台预置的几十个细分类目。</div>
+    <div class="k">理由</div><div class="v">两个问题如果查同样的数据、走同样的动作、用同样的模板，就是一个意图；按话题分会出现路由相同但名字不同的类目，按平台细分则没人维护。Zendesk 与 Gorgias 的电商模板都在十几个意图量级。</div>
+    <div class="k">影响</div><div class="v">每个意图对应一条可配置的处理规则；新增意图的门槛是占比超 3% 且解决路径不同。<b>待客户提供 500 封工单样本验证分布。</b></div>
+  </div>
+
+  <div class="rec">
+    <h2>决策 2 · 情绪不做路由依据，风险信号才是</h2>
+    <div class="k">备选</div><div class="v">"愤怒即转人工"；或按情绪分数设阈值。</div>
+    <div class="k">理由</div><div class="v">情绪判断是模糊的，用它做路由会让转人工率不可控。真正影响账户健康和安全的是明确信号：安全事故、A-to-Z 与拒付、差评威胁、法律、重复联系、高价值。Intercom Fin 的经验是宽泛的升级指引会导致过度转人工。</div>
+    <div class="k">影响</div><div class="v">情绪保留三档，只用于排序、报表和语气。风险信号可解释、可配置、可统计。退款申请不再一刀切转人工，退款动作走审批。</div>
+  </div>
+
+  <div class="rec">
+    <h2>决策 3 · 知识库分四层，产品与政策结构化</h2>
+    <div class="k">备选</div><div class="v">把所有文档和历史邮件放进一个向量库，靠检索回答一切。</div>
+    <div class="k">理由</div><div class="v">兼容、规格、退货窗口这类问题有唯一正确答案，查表比检索可靠；故障排查树决定多少"坏了"不用补发，是最能省钱的一层；历史邮件不经审核入库只会降低命中质量。</div>
+    <div class="k">影响</div><div class="v">产品事实表与政策规则由产品和客服主管维护；故障排查树由客服与工厂共同编写，先覆盖前十个高频症状；沉淀问答需审核并带有效期。</div>
+  </div>
+
+  <div class="rec">
+    <h2>决策 4 · 处理逻辑用固定五步加可配置规则，不用深树</h2>
+    <div class="k">备选</div><div class="v">一棵覆盖所有分支的决策树。</div>
+    <div class="k">理由</div><div class="v">深树每加一个意图就要改树，判断散落各处无法配置；固定步骤加规则表让业务改口径只改配置。复杂多步的配件补发交给流程引擎，不塞进回信逻辑。</div>
+    <div class="k">影响</div><div class="v">接收与关联、风险拦截、理解与处理、回复检查、发送方式五步固定；12 条处理规则、风险信号、发送方式与阈值都在设置页维护。</div>
+  </div>
+
+  <div class="rec">
+    <h2>决策 5 · AI 只提出动作，高风险动作由人确认</h2>
+    <div class="k">备选</div><div class="v">AI 直接执行退款、改地址、创建发货单；或所有动作都人工执行。</div>
+    <div class="k">理由</div><div class="v">这是客户要替换海帆的核心原因，但涉及金钱、物权和对外承诺的动作出错代价高。按风险分三档，只读和低风险写自动执行并留痕，高风险写进审批队列并设 4 小时时限，兼顾效率与可控。</div>
+    <div class="k">影响</div><div class="v">承诺了动作的回复必须等审批通过才发出，避免承诺落空。第二阶段按采纳率逐项申请降级，审计日志始终保留。</div>
+  </div>
+
+  <div class="rec">
+    <h2>决策 6 · 亚马逊站内信走积加，Shopify 与直邮走 Gmail</h2>
+    <div class="k">备选</div><div class="v">只接邮箱，依赖亚马逊转发；或另接 Shopify Inbox 与 Shopify webhook。</div>
+    <div class="k">理由</div><div class="v">亚马逊没有第三方可读的站内信接口，积加已经同步且能收能发；客户确认 Shopify 客户联系全部进 Gmail 客服邮箱，不用 Inbox。两条进线就够，少接一个系统少一处故障点。订单、库存、发货、费用也统一从积加读，避免两套订单数据。</div>
+    <div class="k">影响</div><div class="v"><b>积加开放接口能覆盖的范围是第二阶段能否全自动的前提，属阻塞项</b>；没有接口的部分用浏览器自动化过渡。Shopify webhook 与亚马逊 SP-API 直连不再列入前两阶段。</div>
+  </div>
+
+  <div class="rec">
+<h2>决策 7 · 动作层用统一动作接口加 MCP 适配器，第一阶段只接积加</h2>
+<div class="k">备选</div><div class="v">直接调 Shopify Admin API 与亚马逊 SP-API；或每个系统写一套动作逻辑。</div>
+<div class="k">理由</div><div class="v">客户要求 agent 靠 MCP 操作积加、亚马逊、Shopify，前期只考虑积加，并且要尽量抽象。把"查订单、发站内信、建发货单、退款、改地址、取消"定义成与系统无关的动作，每个动作映射到一个适配器，换 MCP 只改映射，流程、审批和审计都不动。</div>
+<div class="k">影响</div><div class="v">积加做不了的动作（亚马逊与 Shopify 退款、Shopify 改地址、取消）在前两阶段映射为"人工操作清单"：审批通过后生成清单，坐席在后台完成并回填；第三阶段接亚马逊、Shopify MCP 替换。积加 MCP 自建，封装积加开放接口。</div>
+</div>
+<div class="rec">
+<h2>决策 8 · 责任人工判定为主、规则为辅；承担比例逐单协商；报备只管 FSH 现金支出</h2>
+<div class="k">备选</div><div class="v">责任全由 AI 判定并直接决定谁付钱；或每个售后单都要审批。</div>
+<div class="k">理由</div><div class="v">客户确认责任划分是"人工判定加部分规则"，承担方式要 FSH 与工厂协商，报备只有快递费用和额外赔偿两类。责任判错就是钱判错，所以 AI 只给建议和依据，售后负责人确认；比例逐单谈，系统只负责在工厂工作台发起提案、催办、记结果。报备的本质是 FSH 出钱前有人点头，所以与库存分支无关，通过即视为动作审批，不重复审。</div>
+<div class="k">影响</div><div class="v">售后单新增处理方式、责任类型、四项费用、报备、承担比例、协商状态字段；协商与寄件并行，客户不等协商；报表可按责任类型和承担比例看成本。默认比例只是建议值，待客户与工厂确认。</div>
+</div>
+<div class="rec">
+<h2>决策 9 · 草稿一次给 3 版按解决方案区分，而不是按语气</h2>
+<div class="k">备选</div><div class="v">一次一版，坐席不满意就重新生成；或按语气正式、亲切、简短给多版。</div>
+<div class="k">理由</div><div class="v">客户要"草稿抽卡，不同版本，支持手动抽"。对客服真正有用的差异是解决方案（先补发、先查件、部分退款），语气差异对结果影响小、还会让人反复挑字。每版都保留并记录最终采纳哪版，采纳数据能反过来校准处理规则的默认方案。</div>
+<div class="k">影响</div><div class="v">模型调用从每封 2 到 3 次增至 3 到 4 次，含译文与摘要；采纳率统计按"采纳的版本"计；语言切换与中文修改后自动译回客户语言一并进入第二阶段。</div>
+</div>
+<div class="rec">
+<h2>决策 10 · 图片与链接按渠道能力在生成前决定，不在发出前删除</h2>
+<div class="k">备选</div><div class="v">统一生成带图带链接的草稿，发亚马逊前自动剥掉；或所有渠道都只发纯文字。</div>
+<div class="k">理由</div><div class="v">客户要草稿能插入图片和链接，但亚马逊站内信不支持。发出前剥离会留下"见下图""点此链接"这类断句，读起来像出错。把渠道能力做成配置表，生成时就读取：邮件渠道用素材库图片和白名单链接，亚马逊把图示步骤改写成文字步骤。图片只许来自素材库、链接只许白名单，是为了不让模型编造网址。</div>
+<div class="k">影响</div><div class="v">知识库的模板层增加素材库，同一排查内容要有图文版与纯文字版；编辑器在亚马逊工单上置灰插入按钮；第 4 步回复检查增加渠道内容能力一项。<b>亚马逊经积加能否带附件待确认，当前按不支持设计。</b></div>
+</div>
+<div class="rec">
+<h2>决策 11 · 多店铺：店铺是维度加配置覆盖，不是多套流程</h2>
+<div class="k">备选</div><div class="v">每个店铺部署一套系统或一套规则；或完全不区分店铺，只按平台和站点处理。</div>
+<div class="k">理由</div><div class="v">亚马逊和 Shopify 都有多个店铺。每店一套会让规则、知识库、报表成倍维护，采纳率样本也被摊薄；完全不区分则会发错签名、用错凭据、订单号撞车，亚马逊上跨店铺提及订单还有合规风险。折中是一套流程，店铺只做三件事：进线时识别、回复与动作时锁定身份与凭据、少数配置项允许覆盖。</div>
+<div class="k">影响</div><div class="v">新增店铺 Store 对象；工单、售后单、台账、动作都带店铺；权限按店铺划数据范围；可覆盖项限于签名、政策口径、模板、素材与白名单、SLA，意图、风险信号、动作分级全局统一。<b>待客户提供店铺清单与各店铺是否同品牌同政策。</b></div>
+</div>
+<div class="rec">
+<h2>决策 12 · 工厂是集团内生产厂：在同一系统里用工厂工作台协同，不走邮件</h2>
+<div class="k">备选</div><div class="v">继续用模板邮件询价、协商，系统解析工厂回信；或把工厂当外部供应商，单独做一个隔离的外部门户。</div>
+<div class="k">理由</div><div class="v">客户明确：FSH 是销售公司，工厂是生产厂，属同一集团，并要求衔接与沟通在系统内完成。既然是内部单位，就不需要外部门户那套账号隔离和商务往来，给生产厂一个角色和一个只含本厂待办的工作台即可。结构化表单让成本、运费、单号直接写台账，不再解析邮件；每张售后单一个留言线程，结算时有据可查。承担比例是销售公司与生产厂之间的内部分摊，所以用"内部结算"，不用"索赔、回款"。</div>
+<div class="k">影响</div><div class="v">新增生产厂角色、工厂任务对象和第 10 个界面；任务四类：询价、寄件、比例协商、月度结算。比例谈不拢时升级双方负责人。提醒走企业即时通讯。生产厂只见本厂任务与寄件所需信息，不显示客户邮箱与售价。Gmail 不再承担工厂往来。<b>待提供各生产厂对接人名单与使用的即时通讯工具。</b></div>
+</div>
+<div class="ref">每项决策若被推翻，需同步更新产品蓝图对应章节、画布上的决策逻辑图与设置页。</div>
+
+  <div class="sources">
+    <div>参考：<a href="https://support.zendesk.com/hc/en-us/articles/4550640560538-Automatically-classifying-customer-intent-sentiment-and-language">Zendesk 智能分诊</a> · <a href="https://www.gorgias.com/blog/ai-agent-use-cases">Gorgias AI Agent 用例</a> · <a href="https://www.intercom.com/help/en/articles/12396892-manage-fin-ai-agent-s-escalation-guidance-and-rules">Intercom Fin 升级指引</a> · <a href="https://m.media-amazon.com/images/G/01/SellerCentral/CommunicationGuidelines/en_US_Communication_Guidelines.pdf">亚马逊买卖家沟通指南</a></div>
+  </div>
+</div>

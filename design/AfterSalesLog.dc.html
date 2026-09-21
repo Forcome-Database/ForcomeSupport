@@ -1,0 +1,282 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; color: #1c2129; -webkit-font-smoothing: antialiased; }
+    a { color: #3d5fc4; } a:hover { color: #2f4aa0; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; background: #f6f7f9; display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- 顶栏 -->
+  <div style="height: 56px; box-sizing: border-box; background: #ffffff; border-bottom: 1px solid #e3e6eb; display: flex; align-items: center; justify-content: space-between; padding: 0px 20px;">
+    <div style="display: flex; align-items: center; gap: 28px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 26px; height: 26px; border-radius: 7px; background: #3d5fc4; display: flex; align-items: center; justify-content: center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v9a2 2 0 0 1-2 2H9l-5 4z"></path></svg>
+        </div>
+        <div style="font-size: 15px; font-weight: 600;">Forcome Support</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">收件箱</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">工单</div>
+        <div style="font-size: 13px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 6px; padding: 6px 12px;">售后</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">动作审批</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">知识库</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">报表</div>
+        <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">设置</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="width: 260px; height: 34px; box-sizing: border-box; background: #f6f7f9; border: 1px solid #e3e6eb; border-radius: 6px; display: flex; align-items: center; gap: 8px; padding: 0px 10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#98a2b3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <div style="font-size: 13px; color: #98a2b3;">搜索工单、订单号、客户邮箱</div>
+      </div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475467" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10 21h4"></path></svg>
+      <div style="width: 30px; height: 30px; border-radius: 999px; background: #d1fadf; color: #067647; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;">婷</div>
+    </div>
+  </div>
+
+  <div style="flex: 1; padding: 20px 28px; display: flex; flex-direction: column; gap: 16px; min-height: 0px;">
+
+    <!-- 页头 -->
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <div style="font-size: 20px; font-weight: 600;">售后</div>
+          <div style="font-size: 13px; color: #667085;">所有处理方式统一登记：责任、产品成本、运费、额外赔偿、报备、承担比例；其他费用在详情页；自动写入，人工可修正</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">售后单 9</div>
+          <div style="font-size: 13px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 6px; padding: 6px 12px;">登记台账</div>
+          <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">待协商 2</div>
+          <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">待结算 2</div>
+          <div style="font-size: 13px; font-weight: 500; color: #475467; border-radius: 6px; padding: 6px 12px;">内部结算</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="height: 36px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 6px; padding: 0px 14px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#475467" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12"></path><path d="M7 11l5 5 5-5"></path><path d="M4 20h16"></path></svg>
+          <div>导出 Excel</div>
+        </div>
+        <div style="height: 36px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #ffffff; background: #3d5fc4; border-radius: 6px; padding: 0px 16px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-14 5.3"></path><path d="M4 12a8 8 0 0 1 14-5.3"></path><path d="M18 3v4h-4"></path><path d="M6 21v-4h4"></path></svg>
+          <div>同步到积加</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选 -->
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">日期：2026-09-01 至 09-11</div>
+      <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">店铺：全部</div>
+      <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">站点：全部</div>
+      <div style="display: flex; align-items: center; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 2px;">
+        <div style="font-size: 12px; font-weight: 500; color: #2f4aa0; background: #e8edfa; border-radius: 999px; padding: 3px 10px;">分支：全部</div>
+        <div style="font-size: 12px; font-weight: 500; color: #475467; border-radius: 999px; padding: 3px 10px;">良仓无货</div>
+        <div style="font-size: 12px; font-weight: 500; color: #475467; border-radius: 999px; padding: 3px 10px;">良仓有货</div>
+      </div>
+      <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">处理方式：全部</div>
+      <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">责任：全部</div>
+      <div style="font-size: 12px; font-weight: 500; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 999px; padding: 5px 12px;">报备：全部</div>
+      <div style="font-size: 12px; color: #667085; margin-left: 4px;">共 9 条</div>
+    </div>
+
+        <!-- 台账表 -->
+    <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; overflow-x: auto; display: flex; flex-direction: column;">
+      <div style="display: grid; grid-template-columns: 58px 108px 88px 62px 72px 68px 100px 58px 122px 62px 54px 62px 76px 84px 62px 60px; gap: 6px; padding: 10px 12px; background: #f6f7f9; border-bottom: 1px solid #e3e6eb; font-size: 11px; font-weight: 600; color: #667085; letter-spacing: 0.04em;">
+        <div>登记日期</div><div>售后单号</div><div>客户</div><div>站点</div><div>处理方式</div><div>责任</div><div>配件 · 数量</div><div>分支</div><div>快递单号</div><div>产品成本</div><div>运费</div><div>额外赔偿</div><div>报备</div><div>承担 FSH / 工厂</div><div>协商</div><div>登记</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 58px 108px 88px 62px 72px 68px 100px 58px 122px 62px 54px 62px 76px 84px 62px 60px; gap: 6px; padding: 9px 12px; border-bottom: 1px solid #f2f4f7; font-size: 12px; align-items: center;">
+        <div style="color: #667085;">09-11</div>
+        <div style=" font-weight: 500;">S-20260911-0018</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Laura Bennett</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">亚马逊 US</span></div>
+        <div>寄配件</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #5b21b6; background: #ede9fe; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">产品质量</span></div>
+        <div style="color: #667085;">FC-V2-HF01 ×1</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">无货</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #98a2b3;">待工厂回填</div>
+        <div>$3.20</div>
+        <div>$11.50</div>
+        <div style="color: #98a2b3;">—</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">快递 · 待审批</span></div>
+        <div style="color: #98a2b3;">建议 0 / 100</div>
+        <div style="color: #98a2b3; font-weight: 500;">未发起</div>
+        <div style="color: #3d5fc4; font-weight: 500;">自动</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 58px 108px 88px 62px 72px 68px 100px 58px 122px 62px 54px 62px 76px 84px 62px 60px; gap: 6px; padding: 9px 12px; border-bottom: 1px solid #f2f4f7; font-size: 12px; align-items: center;">
+        <div style="color: #667085;">09-10</div>
+        <div style=" font-weight: 500;">S-20260910-0017</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Marcus Lee</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">亚马逊 US</span></div>
+        <div>寄配件</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #5b21b6; background: #ede9fe; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">产品质量</span></div>
+        <div style="color: #667085;">FC-V2-DC01 ×1</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">有货</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">1Z4R28830358229101</div>
+        <div>$4.10</div>
+        <div>$6.80</div>
+        <div style="color: #98a2b3;">—</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">快递 · 已批准</span></div>
+        <div>0 / 100</div>
+        <div style="color: #2f4aa0; font-weight: 500;">已确认 · 待结算</div>
+        <div style="color: #3d5fc4; font-weight: 500;">自动</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 58px 108px 88px 62px 72px 68px 100px 58px 122px 62px 54px 62px 76px 84px 62px 60px; gap: 6px; padding: 9px 12px; border-bottom: 1px solid #f2f4f7; font-size: 12px; align-items: center;">
+        <div style="color: #667085;">09-09</div>
+        <div style=" font-weight: 500;">S-20260909-0016</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">David Park</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">Shopify</span></div>
+        <div>寄配件</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">客户使用</span></div>
+        <div style="color: #667085;">FC-V2-HS02 ×1</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">有货</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">1Z4R28830358229088</div>
+        <div>$2.60</div>
+        <div>$6.80</div>
+        <div style="color: #98a2b3;">—</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">快递 · 已批准</span></div>
+        <div>100 / 0</div>
+        <div style="color: #98a2b3; font-weight: 500;">不适用</div>
+        <div style="color: #3d5fc4; font-weight: 500;">自动</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 58px 108px 88px 62px 72px 68px 100px 58px 122px 62px 54px 62px 76px 84px 62px 60px; gap: 6px; padding: 9px 12px; border-bottom: 1px solid #f2f4f7; font-size: 12px; align-items: center;">
+        <div style="color: #667085;">09-08</div>
+        <div style=" font-weight: 500;">S-20260908-0015</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Hannah Ross</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">亚马逊 US</span></div>
+        <div>寄配件</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">其他</span></div>
+        <div style="color: #667085;">FC-V2-BT01 ×1</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">无货</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">YT2625100012345678</div>
+        <div>$9.80</div>
+        <div>$12.30</div>
+        <div style="color: #98a2b3;">—</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">快递 · 已批准</span></div>
+        <div>50 / 50</div>
+        <div style="color: #2f4aa0; font-weight: 500;">已确认 · 待结算</div>
+        <div style="color: #667085; font-weight: 500;">王磊手工</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 58px 108px 88px 62px 72px 68px 100px 58px 122px 62px 54px 62px 76px 84px 62px 60px; gap: 6px; padding: 9px 12px; border-bottom: 1px solid #f2f4f7; font-size: 12px; align-items: center;">
+        <div style="color: #667085;">09-05</div>
+        <div style=" font-weight: 500;">S-20260905-0014</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Oliver Grant</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">亚马逊 UK</span></div>
+        <div>寄配件</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #5b21b6; background: #ede9fe; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">产品质量</span></div>
+        <div style="color: #667085;">FC-V2-CB01 ×1</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">有货</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">1Z4R28830358229052</div>
+        <div>$1.40</div>
+        <div>$5.90</div>
+        <div style="color: #98a2b3;">—</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">快递 · 已批准</span></div>
+        <div>0 / 100</div>
+        <div style="color: #067647; font-weight: 500;">已结算</div>
+        <div style="color: #3d5fc4; font-weight: 500;">自动</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 58px 108px 88px 62px 72px 68px 100px 58px 122px 62px 54px 62px 76px 84px 62px 60px; gap: 6px; padding: 9px 12px; border-bottom: 1px solid #f2f4f7; font-size: 12px; align-items: center;">
+        <div style="color: #667085;">09-04</div>
+        <div style=" font-weight: 500;">S-20260904-0013</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Emily Chen</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">Shopify</span></div>
+        <div>寄配件</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #5b21b6; background: #ede9fe; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">产品质量</span></div>
+        <div style="color: #667085;">FC-V2-HF01 ×2</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">有货</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">1Z4R28830358229041</div>
+        <div>$6.40</div>
+        <div>$6.80</div>
+        <div style="color: #98a2b3;">—</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">快递 · 已批准</span></div>
+        <div>0 / 100</div>
+        <div style="color: #067647; font-weight: 500;">已结算</div>
+        <div style="color: #3d5fc4; font-weight: 500;">自动</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 58px 108px 88px 62px 72px 68px 100px 58px 122px 62px 54px 62px 76px 84px 62px 60px; gap: 6px; padding: 9px 12px; border-bottom: 1px solid #f2f4f7; font-size: 12px; align-items: center;">
+        <div style="color: #667085;">09-03</div>
+        <div style=" font-weight: 500;">S-20260903-0012</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Jonas Weber</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">亚马逊 DE</span></div>
+        <div>寄配件</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #5b21b6; background: #ede9fe; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">产品质量</span></div>
+        <div style="color: #667085;">FC-V2-BT01 ×1</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">无货</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">YT2625100012340921</div>
+        <div>$9.80</div>
+        <div>$13.60</div>
+        <div style="color: #98a2b3;">—</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">快递 · 已批准</span></div>
+        <div style="color: #98a2b3;">建议 0 / 100</div>
+        <div style="color: #b42318; font-weight: 500;">待升级</div>
+        <div style="color: #667085; font-weight: 500;">王磊手工</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 58px 108px 88px 62px 72px 68px 100px 58px 122px 62px 54px 62px 76px 84px 62px 60px; gap: 6px; padding: 9px 12px; border-bottom: 1px solid #f2f4f7; font-size: 12px; align-items: center;">
+        <div style="color: #667085;">09-02</div>
+        <div style=" font-weight: 500;">S-20260902-0011</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Priya Raman</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">Shopify</span></div>
+        <div>部分补偿</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #2f4aa0; background: #e8edfa; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">物流问题</span></div>
+        <div style="color: #667085;">—</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">—</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #98a2b3;">—</div>
+        <div style="color: #98a2b3;">—</div>
+        <div style="color: #98a2b3;">—</div>
+        <div>$12.00</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #067647; background: #d1fadf; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">赔偿 · 已批准</span></div>
+        <div>100 / 0</div>
+        <div style="color: #98a2b3; font-weight: 500;">不适用</div>
+        <div style="color: #3d5fc4; font-weight: 500;">自动</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 58px 108px 88px 62px 72px 68px 100px 58px 122px 62px 54px 62px 76px 84px 62px 60px; gap: 6px; padding: 9px 12px; border-bottom: 1px solid #e3e6eb; font-size: 12px; align-items: center;">
+        <div style="color: #667085;">09-01</div>
+        <div style=" font-weight: 500;">S-20260901-0010</div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Noah Kim</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #b54708; background: #fef0c7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">亚马逊 US</span></div>
+        <div>调整安装</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">客户使用</span></div>
+        <div style="color: #667085;">—</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">—</span></div>
+        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #98a2b3;">—</div>
+        <div style="color: #98a2b3;">—</div>
+        <div style="color: #98a2b3;">—</div>
+        <div style="color: #98a2b3;">—</div>
+        <div><span style="font-size: 10px; font-weight: 600; color: #475467; background: #f2f4f7; border-radius: 4px; padding: 2px 6px; white-space: nowrap;">不需要</span></div>
+        <div>—</div>
+        <div style="color: #98a2b3; font-weight: 500;">不适用</div>
+        <div style="color: #3d5fc4; font-weight: 500;">自动</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 58px 108px 88px 62px 72px 68px 100px 58px 122px 62px 54px 62px 76px 84px 62px 60px; gap: 6px; padding: 10px 12px; background: #f6f7f9; font-size: 12px; font-weight: 600; align-items: center;">
+        <div>合计</div>
+        <div style="color: #667085; font-weight: 500;">9 单</div>
+        <div></div>
+        <div></div>
+        <div style="color: #667085; font-weight: 500; line-height: 1.3;">寄配件 7<br>补偿 1 · 指导 1</div>
+        <div style="color: #667085; font-weight: 500; line-height: 1.3;">质量 5 · 使用 2<br>物流 1 · 其他 1</div>
+        <div></div>
+        <div style="color: #667085; font-weight: 500; line-height: 1.3;">无货 3<br>有货 4</div>
+        <div></div>
+        <div>$37.30</div>
+        <div>$63.70</div>
+        <div>$12.00</div>
+        <div style="color: #667085; font-weight: 500;">已批 7</div>
+        <div style="line-height: 1.3;">$32.45<br>$80.55 <span style="font-weight: 400; color: #98a2b3;">含建议</span></div>
+        <div style="color: #067647; line-height: 1.3;">结算<br>$20.50</div>
+        <div style="color: #667085; font-weight: 500;">自动 7</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
