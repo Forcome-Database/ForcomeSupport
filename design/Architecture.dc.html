@@ -27,7 +27,7 @@
       <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 4px;"><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">1 渠道与接入</div><div style="font-size: 12px; color: #98a2b3;">所有来信汇成一条队列</div></div>
       <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 14px 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
         <div style="display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600;">积加 ERP</div><div style="font-size: 12px; color: #667085; line-height: 1.5;">亚马逊多店铺 × US / DE / UK 站内信收发；亚马逊与 Shopify 各店铺的订单、库存、发货、费用</div></div>
-        <div style="display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600;">客服邮箱 Gmail</div><div style="font-size: 12px; color: #667085; line-height: 1.5;">每个 Shopify 店铺一个客服邮箱，按收件地址识别店铺；直邮、亚马逊转发备份。工厂往来不走邮件</div></div>
+        <div style="display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600;">客服邮箱 Gmail</div><div style="font-size: 12px; color: #667085; line-height: 1.5;">每个 Shopify 店铺一个客服邮箱，按收件地址识别店铺；直邮。亚马逊买家消息的邮件转发只归档、不建工单，以积加为准。工厂往来不走邮件</div></div>
         <div style="display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600; color: #667085;">第三阶段：亚马逊 MCP、Shopify MCP</div><div style="font-size: 12px; color: #98a2b3; line-height: 1.5;">补充积加覆盖不到的读写；接入统一动作接口，流程不变</div></div>
       </div>
     </div>
@@ -37,15 +37,15 @@
     <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 24px; align-items: stretch;">
       <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 4px;"><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">2 处理流程</div><div style="font-size: 12px; color: #98a2b3;">每封来信固定五步，规则可配置</div></div>
       <div style="display: flex; flex-direction: row; align-items: stretch; gap: 8px;">
-        <div style="flex: 1; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 13px; font-weight: 600;">1 接收与关联</div><div style="font-size: 12px; color: #667085; line-height: 1.5;">识别来源，关联订单与客户，追加或新建工单</div></div>
+        <div style="flex: 1; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 13px; font-weight: 600;">1 接收与关联</div><div style="font-size: 12px; color: #667085; line-height: 1.5;">去重（含亚马逊转发邮件）、识别来源与店铺，关联订单，按店铺加订单归并工单</div></div>
         <div style="display: flex; align-items: center;"><svg width="16" height="16" viewBox="0 0 20 16" fill="none" stroke="#98a2b3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h14"></path><path d="M11 3l5 5-5 5"></path></svg></div>
         <div style="flex: 1; background: #ffffff; border: 1px solid #fecdca; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 13px; font-weight: 600;">2 风险拦截</div><div style="font-size: 12px; color: #667085; line-height: 1.5;">对照风险信号清单，命中即转人工</div></div>
         <div style="display: flex; align-items: center;"><svg width="16" height="16" viewBox="0 0 20 16" fill="none" stroke="#98a2b3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h14"></path><path d="M11 3l5 5-5 5"></path></svg></div>
         <div style="flex: 1.1; background: #e8edfa; border: 1px solid #c7d2f2; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 13px; font-weight: 600; color: #2f4aa0;">3 理解与处理</div><div style="font-size: 12px; color: #3d5fc4; line-height: 1.5;">识别意图与信息，按处理规则查数据、生成回复、提出动作</div></div>
         <div style="display: flex; align-items: center;"><svg width="16" height="16" viewBox="0 0 20 16" fill="none" stroke="#98a2b3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h14"></path><path d="M11 3l5 5-5 5"></path></svg></div>
-        <div style="flex: 1; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 13px; font-weight: 600;">4 回复检查</div><div style="font-size: 12px; color: #667085; line-height: 1.5;">事实有来源、不越政策、渠道内容能力、语言一致</div></div>
+        <div style="flex: 1; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 13px; font-weight: 600;">4 回复检查</div><div style="font-size: 12px; color: #667085; line-height: 1.5;">事实有来源、不越政策、渠道内容能力、语言一致、不泄露内部信息</div></div>
         <div style="display: flex; align-items: center;"><svg width="16" height="16" viewBox="0 0 20 16" fill="none" stroke="#98a2b3" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h14"></path><path d="M11 3l5 5-5 5"></path></svg></div>
-        <div style="flex: 1; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 13px; font-weight: 600;">5 发送方式</div><div style="font-size: 12px; color: #667085; line-height: 1.5;">自动发送 / 待审草稿 / 动作审批后发 / 转人工</div></div>
+        <div style="flex: 1; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 13px; font-weight: 600;">5 发送方式</div><div style="font-size: 12px; color: #667085; line-height: 1.5;">自动发送 / 待审草稿 / 转人工；草稿含审批项时由坐席提交审批</div></div>
       </div>
     </div>
 
@@ -56,7 +56,7 @@
       <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
         <div style="background: #d1fadf; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600; color: #067647;">只读，自动执行</div><div style="font-size: 12px; color: #067647; line-height: 1.5;">查订单、库存、物流、费用</div></div>
         <div style="background: #e8edfa; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600; color: #2f4aa0;">低风险写，自动执行并留痕</div><div style="font-size: 12px; color: #2f4aa0; line-height: 1.5;">加备注、写登记台账、向工厂工作台派发任务、向承运商查件</div></div>
-        <div style="background: #fef0c7; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600; color: #b54708;">高风险写，人工确认后执行</div><div style="font-size: 12px; color: #b54708; line-height: 1.5;">退款、改地址、取消；创建发货单与通知工厂寄出由报备通过直接触发</div></div>
+        <div style="background: #fef0c7; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600; color: #b54708;">高风险写，人工确认后执行</div><div style="font-size: 12px; color: #b54708; line-height: 1.5;">退款、改地址、取消；创建发货单与通知生产厂寄出由报备通过直接触发</div></div>
         <div style="grid-column: 1 / -1; font-size: 12px; color: #475467; background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 8px 12px; line-height: 1.5;"><span style="font-weight: 600; color: #1c2129;">统一动作接口</span> 查订单、物流、库存 · 发站内信 · 创建发货单 · 备注 · 退款 · 改地址 · 取消 → MCP 适配器：第一阶段只接积加 MCP；亚马逊、Shopify MCP 第三阶段接入；积加做不了的动作生成人工操作清单，坐席在后台完成后回填</div>
       </div>
     </div>
@@ -81,8 +81,8 @@
       <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 4px;"><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #667085;">5 工作台</div><div style="font-size: 12px; color: #98a2b3;">人在这里审核、确认、维护</div></div>
       <div style="background: #ffffff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 14px 16px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px;">
         <div style="font-size: 12px; color: #475467; line-height: 1.5;"><span style="font-weight: 600; color: #1c2129;">收件箱</span><br>审草稿、换版本、看摘要</div>
-        <div style="font-size: 12px; color: #475467; line-height: 1.5;"><span style="font-weight: 600; color: #1c2129;">动作审批</span><br>确认高风险动作</div>
-        <div style="font-size: 12px; color: #475467; line-height: 1.5;"><span style="font-weight: 600; color: #1c2129;">售后 · 工厂工作台</span><br>流程与台账；工厂在工厂工作台报价、填单号、谈比例</div>
+        <div style="font-size: 12px; color: #475467; line-height: 1.5;"><span style="font-weight: 600; color: #1c2129;">审批</span><br>审批单与人工操作清单</div>
+        <div style="font-size: 12px; color: #475467; line-height: 1.5;"><span style="font-weight: 600; color: #1c2129;">售后 · 工厂工作台</span><br>流程与台账；生产厂在工作台报价、填单号、谈比例</div>
         <div style="font-size: 12px; color: #475467; line-height: 1.5;"><span style="font-weight: 600; color: #1c2129;">知识库</span><br>四层维护与缺口回填</div>
         <div style="font-size: 12px; color: #475467; line-height: 1.5;"><span style="font-weight: 600; color: #1c2129;">报表</span><br>工单、SLA、售后成本</div>
         <div style="font-size: 12px; color: #475467; line-height: 1.5;"><span style="font-weight: 600; color: #1c2129;">设置</span><br>渠道、发送方式、风险信号</div>
