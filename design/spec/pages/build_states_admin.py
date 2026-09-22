@@ -46,7 +46,7 @@ def k2():
 
 # ---------------------------------------------------------------- K3 报表加载中 / K4 报表无数据
 def report_page(kpis, main, filters):
-    body = page_head('报表', '工单、SLA、AI 与售后成本 · 数据来源：工单系统、登记台账、积加', btn('导出', 'secondary', 'md', 'download')) + \
+    body = page_head('报表', '工单、SLA、AI 与售后成本 · 数据来源：工单系统、登记台账、亚马逊 SP-API、Shopify', btn('导出', 'secondary', 'md', 'download')) + \
         content(filters + kpis + main, '16px 24px', 14)
     return app('zhoumin', '报表', ['报表', '概览'], body)
 
@@ -101,9 +101,9 @@ def k6():
 def k7():
     top = banner('danger', 'Gmail 连接中断：support@forcome.eu', '09-11 10:05 起连续 3 次失败，授权已失效。该邮箱来信暂存，回复进入待发队列；恢复后自动补拉，SLA 按原到达时间计算。',
                  btn('查看渠道状态', 'secondary', 'sm'))
-    im = BS.ch_card('bell', '企业即时通讯', state('未连接'), ['工具待确认（钉钉或企业微信）'], btn('连接', 'secondary', 'sm', disabled=True), 'muted')
+    im = BS.ch_card('users', '钉钉', state('已连接'), ['通讯录同步 · 工作通知 · 登录'], '', 'ok')
     cards = '<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: stretch;">%s%s%s</div>' % (
-        BS.jijia_card(), BS.gmail_card(err=True), im)
+        BS.amazon_card(), BS.gmail_card(err=True), im)
     return frame(top + cards)
 
 
@@ -111,7 +111,7 @@ def k7():
 def k8():
     body = grid(field('平台', select_box('Shopify'), True) + field('站点', select_box('US'), True) +
                 field('店铺名', input_box('forcome.com', st='error'), True, error='店铺名已存在，请换一个') +
-                field('积加店铺 ID', input_box(None, '例如 JJ-SHP-03', 'error'), True, error='请填写积加店铺 ID') +
+                field('Shopify 店铺域名', input_box(None, '例如 forcome-uk.myshopify.com', 'error'), True, error='请填写店铺域名') +
                 field('客服邮箱', input_box('support@forcome', st='error'), True, error='邮箱格式不正确，例如 support@forcome.com') +
                 field('签名', input_box('Forcome Support'), hint='回复末尾使用，可在店铺覆盖项里修改'), 2, 14)
     dlg = dialog('新增店铺', body, btn('取消', 'secondary') + btn('保存店铺', 'primary'), 560, None, '保存后可在处理规则里设置该店铺的覆盖项。')
@@ -224,10 +224,10 @@ def build():
              V('K4 报表无数据', '所选范围无数据时指标显示「—」，主区给出调整筛选与清除筛选。', k4(), '筛选组合没有任何工单或售后单（AC-RP-03）'), 2, 32) +
         grid(V('K5 导出', '生成中按钮进入处理中并显示进度；完成后成功浮层给出下载链接，文件保留 7 天。', k5(), '报表或台账点「导出」') +
              V('K6 设置保存', '修改后显示未保存计数与「保存修改」；成功浮层并记审计日志；失败保留修改、可重试。修改阈值需二次确认。', k6(), '在设置页修改后点「保存修改」'), 2, 32) +
-        grid(V('K7 渠道断开', '全站顶部红色横幅（G4）；渠道卡转「连接异常」并写明原因与暂存情况，提供重新授权。', k7(), '积加或 Gmail 连续 3 次失败，或授权失效') +
-             V('K8 新增店铺校验', '店铺名唯一、积加店铺 ID 必填、邮箱格式正确；保存时校验全部，错误写明怎么改（AC-ST-01）。', k8(), '管理员在 P18 点「新增店铺」并保存'), 2, 32) +
+        grid(V('K7 渠道断开', '全站顶部红色横幅（G4）；渠道卡转「连接异常」并写明原因与暂存情况，提供重新授权。', k7(), 'Gmail、SP-API、Shopify 或良仓接口连续 3 次失败，或授权失效') +
+             V('K8 新增店铺校验', '店铺名唯一、店铺标识（亚马逊卖家 ID 或 Shopify 店铺域名）必填、邮箱格式正确；保存时校验全部，错误写明怎么改（AC-ST-01）。', k8(), '管理员在 P18 点「新增店铺」并保存'), 2, 32) +
         grid(V('K9 放开自动发送不可用', '条件不满足时开关禁用，悬停写明差距（R-SD-02、AC-AI-11）；满足后开关恢复可用。', k9(), '某意图近 30 天采纳率不高于 90% 或样本少于 50') +
-             V('K10 停用成员', '二次确认；有未关闭工单时必须先选接手人改派（AC-ST-02）。', k10(), '管理员在 P20 成员行「更多」中点「停用」'), 2, 32) +
+             V('K10 停用成员', '手动停用需二次确认，有未关闭工单时必须先选接手人改派（AC-ST-02）；成员在钉钉离职后自动停用，其未关闭工单进入客服主管的改派队列（AC-ST-05）。', k10(), '管理员在 P20 成员行「更多」中点「停用」'), 2, 32) +
         grid(V('K11 素材库', '网格卡片，每项图文版与纯文字版成对显示，标注适用渠道与近 30 天引用次数；上传素材后两版一起维护。', k11(), '知识库负责人打开「素材库」页签') +
              V('K12 待审核沉淀', '左侧候选列表，右侧审核抽屉：来源工单、问题、答案、归入层与适用店铺；「通过」入库，「退回」原因必填（R-KB-03）。本例为未填原因点「退回」。', k12(), '坐席把已解决工单标记为 FAQ 候选'), 2, 32) +
         grid(V('K13 知识缺口', '列出问题、来源工单链接、原因（三类）、出现次数；操作为关联到条目或标记无需处理（R-KB-04、AC-AI-10）。', k13(), '转人工、拒绝原因为知识错误、置信度低于 60% 时自动加入') +

@@ -17,20 +17,21 @@ GBP_USD = 1.27
 
 # ---------------------------------------------------------------- 人员与角色
 STAFF = {
-    'liting':   {'name': '李婷', 'avatar': '婷', 'role': '坐席', 'stores': '全部店铺', 'lang': 'EN'},
-    'chenchen': {'name': '陈晨', 'avatar': '晨', 'role': '坐席', 'stores': '全部店铺', 'lang': 'DE · EN'},
-    'zhoumin':  {'name': '周敏', 'avatar': '敏', 'role': '客服主管', 'stores': '全部店铺'},
-    'wanglei':  {'name': '王磊', 'avatar': '磊', 'role': '售后负责人', 'stores': '全部店铺'},
-    'zhaoqian': {'name': '赵倩', 'avatar': '倩', 'role': '知识库负责人', 'stores': '全部店铺'},
-    'liuyang':  {'name': '刘洋', 'avatar': '洋', 'role': '管理员', 'stores': '全部店铺'},
-    'chengong': {'name': '陈工', 'avatar': '陈', 'role': '生产厂对接人', 'factory': 'FQD'},
+    # 成员与部门来自钉钉通讯录（集团统一组织），角色、店铺范围在 P20 分配
+    'liting':   {'name': '李婷', 'avatar': '婷', 'role': '坐席', 'stores': '全部店铺', 'lang': 'EN', 'dept': 'FSH / 客服部'},
+    'chenchen': {'name': '陈晨', 'avatar': '晨', 'role': '坐席', 'stores': '全部店铺', 'lang': 'DE · EN', 'dept': 'FSH / 客服部'},
+    'zhoumin':  {'name': '周敏', 'avatar': '敏', 'role': '客服主管', 'stores': '全部店铺', 'dept': 'FSH / 客服部'},
+    'wanglei':  {'name': '王磊', 'avatar': '磊', 'role': '售后负责人', 'stores': '全部店铺', 'dept': 'FSH / 售后部'},
+    'zhaoqian': {'name': '赵倩', 'avatar': '倩', 'role': '知识库负责人', 'stores': '全部店铺', 'dept': 'FSH / 客服部'},
+    'liuyang':  {'name': '刘洋', 'avatar': '洋', 'role': '管理员', 'stores': '全部店铺', 'dept': 'FSH / 信息部'},
+    'chengong': {'name': '陈工', 'avatar': '陈', 'role': '生产厂对接人', 'factory': 'FQD', 'dept': 'FQD / 品质部'},
     'liucz':    {'name': '刘厂长', 'avatar': '刘', 'role': '生产厂负责人', 'factory': 'FQD'},
-    'zhanggong': {'name': '张工', 'avatar': '张', 'role': '生产厂对接人', 'factory': 'FZJ'},
+    'zhanggong': {'name': '张工', 'avatar': '张', 'role': '生产厂对接人', 'factory': 'FZJ', 'dept': 'FZJ / 品质部'},
     'zhoucz':   {'name': '周厂长', 'avatar': '周', 'role': '生产厂负责人', 'factory': 'FZJ'},
 }
 
 # ---------------------------------------------------------------- 生产厂（集团内部，两家）
-# 售后单按配件（或整机）对应的生产厂派发任务、协商比例、按月结算；对应关系在 P20「工厂账号」配置（示例，待确认 Q-22）。
+# 配件与整机全部由集团内这两家生产厂生产；售后单按 SKU 归属派发、协商、结算。SKU 清单在 P20「工厂账号」配置，上线前导入（下列为示例）。
 FACTORIES = {
     'FQD': {'code': 'FQD', 'scope': '整机及结构件：整机、电池、软管、HEPA 滤芯、集尘杯', 'contact': '陈工', 'head': '刘厂长'},
     'FZJ': {'code': 'FZJ', 'scope': '线材与电源：充电线', 'contact': '张工', 'head': '周厂长'},
@@ -211,8 +212,8 @@ APPROVALS = [
     {'no': 'AP-20260911-001', 'at': '09:30', 'by': '陈晨', 'ticket': 'T-20260902-0071', 'aftersales': 'S-20260911-0020', 'customer': 'Jonas Weber',
      'store': 'Forcome Direct', 'site': 'DE',
      'filings': [('额外赔偿', '€44.90（≈ $49.39）', '免退货全额退款')],
-     'actions': [('亚马逊退款 €44.90', '人工操作清单', '亚马逊退款在卖家后台执行（SP-API 退款待确认 Q-23）')],
-     'reply': '德语回复，退款执行后自动发出', 'approver': '客服主管', 'deadline': '13:30', 'left': '3h 10m', 'status': '待审批'},
+     'actions': [('亚马逊退款 €44.90', 'SP-API', None)],
+     'reply': '德语回复，退款成功后自动发出', 'approver': '客服主管', 'deadline': '13:30', 'left': '3h 10m', 'status': '待审批'},
     {'no': 'AP-20260911-002', 'at': '09:35', 'by': '李婷', 'ticket': 'T-20260910-0195', 'aftersales': 'S-20260911-0021', 'customer': 'Marcus Lee',
      'store': 'Forcome Auto', 'site': 'US',
      'filings': [('快递费用', '$8.40', '错发换发，UPS Ground')],
@@ -234,7 +235,7 @@ APPROVAL_LOG_TODAY = [
     ('09:41', '生产厂提交报价，写入登记台账', '工厂工作台 · 陈工', 'S-20260911-0018', 'success'),
     ('08:50', '向生产厂派发询价单', '工厂工作台 · 自动', 'S-20260911-0019', 'success'),
     ('08:21', '向生产厂派发询价单', '工厂工作台 · 自动', 'S-20260911-0018', 'success'),
-    ('08:02', '亚马逊退款 €29.90 回填完成', '人工操作清单 · 陈晨', 'T-20260909-0128 · AP-20260910-011', 'success'),
+    ('08:02', '亚马逊退款 €29.90 执行成功', 'SP-API · 自动', 'T-20260909-0128 · AP-20260910-011', 'success'),
 ]
 
 # ---------------------------------------------------------------- 工厂任务（factory：FQD / FZJ）

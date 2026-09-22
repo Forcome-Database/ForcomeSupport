@@ -85,18 +85,18 @@ def p05():
     me = avatar('婷', 'green', 28)
     a_chip = chip('A 版 · 未修改', 'accent', 10, 'spark')
     tl = col(''.join([
-        message('Oliver Grant', '经积加同步 · 09-04 10:12', "Hi, the charger cable doesn't work. I plug it in and nothing happens, no light on the vacuum at all.", 'in', ov),
+        message('Oliver Grant', '亚马逊买家消息 · 09-04 10:12', "Hi, the charger cable doesn't work. I plug it in and nothing happens, no light on the vacuum at all.", 'in', ov),
         ev('09-04 10:13', '系统', '意图「产品故障与使用问题」，未命中风险信号；生成 3 版草稿，推荐 A 版排查'),
-        message('李婷', '经积加发出 · 09-04 10:40', "Hi Oliver, sorry about the trouble. Could you try a different 12V socket and check the car's cigarette lighter fuse? If it still won't charge, just reply here and we'll sort it out.", 'out', me, a_chip),
-        message('Oliver Grant', '经积加同步 · 09-04 20:05', 'Tried another socket, still nothing. But it charges fine with my own USB-C cable.', 'in', ov),
+        message('李婷', '经亚马逊买家消息发出 · 09-04 10:40', "Hi Oliver, sorry about the trouble. Could you try a different 12V socket and check the car's cigarette lighter fuse? If it still won't charge, just reply here and we'll sort it out.", 'out', me, a_chip),
+        message('Oliver Grant', '亚马逊买家消息 · 09-04 20:05', 'Tried another socket, still nothing. But it charges fine with my own USB-C cable.', 'in', ov),
         ev('09-05 09:00', '系统', '排查树结论「充电线故障」，创建售后单 S-20260905-0014（待确认）'),
         ev('09-05 09:10', '人工', '王磊确认：寄配件 · 良仓有货 · 产品质量问题；报备快递费用 $5.90'),
-        ev('09-05 09:40', '人工', '周敏批准 AP-20260905-002，积加创建售后发货单'),
+        ev('09-05 09:40', '人工', '周敏批准 AP-20260905-002，经良仓接口创建售后出库单'),
         ev('09-05 15:20', '良仓', '良仓发出，UPS 1Z4R28830358229052'),
-        message('李婷', '经积加发出 · 09-05 15:30 · 工单转「等客户」', "Hi Oliver, a replacement charging cable is on its way via UPS, tracking 1Z4R28830358229052. Please keep the old cable, no return needed.", 'out', me, a_chip),
-        ev('09-06 10:05', '工厂', '陈工在工厂工作台接受承担比例：工厂 100%'),
-        ev('09-10 15:30', '系统', '结算批次 2026-09-A 双方确认，已结算；本单工厂承担 $7.30'),
-        message('Oliver Grant', '经积加同步 · 09-10 09:00', 'Thanks, the new cable works!', 'in', ov),
+        message('李婷', '经亚马逊买家消息发出 · 09-05 15:30 · 工单转「等客户」', "Hi Oliver, a replacement charging cable is on its way via UPS, tracking 1Z4R28830358229052. Please keep the old cable, no return needed.", 'out', me, a_chip),
+        ev('09-06 10:05', '工厂', '张工（生产厂 FZJ）在工厂工作台接受承担比例：工厂 100%'),
+        ev('09-10 16:05', '系统', '结算批次 2026-09-FZJ-A 双方确认，已结算；本单工厂承担 $7.30'),
+        message('Oliver Grant', '亚马逊买家消息 · 09-10 09:00', 'Thanks, the new cable works!', 'in', ov),
         ev('09-10 09:00', '系统', '识别为致谢：亚马逊无需回复，工单转「已解决」'),
     ]), 10)
     left = card(tl, title=text('全程记录', 13, T['ink'], 700), extra=row(seg(['全部', '仅消息', '仅事件'], '全部', 'sm'), 8), pad='14px 18px', gap=12, style='flex: 1; min-height: 0px;')
@@ -166,7 +166,7 @@ def p06():
         act = chip('主身份', 'accent', 10) if main else btn('拆分身份', 'danger_outline', 'sm')
         return '<div style="border: 1px solid %s; border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px;">%s%s%s</div>' % (
             T['line'], between(ch, act), ellipsis(email, 12, T['ink2']), muted(meta, 11))
-    idm = card(col(id_row(channel('亚马逊', 'US', 'Forcome Direct'), ids[0][1], '亚马逊匿名邮箱 · 来自积加同步', True) +
+    idm = card(col(id_row(channel('亚马逊', 'US', 'Forcome Direct'), ids[0][1], '亚马逊匿名邮箱 · 来自买家消息', True) +
                    id_row(channel('Shopify', 'US', 'forcome.com'), ids[1][1], ids[1][2], False), 8) +
                row(btn('合并身份', 'secondary', 'sm', 'merge') + muted('搜索候选客户，按同名、同地址、同邮箱匹配', 11), 10),
                title='身份管理', pad='12px 16px', gap=10)

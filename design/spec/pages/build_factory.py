@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""P21 工厂工作台（陈工 · 东莞生产厂）。部件供 StatesFactory 复用。"""
+"""P21 工厂工作台（陈工 · 生产厂 FQD）。部件供 StatesFactory 复用。"""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -7,9 +7,10 @@ from ui import *
 from data import *
 from as_common import *
 
-LT = ledger_totals()
-OPEN_TASKS = [t for t in FACTORY_TASKS if t['state'] != '已完成']
-DONE_TASKS = [t for t in FACTORY_TASKS if t['state'] == '已完成']
+FAC = 'FQD'  # 当前登录：陈工 · 生产厂 FQD（只看本厂任务）
+LT = factory_totals(FAC)
+OPEN_TASKS = [t for t in FACTORY_TASKS if t['factory'] == FAC and t['state'] != '已完成']
+DONE_TASKS = [t for t in FACTORY_TASKS if t['factory'] == FAC and t['state'] == '已完成']
 
 
 # ---------------------------------------------------------------- 左栏 · 待办列表
@@ -46,8 +47,8 @@ def f_list(sel='S-20260911-0019', empty=False, override=None):
     foot = '<div style="padding: 12px 16px; border-top: 1px solid %s; background: %s; display: flex; flex-direction: column; gap: 4px;">%s%s%s</div>' % (
         T['line'], T['subtle'], between(nowrap('本月本厂应承担（已确认）', 12, T['ink3']), nowrap(money(round(LT['settled'] + LT['pending'], 2)), 14, T['ink'], 700)),
         nowrap('已结算 %s · 待结算 %s' % (money(LT['settled']), money(LT['pending'])), 11, T['ink3']),
-        between(nowrap('批次 2026-09-B 于 10-05 生成', 11, T['ink3']), link('查看结算', 12, 'chev_r')))
-    return '<div style="width: 340px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border-right: 1px solid %s; display: flex; flex-direction: column; min-height: 0px;">%s%s%s</div>' % (
+        between(nowrap('批次 2026-09-FQD-B 于 10-05 生成', 11, T['ink3']), link('查看结算', 12, 'chev_r')))
+    return '<div style="width: 320px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 16px; box-shadow: 0 1px 2px rgba(16,20,35,0.04); overflow: hidden; margin: 10px 0px 12px 14px; display: flex; flex-direction: column; min-height: 0px;">%s%s%s</div>' % (
         T['line'], head, body, foot)
 
 
@@ -113,9 +114,9 @@ def f_thread(extra=''):
     msgs = sys_comment('08:50', '已派发询价：软管 FC-V2-HS02 ×2 · 寄往德国 10115，请在 2 个工作日内报价。') + extra
     box = '<div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid %s; padding-top: 12px;">%s%s</div>' % (
         T['line'], textarea_box(None, '给 FSH 留言，可附图片', h=72), between(row(icon_btn('image', 'secondary', 28) + icon_btn('clip', 'secondary', 28), 6), btn('发送', 'secondary', 'sm', 'send')))
-    return '<div style="width: 320px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border-left: 1px solid %s; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;">%s%s<div style="flex: 1;"></div>%s%s</div>' % (
+    return '<div style="width: 316px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 16px; box-shadow: 0 1px 2px rgba(16,20,35,0.04); overflow: hidden; margin: 10px 14px 12px 0px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;">%s%s<div style="flex: 1;"></div>%s%s</div>' % (
         T['line'], between(row('<div style="font-size: 14px; font-weight: 700; color: %s;">本单沟通</div>' % T['ink'] + nowrap('S-20260911-0019', 12, T['ink3']), 8), ''),
-        msgs, muted('留言随售后单存档；FSH 回复会推送到企业即时通讯。', 11), box)
+        msgs, muted('留言随售后单存档；FSH 回复会推送到钉钉工作通知。', 11), box)
 
 
 def p21(form_st='default', sel='S-20260911-0019', override=None, st='待处理', extra_top='', thread_extra='', form_html=None, head_right=None, badges=None):

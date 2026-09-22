@@ -18,19 +18,27 @@ def save_bar():
 
 
 # ================================================================ P18 渠道与店铺
-def ch_card(ic, name, st, lines, foot, tone='accent', card_tone=None):
-    head = between(row(tile(ic, tone) + '<div style="font-size: 14px; font-weight: 700; color: %s; white-space: nowrap;">%s</div>' % (T['ink'], name), 10), st)
-    body = col(''.join(text(l, 12, T['ink2']) for l in lines), 3)
-    return card(head + body + '<div style="margin-top: auto;">%s</div>' % foot, pad='12px 14px', gap=10, tone=card_tone, style='height: 100%; box-sizing: border-box;')
+def ch_card(ic, name, st, lines, foot='', tone='accent', card_tone=None):
+    head = between(row(tile(ic, tone) + '<div style="font-size: 13.5px; font-weight: 650; color: %s; white-space: nowrap;">%s</div>' % (T['ink'], name), 10), st)
+    body = col(''.join(text(l, 12, T['ink3']) for l in lines), 2)
+    f = '<div style="margin-top: auto;">%s</div>' % foot if foot else ''
+    return card(head + body + f, pad='11px 13px', gap=8, tone=card_tone, style='height: 100%; box-sizing: border-box;')
 
 
-def jijia_card(st='已连接', err=False):
+def amazon_card(err=False):
     if err:
-        return ch_card('refresh', '积加 ERP · MCP', state('连接异常'),
-                       ['09-11 10:05 起连续 3 次调用失败：授权已过期', '亚马逊来信与动作已暂存，恢复后按到达顺序处理'],
+        return ch_card('store', '亚马逊 SP-API', state('连接异常'),
+                       ['09-11 10:05 起连续 3 次调用失败：授权令牌已过期', '订单查询暂停，恢复后自动补拉；买家消息不受影响（走 Gmail）'],
                        row(btn('重新授权', 'primary', 'sm', 'refresh') + btn('查看错误日志', 'ghost', 'sm'), 6), 'bad', 'danger')
-    return ch_card('refresh', '积加 ERP · MCP', state(st), ['最近同步 10:14', '亚马逊 2 个店铺站内信收发', '4 个店铺订单、库存、发货单、费用'],
-                   row(btn('测试连接', 'secondary', 'sm') + icon_btn('more', size=28), 6), 'ok')
+    return ch_card('store', '亚马逊 SP-API', state('已连接'), ['2 个店铺 · 订单、发货与退货信息', '退款、取消（审批后执行）'], '', 'ok')
+
+
+def shopify_card():
+    return ch_card('store', 'Shopify Admin API', state('已连接'), ['2 个店铺 · 订单查询、订单备注', '退款、改地址、取消（审批后执行）'], '', 'ok')
+
+
+def liangcang_card():
+    return ch_card('box', '良仓开放接口', state('已连接'), ['库存查询、创建售后出库单', '回传快递单号与实际运费（范围待确认 Q-21）'], '', 'ok')
 
 
 def gmail_card(err=False):
@@ -38,56 +46,52 @@ def gmail_card(err=False):
         return ch_card('message', 'Gmail', state('连接异常'),
                        ['support@forcome.eu 授权已失效（10:05 起连续 3 次失败）', '该邮箱来信暂存，回复进入待发队列'],
                        row(btn('重新授权', 'primary', 'sm', 'refresh') + btn('查看错误日志', 'ghost', 'sm'), 6), 'bad', 'danger')
-    return ch_card('message', 'Gmail', state('已连接'), ['2 个邮箱：support@forcome.com', 'support@forcome.eu', '最近推送 10:18'],
-                   row(btn('测试连接', 'secondary', 'sm') + btn('添加邮箱', 'ghost', 'sm', 'plus'), 6), 'ok')
+    return ch_card('message', 'Gmail', state('已连接'), ['4 个邮箱：2 个亚马逊买家消息、2 个 Shopify 客服', '最近推送 10:18'], '', 'ok')
 
 
 def p18_channels():
-    im = ch_card('bell', '企业即时通讯', state('未连接'), ['工具待确认（钉钉或企业微信）', '推送审批待办、超时、生产厂任务与催办'],
-                 row(btn('连接', 'secondary', 'sm', disabled=True) + nowrap('确定工具后可连接', 11, T['ink4']), 6), 'muted')
-    mcp = lambda n: dashed_card(between(row(icon('link', 15, T['ink3']) + nowrap(n, 13, T['ink2'], 700), 6), chip('第三阶段', 'neutral', 10)) +
-                                muted('退款、改地址、取消接入统一动作接口，替换人工操作清单', 12), '10px 12px', 4)
-    return '<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 264px; gap: 12px; align-items: stretch;">%s%s%s<div style="display: flex; flex-direction: column; gap: 8px;">%s%s</div></div>' % (
-        jijia_card(), gmail_card(), im, mcp('亚马逊 MCP'), mcp('Shopify MCP'))
+    im = ch_card('users', '钉钉', state('已连接'), ['通讯录：成员与部门每小时同步 · 最近 10:00', '工作通知推送；扫码登录与钉钉内免登'], '', 'ok')
+    jj = dashed_card(between(row(icon('link', 15, T['ink3']) + nowrap('积加 ERP', 13, T['ink2'], 650), 6), chip('预留 · 暂不接入', 'neutral', 10)) +
+                     muted('统一动作接口已预留积加适配器；需要时接入，流程与页面不变。', 12), '11px 13px', 6)
+    return '<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: stretch;">%s%s%s%s%s%s</div>' % (
+        amazon_card(), shopify_card(), gmail_card(), liangcang_card(), im, jj)
 
 
 def p18_stores():
-    cols = [('店铺', 'left'), ('站点', 'left'), ('进线', 'left'), ('积加店铺 ID', 'left'), ('签名', 'left'), ('覆盖项', 'left'), ('状态', 'left')]
+    cols = [('店铺', 'left'), ('站点', 'left'), ('进线邮箱', 'left'), ('平台标识', 'left'), ('覆盖项', 'left'), ('状态', 'left')]
     over = {'amz-direct': '模板 1', 'amz-auto': '签名', 'shop-com': '政策 1', 'shop-eu': '签名'}
     rows = []
-    for s in STORES:
-        entry = s['entry']
-        if entry.startswith('Gmail'):
-            e = col(nowrap('Gmail', 12, T['ink2'], 600) + nowrap(entry.split(' · ')[1], 11, T['ink3']), 0)
-        else:
-            e = col(nowrap('积加', 12, T['ink2'], 600) + nowrap('亚马逊站内信', 11, T['ink3']), 0)
-        rows.append([col(nowrap(s['name'], 12.5, T['ink'], 700) + '<div style="display: flex;">%s</div>' % channel(s['platform'], None, None, 10), 3),
-                     nowrap(' · '.join(s['sites']), 12, T['ink2']), e,
-                     nowrap(s['jijia_id'], 12, T['ink2']), ellipsis(s['signature'], 12, T['ink2']), nowrap(over[s['id']], 12, T['ink2']), state('已连接')])
-    t = table(cols, rows, '112px 72px minmax(0, 1fr) 80px 108px 48px 64px', dense=True)
+    for s_ in STORES:
+        amz = s_['platform'] == '亚马逊'
+        e = col(nowrap(s_['mailbox'], 12, T['ink2'], 600) + nowrap('亚马逊买家消息' if amz else 'Shopify 客服邮箱', 11, T['ink4']), 0)
+        k, v = s_['sid'].rsplit(' ', 1) if amz else ('店铺域名', s_['sid'])
+        sid = col(nowrap(k, 10.5, T['ink4']) + ellipsis(v, 11.5, T['ink2']), 0)
+        rows.append([col(nowrap(s_['name'], 12.5, T['ink'], 650) + '<div style="display: flex;">%s</div>' % channel(s_['platform'], None, None, 10.5), 3),
+                     nowrap(' · '.join(s_['sites']), 12, T['ink2']), e, sid, nowrap(over[s_['id']], 12, T['ink2']), state('已连接')])
+    t = table(cols, rows, '112px 64px minmax(0, 1fr) 150px 52px 64px', dense=True)
     head = between(row(label('店铺') + nowrap('4 个', 12, T['ink3']), 8), btn('新增店铺', 'secondary', 'sm', 'plus'))
-    rule = card(row(icon('info', 16, T['info']) + text('进线识别：亚马逊按积加店铺 ID + 站点，邮件按收件地址。识别不出的来信进入「未归属店铺」队列，由客服主管指定店铺，不生成草稿。', 12, T['ink2']), 8, 'flex-start') +
+    rule = card(row(icon('info', 16, T['info']) + text('进线识别：亚马逊按买家消息的收件邮箱（每店一个）与发件域名（amazon.com / .de / .co.uk）识别店铺和站点；Shopify 按客服邮箱。识别不出的来信进入「未归属店铺」队列，由客服主管指定店铺，不生成草稿。', 12, T['ink2']), 8, 'flex-start') +
                 row(icon('shield', 16, T['ink3']) + text('配置按「全局 → 平台 → 店铺」取值。店铺可覆盖签名、政策口径、模板、素材与链接白名单、SLA 内部目标；意图、风险信号、动作分级只能全局配置。', 12, T['ink2']), 8, 'flex-start'),
-                pad='12px 14px', gap=8)
+                pad='11px 13px', gap=8)
     return col(head + t + rule, 10)
 
 
 def p18_mapping():
-    acts = [('查订单', '只读', '积加 MCP', None), ('查物流', '只读', '积加 MCP', None), ('查库存', '只读', '积加 MCP', None),
-            ('发站内信', '按发送方式', '积加 MCP', None), ('创建发货单', '高风险', '积加 MCP', None), ('订单备注', '低风险', '积加 MCP', None),
-            ('退款', '高风险', '人工操作清单', '亚马逊、Shopify 平台退款'), ('改地址', '高风险', '人工操作清单', 'Shopify 订单'), ('取消', '高风险', '人工操作清单', '仅未发货订单')]
-    rows = []
-    for n, lv, ad, note in acts:
-        a = chip(ad, 'accent' if ad == '积加 MCP' else 'warning', 11)
-        rows.append([nowrap(n, 12.5, T['ink'], 600), cat(lv), col('<div style="display: flex;">%s</div>' % a + (nowrap(note, 11, T['ink3']) if note else ''), 2)])
-    t = table([('统一动作', 'left'), ('分级', 'left'), ('当前适配器', 'left')], rows, '72px 84px minmax(0, 1fr)', dense=True)
-    head = between(row(label('动作映射') + nowrap('9 个统一动作', 12, T['ink3']), 8), nowrap('积加 MCP 6 · 人工操作清单 3', 12, T['ink3']))
+    A, W, N, M = 'accent', 'warning', 'neutral', 'muted'
+    acts = [('查订单', '只读', ('SP-API', A), ('Admin API', A)), ('查物流', '只读', ('承运商查询', A), ('承运商查询', A)),
+            ('查库存', '只读', ('良仓接口', A), ('良仓接口', A)), ('回复客户', '按发送方式', ('Gmail 中转', A), ('Gmail', A)),
+            ('创建出库单', '高风险', ('良仓接口', A), ('良仓接口', A)), ('订单备注', '低风险', ('系统内备注', N), ('Admin API', A)),
+            ('退款', '高风险', ('SP-API', A), ('Admin API', A)), ('改地址', '高风险', ('平台不支持', M), ('Admin API', A)),
+            ('取消', '高风险', ('SP-API', A), ('Admin API', A))]
+    rows = [[nowrap(n, 12.5, T['ink'], 600), nowrap(lv, 11.5, T['ink3']), chip(a[0], a[1], 10.5), chip(b[0], b[1], 10.5)] for n, lv, a, b in acts]
+    t = table([('统一动作', 'left'), ('分级', 'left'), ('亚马逊店铺', 'left'), ('Shopify 店铺', 'left')], rows, '64px 58px minmax(0, 1fr) minmax(0, 1fr)', dense=True)
+    head = between(row(label('动作映射') + nowrap('9 个统一动作', 12, T['ink3']), 8), nowrap('积加适配器：预留', 11.5, T['ink4']))
     return col(head + t, 10)
 
 
 def p18():
     inner = p18_channels() + '<div style="display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start;">%s%s</div>' % (p18_stores(), p18_mapping())
-    return settings_page('liuyang', '渠道与店铺', '渠道与店铺', '积加与 Gmail 两条进线；店铺决定订单匹配、回复身份、签名与数据权限。', save_bar(),
+    return settings_page('liuyang', '渠道与店铺', '渠道与店铺', '亚马逊、Shopify 走官方接口，客户来信统一经 Gmail 收发；积加预留、暂不接入。店铺决定订单匹配、回复身份、签名与数据权限。', save_bar(),
                          label('渠道连接') + inner)
 
 
@@ -177,24 +181,32 @@ MEMBERS = [('liting', 'liting@forcome.com', '10:02'), ('chenchen', 'chenchen@for
 
 
 def member_table(sel=None):
-    cols = [('成员', 'left'), ('角色', 'left'), ('数据范围', 'left'), ('语言', 'left'), ('状态', 'left'), ('最近登录', 'left'), ('', 'right')]
+    cols = [('成员', 'left'), ('钉钉部门', 'left'), ('角色', 'left'), ('数据范围', 'left'), ('语言', 'left'), ('状态', 'left'), ('最近登录', 'left'), ('', 'right')]
     rows = []
     for k, mail, last in MEMBERS:
         s = STAFF[k]
         who_ = row(avatar(s['avatar'], AV_TONE.get(s['role'], 'green'), 28) + col(nowrap(s['name'] + ('（我）' if k == 'liuyang' else ''), 12.5, T['ink'], 700) + nowrap(mail, 11, T['ink3']), 0), 8)
-        rows.append([who_, cat(s['role']), nowrap(s['stores'], 12, T['ink2']), nowrap(s.get('lang', '—'), 12, T['ink2'] if s.get('lang') else T['ink4']),
+        rows.append([who_, nowrap(s['dept'], 12, T['ink2']), cat(s['role']), nowrap(s['stores'], 12, T['ink2']), nowrap(s.get('lang', '—'), 12, T['ink2'] if s.get('lang') else T['ink4']),
                      state('已启用'), nowrap(last, 12, T['ink2']), icon_btn('more', size=24)])
-    return table(cols, rows, 'minmax(0, 1fr) 96px 64px 56px 64px 72px 24px', dense=True, sel=sel)
+    return table(cols, rows, 'minmax(0, 1fr) 84px 96px 60px 44px 60px 70px 24px', dense=True, sel=sel)
 
 
 def factory_accounts():
-    r1 = between(row(avatar('陈', 'amber', 28) + col(nowrap('陈工', 12.5, T['ink'], 700) + nowrap('生产厂对接人 · 最近登录 09:40', 11, T['ink3']), 0), 8),
-                 row(state('已启用') + icon_btn('more', size=24), 8))
-    r2 = between(row(avatar('刘', 'amber', 28) + col(nowrap('刘厂长', 12.5, T['ink'], 700) + nowrap('生产厂负责人 · 不登录系统', 11, T['ink3']), 0), 8),
-                 row(chip('比例升级商定人', 'neutral', 11) + icon_btn('more', size=24), 8))
-    head = row(icon('factory', 16, T['ink3']) + nowrap('东莞生产厂', 13, T['ink'], 700), 8)
-    note = muted('生产厂账号只看本厂任务；询价看不到客户姓名与地址，寄件任务可见收件信息，寄件完成 30 天后隐藏。', 12)
-    return card(head + note + divider() + r1 + divider() + r2, pad='12px 14px', gap=10)
+    def person(av, name, sub_, right):
+        return between(row(avatar(av, 'amber', 26) + col(nowrap(name, 12.5, T['ink'], 650) + nowrap(sub_, 11, T['ink3']), 0), 8), right)
+    out = ''
+    for code in ('FQD', 'FZJ'):
+        f = FACTORIES[code]
+        c = [k for k, v in STAFF.items() if v.get('factory') == code and v['role'] == '生产厂对接人'][0]
+        h = [k for k, v in STAFF.items() if v.get('factory') == code and v['role'] == '生产厂负责人'][0]
+        head = between(row(icon('factory', 15, T['ink3']) + nowrap('生产厂 ' + code, 13, T['ink'], 650), 6), link('负责的 SKU', 12, 'chev_r'))
+        out += col(head + muted(f['scope'], 11.5) +
+                   person(STAFF[c]['avatar'], STAFF[c]['name'], '对接人 · 最近登录 %s' % ('09:40' if code == 'FQD' else '09-10 16:05'), row(state('已启用') + icon_btn('more', size=24), 6)) +
+                   person(STAFF[h]['avatar'], STAFF[h]['name'], '负责人 · 钉钉成员，不分配系统角色', chip('比例升级商定人', 'neutral', 10.5)), 7)
+        if code == 'FQD':
+            out += divider()
+    note = muted('成员来自钉钉；只看本厂任务，寄件完成 30 天后隐藏收件信息。', 11)
+    return card(out + note, pad='11px 13px', gap=9)
 
 
 ROLES = ['坐席', '客服主管', '售后负责人', '知识库负责人', '管理员', '生产厂对接人']
@@ -209,7 +221,7 @@ MATRIX = [
     ('撤回审批单', ['○', '○', '○', '', '', '']),
     ('执行人工操作清单', ['○', '○', '○', '', '', '']),
     ('查看售后单、登记台账', ['只读', '●', '●', '', '', '']),
-    ('同步台账到积加、补登', ['', '', '●', '', '', '']),
+    ('登记台账补登', ['', '', '●', '', '', '']),
     ('确认责任与处理方式、终止售后单', ['', '●', '●', '', '', '']),
     ('比例协商与重开、退回报价、结算批次', ['', '', '●', '', '', '']),
     ('维护知识条目、素材库、审核沉淀', ['部分', '部分', '部分', '●', '', '']),
@@ -236,7 +248,7 @@ def matrix_half(items):
         tpl, T['line'], T['ink3'], ''.join('<div style="text-align: center;">%s</div>' % h for h in ROLE_HEAD))
     body = ''
     for cap, vals in items:
-        body += '<div style="display: grid; grid-template-columns: %s; gap: 6px; align-items: center; padding: 5px 0px; border-bottom: 1px solid %s;"><div style="font-size: 12px; color: %s; line-height: 1.35;">%s</div>%s</div>' % (
+        body += '<div style="display: grid; grid-template-columns: %s; gap: 6px; align-items: center; padding: 4px 0px; border-bottom: 1px solid %s;"><div style="font-size: 12px; color: %s; line-height: 1.35;">%s</div>%s</div>' % (
             tpl, T['line2'], T['ink2'], cap, ''.join('<div>%s</div>' % mark(v) for v in vals))
     return '<div style="display: flex; flex-direction: column; min-width: 0px;">%s%s</div>' % (head, body)
 
@@ -248,16 +260,15 @@ def perm_matrix():
 
 
 def p20_body(sel=None):
-    left = col(between(row(label('成员') + nowrap('6 人', 12, T['ink3']), 8), btn('邀请成员', 'primary', 'sm', 'plus')) + member_table(sel), 10)
-    backup = card(between(nowrap('备用审批人', 12.5, T['ink'], 700), select_box('王磊 · 售后负责人', width='168px', h=28)) +
-                  muted('发起人恰好是唯一有权审批的人时，审批单转给此人（R-AP-02，人选待确认 Q-19）。', 11), pad='10px 14px', gap=6)
-    right = col(between(row(label('生产厂账号') + nowrap('1 个生产厂', 12, T['ink3']), 8), btn('新增生产厂账号', 'secondary', 'sm', 'plus')) + factory_accounts() + backup, 10)
+    left = col(between(row(label('成员') + nowrap('6 人 · 来自钉钉通讯录，10:00 同步', 12, T['ink3']), 8), btn('从钉钉添加', 'primary', 'sm', 'plus')) + member_table(sel), 10)
+    right = col(between(row(label('生产厂账号') + nowrap('2 个生产厂', 12, T['ink3']), 8), btn('添加生产厂成员', 'secondary', 'sm', 'plus')) + factory_accounts(), 10)
     top = '<div style="display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start;">%s%s</div>' % (left, right)
     return top + perm_matrix()
 
 
 def p20():
-    return settings_page('liuyang', '团队与权限', '团队与权限', '成员、角色、店铺数据范围与生产厂账号。停用成员前需先改派其未处理的工单。', '', p20_body())
+    backup = row(col(nowrap('备用审批人', 12, T['ink2'], 650) + nowrap('唯一有权审批的人是发起人时转给此人（R-AP-02）', 11, T['ink4']), 1) + select_box('王磊 · 售后负责人', width='168px', h=32), 10)
+    return settings_page('liuyang', '团队与权限', '团队与权限', '成员与部门来自钉钉通讯录；在这里分配角色、店铺数据范围、生产厂与备用审批人。钉钉离职的成员自动停用。', backup, p20_body())
 
 
 if __name__ == '__main__':

@@ -16,7 +16,7 @@ PAGES = [
     {'id': 'page-6', 'name': '状态与异常'},
     {'id': 'page-1', 'name': '流程与架构'},
     {'id': 'page-4', 'name': '邮件流转全链路'},
-    {'id': 'page-3', 'name': '视觉方向（已选 A）'},
+    {'id': 'page-3', 'name': '早期视觉方向（已由 v3 取代）'},
 ]
 GAP_X, GAP_Y = 120, 160
 ROWS_HIFI = [
@@ -32,7 +32,7 @@ STATES = [('StatesInbox', '状态板 · 收件箱与工单'), ('StatesApproval',
           ('StatesFactory', '状态板 · 工厂工作台'), ('StatesAdmin', '状态板 · 知识库、报表、设置')]
 SPEC = [('DesignSystem', '设计规范'), ('GlobalStates', '全局状态与反馈'), ('PageMap', '页面地图')]
 FLOWS = [('Architecture', '系统架构'), ('LifeCycle', '产品全生命周期'), ('AfterSales', '售后流程'), ('DecisionTree', 'AI Agent 决策逻辑')]
-DIRS = [('DirectionA', '方向 A · 精密工作台（已选）'), ('DirectionB', '方向 B · 暖色编辑'), ('DirectionC', '方向 C · 深色控制台')]
+DIRS = [('DirectionA', '方向 A · 精密工作台（v2，已由 v3 取代）'), ('DirectionB', '方向 B · 暖色编辑'), ('DirectionC', '方向 C · 深色控制台')]
 
 JS = "() => { const r = (document.querySelector('x-dc > div') || document.body.firstElementChild).getBoundingClientRect(); return [Math.ceil(r.width), Math.ceil(r.height)]; }"
 
@@ -71,7 +71,7 @@ def main(seed=False):
     for n, t in SPEC:
         w, _ = add(n, x, 0, t, 'page-0')
         x += w + GAP_X
-    notes.append({'id': 'note-ds', 'x': x, 'y': 0, 'w': 360, 'page': 'page-0', 'text': '怎么用这一页\n\n设计规范：色彩、字体、间距、组件、状态标识、文案规则。全部高保真页面只用这里的组件，研发实现以组件库 spec/ui.py 为准。\n\n全局状态：加载、无权限、找不到、断网、集成中断、浮层提示、二次确认、并发、未保存离开。每个页面都适用。\n\n页面地图：21 个页面的跳转关系与 7 条关键用户路径，编号与 PRD 第 4、8 节一致。'})
+    notes.append({'id': 'note-ds', 'x': x, 'y': 0, 'w': 360, 'page': 'page-0', 'text': '怎么用这一页\n\n设计规范：色彩、字体、间距、组件、状态标识、文案规则。全部高保真页面只用这里的组件，研发实现以组件库 spec/ui.py 为准；与 shadcn/ui + Tailwind CSS v4 的令牌和组件对照见第 12 节。\n\n全局状态：加载、无权限、找不到、断网、集成中断、浮层提示、二次确认、并发、未保存离开。每个页面都适用。\n\n页面地图：21 个页面的跳转关系与 7 条关键用户路径，编号与 PRD 第 4、8 节一致。'})
 
     # 高保真页面
     y = 0
@@ -96,7 +96,7 @@ def main(seed=False):
     for n, t in FLOWS:
         w, h = add(n, 0, y, t, 'page-1')
         y += h + GAP_Y
-    notes.append({'id': 'note-flows', 'x': 1560, 'y': 0, 'w': 340, 'page': 'page-1', 'text': '流程与架构\n\n这些是给业务与技术评审看的全景图，规则的唯一定义在 PRD 第 5 至 7 节：\n\n· 系统架构：两条进线、五步处理、统一动作接口、数据、工作台。\n· 产品全生命周期：七个阶段的客户触点、系统动作、人工介入、数据沉淀，下方是工单状态机。\n· 售后流程：两条创建路径、三种处理方式、报备、并行的比例协商。\n· AI Agent 决策逻辑：五步处理、风险信号、12 条处理规则、发送方式与动作分级。'})
+    notes.append({'id': 'note-flows', 'x': 1560, 'y': 0, 'w': 340, 'page': 'page-1', 'text': '流程与架构\n\n这些是给业务与技术评审看的全景图，规则的唯一定义在 PRD 第 5 至 7 节：\n\n· 系统架构：官方接入（亚马逊买家消息与 SP-API、Shopify、良仓接口，积加预留）、五步处理、统一动作接口、数据、工作台。\n· 产品全生命周期：七个阶段的客户触点、系统动作、人工介入、数据沉淀，下方是工单状态机。\n· 售后流程：两条创建路径、三种处理方式、报备、并行的比例协商。\n· AI Agent 决策逻辑：五步处理、风险信号、12 条处理规则、发送方式与动作分级。'})
 
     # 邮件流转
     w, h = add('EmailFlow', 0, 0, '一封来信的完整流转', 'page-4')
@@ -107,7 +107,7 @@ def main(seed=False):
     for n, t in DIRS:
         w, h = add(n, x, 0, t, 'page-3')
         x += w + GAP_X
-    notes.append({'id': 'note-directions', 'x': 0, 'y': 1020, 'w': 1440, 'page': 'page-3', 'text': '已选定方向 A「精密工作台」（决策 19、PRD D-10）：信息密度最高、最接近成熟客服工作台、实现风险最低。全部高保真页面按 A 制作。\n\nB「暖色编辑」、C「深色控制台」保留作对比。如客户改选，只需替换组件库色板与字体，页面结构不变（PRD Q-17）。'})
+    notes.append({'id': 'note-directions', 'x': 0, 'y': 1020, 'w': 1440, 'page': 'page-3', 'text': '当前视觉为 v3（决策 22、PRD D-10）：按客户提供的参考稿 forcome-support-console.html 升级——56px 顶栏 + 分段导航、浅灰底浮动面板、靛蓝主色、AI 用靛蓝→青色渐变标识；研发用 shadcn/ui + Tailwind CSS v4，对照表见设计规范第 12 节。\n\n本页 A、B、C 为 09-21 的早期探索，仅作历史对比，不再作为实现依据。'})
 
     canvas = {'pages': PAGES, 'artboards': arts, 'annotations': notes, 'launch': {'view': 'canvas', 'page': 'page-2'}}
     io.open(os.path.join(DESIGN, 'canvas.json'), 'w', encoding='utf-8').write(json.dumps(canvas, ensure_ascii=False, indent=2))

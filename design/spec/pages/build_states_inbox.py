@@ -24,13 +24,13 @@ def scrim_frame(bg_html, dlg, w=VW, h=550):
 
 # ---------------------------------------------------------------- I1 收件箱加载中
 def i1():
-    q = ('<div style="width: 320px; flex-shrink: 0; background: #ffffff; border-right: 1px solid %s; display: flex; flex-direction: column;">'
+    q = ('<div style="width: 308px; flex-shrink: 0; background: #ffffff; border: 1px solid %s; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column;">'
          '<div style="padding: 14px 16px 12px 16px; border-bottom: 1px solid %s; display: flex; flex-direction: column; gap: 10px;">%s%s</div>%s</div>') % (
         T['line'], T['line'], between(text('待处理', 16, T['ink'], 700), skel('84px', 20, 999)), skel('100%', 42, 6), skel_rows(8))
-    mid = '<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column;"><div style="background: #ffffff; border-bottom: 1px solid %s; padding: 14px 20px; display: flex; flex-direction: column; gap: 10px;">%s%s%s</div><div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 12px;">%s%s%s</div></div>' % (
-        T['line'], skel('46%', 16), skel('72%', 10), skel('38%', 10), skel('100%', 56, 8), skel('100%', 92, 8),
+    mid = '<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; background: #ffffff; border: 1px solid %s; border-radius: 16px; overflow: hidden;"><div style="background: #ffffff; border-bottom: 1px solid %s; padding: 14px 20px; display: flex; flex-direction: column; gap: 10px;">%s%s%s</div><div style="padding: 14px 20px; display: flex; flex-direction: column; gap: 12px;">%s%s%s</div></div>' % (
+        T['line'], T['line2'], skel('46%', 16), skel('72%', 10), skel('38%', 10), skel('100%', 56, 8), skel('100%', 92, 8),
         card(col(row(spinner(16) + muted('正在载入 AI 草稿…', 12), 8) + skel('60%', 12) + skel('100%', 10) + skel('94%', 10) + skel('88%', 10) + skel('100%', 10) + skel('52%', 10), 10), pad='14px 16px', tone='accent'))
-    right = '<div style="width: 340px; flex-shrink: 0; background: #ffffff; border-left: 1px solid %s; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px;">%s</div>' % (
+    right = '<div style="width: 332px; flex-shrink: 0; background: #ffffff; border: 1px solid %s; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px;">%s</div>' % (
         T['line'], ''.join(col(skel('30%', 10) + skel('100%', 12) + skel('80%', 12) + skel('90%', 12), 8) + divider() for _ in range(3)))
     page = app('liting', '收件箱', ['收件箱', '待处理'], three_col(q, mid, right))
     return variant('I1 收件箱加载中', '保留外壳、导航与队列标题，三栏用骨架占位；草稿区显示行内转圈。超过 10 秒转为全局 G4 加载失败。',
@@ -90,12 +90,12 @@ def i5():
     tabs_html = ver_tabs(SARAH_VERSIONS, 'B', '')
     body = body_box(paras(DRAFTS['sarah_B']))
     foot = draft_foot(btn('48 秒后自动重试', 'primary', 'md', 'refresh', disabled=True) + btn('立即重试', 'secondary', 'md', 'send') + btn('复制草稿', 'ghost', 'md', 'copy'),
-                      row(icon('alert', 14, T['bad'], 2) + nowrap('10:21 经积加发送失败，草稿已保留', 12, T['bad']), 6))
+                      row(icon('alert', 14, T['bad'], 2) + nowrap('10:21 经亚马逊买家消息发送失败，草稿已保留', 12, T['bad']), 6))
     dc = draft_card('B 版无审批项 · 可直接发送', tabs_html, '', body, '', check_row(), '', foot)
-    tst = toast('error', '发送失败：积加接口超时', '草稿已保留，48 秒后自动重试。工单仍为「待审草稿」，SLA 继续计时。', row(link('立即重试') + link('复制草稿'), 12))
+    tst = toast('error', '发送失败：Gmail 接口超时', '草稿已保留，48 秒后自动重试。工单仍为「待审草稿」，SLA 继续计时。', row(link('立即重试') + link('复制草稿'), 12))
     frame = mini(dc + abs_(tst, 'top: 14px; right: 16px;'), VW, 390, pad='64px 20px 20px 20px')
     return variant('I5 发送失败', '失败浮层不自动消失；草稿原样保留；主按钮变为倒计时（1 分钟后自动重试，最多 3 次），旁边提供立即重试与复制草稿。',
-                   frame, VW, trigger='点「发送」后积加接口超时或返回错误。')
+                   frame, VW, trigger='点「发送」后 Gmail 接口超时或返回错误。')
 
 
 # ---------------------------------------------------------------- I6 他人处理中
@@ -117,7 +117,7 @@ def i7():
     bn = banner('warning', '编辑期间客户又来了一封信，原草稿已失效', '10:18 Sarah Mitchell 又发来 1 封。系统正在为新来信重新生成草稿；你改过的内容已保存在草稿历史。',
                 btn('查看新草稿', 'secondary', 'sm'))
     newmsg = '<div style="border: 1px solid %s; border-radius: 8px; background: %s; padding: 10px 14px; display: flex; flex-direction: column; gap: 4px;">%s%s</div>' % (
-        T['accent_line'], T['accent_bg'], row(chip('新来信', 'accent', 10) + text('Sarah Mitchell', 13, T['ink'], 700) + muted('经积加同步 · 10:18', 12), 8),
+        T['accent_line'], T['accent_bg'], row(chip('新来信', 'accent', 10) + text('Sarah Mitchell', 13, T['ink'], 700) + muted('亚马逊买家消息 · 10:18', 12), 8),
         text('Any update on this? I leave Tuesday morning and really need it before then.', 13, T['ink']))
     stale = draft_card('09-10 16:01 生成 · A 先补发', '', '', body_box(paras(DRAFTS['sarah_A'].split('\n\n')[1]), 'stale'), '', '', '',
                        draft_foot(btn('提交审批', 'primary', 'md', icon_right='arrow_r', disabled=True) + btn('基于新来信重新生成', 'secondary', 'md', 'refresh', loading=True), ''),
@@ -132,7 +132,7 @@ def i8():
     def line(k, v):
         return '<div style="display: flex; gap: 12px; align-items: flex-start; padding: 8px 0px; border-bottom: 1px solid %s;"><div style="width: 64px; flex-shrink: 0; font-size: 12px; color: %s; padding-top: 1px;">%s</div><div style="flex: 1; min-width: 0px; font-size: 13px; color: %s; line-height: 1.55;">%s</div></div>' % (
             T['line2'], T['ink3'], k, T['ink'], v)
-    body = col(line('动作', '积加创建售后发货单：良仓 US · V2 黑色 ×1 · UPS Next Day Air') +
+    body = col(line('动作', '良仓创建售后出库单：良仓 US · V2 黑色 ×1 · UPS Next Day Air') +
                line('报备', '快递费用 <b>$12.40</b>') +
                line('绑定回复', 'English · A 先补发，发货单创建成功后自动发出') +
                line('售后单', '同时创建：寄配件 · 良仓有货 · 物流问题（FSH 100%，向 UPS 索赔）') +
@@ -220,7 +220,7 @@ def i14():
     cols = [('来信', 'left'), ('识别依据', 'left'), ('到达', 'left'), ('SLA', 'left'), ('指定店铺', 'left')]
     rows = [
         [col(text('Tom Harris', 12.5, T['ink'], 600) + ellipsis('Where is my order? Tracking says delivered.', 12, T['ink3']), 1),
-         col(nowrap('亚马逊站内信 · 经积加', 12, T['ink2']) + nowrap('积加店铺 ID JJ-AMZ-07 未登记', 11.5, T['warn'], 600), 1),
+         col(nowrap('亚马逊买家消息 · Gmail', 12, T['ink2']) + nowrap('收件地址 amz-uk@forcome.com 未登记', 11.5, T['warn'], 600), 1),
          nowrap('09-11 10:02', 12, T['ink2']), col(sla('23h 42m', 'normal') + nowrap('亚马逊 24 小时', 11, T['ink4']), 2),
          select_box(None, '选择店铺', width='150px', h=28)],
         [col(text('Hanna Vogel', 12.5, T['ink'], 600) + ellipsis('Der Filter passt nicht in mein Gerät.', 12, T['ink3']), 1),
@@ -233,8 +233,8 @@ def i14():
     note = banner('warning', '2 封来信识别不出店铺，未生成草稿', 'SLA 按原到达时间照常计时。指定店铺后进入该店铺队列并开始五步处理；新店铺请管理员在「设置 · 渠道与店铺」登记（E-13）。')
     tail = row(icon('check_c', 14, T['ok_solid'], 2) + nowrap('指定后浮层「已归入 forcome.eu，正在生成草稿」，本行移出列表。', 12, T['ink3']), 6)
     frame = mini(col(head + note + tbl + tail, 12), VW, 400, pad='20px')
-    return variant('I14 未归属店铺队列', '客服主管周敏的视角（P04 筛选「未归属店铺」或收件箱提醒进入）。每行显示识别依据（收件地址或积加店铺 ID）、到达时间、仍在计时的 SLA，行尾「指定店铺」下拉；不生成草稿、不能回复，直到指定店铺。',
-                   frame, VW, trigger='积加店铺 ID 或收件地址未登记（E-13、AC-TK-09、AC-TK-11）。')
+    return variant('I14 未归属店铺队列', '客服主管周敏的视角（P04 筛选「未归属店铺」或收件箱提醒进入）。每行显示识别依据（收件地址、卖家 ID）、到达时间、仍在计时的 SLA，行尾「指定店铺」下拉；不生成草稿、不能回复，直到指定店铺。',
+                   frame, VW, trigger='收件地址或卖家 ID 未登记（E-13、AC-TK-09、AC-TK-11）。')
 
 
 # ---------------------------------------------------------------- I15 已达 5 版上限

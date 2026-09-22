@@ -65,7 +65,7 @@ def p13_summary():
 
 def p13_filters():
     left = row(filter_chip('日期', '2026-09-01 至 09-11', True) + filter_chip('店铺', '全部') + filter_chip('处理方式') + filter_chip('责任') + filter_chip('报备') + filter_chip('结算'), 8)
-    right = row(nowrap('已隐藏 1 列：配件 × 数量 · 表格可横向滚动', 12, T['ink3']) + btn('列设置', 'secondary', 'md', 'sort') + btn('同步到积加', 'secondary', 'md', 'refresh') + btn('导出 Excel', 'secondary', 'md', 'download'), 8)
+    right = row(nowrap('已隐藏 1 列：配件 × 数量 · 表格可横向滚动', 12, T['ink3']) + btn('列设置', 'secondary', 'md', 'sort') + btn('导出 Excel', 'secondary', 'md', 'download'), 8)
     return between(left, right)
 
 
@@ -90,9 +90,9 @@ NOTE = {
 
 
 def p14_table():
-    cols = [('售后单号', 'left'), ('客户', 'left'), ('责任', 'left'), ('费用合计', 'right'), ('FSH / 工厂 %', 'left'), ('协商', 'left'), ('工厂承担', 'right'), ('说明', 'left')]
-    tpl = '124px 104px 96px 76px 88px 84px 76px minmax(0, 1fr)'
-    heads = {'已结算': '批次 2026-09-A · 09-08 生成（提前）· 09-10 双方确认', '待结算': '比例已确认 · 进入 10-05 生成的批次 2026-09-B',
+    cols = [('售后单号', 'left'), ('生产厂', 'left'), ('客户', 'left'), ('责任', 'left'), ('费用合计', 'right'), ('FSH / 工厂 %', 'left'), ('协商', 'left'), ('工厂承担', 'right'), ('说明', 'left')]
+    tpl = '124px 52px 96px 88px 76px 88px 84px 76px minmax(0, 1fr)'
+    heads = {'已结算': '批次 FQD-A、FZJ-A · 09-08 提前生成 · 09-10 双方确认', '待结算': '比例已确认 · 进入 10-05 生成的批次 2026-09-FQD-B',
              '未定': '比例未定 · 不进批次，按建议比例估算'}
     groups = []
     for st, nos in GROUPS:
@@ -103,37 +103,35 @@ def p14_table():
             quoted = a['product'] is not None
             share = factory_share(a)
             sub += share
-            rows.append([nowrap(no, 12.5, T['accent'], 600), ellipsis(a['customer'], 12.5), cat(a['resp']),
+            rows.append([nowrap(no, 12.5, T['accent'], 600), cat(a['factory']), ellipsis(a['customer'], 12.5), cat(a['resp']),
                          money(total(a)) if quoted else pending('待报价'), ratio_txt(a), state(a['nego']),
                          nowrap(money(share) if quoted else '待报价', 12.5, T['ink'] if quoted else T['ink4'], 700), ellipsis(NOTE[no], 12, T['ink3'])])
         groups.append((row(state(st) + nowrap(heads[st], 12, T['ink2']), 8), '%d 单 · 小计 <b style="color: %s;">%s</b>' % (len(nos), T['ink'], money(round(sub, 2))), rows))
-    footer = [nowrap('合计 · 8 单', 12.5, T['ink'], 700), '', '', '', '', '', money(LT['factory']), nowrap('已确认 %s · 未定 %s' % (money(round(LT['settled'] + LT['pending'], 2)), money(LT['undecided'])), 12, T['ink3'])]
+    footer = [nowrap('合计 · 8 单', 12.5, T['ink'], 700), '', '', '', '', '', '', money(LT['factory']), nowrap('已确认 %s · 未定 %s' % (money(round(LT['settled'] + LT['pending'], 2)), money(LT['undecided'])), 12, T['ink3'])]
     return group_table(cols, groups, tpl, footer)
 
 
 def p14_batches():
-    a = SETTLE_BATCHES[0]
-    b = SETTLE_BATCHES[1]
-    amt_a = round(sum(factory_share(AS[x]) for x in a['items']), 2)
-    amt_b = round(sum(factory_share(AS[x]) for x in b['items']), 2)
-    ca = card(between(nowrap('批次 ' + a['no'], 14, T['ink'], 700), state(a['state'])) +
-              kv('售后单', '%d 单' % len(a['items'])) + kv('工厂承担', money(amt_a)) + kv('生成', '09-08（提前生成）') +
-              kv('生产厂确认', '陈工 · 09-10 15:30') + kv('FSH 确认', '王磊 · 09-10') + link('查看结算单', 12, 'chev_r'), pad='12px 14px', gap=7)
-    cb = card(between(nowrap('批次 ' + b['no'], 14, T['ink'], 700), state(b['state'])) +
-              kv('售后单', '%d 单' % len(b['items'])) + kv('工厂承担', money(amt_b)) + kv('计划生成', '10-05 自动') +
-              muted('每月 5 日自动生成上月批次，可提前生成。生成后推送陈工确认，双方确认后转为已结算。', 12), pad='12px 14px', gap=7, tone='accent')
-    rules = card(bullet('只收比例已确认的售后单；比例未定的不进批次。') + bullet('批次状态：待生成 → 待确认 → 已结算。') +
-                 bullet('批次生成后其中售后单的比例不能再改，需调整时在下一批次冲销。'), '结算规则', pad='12px 14px', gap=6)
-    return label('结算批次 · 东莞生产厂') + ca + cb + rules
+    def bcard(b):
+        amt = round(sum(factory_share(AS[x]) for x in b['items']), 2)
+        done = b['state'] == '已结算'
+        conf = b['note'].split('；')[1] if done else '生成后推送对接人确认，双方确认后转已结算'
+        return card(between(row(nowrap(b['no'], 13, T['ink'], 650) + cat(b['factory']), 6), state(b['state'])) +
+                    kv('售后单 · 工厂承担', '%d 单 · %s' % (len(b['items']), money(amt))) +
+                    kv('生成' if done else '计划生成', '%s%s' % (b['at'], '（提前）' if done else ' 自动')) +
+                    muted(conf, 11.5), pad='11px 13px', gap=6, tone=None if done else 'accent')
+    rules = card(bullet('每个生产厂每月一个批次，分别确认。') + bullet('只收比例已确认的售后单；比例未定的不进批次。') + bullet('批次状态：待生成 → 待确认 → 已结算。') +
+                 bullet('批次生成后其中售后单的比例不能再改，需调整时在下一批次冲销。'), '结算规则', pad='11px 13px', gap=5)
+    return label('结算批次 · 按生产厂') + ''.join(bcard(b) for b in SETTLE_BATCHES) + rules
 
 
 def p14():
     kpis = grid(kpi('工厂承担（含估算）', money(LT['factory']), sub='8 单 · 2026-09 · 以内部结算为准') +
-                kpi('已结算', money(LT['settled']), sub='批次 2026-09-A · 2 单') +
-                kpi('待结算', money(LT['pending']), sub='进入 10-05 生成的 2026-09-B · 2 单') +
+                kpi('已结算', money(LT['settled']), sub='批次 FQD-A、FZJ-A · 2 单') +
+                kpi('待结算', money(LT['pending']), sub='进入 10-05 生成的 FQD-B · 2 单') +
                 kpi('比例未定', money(LT['undecided']), sub='4 单 · 不进批次'), 4, 12)
-    filters = between(row(filter_chip('生产厂', '东莞生产厂', True) + filter_chip('月份', '2026-09', True) + filter_chip('店铺', '全部'), 8),
-                      row(btn('导出结算单', 'secondary', 'md', 'download') + btn('提前生成批次 2026-09-B', 'primary', 'md', 'plus'), 8))
+    filters = between(row(filter_chip('生产厂', '全部') + filter_chip('月份', '2026-09', True) + filter_chip('店铺', '全部'), 8),
+                      row(btn('导出结算单', 'secondary', 'md', 'download') + btn('提前生成批次 2026-09-FQD-B', 'primary', 'md', 'plus'), 8))
     main = filters + kpis + p14_table()
     body = as_head('内部结算') + two_col(main, p14_batches(), 300, 16, '16px 24px')
     return app('wanglei', '售后', ['售后', '内部结算'], body)

@@ -15,38 +15,40 @@ def sw(name, hexv, use, dark=False):
 
 colors = grid(''.join([
     sw('画布', T['canvas'], '页面底色'), sw('表面', T['surface'], '卡片、栏、表格'), sw('浅底', T['subtle'], '表头、次级区'),
-    sw('分隔线', T['line'], '卡片边框、栏分隔'), sw('描边', T['line_strong'], '输入框、次按钮'), sw('导航栏', T['rail'], '左侧导航底色'),
+    sw('分隔线', T['line'], '卡片与面板边框'), sw('描边', T['line_strong'], '输入框、次按钮'), sw('轨道', T['track'], '分段控件与徽标浅底'),
     sw('主文字', T['ink'], '标题、正文'), sw('次文字', T['ink2'], '按钮文字、表格次要'), sw('辅助文字', T['ink3'], '说明、元信息'), sw('弱文字', T['ink4'], '占位、禁用'),
     sw('强调', T['accent'], '主按钮、选中、链接'), sw('强调底', T['accent_bg'], '选中行、强调标签底'),
 ]), 6, 12) + grid(''.join([
+    sw('青色', T['cyan'], '只作渐变第二色'), col('<div style="height: 44px; border-radius: 9px; background: %s;"></div><div style="font-size: 12px; font-weight: 700; color: %s;">AI 渐变</div><div style="font-size: 11px; color: %s;">#4f46e5 → #06b6d4 · 120°</div><div style="font-size: 11px; color: %s; line-height: 1.4;">只用于 AI 标识（✦）、品牌标、草稿卡顶条</div>' % (GRAD, T['ink'], T['ink3'], T['ink4']), 3),
+]), 6, 12) + grid(''.join([
     sw('成功', T['ok'], '已完成、已批准、通过'), sw('警示', T['warn'], '待处理、待审批、临近超时'), sw('危险', T['bad'], '转人工、驳回、失败、超时'),
-    sw('流程', T['flow'], '工厂相关的执行记录'), sw('信息', T['info'], '中性提示横幅'), sw('渠道色', T['amazon'] , '亚马逊橙、Shopify 绿：渠道圆点与按渠道拆分的图表'),
+    sw('流程', T['flow'], '工厂相关的执行记录'), sw('信息', T['info'], '中性提示横幅'), sw('渠道色', T['amazon'], '亚马逊蓝、Shopify 绿、邮件灰：渠道徽标与按渠道拆分的图表'),
 ]), 6, 12)
 
 type_scale = col(''.join(
-    '<div style="display: flex; align-items: baseline; gap: 20px; border-bottom: 1px solid %s; padding-bottom: 8px;"><div style="width: 150px; font-size: 12px; color: %s;">%s</div><div style="font-size: %dpx; font-weight: %d; color: %s;">%s</div></div>' % (T['line2'], T['ink3'], a, s, w, T['ink'], t)
+    '<div style="display: flex; align-items: baseline; gap: 20px; border-bottom: 1px solid %s; padding-bottom: 8px;"><div style="width: 180px; font-size: 12px; color: %s;">%s</div><div style="font-size: %spx; font-weight: %d; color: %s;">%s</div></div>' % (T['line2'], T['ink3'], a, s, w, T['ink'], t)
     for a, s, w, t in [
         ('24 / 700 · 指标数字', 24, 700, '$129.94  96.4%'),
-        ('20 / 700 · 页面标题', 20, 700, '售后单'),
-        ('18 / 700 · 详情标题', 18, 700, 'HEPA 滤芯组件补发 · Laura Bennett'),
-        ('16 / 700 · 弹窗与区块标题', 16, 700, '驳回报备'),
-        ('14 / 600 · 强调正文', 14, 600, '批准并通知生产厂寄出'),
+        ('19 / 700 · 页面标题', 19, 700, '售后单'),
+        ('17.6 / 650 · 详情与会话标题', 17.6, 650, 'HEPA 滤芯组件补发 · Laura Bennett'),
+        ('15.5 / 650 · 弹窗标题', 15.5, 650, '驳回报备'),
+        ('14.6 / 650 · 面板标题', 14.6, 650, '待处理 · 工单上下文'),
         ('13 / 400 · 正文、表格', 13, 400, 'UPS 自 09-05 无扫描且已超预计送达。'),
-        ('12 / 400 · 元信息、表单标签', 12, 400, '经积加同步 · 09-10 16:00'),
-        ('11 / 700 · 区块小标题、标签', 11, 700, '登记信息'),
-    ]), 8) + muted('字体：Manrope（拉丁字母与数字）+ Noto Sans SC（中文），导出时回退到 PingFang SC / 微软雅黑。数字一律等宽（tabular-nums），金额、时间、单号对齐。', 12)
+        ('12 / 400 · 元信息、表单标签', 12, 400, '亚马逊买家消息 · 09-10 16:00'),
+        ('11.5 / 650 · 区块小标题、徽标', 11.5, 650, '登记信息'),
+    ]), 8) + muted('字体：Inter（拉丁字母与数字）+ PingFang SC / HarmonyOS Sans SC / Noto Sans SC（中文），最后回退微软雅黑。字重用 400、500、600、650、700 五档。数字一律等宽（tabular-nums），金额、时间、单号对齐。', 12)
 
 spacing = grid(
     card(label('间距（4 的倍数）') + row(''.join('<div style="display: flex; flex-direction: column; align-items: center; gap: 4px;"><div style="width: %dpx; height: %dpx; background: %s; border-radius: 2px;"></div><div style="font-size: 11px; color: %s;">%d</div></div>' % (s, s, T['accent_line'], T['ink3'], s) for s in (4, 8, 12, 16, 20, 24, 32)), 14, 'flex-end'), pad='14px 16px') +
-    card(label('圆角') + row(''.join('<div style="display: flex; flex-direction: column; align-items: center; gap: 4px;"><div style="width: 44px; height: 32px; border: 1.5px solid %s; border-radius: %dpx;"></div><div style="font-size: 11px; color: %s;">%s</div></div>' % (T['ink3'], r, T['ink3'], n) for r, n in ((4, '4 标签'), (6, '6 按钮输入'), (8, '8 卡片'), (10, '10 弹窗'), (999, '999 胶囊'))), 14, 'flex-end'), pad='14px 16px') +
-    card(label('阴影') + row(''.join('<div style="display: flex; flex-direction: column; align-items: center; gap: 6px;"><div style="width: 60px; height: 36px; background: #ffffff; border-radius: 8px; box-shadow: %s;"></div><div style="font-size: 11px; color: %s;">%s</div></div>' % (s, T['ink3'], n) for s, n in ((SHADOW_XS, 'xs 卡片按钮'), (SHADOW_MD, 'md 浮层提示菜单'), (SHADOW_LG, 'lg 弹窗'))), 20, 'flex-end'), pad='14px 16px') +
+    card(label('圆角') + row(''.join('<div style="display: flex; flex-direction: column; align-items: center; gap: 4px;"><div style="width: 44px; height: 32px; border: 1.5px solid %s; border-radius: %dpx;"></div><div style="font-size: 11px; color: %s;">%s</div></div>' % (T['ink3'], r, T['ink3'], n) for r, n in ((6, '6 徽标'), (9, '9 按钮输入'), (13, '13 卡片'), (16, '16 面板弹窗'), (999, '999 圆点'))), 14, 'flex-end'), pad='14px 16px') +
+    card(label('阴影') + row(''.join('<div style="display: flex; flex-direction: column; align-items: center; gap: 6px;"><div style="width: 60px; height: 36px; background: #ffffff; border-radius: 8px; box-shadow: %s;"></div><div style="font-size: 11px; color: %s;">%s</div></div>' % (s, T['ink3'], n) for s, n in ((SHADOW_XS, 'xs 卡片'), (SHADOW_CARD, 'card 草稿卡'), (SHADOW_MD, 'md 浮层菜单'), (SHADOW_LG, 'lg 弹窗'), (SHADOW_POP, 'pop 主按钮'))), 14, 'flex-end'), pad='14px 16px') +
     card(label('控件高度') + col(row(btn('28 小', 'secondary', 'sm') + btn('32 默认', 'secondary') + btn('36 表单主按钮', 'primary', 'lg'), 8) + muted('同一行内的按钮、输入框、筛选器高度一致。', 12), 8), pad='14px 16px'),
     4, 12)
 
 buttons = col(
     grid(''.join(col(label(n) + row(btn(n2, k) + btn(n2, k, disabled=True) + btn('处理中', k, loading=True), 8, wrap=True), 6) for n, n2, k in [
         ('主操作 primary · 每个区域最多一个', '批准', 'primary'), ('次操作 secondary', '驳回', 'secondary'), ('危险 danger · 不可撤销', '终止流程', 'danger'),
-        ('危险描边 danger_outline', '驳回报备', 'danger_outline'), ('强调描边 accent_outline', '修改后发送', 'accent_outline'), ('幽灵 ghost / 链接 link', '取消', 'ghost')]), 3, 16) +
+        ('危险描边 danger_outline', '驳回报备', 'danger_outline'), ('强调浅底 accent_outline', '修改后发送', 'accent_outline'), ('警示 warn · 建议动作', '提交建议动作', 'warn')]), 3, 16) +
     row(btn('带图标', 'secondary', 'md', 'refresh') + btn('提交审批', 'primary', 'md', icon_right='arrow_r') + btn('小按钮', 'secondary', 'sm', 'plus') + btn('大按钮', 'primary', 'lg') + icon_btn('more', 'secondary') + icon_btn('bell', badge=True) + link('查看全部', 12, 'chev_r'), 10) +
     muted('文案用动词短语，说清结果：「批准并通知生产厂寄出」而不是「确定」。禁用按钮必须在旁边或悬停提示里说明原因。点击后进入「处理中」并防止重复提交；成功后按钮恢复并弹出成功提示。', 12), 14)
 
@@ -79,16 +81,16 @@ state_groups = [
     ('渠道连接', ['已连接', '同步延迟', '连接异常', '未连接']),
 ]
 states = grid(''.join(col(label(n) + row(''.join(state(s) for s in ss), 6, wrap=True), 8) for n, ss in state_groups), 3, 18) + grid(''.join([
-    col(label('渠道与店铺（分类值，中性底色 + 平台圆点）') + row(channel('亚马逊', 'US', 'Forcome Direct') + channel('Shopify', 'US', 'forcome.com') + channel('邮件'), 6, wrap=True), 8),
+    col(label('渠道与店铺（平台徽标 + 店铺名）') + row(channel('亚马逊', 'US', 'Forcome Direct') + channel('Shopify', 'US', 'forcome.com') + channel('邮件'), 6, wrap=True), 8),
     col(label('分类值（意图、处理方式、责任）') + row(cat('未收到与异常') + cat('寄配件') + cat('产品质量问题'), 6, wrap=True), 8),
     col(label('SLA 剩余（≤2h 危险，≤6h 警示）') + row(sla('0h 55m', 'danger') + sla('5h 40m', 'warning') + sla('11h 10m') + sla('已回复', 'none'), 6, wrap=True), 8),
     col(label('优先级 / 情绪 / 标签 / 计数') + row(priority('紧急') + priority('高') + priority('普通') + sentiment('负面') + sentiment('中性') + sentiment('正面') + pill('路途急') + badge_count(12), 8, wrap=True), 8),
-]), 2, 18) + muted('规则：状态一律带圆点并用语义色；分类值一律中性灰。同一个状态在所有页面颜色相同，映射表在组件库 STATE_TONE。', 12)
+]), 2, 18) + muted('规则：状态一律带圆点并用语义浅底；分类值一律中性灰；AI 产出一律用渐变 ✦ 徽标（' + ai_badge('AI 摘要') + '）。同一个状态在所有页面颜色相同，映射表在组件库 STATE_TONE。', 12)
 
 feedback = grid(''.join([
-    col(label('页内横幅') + banner('info', '工单已合并到 T-20260902-0071', '原工单只读，新来信会进入主工单。') + banner('success', '已批准，发货单创建成功', '回复已自动发出，SLA 计时停止。') + banner('warning', 'SLA 剩 55 分钟，审批时限 4 小时', '承诺类回复要等审批后才能发出。建议先发一条不含承诺的进展回复。', btn('插入进展回复', 'secondary', 'sm')) + banner('danger', '积加连接中断，亚马逊来信暂存队列', '09-11 10:05 起未同步。恢复后按到达顺序处理，SLA 从原到达时间计算。', btn('查看状态', 'secondary', 'sm')), 10),
-    col(label('浮层提示（右上角，成功 3 秒消失，失败需手动关闭）') + toast('success', '已提交审批', '周敏会在 4 小时内处理，结果会通知你。') + toast('error', '发送失败：积加接口超时', '草稿已保留，系统将在 1 分钟后自动重试。', row(link('立即重试') + link('复制草稿'), 12)) + toast('info', '陈晨正在处理这张工单', '你可以查看，但不能同时编辑回复。') + toast('warning', '草稿已失效', '客户在你编辑期间又来了一封信，请先阅读新消息。'), 10),
-    col(label('确认弹窗 / 驳回弹窗') + dialog('驳回这张审批单？', field('驳回原因', textarea_box(None, '写清楚为什么驳回、发起人要怎么改', 'error', 64, '0 / 200'), True, error='请填写驳回原因') + checkbox('同时退回售后单到「待确认」', True), btn('取消', 'secondary') + btn('驳回', 'danger'), 420, 'danger', '驳回后发起人会收到通知，绑定的回复不会发出。'), 10),
+    col(label('页内横幅') + banner('info', '工单已合并到 T-20260902-0071', '原工单只读，新来信会进入主工单。') + banner('success', '已批准，发货单创建成功', '回复已自动发出，SLA 计时停止。') + banner('warning', 'SLA 剩 55 分钟，审批时限 4 小时', '承诺类回复要等审批后才能发出。建议先发一条不含承诺的进展回复。', btn('插入进展回复', 'secondary', 'sm')) + banner('danger', 'Gmail 连接中断，来信暂存队列', '09-11 10:05 起未收取。恢复后按到达顺序处理，SLA 从原到达时间计算。', btn('查看状态', 'secondary', 'sm')), 10),
+    col(label('浮层提示（右上角，成功 3 秒消失，失败需手动关闭）') + toast('success', '已提交审批', '周敏会在 4 小时内处理，结果会通知你。') + toast('error', '发送失败：Gmail 接口超时', '草稿已保留，系统将在 1 分钟后自动重试。', row(link('立即重试') + link('复制草稿'), 12)) + toast('info', '陈晨正在处理这张工单', '你可以查看，但不能同时编辑回复。') + toast('warning', '草稿已失效', '客户在你编辑期间又来了一封信，请先阅读新消息。'), 10),
+    col(label('确认弹窗 / 驳回弹窗') + dialog('驳回这张审批单？', field('驳回原因', textarea_box(None, '写清楚为什么驳回、发起人要怎么改', 'error', 64, '0 / 200'), True, error='请填写驳回原因') + muted('驳回后工单回到提交前状态，售后单退回「待确认」。', 12), btn('取消', 'secondary') + btn('驳回', 'danger'), 420, 'danger', '驳回后发起人会收到通知，绑定的回复不会发出。'), 10),
     col(label('提示气泡 / 下拉菜单') + tooltip('禁用原因：这张工单由陈晨处理中。你可以在工单详情里申请接手。') + menu([('改派', 'handoff', None), ('合并到其他工单', 'merge', None), ('添加标签', 'tag', None), '-', ('关闭工单', 'x_c', 'danger')], 220), 10),
 ]), 4, 20)
 
@@ -105,7 +107,7 @@ data_disp = grid(''.join([
 loading = grid(''.join([
     col(label('空状态') + card(empty('inbox', '收件箱已清空', '没有待你处理的工单。新来信会自动出现在这里。', btn('查看全部工单', 'secondary')), pad='0px'), 8),
     col(label('无权限') + card(no_permission('没有访问权限', '「设置」只对客服主管和管理员开放。如需开通，请联系管理员刘洋。'), pad='0px'), 8),
-    col(label('加载失败') + card(load_error('报表加载失败', '积加数据接口超时。已显示的数据截止 09-11 09:30。'), pad='0px'), 8),
+    col(label('加载失败') + card(load_error('报表加载失败', 'SP-API 接口超时。已显示的数据截止 09-11 09:30。'), pad='0px'), 8),
     col(label('骨架屏（首屏加载 > 300ms 时显示）') + card(skel_rows(4, True), pad='0px') + row(spinner() + muted('局部加载用行内转圈，不遮挡整页'), 8) + progress(62) , 8),
 ]), 4, 20)
 
@@ -116,17 +118,95 @@ copy_rules = table([('场景', 'left'), ('写法', 'left'), ('示例', 'left')],
     ['时长', '小时与分钟，SLA 精确到分钟', '5h 40m · 剩 2 个工作日'],
     ['金额', '币种符号 + 两位小数；欧元订单同时显示折算', '$14.70 · €44.90（≈ $49.39）'],
     ['单号', '固定前缀：T 工单、S 售后单、AP 审批单', 'T-20260910-0192 · S-20260911-0018 · AP-20260911-001'],
-    ['错误', '发生了什么 + 怎么处理，不道歉、不含糊', '发送失败：积加接口超时。草稿已保留，1 分钟后自动重试。'],
+    ['错误', '发生了什么 + 怎么处理，不道歉、不含糊', '发送失败：Gmail 接口超时。草稿已保留，1 分钟后自动重试。'],
     ['空状态', '说明为什么空 + 下一步', '没有待你处理的工单。新来信会自动出现在这里。'],
 ], '120px 320px minmax(0, 1fr)', dense=True)
 
 shell_note = grid(''.join([
-    card(label('页面外壳') + text('左侧 64px 深色导航栏：图标 + 两字标签，当前项靛蓝底，待办数用红色角标。导航项按角色显示，没有权限的入口不出现；直接访问链接显示无权限状态。', 13) + text('顶部 48px 工具条：面包屑、店铺范围选择（按授权店铺过滤全站数据）、全局搜索（Ctrl K）、通知。', 13) + text('内容区：列表页用「标题区 + 筛选行 + 表格」；详情页用「标题区 + 左主右辅两栏（右栏 360–400px）」；收件箱用三栏（列表 320 / 会话 / 上下文 340）。', 13), pad='16px 18px'),
+    card(label('页面外壳') + text('顶部 56px 白色顶栏：品牌标（渐变 F）· 分段导航（浅灰轨道，当前项白底描边，待办数用浅靛蓝计数）· 店铺范围（按授权店铺过滤全站数据）· 搜索（Ctrl K 命令面板）· 密度（舒适 / 紧凑）· 通知 · 当前用户与角色。第一期只有浅色，不放主题切换。导航项按角色显示，无权入口不出现。', 13) + text('内容区为浅灰底（#f5f6fa）：列表页「标题区 + 筛选行 + 表格卡片」；详情页「标题区 + 左主右辅两栏（右栏 360–400px）」；收件箱、知识库、设置、工厂工作台用 16px 圆角的浮动面板，面板间距 12px。', 13) + text('收件箱三栏：队列 308 / 处理台（自适应，内容区浅底）/ 上下文 332；上下文分区可折叠。', 13), pad='16px 18px'),
     card(label('交互通则') + text('1. 所有写操作点击后立即进入「处理中」，防重复提交；成功给浮层提示，失败给可重试的提示并保留输入。', 13) + text('2. 不可撤销的操作（驳回、终止流程、关闭工单、执行退款）必须二次确认，驳回与终止必须填原因。', 13) + text('3. 同一工单同一时间只允许一人编辑回复，其他人只读并看到「谁在处理」。', 13) + text('4. 列表默认排序写在列表上方；筛选条件在地址栏保留，刷新后不丢。', 13), pad='16px 18px'),
 ]), 2, 16)
 
+TOK = [
+    ('canvas', '--background', '#f5f6fa', '#0c0e14', '页面底色'),
+    ('surface', '--card / --popover', '#ffffff', '#14171f', '卡片、面板、弹层'),
+    ('subtle', '--muted', '#f7f8fc', '#1a1e28', '表头、处理台内容区、底栏'),
+    ('track', '--secondary / --accent', '#f1f3f9', '#20242f', '分段轨道、徽标浅底、悬停'),
+    ('line', '--border', '#e7e9f1', '#272c39', '边框与分隔'),
+    ('line_strong', '--input', '#d8dce7', '#333a4a', '输入框、次按钮描边'),
+    ('ink', '--foreground', '#0f1320', '#e9ebf2', '标题与正文'),
+    ('ink3', '--muted-foreground', '#5a6376', '#a3aab9', '说明、元信息'),
+    ('accent', '--primary / --ring', '#4f46e5', '#6f6bf6', '主操作、选中、焦点环'),
+    ('accent_bg', '--primary-soft（自定义）', '#f0effd', 'rgba(111,107,246,.15)', '选中底、强调徽标'),
+    ('bad_solid', '--destructive', '#dc3b45', '#f0606b', '危险操作与失败'),
+    ('ok_solid', '--success（自定义）', '#0f9960', '#3dd68c', '成功、已完成'),
+    ('warn_solid', '--warning（自定义）', '#c2740a', '#e0a44a', '待处理、临近超时'),
+    ('info', '--info（自定义）', '#2563eb', '#5b8def', '信息、亚马逊徽标'),
+    ('cyan', '--brand-2（自定义）', '#06b6d4', '#22c7e0', '渐变第二色'),
+]
+tok_rows = [[nowrap(a, 12, T['ink'], 600), nowrap(b, 12, T['accent_ink'], 600),
+             row('<div style="width: 14px; height: 14px; border-radius: 4px; background: %s; border: 1px solid %s;"></div>' % (c, T['line']) + nowrap(c, 11.5, T['ink2']), 6),
+             row('<div style="width: 14px; height: 14px; border-radius: 4px; background: %s; border: 1px solid %s;"></div>' % (d, T['line']) + nowrap(d, 11.5, T['ink2']), 6),
+             nowrap(e, 12, T['ink3'])] for a, b, c, d, e in TOK]
+tok_table = table([('原型 token（ui.T）', 'left'), ('shadcn 变量', 'left'), ('浅色', 'left'), ('深色（预留，第一期不上线）', 'left'), ('用途', 'left')], tok_rows, '130px 190px 150px 190px minmax(0, 1fr)', dense=True)
+CSS = """@import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #f5f6fa;  --foreground: #0f1320;
+  --card: #ffffff;        --popover: #ffffff;
+  --muted: #f7f8fc;       --muted-foreground: #5a6376;
+  --secondary: #f1f3f9;   --accent: #f1f3f9;
+  --border: #e7e9f1;      --input: #d8dce7;
+  --primary: #4f46e5;     --primary-foreground: #ffffff;  --ring: #4f46e5;
+  --destructive: #dc3b45; --success: #0f9960; --warning: #c2740a; --info: #2563eb;
+  --brand-2: #06b6d4;     --radius: 13px;
+}
+.dark { --background: #0c0e14; --card: #14171f; --primary: #6f6bf6; /* 其余见左表 */ }
+
+@theme inline {
+  --color-background: var(--background);  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);        --color-success: var(--success);
+  --color-warning: var(--warning);        --color-info: var(--info);
+  --radius-sm: 6px;  --radius-md: 9px;  --radius-lg: var(--radius);  --radius-xl: 16px;
+  --font-sans: "Inter", "PingFang SC", "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+}"""
+css_box = '<pre style="margin: 0px; background: #0f1320; color: #e9ebf2; border-radius: 13px; padding: 14px 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; line-height: 1.6; white-space: pre; overflow: hidden;">%s</pre>' % CSS.replace('<', '&lt;')
+CMP = [
+    ('btn · icon_btn', 'Button', 'variant：default / outline / ghost / destructive / link；新增 warn、soft（accent_outline）；size：sm 28 / default 32 / lg 36'),
+    ('chip · state · cat · pill · channel', 'Badge', '按 STATE_TONE 生成 variant；状态带 5px 圆点'),
+    ('ai_badge', 'Badge（variant="ai"）', 'bg-gradient-to-r from-primary to-brand-2 + ✦'),
+    ('card · kpi', 'Card', 'rounded-lg（13px）+ border + shadow-xs'),
+    ('tabs', 'Tabs（line 样式）', '选中下划线 2px，计数用 Badge'),
+    ('seg · ver_tabs · queue_seg · 顶部导航', 'Tabs / ToggleGroup（胶囊样式）', '浅灰轨道，选中白底描边'),
+    ('input_box · select_box · textarea_box · field', 'Input · Select · Textarea · Form', 'Form 用 react-hook-form + zod，错误写「哪里错 + 怎么改」'),
+    ('checkbox · radio · toggle · radio_card', 'Checkbox · RadioGroup · Switch', 'radio_card 为 RadioGroup 的卡片样式'),
+    ('table · group_table', 'Table + TanStack Table', '排序、筛选、列显隐、分页、行选择'),
+    ('dialog · scrim', 'Dialog / AlertDialog', '不可撤销操作用 AlertDialog'),
+    ('审核抽屉（K12）', 'Sheet', '右侧抽屉'),
+    ('menu · tooltip · filter_chip', 'DropdownMenu · Tooltip · Popover + Command', '筛选器为 Popover 内的 Command 列表'),
+    ('search_box（Ctrl K）', 'Command（CommandDialog）', '全局搜索与命令面板'),
+    ('toast', 'Sonner', '成功 3 秒消失，失败常驻'),
+    ('banner', 'Alert', 'info / success / warning / destructive'),
+    ('skel · progress · spinner', 'Skeleton · Progress · lucide Loader2', ''),
+    ('rsec（可折叠分区）', 'Collapsible / Accordion', '收件箱右栏'),
+    ('avatar · kbd · pagination', 'Avatar · Kbd · Pagination', ''),
+    ('三栏面板 · 滚动区', 'ResizablePanelGroup · ScrollArea', '面板宽度可拖动（可选）'),
+    ('图表', 'Chart（Recharts）', '颜色取 --chart-1…5'),
+    ('日期字段', 'Calendar + Popover（DatePicker）', ''),
+    ('stepper · 执行记录', '自定义组件', 'shadcn 无现成组件'),
+    ('icon()', 'lucide-react', '同名替换：inbox、ticket、package、square-check、book-open、chart-column、settings 等'),
+]
+cmp_table = table([('原型组件（ui.py）', 'left'), ('shadcn/ui', 'left'), ('说明', 'left')], [[nowrap(a, 12, T['ink'], 600), nowrap(b, 12, T['accent_ink'], 600), text(c, 12, T['ink3'])] for a, b, c in CMP],
+                  '300px 300px minmax(0, 1fr)', dense=True)
+dens = table([('密度', 'left'), ('正文', 'left'), ('次要', 'left'), ('徽标', 'left'), ('队列行内边距', 'left'), ('队列行距', 'left'), ('表格行高', 'left'), ('面板内边距', 'left')],
+             [[nowrap('舒适（默认）', 12, T['ink'], 600), '13', '12', '11', '9', '4', '40', '14–16'], [nowrap('紧凑', 12, T['ink'], 600), '12.5', '11.5', '10.5', '6', '2', '32', '12']],
+             '140px repeat(7, minmax(0, 1fr))', dense=True)
+dev_map = grid(col(label('令牌对照') + tok_table, 8) + col(label('Tailwind v4 主题（globals.css 摘要）') + css_box, 8), template='minmax(0, 1.25fr) minmax(0, 1fr)', gap=20) + \
+    col(label('组件对照') + cmp_table, 8) + col(label('密度（第一期两档都上线；顶栏「密度」按钮切换，按用户保存；只改字号与间距，不改布局；单位 px）') + dens, 8)
+
 body = col(''.join([
-    sec('1 色彩', '中性色表达层级，靛蓝只用于主操作与选中；绿、黄、红、紫只表达状态，不做装饰。', colors),
+    sec('1 色彩', '中性色表达层级；靛蓝只用于主操作与选中；靛蓝→青色渐变只用于 AI 与品牌；绿、黄、红、紫只表达状态，不做装饰。', colors),
     sec('2 字体与字号', '8 级字号，正文 13px。', type_scale),
     sec('3 间距、圆角、阴影、控件高度', '所有尺寸取自下列刻度。', spacing),
     sec('4 按钮', '每种按钮都有默认、禁用、处理中三态。', buttons),
@@ -135,19 +215,20 @@ body = col(''.join([
     sec('7 反馈', '横幅用于持续存在的情况，浮层提示用于一次性结果，弹窗用于需要确认或填写原因的操作。', feedback),
     sec('8 数据展示', '表格、键值、指标、步骤条、执行记录。', data_disp),
     sec('9 空、无权限、失败、加载', '每个列表和面板都要设计这四种情况。', loading),
-    sec('10 外壳与交互通则', '所有页面共用。', shell_note),
+    sec('10 外壳与交互通则', '所有页面共用。参考稿：forcome-support-console.html。', shell_note),
     sec('11 文案规范', '同一概念全站同一个词，术语以 PRD 第 1.4 节术语表为准。', copy_rules),
+    sec('12 研发映射 · shadcn/ui + Tailwind CSS v4', '开发用 shadcn/ui 与 Tailwind CSS（v4，研发启动时锁定当时最新稳定小版本）。原型里的每个颜色、圆角、组件都能在下表找到对应的 CSS 变量或 shadcn 组件；第一期只做浅色；舒适（默认）与紧凑两档密度都上线（Q-24 已确认），对照见全局状态 G9；深色令牌预留，不上线。', dev_map),
 ]), 20)
-save('DesignSystem.dc.html', board('设计规范', '视觉方向 A「精密工作台」。本板定义色彩、字体、间距、组件与状态，所有高保真页面只使用这里的组件；代码实现时以组件库 spec/ui.py 为准。', body, 1920, 2400))
+save('DesignSystem.dc.html', board('设计规范', '视觉 v3：顶栏分段导航 + 浅灰底浮动面板 + 靛蓝主色，AI 用靛蓝→青色渐变标识（参考 forcome-support-console.html）。本板定义色彩、字体、间距、组件、状态与研发映射；所有高保真页面只使用这里的组件，开发用 shadcn/ui + Tailwind CSS v4。', body, 1920, 2400))
 
 # ---------------------------------------------------------------- 全局状态
 from data import NOW_LABEL
-page_skel = app('liting', '收件箱', ['收件箱', '待处理'], '<div style="flex: 1; display: flex; min-height: 0px;"><div style="width: 320px; background: #ffffff; border-right: 1px solid %s;">%s</div><div style="flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px;">%s%s%s%s</div><div style="width: 340px; background: #ffffff; border-left: 1px solid %s; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">%s%s%s%s</div></div>' % (
+page_skel = app('liting', '收件箱', ['收件箱', '待处理'], '<div style="flex: 1; display: flex; gap: 12px; padding: 10px 14px 12px 14px; min-height: 0px;"><div style="width: 308px; background: #ffffff; border: 1px solid %s; border-radius: 16px; overflow: hidden;">%s</div><div style="flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; background: #ffffff; border-radius: 16px;">%s%s%s%s</div><div style="width: 332px; background: #ffffff; border: 1px solid %s; border-radius: 16px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">%s%s%s%s</div></div>' % (
     T['line'], skel_rows(8), skel('50%', 16), skel('100%', 90, 8), skel('100%', 200, 8), skel('40%', 32, 6), T['line'], skel('40%', 10), skel('80%', 10), skel('100%', 120, 8), skel('100%', 80, 8)), w=1440, h=900)
 page_403 = app('liting', '', ['设置'], '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(no_permission('没有访问权限', '「设置」只对客服主管和管理员开放。你当前的角色是坐席。如需开通，请联系管理员刘洋。', row(btn('返回收件箱', 'primary', 'md', 'chev_l') + btn('申请权限', 'secondary'), 8)), pad='8px 24px'))
 page_404 = app('liting', '工单', ['工单', 'T-20260801-9999'], '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(empty('search', '找不到这张工单', '工单 T-20260801-9999 不存在，或已按数据保留策略清除。', row(btn('返回工单列表', 'primary') + btn('按订单号搜索', 'secondary', 'md', 'search'), 8)), pad='8px 24px'))
 page_offline = app('liting', '收件箱', ['收件箱', '待处理'], '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(load_error('网络连接已断开', '你刚才编辑的回复已保存在本机。恢复连接后会自动同步，不需要重新输入。', row(btn('重新连接', 'primary', 'md', 'refresh'), 8)), pad='8px 24px'),
-                   banner_html=banner('danger', '积加连接中断，亚马逊来信暂存队列', '09-11 10:05 起未同步。恢复后按到达顺序处理，SLA 从原到达时间计算。管理员已收到通知。', btn('查看渠道状态', 'secondary', 'sm')))
+                   banner_html=banner('danger', 'Gmail 连接中断，来信暂存队列', '09-11 10:05 起未收取。恢复后按到达顺序处理，SLA 从原到达时间计算。管理员已收到通知。', btn('查看渠道状态', 'secondary', 'sm')))
 
 
 def scaled(inner, w=1440, h=900, s=0.5):
@@ -159,15 +240,35 @@ confirm_frame = mini('<div style="flex: 1; display: flex; align-items: center; j
 conflict_frame = mini(col(banner('info', '陈晨正在处理这张工单', '09-11 10:12 开始编辑回复。你可以查看会话和上下文，回复框只读。', row(btn('申请接手', 'secondary', 'sm') + btn('刷新', 'ghost', 'sm', 'refresh'), 6)) + banner('warning', '这张工单在你编辑期间收到新来信', '09-11 10:18 Jonas Weber 又发来 1 封。你的草稿已保留，请阅读新消息后再发送。', btn('查看新消息', 'secondary', 'sm')) + banner('danger', '你没有这个店铺的权限', '工单属于店铺 forcome.eu，你的数据范围是 Forcome Direct、forcome.com。', btn('联系主管', 'secondary', 'sm')), 10), 700, 330, pad='20px')
 unsaved_frame = mini('<div style="flex: 1; display: flex; align-items: center; justify-content: center; background: rgba(16,24,40,0.45);">%s</div>' % dialog('离开前保存修改？', muted('回复草稿有未发送的修改。离开后草稿会保留 7 天，下次打开这张工单时恢复。', 13), btn('继续编辑', 'secondary') + btn('保留草稿并离开', 'primary'), 440, 'warning'), 700, 330)
 
+# G9 密度切换
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pages'))
+import inbox_parts as IP
+
+
+def dens_col(dense):
+    rows = ''.join(IP.queue_row(IP.TK[n], n == 'T-20260910-0192', dense=dense) for n in ('T-20260902-0071', 'T-20260910-0176', 'T-20260910-0192', 'T-20260910-0195'))
+    q = '<div style="background: #ffffff; border: 1px solid %s; border-radius: 16px; padding: %s; display: flex; flex-direction: column; gap: %dpx;">%s</div>' % (
+        T['line'], '6px' if dense else '8px', 2 if dense else 3, rows)
+    trs = [[nowrap(a['no'], 12.5 - (0.5 if dense else 0), T['ink'], 600), ellipsis(a['customer'], 12.5 - (0.5 if dense else 0)), state(a['status'], 11 - (0.5 if dense else 0)), money(total(a)) if a['product'] is not None else '待报价']
+           for a in AFTERSALES[7:11]]
+    tb = table([('售后单号', 'left'), ('客户', 'left'), ('状态', 'left'), ('费用', 'right')], trs, '130px minmax(0, 1fr) 80px 70px', py=6 if dense else 10, fs=12 if dense else 12.5)
+    return col(row(text('紧凑' if dense else '舒适（默认）', 13, T['ink'], 650) + nowrap('队列行距 %s · 表格行高 %s' % (('2', '32') if dense else ('4', '40')), 11.5, T['ink3']), 8) + q + tb, 10, 'flex: 1; min-width: 0px;')
+
+
+from data import AFTERSALES, total, money
+dens_frame = '<div style="width: 1500px; box-sizing: border-box; padding: 20px; background: %s; display: flex; gap: 24px; align-items: flex-start;">%s%s</div>' % (T['canvas'], dens_col(False), dens_col(True))
+
 gs_body = col(
     grid(variant('G1 整页加载', '首屏数据超过 300ms 未返回时显示骨架屏，保留外壳与导航；超过 10 秒转为 G4 加载失败。', scaled(page_skel)) +
          variant('G2 无权限（403）', '导航里不显示无权限入口；从链接直接进入时显示本页。按钮回到该角色的默认首页。', scaled(page_403)), 2, 32) +
     grid(variant('G3 找不到（404）', '单号不存在或已按保留策略清除。提供按订单号搜索的出口。', scaled(page_404)) +
-         variant('G4 网络断开 + 集成中断', '浏览器断网：整页提示，未发送的草稿保存在本机。积加或 Gmail 中断：全站顶部红色横幅，仅管理员可关闭。', scaled(page_offline)), 2, 32) +
+         variant('G4 网络断开 + 集成中断', '浏览器断网：整页提示，未发送的草稿保存在本机。Gmail、SP-API、Shopify 或良仓接口中断：全站顶部红色横幅，仅管理员可关闭。', scaled(page_offline)), 2, 32) +
     grid(variant('G5 浮层提示', '右上角堆叠，最多 3 条。成功与信息 3 秒消失；失败与警示不自动消失，必须给出重试或下一步。', toasts_frame, 700) +
          variant('G6 二次确认', '关闭工单、驳回、终止流程、执行退款前确认；带原因的操作原因必填。', confirm_frame, 700), 2, 32) +
     grid(variant('G7 并发与数据范围', '同一工单只允许一人编辑回复；编辑期间来新信则草稿失效提醒；访问无权店铺的数据显示范围提示。', conflict_frame, 700) +
-         variant('G8 未保存离开', '回复框、表单有未提交修改时离开页面，提示保留草稿。', unsaved_frame, 700), 2, 32),
+         variant('G8 未保存离开', '回复框、表单有未提交修改时离开页面，提示保留草稿。', unsaved_frame, 700), 2, 32) +
+    variant('G9 密度切换', '第一期提供舒适（默认）与紧凑两档（Q-24）。顶栏「密度」按钮切换，按用户保存；只改字号、行距与内边距，不改布局和信息量。紧凑：正文 12.5、队列行内边距 6、行距 2、表格行高 32。', dens_frame, 1500,
+            trigger='点顶栏「密度」按钮（图标：三条横线）。'),
     32)
-save('GlobalStates.dc.html', board('全局状态与反馈', '所有页面共用的加载、无权限、找不到、断网、集成中断、提示、确认、并发与未保存状态。各模块自己的状态见对应状态板。演示时刻 %s。' % NOW_LABEL, gs_body, 1920, 2400))
+save('GlobalStates.dc.html', board('全局状态与反馈', '所有页面共用的加载、无权限、找不到、断网、集成中断、提示、确认、并发、未保存与密度切换状态。各模块自己的状态见对应状态板。演示时刻 %s。' % NOW_LABEL, gs_body, 1920, 2400))
 print('ok')

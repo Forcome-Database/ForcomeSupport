@@ -35,7 +35,7 @@ def p01_right():
         col(kv('商品', 'V2 黑色 ×1 · $49.99') + kv('配送方式', 'FBM · 良仓 US') + kv('下单', '09-03') +
             kv('承运商', 'UPS 1Z4R28830358229017') + kv('最后扫描', '09-05 Louisville, KY') +
             kv('预计送达', '09-09（已超 2 天）', 'warning'), 4), 8),
-        extra=link('在积加中打开', 12, 'external'))
+        extra=link('在卖家后台打开', 12, 'external'))
     ai = rsec('AI 分析', col(
         kv('意图', cat('未收到与异常')) + kv('情绪', sentiment('负面')) + kv('风险信号', '未命中', 'muted') + kv('语言', '英语') +
         kv('紧急度', '高 · 9 月 15 日前要用') + kv('发送方式', '待审草稿 → 提交审批'), 6) +
@@ -84,7 +84,7 @@ def p02_middle():
     t = TK['T-20260911-0031']
     head = conv_head(t, '婷')
     msg = customer_msg('Olivia Turner', 'Gmail · support@forcome.com · 09-11 09:12', MSG_IN['olivia_en'], '', seg(['原文', '中文译文'], '原文', 'sm'))
-    tabs_html = ver_tabs([('A', 'A 先排查', chip('AI 推荐', 'accent', 10, 'spark')), ('B', 'B 直接寄滤芯', ''), ('C', 'C 退款', '')], 'A', btn('换一版', 'ghost', 'sm', 'refresh'))
+    tabs_html = ver_tabs([('A', 'A 先排查', ai_badge('推荐', 9.5)), ('B', 'B 直接寄滤芯', ''), ('C', 'C 退款', '')], 'A', btn('换一版', 'ghost', 'sm', 'refresh'))
     toolbar = draft_toolbar('English', False, media=True, lib=True)
     ev = evidence([('排查树 · 吸力下降 → 清洁滤芯', 'book'), ('产品事实 · V2 保修 12 个月', 'book'), ('素材库 · IMG-V2-014', 'image')])
     foot = draft_foot(btn('发送', 'primary', 'md', 'send') + btn('修改', 'secondary', 'md', 'edit') + btn('转人工', 'secondary', 'md', 'handoff') +
@@ -110,7 +110,7 @@ def p02_right():
                                    ('仍未解决：创建售后单（寄滤芯）', 'todo')]), extra=nowrap('吸力下降排查 · 第 1 步', 11, T['ink3']))
     order = rsec('订单', col(between(nowrap('#1063', 13, T['ink'], 700), state('已签收')) +
                            kv('商品', 'V2 车载吸尘器 ×1 · $54.99') + kv('下单', '08-05') + kv('保修', '保修期内 · 已购买 37 天', 'success'), 4),
-                 extra=link('在积加中打开', 12, 'external'), last=True)
+                 extra=link('在 Shopify 后台打开', 12, 'external'), last=True, collapsed=True)
     return right_column(info + chk + tree + order)
 
 
@@ -131,8 +131,8 @@ def jonas_submitted():
     quote = '<div style="font-size: 12px; color: %s; line-height: 1.55; border-left: 2px solid %s; padding: 0px 0px 0px 10px;">%s</div>' % (T['ink2'], T['warn_line'], prev)
     body = col(
         '<div style="display: flex; gap: 28px;">%s%s</div>' % (kvline('报备', '额外赔偿 <b>€44.90</b>（≈ $49.39）· 免退货全额退款', 52),
-                                                              kvline('动作', row(nowrap('亚马逊退款 €44.90', 13, T['ink']) + cat('人工操作清单'), 6), 28)) +
-        kvline('绑定回复', col(quote + row(muted('Deutsch · 退款回填后自动发出', 12) + link('展开全文与中文译文', 12, 'chev_d'), 12), 3), 52), 5)
+                                                              kvline('动作', row(nowrap('亚马逊退款 €44.90', 13, T['ink']) + cat('SP-API'), 6), 28)) +
+        kvline('绑定回复', col(quote + row(muted('Deutsch · 退款成功后自动发出', 12) + link('展开全文与中文译文', 12, 'chev_d'), 12), 3), 52), 5)
     return card(head + body, pad='9px 14px', gap=7, tone='warning')
 
 
@@ -140,7 +140,7 @@ def jonas_msg():
     two = grid('<div>%s</div>' % DRAFTS['jonas_in_de'] +
                '<div style="color: %s; border-left: 1px solid %s; padding-left: 14px;">%s</div>' % (T['ink2'], T['line'], DRAFTS['jonas_in_zh']),
                gap=14, template='minmax(0, 1.3fr) minmax(0, 1fr)')
-    return customer_msg('Jonas Weber', '经积加同步 · 09-10 11:15 · 第 2 次来信', two, '', seg(['并排', '原文', '译文'], '并排', 'sm'))
+    return customer_msg('Jonas Weber', '亚马逊买家消息 · 09-10 11:15 · 第 2 封来信', two, '', seg(['并排', '原文', '译文'], '并排', 'sm'))
 
 
 def progress_reply():
@@ -152,7 +152,7 @@ def progress_reply():
              '<div style="min-height: 84px; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 6px; padding: 8px 10px; font-size: 13px; line-height: 1.55; color: %s;">%s</div>' % (
                  T['line'], T['subtle'], T['ink'], DRAFTS['jonas_progress_de']), 4)
     foot = draft_foot(btn('发送进展回复', 'primary', 'md', 'send') + btn('让 AI 起草', 'secondary', 'md', 'spark') + btn('转客服主管', 'secondary', 'md', 'handoff'),
-                      nowrap('经积加以 Forcome Direct 发出', 11, T['ink4']))
+                      nowrap('经亚马逊买家消息以 Forcome Direct 发出', 11, T['ink4']))
     return card(tb + grid(zh + de, 2, 12) + foot, pad='10px 16px', gap=8)
 
 
@@ -164,7 +164,7 @@ def p03_middle():
     hist = '<div style="display: flex; align-items: center; gap: 8px; padding: 0px 2px;">%s<div style="font-size: 12px; color: %s; flex: 1; min-width: 0px;">本工单 09-02 首次来信，已建售后单 <span style="color: %s; font-weight: 600;">S-20260903-0012</span>（电池，生产厂直寄运输中）</div>%s</div>' % (
         icon('history', 15, T['ink3']), T['ink2'], T['accent'], link('展开历史', 12, 'chev_d'))
     warn = banner('warning', 'SLA 剩 55 分钟，审批还剩 3h 10m', '承诺退款的回复要在审批后才发出。建议先发一条不含承诺的进展回复。', btn('插入进展回复模板', 'secondary', 'sm', 'book'))
-    return middle(head, risk + hist + jonas_msg() + jonas_submitted() + warn + progress_reply(), pad='12px 20px', gap=8)
+    return middle(head, risk + hist + jonas_msg() + jonas_submitted() + warn + progress_reply(), pad='10px 18px', gap=8)
 
 
 def p03_right():
@@ -182,7 +182,7 @@ def p03_right():
         as_card('S-20260911-0020', cat('退款或部分补偿') + cat('产品质量问题'), state('进行中'), '当前环节：报备审批 · 额外赔偿 · 等周敏'), 8), extra=nowrap('2 张', 11, T['ink3']))
     order = rsec('订单', col(between(nowrap('302-8811234-9901122', 13, T['ink'], 700), state('已签收')) +
                            kv('商品', '车载吸尘器 V2 ×1 · €44.90') + kv('站点', '亚马逊 DE · Forcome Direct') + kv('签收', '08-27'), 4),
-                 extra=link('在积加中打开', 12, 'external'), last=True)
+                 extra=link('在卖家后台打开', 12, 'external'), last=True, collapsed=True)
     return right_column(info + hist + rel + order)
 
 

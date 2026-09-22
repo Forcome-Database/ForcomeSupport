@@ -269,7 +269,7 @@ def settings_menu(active, role):
             '' if allowed else icon('lock', 13, T['ink4']))
     foot = '<div style="margin-top: auto; padding: 10px; border-top: 1px solid %s; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 11px; color: %s; line-height: 1.5;">带锁的项由%s维护</div><div style="display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: %s;">%s查看审计日志</div></div>' % (
         T['line'], T['ink4'], '客服主管' if role == '管理员' else '管理员', T['accent'], icon('history', 14, T['accent']))
-    return '<div style="width: 208px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border-right: 1px solid %s; padding: 16px 10px; display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 16px; font-weight: 700; color: %s; padding: 0px 10px 10px 10px;">设置</div>%s%s</div>' % (
+    return '<div style="width: 208px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 16px; box-shadow: 0 1px 2px rgba(16,20,35,0.04); overflow: hidden; margin: 10px 0px 12px 14px; padding: 14px 10px; display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 16px; font-weight: 700; color: %s; padding: 0px 10px 10px 10px;">设置</div>%s%s</div>' % (
         T['line'], T['ink'], items, foot)
 
 

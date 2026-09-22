@@ -30,9 +30,9 @@ def fbox(title, body):
 
 
 D_BOUNDARY = fbox('系统边界', frow(
-    '<div class="fcol">%s%s%s</div>' % (frow(n('客户', 'src', '亚马逊站内信'), a(), n('积加', 'sys', '积加 MCP')), frow(n('客户', 'src', '邮件'), a(), n('Gmail', 'sys', 'Gmail API')), frow(n('生产厂', 'src', '东莞生产厂'), a(), n('工厂工作台', 'sys', '同一系统内'))),
+    '<div class="fcol">%s%s%s</div>' % (frow(n('客户', 'src', '亚马逊买家消息'), a(), n('亚马逊邮件中转', 'sys', '店铺绑定邮箱')), frow(n('客户', 'src', 'Shopify 邮件'), a(), n('Gmail', 'sys', 'Gmail API 收发')), frow(n('生产厂', 'src', 'FQD、FZJ'), a(), n('工厂工作台', 'sys', '同一系统内'))),
     a(), n('Forcome Support', 'hub', '工单 · 售后单 · 审批单 · 台账'), a(),
-    '<div class="fcol">%s%s</div>' % (frow(n('统一动作接口', 'sys'), a(), n('积加 MCP / 人工操作清单', 'out', '三期：亚马逊 MCP、Shopify MCP')), frow(n('企业即时通讯', 'sys'), a(), n('审批人 · 生产厂对接人', 'out')))))
+    '<div class="fcol">%s%s</div>' % (frow(n('统一动作接口', 'sys'), a(), n('SP-API · Shopify Admin API · 良仓接口', 'out', '人工操作清单兜底；积加预留')), frow(n('钉钉', 'sys', '通讯录 · 工作通知 · 登录'), a(), n('审批人 · 生产厂对接人', 'out')))))
 
 D_FIVE = fbox('每封来信的五步处理', frow(n('来信', 'src'), a(), n('① 接收与关联', '', '去重 · 店铺 · 订单 · 归并'), a(), n('② 风险拦截', 'risk', '命中即转人工'), a('未命中'), n('③ 理解与处理', 'hub', '意图 · 规则 · 3 版草稿'), a(), n('④ 回复检查', '', '5 项检查'), a(), n('⑤ 发送方式', '', 'R-SD')) +
                 '<div class="fsplit"><div class="fbr">%s</div><div class="fbr"><span class="flab">⑤ 的三种结果</span>%s%s%s</div><div class="fbr"><span class="flab">草稿含审批项时</span>%s</div></div>' % (
@@ -40,13 +40,13 @@ D_FIVE = fbox('每封来信的五步处理', frow(n('来信', 'src'), a(), n('�
                     n('自动发送', 'ok', '白名单 + 阈值'), n('待审草稿', 'acc', '默认；含审批项时标出'), n('转人工', 'bad', '检查不过且置信度低'),
                     frow(n('待审草稿', 'acc', '标出审批项'), a('坐席审阅'), n('提交审批', 'src'), a(), n('待审批', 'warn', '转人工工单保持转人工'))))
 
-D_APPROVAL = fbox('审批单流程（动作与报备合一）', frow(n('坐席提交或系统发起', 'src'), a(), n('待审批', 'warn', '4 小时时限'), a('批准'), n('执行中', 'acc', '积加 MCP / 工厂工作台 / 人工操作清单'), a('全部成功'), n('已执行', 'ok'), a(), n('发出绑定回复', 'ok')) +
+D_APPROVAL = fbox('审批单流程（动作与报备合一）', frow(n('坐席提交或系统发起', 'src'), a(), n('待审批', 'warn', '4 小时时限'), a('批准'), n('执行中', 'acc', '平台与良仓接口 / 工厂工作台 / 人工操作清单'), a('全部成功'), n('已执行', 'ok'), a(), n('发出绑定回复', 'ok')) +
                     '<div class="fsplit"><div class="fbr">%s</div><div class="fbr">%s</div><div class="fbr">%s</div></div>' % (
                         frow(n('待审批', 'warn'), a('驳回 · 原因必填'), n('已驳回', 'bad', '回复不发出；工单回到提交前状态')),
                         frow(n('待审批', 'warn'), a('发起人撤回'), n('已撤回', 'mut', '工单回到提交前状态')),
                         frow(n('执行中', 'acc'), a('重试 3 次仍失败'), n('执行失败', 'bad', '重试或转人工操作清单'))))
 
-D_NEGO = fbox('比例协商与内部结算', frow(n('报备通过', 'src'), a(), n('需要协商？', 'q', '质量或其他'), a('是'), n('待工厂答复', 'acc', '3 个工作日'), a('接受'), n('已确认', 'ok'), a(), n('结算批次', 'acc', '每月 5 日'), a('双方确认'), n('已结算', 'ok')) +
+D_NEGO = fbox('比例协商与内部结算', frow(n('报备通过', 'src'), a(), n('需要协商？', 'q', '质量或其他'), a('是'), n('待工厂答复', 'acc', '3 个工作日'), a('接受'), n('已确认', 'ok'), a(), n('结算批次', 'acc', '每厂每月 5 日'), a('双方确认'), n('已结算', 'ok')) +
                 '<div class="fsplit"><div class="fbr">%s</div><div class="fbr">%s</div><div class="fbr">%s</div></div>' % (
                     frow(n('需要协商？', 'q'), a('否'), n('不适用', 'mut', '物流、客户使用')),
                     frow(n('待工厂答复', 'acc'), a('还价'), n('工厂还价', 'warn', '接受 / 再次提案 / 升级')),
@@ -102,7 +102,7 @@ CSS = r'''
 :root {
   --bg: #f4f6f9; --surface: #ffffff; --subtle: #f8f9fb; --line: #e4e8ef; --line2: #f1f3f7; --strong: #d0d5dd;
   --ink: #101828; --ink2: #344054; --ink3: #667085; --ink4: #98a2b3;
-  --acc: #4f46e5; --acc-ink: #3730a3; --acc-bg: #eef2ff; --acc-line: #c7d2fe;
+  --acc: #4f46e5; --acc-ink: #4338ca; --acc-bg: #f0effd; --acc-line: #d3d1f9;
   --ok: #047857; --ok-bg: #ecfdf5; --ok-line: #a7f3d0; --warn: #b45309; --warn-bg: #fffbeb; --warn-line: #fde68a;
   --bad: #b91c1c; --bad-bg: #fef2f2; --bad-line: #fecaca; --flow: #6d28d9; --flow-bg: #f5f3ff;
 }
@@ -124,7 +124,7 @@ CSS = r'''
 }
 * { box-sizing: border-box; }
 html { scroll-padding-top: 20px; }
-body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Manrope", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 14.5px; line-height: 1.65; -webkit-font-smoothing: antialiased; padding-inline: 20px; padding-block: 0 80px; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Inter", "PingFang SC", "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei", sans-serif; font-size: 14.5px; line-height: 1.65; -webkit-font-smoothing: antialiased; padding-inline: 20px; padding-block: 0 80px; }
 a { color: var(--acc); text-decoration: none; } a:hover { text-decoration: underline; }
 a:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 3px; }
 .layout { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 40px; }
@@ -196,7 +196,7 @@ page = '''<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forcome Support 产品蓝图</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;family=Noto+Sans+SC:wght@400;500;700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&amp;family=Noto+Sans+SC:wght@400;500;700&amp;display=swap">
 <style>%s</style>
 </head>
 <body>

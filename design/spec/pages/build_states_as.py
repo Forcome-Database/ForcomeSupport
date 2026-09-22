@@ -43,7 +43,7 @@ def s3():
                 '驳回原因：运费高于同线路均价 30%，请生产厂改走云途普货后重新报价。售后单已退回「待确认」，寄件任务未生成，绑定回复未发出。',
                 row(btn('修改后重新提交', 'primary', 'sm') + btn('查看审批单', 'secondary', 'sm'), 6))
     extra = card(log_item('10:52', '人工', '周敏驳回 AP-20260911-003（快递费用 $11.50），原因已通知王磊。') +
-                 log_item('10:52', '系统', '售后单退回待确认；东莞生产厂的报价保留，可请陈工改承运方式后重新报价。'), '执行记录', pad='12px 16px', gap=8)
+                 log_item('10:52', '系统', '售后单退回待确认；生产厂 FQD的报价保留，可请陈工改承运方式后重新报价。'), '执行记录', pad='12px 16px', gap=8)
     return detail_top('HEPA 滤芯组件补发 · Laura Bennett', state('待确认') + cat('寄配件 · 良仓无货') + cat('产品质量问题'),
                       meta_line(['售后单 S-20260911-0018', '原工单 T-20260910-0201', '负责人 王磊']),
                       btn('查看原工单', 'secondary', 'md', 'external') + btn('终止流程', 'danger_outline'), steps,
@@ -52,13 +52,13 @@ def s3():
 
 # ---------------------------------------------------------------- S4 库存用尽自动切换
 def s4():
-    steps = [('确认', '09:35', 'done'), ('积加创建发货单', '库存不足 10:31', 'error'), ('派发询价', '10:31', 'current'),
+    steps = [('确认', '09:35', 'done'), ('良仓创建出库单', '库存不足 10:31', 'error'), ('派发询价', '10:31', 'current'),
              ('生产厂报价', '', 'todo'), ('报备审批', '', 'todo'), ('生产厂寄件', '', 'todo'), ('单号回复客户', '', 'todo')]
     bn = banner('warning', '发货单创建失败，已切到良仓无货',
-                '积加返回良仓 US「车载吸尘器 V2 黑色（整机）」库存不足。原报备 AP-20260911-002（快递费用 $8.40）已作废；已向东莞生产厂派发询价，报价后按新金额重新报备。已通知王磊。',
+                '良仓接口返回良仓 US「车载吸尘器 V2 黑色（整机）」库存不足。原报备 AP-20260911-002（快递费用 $8.40）已作废；已向生产厂 FQD派发询价，报价后按新金额重新报备。已通知王磊。',
                 btn('查看询价单', 'secondary', 'sm'))
     extra = card(log_item('10:30', '人工', '周敏批准 AP-20260911-002。') +
-                 log_item('10:31', '自动', '积加 MCP 创建售后发货单失败：良仓 US 整机黑色库存 0 件。') +
+                 log_item('10:31', '自动', '良仓接口创建售后出库单失败：良仓 US 整机黑色库存 0 件。') +
                  log_item('10:31', '系统', '切换为良仓无货，原报备作废；在工厂工作台派发询价：整机黑色 ×1 · 寄往美国。'), '执行记录', pad='12px 16px', gap=8)
     return detail_top('整机换发 · Marcus Lee', state('进行中') + cat('寄配件 · 良仓无货') + cat('物流问题'),
                       meta_line(['售后单 S-20260911-0021', '原工单 T-20260910-0195', '负责人 王磊']),
@@ -70,13 +70,13 @@ def s4():
 def s5():
     base = [('确认', '08:49', 'done'), ('派发询价', '08:50', 'done')]
     tail = [('报备审批', '', 'todo'), ('生产厂寄件', '', 'todo'), ('单号回复客户', '', 'todo'), ('完成', '', 'todo')]
-    a = card(between(row(nowrap('S-20260911-0019 · 软管 ×2 · Lukas Braun', 13, T['ink'], 700) + state('进行中'), 8), nowrap('等东莞生产厂', 12, T['ink3'])) +
+    a = card(between(row(nowrap('S-20260911-0019 · 软管 ×2 · Lukas Braun', 13, T['ink'], 700) + state('进行中'), 8), nowrap('等生产厂 FQD', 12, T['ink3'])) +
              stepper(base + [('生产厂报价', '已催 1 次 · 已超时限', 'current')] + tail) +
-             row(icon('bell', 14, T['warn']) + nowrap('09-15 08:50 报价超过 2 个工作日，已自动催办 1 次（企业即时通讯）。再过 2 个工作日仍未报价将标为卡住。', 12, T['ink2']), 6),
+             row(icon('bell', 14, T['warn']) + nowrap('09-15 08:50 报价超过 2 个工作日，已自动催办 1 次（钉钉工作通知）。再过 2 个工作日仍未报价将标为卡住。', 12, T['ink2']), 6),
              pad='12px 16px', gap=12)
-    b = card(between(row(nowrap('S-20260911-0019 · 软管 ×2 · Lukas Braun', 13, T['ink'], 700) + state('进行中'), 8), nowrap('等东莞生产厂', 12, T['ink3'])) +
+    b = card(between(row(nowrap('S-20260911-0019 · 软管 ×2 · Lukas Braun', 13, T['ink'], 700) + state('进行中'), 8), nowrap('等生产厂 FQD', 12, T['ink3'])) +
              stepper(base + [('生产厂报价', '卡住 · 超时 2 个工作日', 'error')] + tail) +
-             banner('danger', '生产厂报价卡住，已通知你', '东莞生产厂超过时限 2 个工作日仍未报价（已催办 1 次）。建议电话跟进陈工，或改处理方式。',
+             banner('danger', '生产厂报价卡住，已通知你', '生产厂 FQD超过时限 2 个工作日仍未报价（已催办 1 次）。建议电话跟进陈工，或改处理方式。',
                     row(btn('给陈工留言', 'secondary', 'sm') + btn('改处理方式', 'secondary', 'sm'), 6)),
              pad='12px 16px', gap=12, tone='danger')
     return frame(cap('已催 1 次') + a + cap('卡住') + b)
@@ -86,7 +86,7 @@ def s5():
 def s6():
     body = field('终止原因', textarea_box(None, '例如：客户撤回售后申请、改为退款处理', 'error', 64, '0 / 200'), True, error='请填写终止原因') + \
         col(bullet('售后单变为「已取消」，不可恢复；已产生的费用照常登记到台账。') +
-            bullet('待审批的报备 AP-20260911-003 自动撤回，东莞生产厂的任务自动取消并通知陈工。') +
+            bullet('待审批的报备 AP-20260911-003 自动撤回，生产厂 FQD的任务自动取消并通知陈工。') +
             bullet('关联工单 T-20260910-0201 不会自动回复客户，请在工单中说明。'), 4)
     dlg = dialog('终止售后单 S-20260911-0018？', body, btn('取消', 'secondary') + btn('终止流程', 'danger'), 460, 'danger', '终止后流程停止，无法恢复。')
     return overlay(scaled(BA.p09(), 1440, 900, 0.6), dlg, W, 540)
@@ -95,7 +95,7 @@ def s6():
 # ---------------------------------------------------------------- S7 客户改地址
 def s7():
     a = banner('info', '客户更新了收货地址，已同步到生产厂寄件任务',
-               '10:15 来自工单 T-20260910-0201 新来信。1180 Peachtree St NE, Atlanta, GA 30309 → 455 Ponce De Leon Ave NE, Atlanta, GA 30308。已通知东莞生产厂。',
+               '10:15 来自工单 T-20260910-0201 新来信。1180 Peachtree St NE, Atlanta, GA 30309 → 455 Ponce De Leon Ave NE, Atlanta, GA 30308。已通知生产厂 FQD。',
                link('查看变更记录', 12))
     b = card(banner('warning', '包裹已寄出后客户要求改地址', '云途 YT2625100012351234 已于 09-12 寄出。新地址：455 Ponce De Leon Ave NE, Atlanta, GA 30308。请选择处理方式。') +
              row(radio_card('联系承运商改派', '王磊联系云途改派；改派费发起快递费用报备，批准后计入运费', True) +
@@ -120,7 +120,7 @@ def s9():
     body = t + col(bullet('只含比例已确认的售后单；比例未定的 4 单（%s）不进入本批次。' % money(BL.LT['undecided'])) +
                    bullet('生成后批次为「待确认」，推送陈工确认；双方确认后转为已结算。') +
                    bullet('批次生成后，其中售后单的比例不能再改。'), 4)
-    dlg = dialog('提前生成批次 2026-09-B？', body, btn('取消', 'secondary') + btn('生成并推送生产厂', 'primary', 'md', 'send'), 480, None, '东莞生产厂 · 2026-09 · 原定 10-05 自动生成。')
+    dlg = dialog('提前生成批次 2026-09-B？', body, btn('取消', 'secondary') + btn('生成并推送生产厂', 'primary', 'md', 'send'), 480, None, '生产厂 FQD · 批次 2026-09-FQD-B · 原定 10-05 自动生成。')
     return overlay(scaled(BL.p14(), 1440, 900, 0.6), dlg, W, 540)
 
 
@@ -139,9 +139,9 @@ def s10():
 def s11():
     prog = '<div style="width: 360px; box-sizing: border-box; display: flex; gap: 10px; align-items: flex-start; background: #ffffff; border: 1px solid %s; border-radius: 8px; padding: 12px 14px; box-shadow: %s;">%s<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 6px;"><div style="font-size: 13px; font-weight: 700; color: %s;">正在导出登记台账</div><div style="font-size: 12px; color: %s;">12 单 · 按当前筛选（2026-09-01 至 09-11）· 62%%</div>%s</div></div>' % (
         T['line'], SHADOW_MD, spinner(18), T['ink'], T['ink3'], progress(62))
-    left = col(cap('导出中') + row(btn('列设置', 'secondary', 'md', 'sort') + btn('同步到积加', 'secondary', 'md', 'refresh') + btn('导出中', 'secondary', 'md', loading=True), 8) + prog, 12)
+    left = col(cap('导出中') + row(btn('列设置', 'secondary', 'md', 'sort') + btn('导出中', 'secondary', 'md', loading=True), 8) + prog, 12)
     done = toast('success', '登记台账已导出', '登记台账_20260901-20260911.xlsx · 12 单。文件保留 7 天。', row(link('下载', 12, 'download') + link('查看导出记录', 12), 12))
-    right = col(cap('完成') + row(btn('列设置', 'secondary', 'md', 'sort') + btn('同步到积加', 'secondary', 'md', 'refresh') + btn('导出 Excel', 'secondary', 'md', 'download'), 8) + done, 12)
+    right = col(cap('完成') + row(btn('列设置', 'secondary', 'md', 'sort') + btn('导出 Excel', 'secondary', 'md', 'download'), 8) + done, 12)
     return frame(grid(left + right, 2, 24))
 
 
@@ -150,12 +150,12 @@ def build():
     body = col(
         grid(V('S1 确认页未选必填', '处理方式、责任类型必选；责任与 AI 建议不同即为改判，必须填理由（R-AS-03）。报错在字段下方，提交按钮保持可点，点击后定位到第一个错误。', s1(),
                '在 P08 点「确认并提交报备」时未选责任类型，或改判未填理由') +
-             col(V('S2 库存查询失败', '第 3 项显示失败原因与重试；可手工选择分支继续确认，手工选择记审计日志。', s2(), '进入 P08 时积加库存接口超时或报错') +
+             col(V('S2 库存查询失败', '第 3 项显示失败原因与重试；可手工选择分支继续确认，手工选择记审计日志。', s2(), '进入 P08 时良仓库存接口超时或报错') +
                  V('S8 录入最终比例校验', '比例为 0–100 的整数，两者之和须为 100；商定依据不少于 10 个字；商定人双方必选。', s8(), 'P12 点「录入最终比例」时校验不通过'), 32), 2, 32) +
         grid(V('S3 报备被驳回', '详情顶部红色横幅：驳回人、时间、原因；售后单退回待确认（R-AP-07），步骤条当前环节标红。「修改后重新提交」回到 P08 并带入原值。', s3(),
                '客服主管在审批页驳回含报备的审批单') +
              V('S4 库存用尽自动切换', '黄色横幅说明发生了什么与已自动完成的处理：原报备作废、派发询价、通知售后负责人（R-AS-04）。步骤条换成良仓无货分支。', s4(),
-               '报备通过后积加创建发货单返回库存不足'), 2, 32) +
+               '报备通过后良仓创建出库单返回库存不足'), 2, 32) +
         grid(V('S5 生产厂超时', '超时限自动催办 1 次，步骤条标「已催 1 次」（黄）；再过 2 个工作日标「卡住」（红）并通知售后负责人（E-07）。', s5(),
                '询价 2 个工作日、寄件 3 个工作日、比例答复 3 个工作日未提交') +
              V('S6 终止流程', '危险弹窗，原因必填；说明已产生的费用照常登记、待审批的报备自动撤回、生产厂任务取消。', s6(), '在售后单详情点「终止流程」'), 2, 32) +

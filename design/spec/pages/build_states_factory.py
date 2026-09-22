@@ -20,7 +20,7 @@ def task_head(title, st, right, meta):
 # ---------------------------------------------------------------- F1 待办为空
 def f1():
     mid = '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(
-        empty('inbox', '暂无待办', '东莞生产厂当前没有需要处理的询价、寄件、比例答复或结算确认。新任务会推送到企业即时通讯。',
+        empty('inbox', '暂无待办', '生产厂 FQD 当前没有需要处理的询价、寄件、比例答复或结算确认。新任务会推送到钉钉工作通知。',
               row(btn('查看已完成', 'secondary') + btn('查看结算', 'secondary'), 8)), pad='8px 24px')
     body = '<div style="flex: 1; min-height: 0px; display: flex; flex-direction: row;">%s%s</div>' % (BF.f_list(empty=True), mid)
     return scaled(factory_app('待办', ['待办'], body, badges={}), 1440, 900, 0.6)
@@ -75,7 +75,7 @@ def f5():
 # ---------------------------------------------------------------- F6 越权
 def f6():
     mid = '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(
-        no_permission('没有访问权限', '这张单据不属于东莞生产厂。工厂工作台只显示本厂任务，本次访问已记录。', btn('返回待办', 'primary', 'md', 'chev_l')), pad='8px 24px')
+        no_permission('没有访问权限', '这张单据不属于生产厂 FQD。工厂工作台只显示本厂任务，本次访问已记录。', btn('返回待办', 'primary', 'md', 'chev_l')), pad='8px 24px')
     return scaled(factory_app('待办', ['待办', '单据详情'], mid), 1440, 900, 0.6)
 
 
@@ -88,8 +88,8 @@ def f7():
 
 # ---------------------------------------------------------------- F8 结算确认
 def f8():
-    b = SETTLE_BATCHES[1]
-    head = task_head('结算确认 · 批次 2026-09-B', '待处理', sla('5 个工作日内确认', 'normal'), ['10-05 09:00 自动生成', '%d 单' % len(b['items']), '国庆假期不计入时限', 'FSH 对接人 王磊'])
+    b = BATCH['2026-09-FQD-B']
+    head = task_head('结算确认 · 批次 2026-09-FQD-B', '待处理', sla('5 个工作日内确认', 'normal'), ['10-05 09:00 自动生成', '%d 单' % len(b['items']), 'FSH 对接人 王磊'])
     cols = [('售后单号', 'left'), ('配件', 'left'), ('责任', 'left'), ('费用合计', 'right'), ('FSH / 工厂 %', 'left'), ('工厂承担', 'right')]
     rows = []
     for no in b['items']:
@@ -127,7 +127,7 @@ def f9():
     nav = '<div style="margin-top: auto; background: #ffffff; border-top: 1px solid %s; display: grid; grid-template-columns: repeat(3, 1fr); padding: 8px 0px 14px 0px;">%s</div>' % (
         T['line'], ''.join('<div style="display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-weight: %d; color: %s;">%s%s</div>' % (
             700 if n == '待办' else 500, T['accent'] if n == '待办' else T['ink3'], icon(ic, 20, T['accent'] if n == '待办' else T['ink3']), n) for n, ic in [('待办', 'inbox'), ('已完成', 'check_c'), ('结算', 'money')]))
-    p1 = phone(m_bar(col(row(text('待办', 17, T['ink'], 700) + chip(str(len(opens)), 'accent', 11), 6) + nowrap('东莞生产厂 · 陈工', 12, T['ink3']), 2), icon_btn('bell', 'secondary', 30)) +
+    p1 = phone(m_bar(col(row(text('待办', 17, T['ink'], 700) + chip(str(len(opens)), 'accent', 11), 6) + nowrap('生产厂 FQD · 陈工', 12, T['ink3']), 2), icon_btn('bell', 'secondary', 30)) +
                '<div style="padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;">%s%s</div>' % (seg(['全部 %d' % len(opens), '待处理 1', '已提交 2'], '全部 %d' % len(opens), 'sm'), cards) + nav)
     need = '<div style="background: #ffffff; border: 1px solid %s; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;">%s%s%s%s</div>' % (
         T['line'], kv('配件', '软管 FC-V2-HS02 ×2'), kv('寄往', '德国 10115'), text('软管在接口处开裂，吸尘时漏气。', 12.5, T['ink2']), row(img_thumb('照片 1', 64, 48) + img_thumb('照片 2', 64, 48), 8))
@@ -153,10 +153,10 @@ def build():
         grid(V('F5 比例答复', '接受、还价、拒绝三选一；还价需填新比例与理由，拒绝需填理由。第 3 轮后仍未达成转待升级（R-AS-06）。', f5(), 'FSH 在工厂工作台发起比例提案') +
              V('F6 越权', '打开他厂单据链接时显示无权限，不透露单据内容，记审计日志（E-24）。', f6(), '生产厂对接人访问不属于本厂的售后单或任务'), 2, 32) +
         grid(V('F7 网络失败', '失败浮层不自动消失，表单内容保留，提供重试；按钮恢复可点。', f7(), '提交报价、单号或答复时网络中断或服务超时') +
-             V('F8 结算确认', '批次明细与合计（工厂承担 $21.95）；「确认」或「有异议」二选一，有异议必须填理由，批次保持待确认并通知王磊（E-30、AC-AS-19）。', f8(), '批次 2026-09-B 于 10-05 生成并推送（未来画面）'), 2, 32) +
-        grid(V('F9 手机端', '375 宽单栏：待办卡片列表 + 底部导航；任务详情表单纵向排列，「提交报价」固定在底部。字段、校验与桌面端一致。', f9(), '陈工在手机浏览器打开企业即时通讯推送的任务链接'), 2, 32),
+             V('F8 结算确认', '批次明细与合计（工厂承担 $21.95）；「确认」或「有异议」二选一，有异议必须填理由，批次保持待确认并通知王磊（E-30、AC-AS-19）。', f8(), '批次 2026-09-FQD-B 于 10-05 生成并推送（未来画面）'), 2, 32) +
+        grid(V('F9 手机端', '375 宽单栏：待办卡片列表 + 底部导航；任务详情表单纵向排列，「提交报价」固定在底部。字段、校验与桌面端一致。', f9(), '陈工在钉钉里点开工作通知（钉钉内免登，无需另外登录）'), 2, 32),
         40)
-    return board('工厂工作台状态', '东莞生产厂对接人陈工在工厂工作台的空、校验、成功、回填、答复、越权、失败、结算确认与手机端状态（F1–F9）。演示时刻 %s；寄件与比例答复为报备通过后的后续画面。' % NOW_LABEL, body, 1920, 2879)
+    return board('工厂工作台状态', '生产厂 FQD对接人陈工在工厂工作台的空、校验、成功、回填、答复、越权、失败、结算确认与手机端状态（F1–F9）。演示时刻 %s；寄件与比例答复为报备通过后的后续画面。' % NOW_LABEL, body, 1920, 2879)
 
 
 if __name__ == '__main__':

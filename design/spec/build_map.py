@@ -50,7 +50,7 @@ for g, desc, ids in GROUPS:
     cols += col(col('<div style="font-size: 15px; font-weight: 700; color: %s;">%s</div>%s' % (T['ink'], g, muted(desc, 12) if desc else ''), 2) + (grid(''.join(page_card(i) for i in ids), 2, 10) if len(ids) > 4 else col(''.join(page_card(i) for i in ids), 10)), 12, 'min-width: 0px;')
 
 flows = table([('用户路径', 'left'), ('经过的页面', 'left'), ('对应场景', 'left')], [
-    ['亚马逊补发', 'P01 审草稿 → 提交审批（I8）→ P15 主管批准（A2）→ 积加建发货单 → 回复自动发出 → P09 / P10 查看售后单', 'SC-01'],
+    ['亚马逊补发', 'P01 审草稿 → 提交审批（I8）→ P15 主管批准（A2）→ 良仓建出库单 → 回复自动发出 → P09 / P10 查看售后单', 'SC-01'],
     ['邮件排查转售后', 'P02 发送排查草稿 → 客户回信未解决 → P07 待确认 → P08 确认 → P10 良仓有货执行', 'SC-02'],
     ['风险工单退款', 'P03 转人工 → 提交退款审批 → 先发进展回复 → P15 批准 → 人工操作清单回填（A6）→ 回复自动发出', 'SC-03'],
     ['良仓无货配件', 'P08 确认 → P21 生产厂报价 → P15 报备审批 → P21 寄件回填单号 → P09 单号回复客户', 'SC-04'],

@@ -53,12 +53,12 @@ def a2():
     quote = '<div style="font-size: 12px; color: %s; line-height: 1.55; border-left: 2px solid %s; padding-left: 10px; margin-top: 4px;">%s</div>' % (T['ink2'], T['accent_line'], DRAFTS['jonas_bound_de'])
     body = col(label('批准后按顺序执行') +
                step_line(1, '报备通过：额外赔偿 <b>€44.90</b>（≈ $49.39）写入登记台账', '售后单 S-20260911-0020 进入「执行付款」') +
-               step_line(2, '生成人工操作清单「亚马逊退款 €44.90」，指派陈晨', '积加不支持亚马逊退款；4 个工作小时内回填') +
-               step_line(3, '回填金额一致后，自动发出德语绑定回复', quote) +
+               step_line(2, '经 SP-API 退款 €44.90（Forcome Direct · DE）', '失败按 1、5、15 分钟自动重试 3 次；仍失败时陈晨可转人工操作清单') +
+               step_line(3, '退款成功后，自动发出德语绑定回复', quote) +
                step_line(4, '在工厂工作台发起比例提案：建议工厂承担 100%', '与退款并行，客户不等协商结果'), 12)
-    dlg = dialog('批准 AP-20260911-001？', body, btn('取消', 'secondary') + btn('批准并生成退款清单', 'primary', 'md', 'check'), 560, None,
+    dlg = dialog('批准 AP-20260911-001？', body, btn('取消', 'secondary') + btn('批准并退款', 'primary', 'md', 'check'), 560, None,
                  '审批单转「执行中」，每一步的结果写入执行日志。')
-    return variant('A2 批准确认', '弹窗按执行顺序列出批准后发生的动作与绑定回复；主按钮文案写清结果。确认后浮层「已批准，已生成人工操作清单给陈晨」。',
+    return variant('A2 批准确认', '弹窗按执行顺序列出批准后发生的动作与绑定回复；主按钮文案写清结果。确认后浮层「已批准，正在经 SP-API 退款」。',
                    scrim_frame(scaled(P.p15(), 1440, 900, S), dlg), VW, trigger='在待我审批卡片上点「批准」。')
 
 
@@ -87,14 +87,14 @@ def a4():
 # ---------------------------------------------------------------- A5 执行失败
 def a5():
     a = P.AP['AP-20260911-002']
-    head = between(row(nowrap(a['no'], 14, T['ink'], 700) + cat('报备 · 快递费用') + cat('动作 · 积加 MCP'), 8),
+    head = between(row(nowrap(a['no'], 14, T['ink'], 700) + cat('报备 · 快递费用') + cat('动作 · 良仓接口'), 8),
                    row(state('执行失败') + nowrap('周敏 10:51 批准', 12, T['ink3']), 8))
-    bn = banner('danger', '积加创建售后发货单失败，已自动重试 3 次', '10:52 首次失败，按 1、5、15 分钟重试仍失败（最后一次 11:13）。积加返回：良仓 US 发货单接口超时。绑定回复未发出。')
+    bn = banner('danger', '良仓创建售后出库单失败，已自动重试 3 次', '10:52 首次失败，按 1、5、15 分钟重试仍失败（最后一次 11:13）。良仓接口返回：出库单服务超时。绑定回复未发出。')
     steps = col(exec_step('ok', '报备快递费用 $8.40 已登记', '写入登记台账 · S-20260911-0021') +
-                exec_step('fail', '积加创建售后发货单：良仓 US · 整机黑色 ×1', '4 次尝试均失败 · 11:13') +
+                exec_step('fail', '良仓创建售后出库单：良仓 US · 整机黑色 ×1', '4 次尝试均失败 · 11:13') +
                 exec_step('todo', '发出英语绑定回复', '等发货单创建成功'), 10)
     foot = P.draft_like_foot(btn('重试', 'primary', 'md', 'refresh') + btn('转人工操作清单', 'secondary', 'md', 'handoff'),
-                             nowrap('转人工后由你在积加后台手工创建，回填单号即视为成功', 12, T['ink3']))
+                             nowrap('转人工后由你在良仓后台手工创建出库单，回填单号即视为成功', 12, T['ink3']))
     c = card(head + P.ap_meta(a) + bn + steps + foot, pad='14px 18px', gap=11, tone='danger')
     frame = mini(c, VW, 404, pad='20px')
     return variant('A5 执行失败', '卡片顶部红色横幅写明失败的动作、重试次数与返回原因；逐项显示已成功 / 失败 / 未执行；发起人可「重试」或「转人工操作清单」。',
@@ -104,7 +104,7 @@ def a5():
 # ---------------------------------------------------------------- A6 / A7 人工操作清单回填
 def manual_head():
     return between(row(icon('handoff', 16, T['ink2'], 2) + text('亚马逊退款 €44.90', 14, T['ink'], 700) + state('待执行'), 8),
-                   row(sla('剩 3h 45m', 'warning') + nowrap('4 个工作小时 · 10:25 生成 · 14:25 截止', 12, T['ink3']), 8)) + \
+                   row(sla('剩 3h 45m', 'warning') + nowrap('4 个工作小时 · 10:45 生成 · 14:45 截止', 12, T['ink3']), 8)) + \
         row(nowrap('AP-20260911-001', 12, T['accent'], 600) + nowrap('Jonas Weber', 12, T['ink2']) + channel('亚马逊', 'DE', 'Forcome Direct') + nowrap('订单 302-8811234-9901122', 12, T['ink3']), 8)
 
 
@@ -128,8 +128,8 @@ def a6():
         label('操作步骤'), manual_steps(3), T['line2'], form)
     c = card(manual_head() + body + foot, pad='14px 18px', gap=12)
     frame = mini(c, VW, 504, pad='20px')
-    return variant('A6 人工操作清单回填', '左侧逐步勾选，右侧回填外部单号、金额、截图（均必填）；金额与审批一致时给出确认提示。指派给发起人陈晨，4 个工作小时内完成，头部同时显示剩余时长与截止时刻（按工作日历 R-CL-01）。',
-                   frame, VW, trigger='审批通过后，积加不支持的动作生成人工操作清单（陈晨在「人工操作清单」页签）。')
+    return variant('A6 人工操作清单回填', '人工操作清单只作兜底：接口执行失败或暂无接口时生成。左侧逐步勾选，右侧回填外部单号、金额、截图（均必填）；金额与审批一致时给出确认提示。指派给发起人陈晨，4 个工作小时内完成，头部同时显示剩余时长与截止时刻（R-CL-01）。',
+                   frame, VW, trigger='AP-20260911-001 批准后 SP-API 退款连续失败 3 次（亚马逊返回：订单已进入退货流程，不允许接口退款），陈晨点「转人工操作清单」，在卖家后台完成后回填。')
 
 
 def a7():
@@ -152,7 +152,7 @@ def a8():
     head = '<div style="background: #ffffff; padding: 14px 20px 0px 20px; border-bottom: 1px solid %s; display: flex; flex-direction: column; gap: 6px;">%s%s</div>' % (
         T['line'], between(text('审批', 18, T['ink'], 700), row(avatar('婷', 'green', 20) + nowrap('李婷 · 坐席', 12, T['ink3']), 6)), '<div style="margin-bottom: -1px;">%s</div>' % tabs_html.replace('border-bottom: 1px solid %s;">' % T['line'], 'border-bottom: 0px;">', 1))
     rows = []
-    for no, what in (('AP-20260911-002', '报备快递费用 $8.40 + 积加创建售后发货单'), ('AP-20260911-004', 'Shopify #1057 改收货地址 → 人工操作清单')):
+    for no, what in (('AP-20260911-002', '报备快递费用 $8.40 + 良仓创建售后出库单'), ('AP-20260911-004', 'Shopify #1057 改收货地址 · Shopify Admin API')):
         a = P.AP[no]
         rows.append([nowrap(no, 12.5, T['accent'], 600), col(text(a['customer'], 12.5, T['ink'], 600) + ellipsis(what, 12, T['ink3']), 1), state('待审批'),
                      sla('剩 ' + a['left'], 'warning'), nowrap(a['approver'], 12, T['ink2']), btn('撤回', 'secondary', 'sm')])
