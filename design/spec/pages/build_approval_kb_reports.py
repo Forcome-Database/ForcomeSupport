@@ -29,14 +29,14 @@ def ap_right(a, st='待审批', left_level='warning', left_text=None):
 
 def ap_card_expanded(a, foot=None, top='', st='待审批', left_level='warning', left_text=None, tone='accent'):
     head = between(row(nowrap(a['no'], 14, T['ink'], 700) + cat('报备 · 额外赔偿') + cat('动作 · SP-API'), 8), ap_right(a, st, left_level, left_text))
-    reason = '<div style="background: %s; border: 1px solid %s; border-radius: 6px; padding: 8px 12px; font-size: 13px; color: %s; line-height: 1.55;"><span style="font-weight: 700; color: %s;">理由</span>　使用两周故障；09-02 答应补发的电池一周多未到；客户要求退款并威胁差评。</div>' % (
+    reason = '<div style="background: %s; border: 1px solid %s; border-radius: 6px; padding: 8px 12px; font-size: 13px; color: %s; line-height: 1.55;"><span style="font-weight: 700; color: %s;">理由</span>　签收后不到一周故障；09-03 答应补发的电池一周多未到；客户要求退款并威胁差评。</div>' % (
         T['subtle'], T['line'], T['ink2'], T['ink'])
-    quote = '<div style="font-size: 12px; color: %s; line-height: 1.55; border-left: 2px solid %s; padding-left: 10px;">%s</div>' % (T['ink2'], T['accent_line'], DRAFTS['jonas_bound_de'])
+    quote = '<div style="font-size: 12px; color: %s; line-height: 1.55; border-left: 2px solid %s; padding-left: 10px;">%s</div>' % (T['ink2'], T['accent_line'], DRAFTS['mateo_bound_es'])
     detail = col(
-        kl('报备', row('额外赔偿 <b>€44.90</b>（≈ $49.39）' + muted('免退货全额退款', 12), 8)) +
-        kl('动作', row('亚马逊退款 €44.90' + cat('SP-API') + muted('批准后自动执行；失败自动重试 3 次，仍失败可转人工操作清单', 12), 8)) +
-        kl('绑定回复', col(row(nowrap('Deutsch · 退款成功后自动发出', 13, T['ink']) + link('展开原文与中文译文', 12, 'chev_d'), 12) + quote, 5)) +
-        kl('责任', row(cat('产品质量问题') + nowrap('建议工厂承担 100%，报备通过后另行协商', 12, T['ink3']), 8)), 9)
+        kl('报备', row('额外赔偿 <b>MX$889.00</b>（≈ $49.39）' + muted('免退货全额退款', 12), 8)) +
+        kl('动作', row('亚马逊退款 MX$889.00' + cat('SP-API') + muted('批准后自动执行；失败自动重试 3 次，仍失败可转人工操作清单', 12), 8)) +
+        kl('绑定回复', col(row(nowrap('Español · 退款成功后自动发出', 13, T['ink']) + link('展开原文与中文译文', 12, 'chev_d'), 12) + quote, 5)) +
+        kl('责任', row(cat('产品质量问题') + nowrap('建议三组均 FSH 0 / 工厂 100，报备通过后另行协商', 12, T['ink3']), 8)), 9)
     f = foot if foot is not None else draft_like_foot(btn('批准', 'primary', 'md', 'check') + btn('驳回', 'secondary', 'md', 'x'),
                                                       nowrap('批准后经 SP-API 退款，成功即发出绑定回复', 12, T['ink3']))
     return card(head + ap_meta(a) + top + reason + detail + f, pad='14px 18px', gap=11, tone=tone)
@@ -54,7 +54,7 @@ def ap_card_collapsed(a, chips, summary, st='待审批', left_level='warning', l
 
 
 AP_SUMMARY = {
-    'AP-20260911-002': (cat('报备 · 快递费用') + cat('动作 · 良仓接口'),
+    'AP-20260911-002': (cat('报备 · 快递费用') + cat('动作 · 积加'),
                         '报备快递费用 <b>$8.40</b>（错发换发，UPS Ground）+ 良仓创建售后出库单：良仓 US · 整机黑色 ×1。责任：物流问题（良仓错发，向良仓索赔）。'),
     'AP-20260911-003': (cat('报备 · 快递费用') + cat('动作 · 工厂工作台'),
                         '报备快递费用 <b>$11.50</b>（生产厂直寄美国，云途专线）。批准后在工厂工作台生成寄件任务，并发起比例协商。无绑定回复。'),
@@ -122,7 +122,7 @@ def p16():
     nav = col(label('分类', 'padding: 0px 10px;') + cat_nav([('全部', total_n, 'book'), ('产品事实表', KB_COUNTS['产品事实表'], 'file'), ('政策规则', KB_COUNTS['政策规则'], 'shield'),
                                                          ('故障排查树', KB_COUNTS['故障排查树'], 'merge'), ('模板与素材', KB_COUNTS['模板与素材'], 'image'), ('沉淀问答', KB_COUNTS['沉淀问答'], 'message')], '全部'), 2) + \
         col(label('有效期', 'padding: 0px 10px;') + cat_nav([('即将过期', 1, 'clock'), ('已过期', 0, 'x_c')], None), 2)
-    nav_panel = '<div style="width: 188px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 16px; box-shadow: 0 1px 2px rgba(16,20,35,0.04); overflow: hidden; margin: 10px 0px 12px 14px; padding: 14px 10px; display: flex; flex-direction: column; gap: 18px;">%s</div>' % (T['line'], nav)
+    nav_panel = '<div style="width: 188px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 16px; box-shadow: 0 1px 2px rgba(16,20,35,0.04); overflow: hidden; margin: 10px 0px 14px 24px; padding: 14px 10px; display: flex; flex-direction: column; gap: 18px;">%s</div>' % (T['line'], nav)
 
     rows = []
     for (title, layer, store, lang, ch, owner, exp, hits, st) in KB:
@@ -151,7 +151,7 @@ def p16():
         col(label('适用范围') + kv('店铺', k0[2]) + kv('语言', k0[3]) + kv('渠道', k0[4]) + kv('有效期', k0[6]) + kv('近 30 天命中', '%d 次' % k0[7]), 6) + divider() +
         col(label('引用它的最近工单') + refs, 8) +
         row(btn('编辑', 'secondary', 'sm', 'edit') + btn('停用', 'danger_outline', 'sm') + spacer() + link('查看全文', 12, 'chev_r'), 8), 14)
-    prev_panel = '<div style="width: 336px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 16px; box-shadow: 0 1px 2px rgba(16,20,35,0.04); overflow: hidden; margin: 10px 14px 12px 0px; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px;">%s</div>' % (T['line'], prev)
+    prev_panel = '<div style="width: 336px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 16px; box-shadow: 0 1px 2px rgba(16,20,35,0.04); overflow: hidden; margin: 10px 24px 14px 0px; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px;">%s</div>' % (T['line'], prev)
     body = head + '<div style="flex: 1; min-height: 0px; display: flex;">%s%s%s</div>' % (nav_panel, main, prev_panel)
     return app('zhaoqian', '知识库', ['知识库', '条目'], body)
 
@@ -195,19 +195,19 @@ def chart_card(title, sub, body, extra=None):
 
 
 def p17():
-    head = page_head('报表', '数据来源：工单系统、登记台账、亚马逊 SP-API、Shopify · 更新于 10:15', btn('导出', 'secondary', 'md', 'download'))
-    filt = between(row(seg(['本周', '本月', '自定义'], '本周') + nowrap('09-05 至 09-11', 12, T['ink3']) + divider(True, 16) +
+    head = page_head('报表', '数据来源：工单系统、登记台账、积加（订单与物流） ·更新于 10:15', btn('导出', 'secondary', 'md', 'download'))
+    filt = between(row(seg(['近 7 天', '本月', '自定义'], '近 7 天') + nowrap('09-05 至 09-11', 12, T['ink3']) + divider(True, 16) +
                        filter_chip('店铺', '全部') + filter_chip('站点', '全部') + filter_chip('标签'), 8),
                    chip('指标为示例数据', 'warning', 11, 'info'))
     R = REPORT
-    kpis = grid(kpi('工单量', str(R['tickets_week']), R['tickets_delta'], 'muted', '本周 · 全部渠道') +
+    kpis = grid(kpi('工单量', str(R['tickets_week']), R['tickets_delta'], 'muted', '近 7 天 · 全部渠道') +
                 kpi('首响中位数', R['frt_median'], R['frt_delta'], 'success', '从来信到第一封回复') +
                 kpi('SLA 达标率（亚马逊）', R['sla_rate'], None, 'muted', '未达标 %d 封' % R['sla_miss']) +
                 kpi('草稿采纳率', R['adopt_rate'], None, 'muted', R['adopt_split']) +
                 kpi('自动发送占比', R['auto_rate'], None, 'muted', R['auto_note']), 5, 12)
 
-    daily = chart_card('每日工单量', '按渠道堆叠 · 本周', legend([('亚马逊', T['amazon']), ('Shopify 与邮件', T['shopify'])]) + stacked_columns(R['daily'], 184, 80, 20))
-    intents = chart_card('意图分布', '本周工单主意图占比', hbars(R['intents'], lambda v: '%d%%' % v, 35, T['accent'], 124, 12, 17))
+    daily = chart_card('每日工单量', '按渠道堆叠 · 近 7 天', legend([('亚马逊', T['amazon']), ('Shopify 与邮件', T['shopify'])]) + stacked_columns(R['daily'], 184, 80, 20))
+    intents = chart_card('意图分布', '近 7 天工单主意图占比', hbars(R['intents'], lambda v: '%d%%' % v, 35, T['accent'], 124, 12, 17))
 
     cbr = cost_by_resp()
     order = sorted(cbr.items(), key=lambda x: -x[1])
@@ -224,9 +224,11 @@ def p17():
             v * 100.0 / lt['factory'], c, ' margin-right: 2px;' if i < 2 else '', ' border-radius: 4px 0px 0px 4px;' if i == 0 else (' border-radius: 0px 4px 4px 0px;' if i == 2 else ''))
     bar = '<div style="display: flex; height: 14px;">%s</div>' % seg_bar
     rows_ = col(''.join('<div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><div style="width: 10px; height: 10px; border-radius: 2px; background: %s;"></div><div style="flex: 1; color: %s;">%s</div><div style="color: %s; width: 56px; text-align: right;">%s</div><div style="font-weight: 600; color: %s; width: 64px; text-align: right; font-variant-numeric: tabular-nums;">%s</div></div>' % (
-        c, T['ink2'], n + note, T['ink3'], '%.0f%%' % (v * 100.0 / lt['factory']), T['ink'], money(v)) for (n, v, c), note in zip(parts, ['· 批次 2026-09-A', '· 进入 10-05 生成的 2026-09-B', '· 按建议比例估算，不进批次'])), 8)
+        c, T['ink2'], n + note, T['ink3'], '%.0f%%' % (v * 100.0 / lt['factory']), T['ink'], money(v)) for (n, v, c), note in zip(parts, [' · 批次 FQD-A、FZJ-A', ' · 进入 10-05 生成的 FQD-B', ' · 按建议比例估算，不进批次'])), 8)
     fac = chart_card('工厂承担与结算进度', '生产厂 FQD、FZJ · 本月',
-                     row(text(money(lt['factory']), 20, T['ink'], 700) + muted('工厂承担（含估算）· 其中已确认 %s' % money(round(lt['settled'] + lt['pending'], 2)), 12), 8, 'baseline') + bar + rows_)
+                     row(text(money(lt['factory']), 20, T['ink'], 700) + muted('工厂承担（含估算）· 其中已确认 %s' % money(round(lt['settled'] + lt['pending'], 2)), 12), 8, 'baseline') + bar + rows_ +
+                     '<div style="display: flex; gap: 16px; border-top: 1px solid %s; padding-top: 8px; font-size: 12px; color: %s;">%s</div>' % (T['line2'], T['ink3'], ''.join(
+                         '<div>生产厂 %s <b style="color: %s;">%s</b>（已确认 %s）</div>' % (c, T['ink'], money(factory_totals(c)['factory']), money(round(factory_totals(c)['settled'] + factory_totals(c)['pending'], 2))) for c in ('FQD', 'FZJ'))))
     charts = grid(daily + intents, template='minmax(0, 1.25fr) minmax(0, 1fr)', gap=14) + grid(cost + fac, template='minmax(0, 1fr) minmax(0, 1fr)', gap=14)
     return app('zhoumin', '报表', ['报表', '概览'], head + content(filt + kpis + charts, '14px 24px', 12))
 

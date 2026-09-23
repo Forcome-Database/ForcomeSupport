@@ -3,7 +3,7 @@
 Forcome Support 组件库（高保真原型唯一样式来源）
 
 视觉 v3（参考 forcome-support-console.html，研发用 shadcn/ui + Tailwind CSS v4 实现）：
-56px 白色顶栏 + 分段导航；浅灰底上的圆角浮动面板；靛蓝主色，靛蓝→青色渐变只用于 AI 标识与品牌；
+56px 白色顶栏 + 分段导航；浅灰底上的圆角浮动面板；靛蓝主色，靛蓝→青色渐变只用于 AI 标识、品牌标与内部成员头像；
 语义色只表达状态。T 的每个键在设计规范板上有对应的 shadcn CSS 变量。
 所有页面用 app() 或 factory_app() 生成外壳，内容区只用本文件的组件拼装。
 不要在页面脚本里手写颜色、字号、圆角；需要新组件时在本文件里加，并同步到设计规范板。
@@ -24,7 +24,6 @@ T = {
     # 背景与线（shadcn：--background / --card / --muted / --border / --input）
     'canvas': '#f5f6fa', 'surface': '#ffffff', 'subtle': '#f7f8fc', 'hover': '#f1f3f9', 'track': '#f1f3f9',
     'line': '#e7e9f1', 'line2': '#eff1f7', 'line_strong': '#d8dce7',
-    'rail': '#141a26', 'rail_text': '#98a2b3', 'rail_hover': '#1f2737',
     # 文字（--foreground / --muted-foreground）
     'ink': '#0f1320', 'ink2': '#3b4356', 'ink3': '#5a6376', 'ink4': '#9099ab',
     # 主色（--primary / --ring / --accent）
@@ -62,7 +61,7 @@ STATE_TONE = {
     # 协商
     '不适用': 'muted', '未发起': 'muted', '待工厂答复': 'accent', '工厂还价': 'warning', '待升级': 'danger', '已确认': 'success',
     # 结算
-    '未定': 'muted', '待结算': 'accent', '结算中': 'accent', '已结算': 'success', '待生成': 'muted',
+    '未定': 'muted', '待结算': 'accent', '已结算': 'success', '待生成': 'muted',
     # 工厂任务
     '待处理': 'warning', '已提交': 'accent', '已退回': 'danger', '已作废': 'muted',
     # 草稿
@@ -699,20 +698,6 @@ NAV_ICON = {'收件箱': 'inbox', '工单': 'ticket', '售后': 'box', '审批':
 AV_TONE = {'坐席': 'green', '客服主管': 'accent', '售后负责人': 'amber', '知识库负责人': 'violet', '管理员': 'grey', '生产厂对接人': 'amber', '生产厂负责人': 'amber'}
 
 
-def _rail(items, active, user, badges=None, logo='message'):
-    badges = badges or {}
-    nav = ''
-    for n in items:
-        on = n == active
-        b = ''
-        if n in badges and badges[n]:
-            b = '<div style="position: absolute; top: 4px; right: 4px;">%s</div>' % badge_count(badges[n], 'danger' if n in ('收件箱', '待办') else 'accent')
-        nav += '<div style="position: relative; width: 52px; height: 52px; border-radius: 8px; background: %s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;">%s<div style="font-size: 11px; font-weight: %d; color: %s;">%s</div>%s</div>' % (
-            T['accent'] if on else 'transparent', icon(NAV_ICON.get(n, 'inbox'), 20, '#ffffff' if on else T['rail_text']), 600 if on else 500, '#ffffff' if on else T['rail_text'], n, b)
-    return '<div style="width: 64px; flex-shrink: 0; box-sizing: border-box; background: %s; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 12px 0px 14px 0px;"><div style="display: flex; flex-direction: column; align-items: center; gap: 4px;"><div style="width: 30px; height: 30px; border-radius: 8px; background: %s; display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">%s</div>%s</div><div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">%s<div style="font-size: 10px; color: %s;">%s</div></div></div>' % (
-        T['rail'], T['accent'], icon(logo, 18, '#ffffff'), nav, avatar(user['avatar'], AV_TONE.get(user['role'], 'green'), 32), T['rail_text'], {'知识库负责人': '知识库', '售后负责人': '售后', '生产厂对接人': '生产厂', '生产厂负责人': '生产厂'}.get(user['role'], user['role']))
-
-
 def _brand(sub_='Support'):
     return ('<div style="display: flex; align-items: center; gap: 9px; flex-shrink: 0;"><div style="width: 28px; height: 28px; border-radius: 9px; background: %s; color: #ffffff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: %s;">F</div>'
             '<div style="font-size: 14.5px; font-weight: 650; color: %s; letter-spacing: -0.01em;">Forcome</div><div style="font-size: 12.5px; font-weight: 450; color: %s; margin-left: -3px; white-space: nowrap;">%s</div></div>') % (
@@ -734,10 +719,10 @@ def _segnav(items, active, badges=None):
     return '<div style="display: flex; align-items: center; gap: 2px; background: %s; padding: 3px; border-radius: 10px; flex-shrink: 0;">%s</div>' % (T['track'], out)
 
 
-def _topbar(items, active, user, badges=None, scope='全部店铺', show_scope=True, right_extra='', search_ph='搜索工单、订单号、客户邮箱', brand_sub='Support', scope_label='店铺'):
+def _topbar(items, active, user, badges=None, scope='全部店铺', show_scope=True, right_extra='', search_ph='搜索工单、订单号、客户邮箱', brand_sub='Support', scope_label='店铺', scope_fixed=False):
     """56px 白色顶栏：品牌 · 分段导航 · 店铺范围 · 搜索（Ctrl K 命令面板）· 密度（舒适 / 紧凑）· 通知 · 当前用户。第一期只有浅色，不放主题切换。"""
     scope_html = '<div style="height: 32px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; border: 1px solid %s; border-radius: 10px; padding: 0px 10px; background: #ffffff; white-space: nowrap;">%s<div style="font-size: 12px; color: %s;">%s：<span style="font-weight: 650; color: %s;">%s</span></div>%s</div>' % (
-        T['line'], icon('store', 14, T['ink4']), T['ink3'], scope_label, T['ink'], scope, icon('chev_d', 12, T['ink4'])) if show_scope else ''
+        T['line'], icon('lock' if scope_fixed else 'store', 14, T['ink4']), T['ink3'], scope_label, T['ink'], scope, '' if scope_fixed else icon('chev_d', 12, T['ink4'])) if show_scope else ''
     role = {'知识库负责人': '知识库', '售后负责人': '售后负责人', '生产厂对接人': '生产厂对接人', '生产厂负责人': '生产厂负责人'}.get(user['role'], user['role'])
     me = '<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">%s<div style="display: flex; flex-direction: column; line-height: 1.25;"><div style="font-size: 12.5px; font-weight: 650; color: %s; white-space: nowrap;">%s</div><div style="font-size: 11px; color: %s; white-space: nowrap;">%s</div></div></div>' % (
         avatar(user['avatar'], 'grad', 30), T['ink'], user['name'], T['ink4'], role)
@@ -762,7 +747,7 @@ def factory_app(active, crumbs, body, badges=None, w=1440, h=900, user_key='chen
     user = STAFF[user_key]
     b = badges if badges is not None else {'待办': 1}
     return '<div style="width: %dpx; height: %dpx; box-sizing: border-box; background: %s; display: flex; flex-direction: column; overflow: hidden; position: relative; font-variant-numeric: tabular-nums;">%s<div style="flex: 1; display: flex; flex-direction: column; min-height: 0px; min-width: 0px;">%s</div></div>' % (
-        w, h, T['canvas'], _topbar(FACTORY_NAV, active, user, b, '生产厂 ' + user['factory'], True, '', '搜索售后单号、配件号', '工厂工作台', '范围'), body)
+        w, h, T['canvas'], _topbar(FACTORY_NAV, active, user, b, '生产厂 ' + user['factory'], True, '', '搜索售后单号、配件号', '工厂工作台', '范围', True), body)
 
 
 def page_head(title, desc=None, actions='', tabs_html='', chips=''):

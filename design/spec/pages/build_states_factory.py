@@ -33,23 +33,24 @@ def f2():
 
 # ---------------------------------------------------------------- F3 提交成功
 def f3():
-    page = BF.p21(override={'S-20260911-0019': ('已提交', '已报价 $18.00，等 FSH 报备')}, st='已提交', form_html=BF.submitted_card(),
-                  head_right=nowrap('提交于 10:22', 12, T['ink3']), badges={},
-                  thread_extra=sys_comment('10:22', '陈工提交报价：产品成本 $5.20、运费 $12.80，已写入登记台账，已通知王磊。'))
+    q = BF.Q
+    page = BF.p21(override={BF.SEL: ('已提交', '已报价 %s，等 FSH 报备' % money(round(q['product'] + q['freight'], 2)))}, st='已提交', form_html=BF.submitted_card(),
+                  head_right=nowrap('提交于 ' + q['at'], 12, T['ink3']), badges={},
+                  thread_extra=sys_comment(q['at'], '陈工提交报价：产品成本 %s、运费 %s，已写入登记台账，已通知王磊。' % (money(q['product']), money(q['freight']))))
     t = toast('success', '报价已提交', 'S-20260911-0019 已转为「已提交」。FSH 报备通过后会生成寄件任务并推送给你。')
     return toast_at(scaled(page, 1440, 900, 0.6), t, W, 540)
 
 
 # ---------------------------------------------------------------- F4 回填单号
 def f4():
-    head = task_head('寄件 · S-20260911-0018', '待处理', sla('剩 3 个工作日', 'normal'), ['派发 09-11 13:45', '报备已批准 · 快递费用 $11.50', 'FSH 对接人 王磊'])
-    recv = card(grid(stat('收件人', 'Laura Bennett') + stat('电话', '+1 404-555-0182') + stat('配件', 'HEPA 滤芯组件 FC-V2-HF01 ×1') +
-                     '<div style="grid-column: span 2;">%s</div>' % stat('地址', '1180 Peachtree St NE, Atlanta, GA 30309, United States') + stat('承运方式', '云途专线（报价时选择）'), 3, 12) +
+    head = task_head('寄件 · S-20260911-0018', '待处理', sla('剩 3 个工作日 · 09-16 周三 14:15 截止', 'normal'), ['派发 09-11 14:15', '报备已批准（超时后批准）· 快递费用 $11.50', 'FSH 对接人 王磊'])
+    recv = card(grid(stat('收件人', 'Laura Bennett') + stat('电话', ORDERS['111-2233445-5566778']['phone']) + stat('配件', 'HEPA 滤芯组件 FC-V2-HF01 ×1') +
+                     '<div style="grid-column: span 2;">%s</div>' % stat('地址', ORDERS['111-2233445-5566778']['address'] + ', United States') + stat('承运方式', '云途专线（报价时选择）'), 3, 12) +
                 row(icon('lock', 13, T['ink4']) + nowrap('收件信息仅用于本次寄件，寄件完成 30 天后隐藏。', 12, T['ink3']), 6),
                 '收件信息', link('复制地址', 12, 'copy'), pad='14px 16px', gap=10)
-    form = card(grid(field('快递单号', input_box('YT2625100012351234', mono=True), True) +
-                     field('实际运费', input_box('13.20', prefix='$', suffix='USD', mono=True), True, hint='报备金额 $11.50') +
-                     field('寄出日期', input_box('2026-09-12', icon_name='calendar', mono=True), True) +
+    form = card(grid(field('快递单号', input_box(ORDERS['111-2233445-5566778']['tracking'], mono=True), True) +
+                     field('实际运费', input_box('%.2f' % ORDERS['111-2233445-5566778']['freight_actual'], prefix='$', suffix='USD', mono=True), True, hint='报备金额 $11.50') +
+                     field('寄出日期', input_box('2026-09-14', icon_name='calendar', mono=True), True) +
                      field('面单照片', row(img_thumb('面单 1', 64, 32) + btn('上传', 'secondary', 'sm', 'upload'), 8)), 4, 12) +
                 banner('warning', '实际运费 $13.20 超出报备金额 $11.50 的 10%（+14.8%）', '可以照常提交。提交后 FSH 会自动发起补充报备，不影响已寄出的包裹。') +
                 between(muted('单号与实际运费提交后直接写入 FSH 登记台账，并由 FSH 回复客户。', 12), btn('提交单号', 'primary', 'md', 'send')),
@@ -59,14 +60,15 @@ def f4():
 
 # ---------------------------------------------------------------- F5 比例答复
 def f5():
-    head = task_head('比例协商 · S-20260911-0018', '待处理', sla('剩 3 个工作日', 'normal'), ['FSH 提案 09-12 09:10', '第 1 轮，最多 3 轮', 'FSH 对接人 王磊'])
+    head = task_head('比例协商 · S-20260911-0018', '待处理', sla('剩 3 个工作日 · 09-16 周三 14:15 截止', 'normal'), ['报备批准时系统发起 09-11 14:15', '第 1 轮，最多 3 轮', 'FSH 对接人 王磊'])
     big = '<div style="font-size: 20px; font-weight: 700; color: %s; font-variant-numeric: tabular-nums;">工厂 100%%</div>' % T['ink']
-    prop = card(row(big + nowrap('FSH 0% · 费用 $14.70 = 产品成本 $3.20 + 运费 $11.50 + 额外赔偿 $0.00 + 其他 $0.00', 12, T['ink3']), 10, 'baseline') +
+    r = AS['S-20260911-0018']['ratios']
+    prop = card(row(big + nowrap('%s · 费用 $14.70 = 产品成本 $3.20 + 运费 $11.50 + 额外赔偿 $0.00 + 其他 $0.00' % ratio_words(r), 12, T['ink3']), 10, 'baseline') +
                 text('依据：产品质量问题。HEPA 滤芯发黄、吸力下降，排查两轮未解决，在保修期内。', 12, T['ink2']),
-                'FSH 提案', nowrap('王磊 · 09-12 09:10', 12, T['ink3']), pad='12px 16px', gap=8)
-    choice = row(radio_card('接受', '工厂承担 100%，$14.70') + radio_card('还价', '提出新的比例与理由', True) + radio_card('拒绝', '需填写理由，转双方负责人商定'), 8, 'stretch')
-    form = grid(field('工厂承担', input_box('50', suffix='%', mono=True), True) + field('FSH 承担', input_box('50', suffix='%', st='readonly', mono=True), hint='按 100 减去工厂比例') +
-                '<div style="grid-column: span 2;">%s</div>' % field('还价理由', textarea_box(None, '说明为什么调整比例，例如来料批次、检测结论；可附图', 'error', 56, '0 / 200'), True, error='还价需要填写理由'), 4, 12)
+                'FSH 提案', nowrap('系统 · 09-11 14:15', 12, T['ink3']), pad='12px 16px', gap=8)
+    choice = row(radio_card('接受', '%s，工厂承担 $14.70' % ratio_words(r)) + radio_card('还价', '按费用项提出新比例与理由', True) + radio_card('拒绝', '需填写理由，转双方负责人商定'), 8, 'stretch')
+    form = grid(''.join(field('%s · 工厂承担' % lab, input_box('50', suffix='%', mono=True), True, hint='FSH 自动 %s' % '50%') for lab, _ in RATIO_PARTS) +
+                '<div style="grid-column: span 3;">%s</div>' % field('还价理由', textarea_box(None, '说明为什么调整比例，例如来料批次、检测结论；可附图', 'error', 56, '0 / 200'), True, error='还价需要填写理由'), 3, 12)
     ans = card(choice + form + between(muted('答复后写入登记台账；FSH 可接受、再次提案或升级双方负责人。', 12), btn('提交答复', 'primary', 'md', 'send')),
                '你的答复', pad='12px 16px', gap=12)
     return frame(head + prop + ans, bg='#ffffff', pad='16px 20px')
@@ -89,13 +91,13 @@ def f7():
 # ---------------------------------------------------------------- F8 结算确认
 def f8():
     b = BATCH['2026-09-FQD-B']
-    head = task_head('结算确认 · 批次 2026-09-FQD-B', '待处理', sla('5 个工作日内确认', 'normal'), ['10-05 09:00 自动生成', '%d 单' % len(b['items']), 'FSH 对接人 王磊'])
+    head = task_head('结算确认 · 批次 2026-09-FQD-B', '待处理', sla('剩 5 个工作日 · 10-12 周一 09:00 截止', 'normal'), ['10-05 09:00 自动生成', '%d 单' % len(b['items']), 'FSH 对接人 王磊'])
     cols = [('售后单号', 'left'), ('配件', 'left'), ('责任', 'left'), ('费用合计', 'right'), ('FSH / 工厂 %', 'left'), ('工厂承担', 'right')]
     rows = []
     for no in b['items']:
         a = AS[no]
         rows.append([nowrap(no, 12.5, T['ink'], 600), ellipsis('%s ×%d' % (PARTS[a['part']], a['qty']), 12.5, T['ink2']), cat(a['resp']), money(total(a)),
-                     nowrap('%d / %d' % a['ratio'], 12.5, T['ink2']), nowrap(money(factory_share(a)), 12.5, T['ink'], 700)])
+                     nowrap(ratio_txt(a, False), 12.5, T['ink2']), nowrap(money(factory_share(a)), 12.5, T['ink'], 700)])
     amt = round(sum(factory_share(AS[x]) for x in b['items']), 2)
     tbl = table(cols, rows, '136px minmax(0, 1fr) 104px 76px 92px 80px', footer=[nowrap('合计 · %d 单' % len(b['items']), 12.5, T['ink'], 700), '', '', '', '', money(amt)])
     note = row(icon('info', 14, T['ink4']) + nowrap('只含比例已确认的售后单；点行可展开产品成本、运费、额外赔偿、其他四项。', 12, T['ink3']), 6)
@@ -130,14 +132,15 @@ def f9():
     p1 = phone(m_bar(col(row(text('待办', 17, T['ink'], 700) + chip(str(len(opens)), 'accent', 11), 6) + nowrap('生产厂 FQD · 陈工', 12, T['ink3']), 2), icon_btn('bell', 'secondary', 30)) +
                '<div style="padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;">%s%s</div>' % (seg(['全部 %d' % len(opens), '待处理 1', '已提交 2'], '全部 %d' % len(opens), 'sm'), cards) + nav)
     need = '<div style="background: #ffffff; border: 1px solid %s; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;">%s%s%s%s</div>' % (
-        T['line'], kv('配件', '软管 FC-V2-HS02 ×2'), kv('寄往', '德国 10115'), text('软管在接口处开裂，吸尘时漏气。', 12.5, T['ink2']), row(img_thumb('照片 1', 64, 48) + img_thumb('照片 2', 64, 48), 8))
-    form = col(field('产品成本', input_box('5.20', prefix='$', suffix='USD', mono=True), True) +
-               field('运费', input_box('12.80', prefix='$', suffix='USD', mono=True), True) +
-               field('承运方式', select_box('云途专线')) +
-               field('可寄出日期', input_box('2026-09-14', icon_name='calendar', mono=True), True), 10)
+        T['line'], kv('配件', '软管 FC-V2-HS02 ×%d' % AS[BF.SEL]['qty']), kv('寄往', '%s %s' % (BF.DEST['country'], BF.DEST['zip'])), text('软管在接口处开裂，吸尘时漏气。', 12.5, T['ink2']), row(img_thumb('照片 1', 64, 48) + img_thumb('照片 2', 64, 48), 8))
+    q = BF.Q
+    form = col(field('产品成本', input_box(BF.amt2(q['product']), prefix='$', suffix='USD', mono=True), True) +
+               field('运费', input_box(BF.amt2(q['freight']), prefix='$', suffix='USD', mono=True), True) +
+               field('承运方式', select_box(q['carrier'])) +
+               field('可寄出日期', input_box(q['ship_date'], icon_name='calendar', mono=True), True), 10)
     sticky = '<div style="margin-top: auto; background: #ffffff; border-top: 1px solid %s; padding: 10px 14px 16px 14px; display: flex; gap: 8px; box-shadow: 0 -4px 12px rgba(16,24,40,0.06);">%s%s</div>' % (
         T['line'], btn('无法供货', 'danger_outline'), btn('提交报价', 'primary', 'md', 'send', full=True))
-    p2 = phone(m_bar(row(icon('chev_l', 18, T['ink2']) + col(text('询价 · S-20260911-0019', 14, T['ink'], 700) + nowrap('派发 09-11 08:50', 11, T['ink3']), 1), 6), sla('剩 2 个工作日', 'normal')) +
+    p2 = phone(m_bar(row(icon('chev_l', 18, T['ink2']) + col(text('询价 · S-20260911-0019', 14, T['ink'], 700) + nowrap('派发 08:50 · 09-15 09:00 截止', 11, T['ink3']), 1), 6), sla('剩 2 个工作日', 'normal')) +
                '<div style="padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; overflow: hidden;">%s%s</div>' % (need, form) + sticky)
     return '<div style="display: flex; gap: 32px; padding: 20px; background: %s;">%s%s</div>' % (T['canvas'], p1, p2)
 
@@ -150,13 +153,13 @@ def build():
         grid(V('F3 提交成功', '成功浮层；左栏任务转「已提交」，中栏表单变为只读结果；本单沟通追加系统记录。报价直接写入登记台账（R-FT-03）。', f3(), '报价校验通过并提交') +
              V('F4 回填单号', '寄件任务可见收件人姓名、完整地址、电话（R-FT-02）；回填快递单号与实际运费。实际运费超报备 10% 以上时黄色提示将触发补充报备（R-FL-05）。', f4(),
                '报备通过后生成寄件任务，生产厂寄出后回填'), 2, 32) +
-        grid(V('F5 比例答复', '接受、还价、拒绝三选一；还价需填新比例与理由，拒绝需填理由。第 3 轮后仍未达成转待升级（R-AS-06）。', f5(), 'FSH 在工厂工作台发起比例提案') +
+        grid(V('F5 比例答复', '接受、还价、拒绝三选一；还价按产品成本、快递物流、其他费用三组分别填工厂承担比例与理由，拒绝需填理由。第 3 轮后仍未达成转待升级（R-AS-06）。', f5(), 'FSH 在工厂工作台发起比例提案') +
              V('F6 越权', '打开他厂单据链接时显示无权限，不透露单据内容，记审计日志（E-24）。', f6(), '生产厂对接人访问不属于本厂的售后单或任务'), 2, 32) +
         grid(V('F7 网络失败', '失败浮层不自动消失，表单内容保留，提供重试；按钮恢复可点。', f7(), '提交报价、单号或答复时网络中断或服务超时') +
              V('F8 结算确认', '批次明细与合计（工厂承担 $21.95）；「确认」或「有异议」二选一，有异议必须填理由，批次保持待确认并通知王磊（E-30、AC-AS-19）。', f8(), '批次 2026-09-FQD-B 于 10-05 生成并推送（未来画面）'), 2, 32) +
         grid(V('F9 手机端', '375 宽单栏：待办卡片列表 + 底部导航；任务详情表单纵向排列，「提交报价」固定在底部。字段、校验与桌面端一致。', f9(), '陈工在钉钉里点开工作通知（钉钉内免登，无需另外登录）'), 2, 32),
         40)
-    return board('工厂工作台状态', '生产厂 FQD对接人陈工在工厂工作台的空、校验、成功、回填、答复、越权、失败、结算确认与手机端状态（F1–F9）。演示时刻 %s；寄件与比例答复为报备通过后的后续画面。' % NOW_LABEL, body, 1920, 2879)
+    return board('工厂工作台状态', '生产厂 FQD 对接人陈工在工厂工作台的空、校验、成功、回填、答复、越权、失败、结算确认与手机端状态（F1–F9）。演示时刻 %s；寄件与比例答复为报备通过后的后续画面。' % NOW_LABEL, body, 1920, 2879)
 
 
 if __name__ == '__main__':

@@ -17,7 +17,7 @@
 
   <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 32px;">
     <div style="font-size: 26px; font-weight: 600; letter-spacing: -0.01em;">Forcome Support 系统架构</div>
-    <div style="font-size: 14px; color: #5a6376;">五层：来信经 Gmail 进入（亚马逊买家消息走官方邮件中转），订单与动作走 SP-API、Shopify Admin API、良仓接口，固定五步处理，动作经统一接口与 MCP 适配器按风险分级执行，工单是唯一事实来源，人在工作台审核与维护</div>
+    <div style="font-size: 14px; color: #5a6376;">五层：来信经 Gmail 进入（亚马逊买家消息走官方邮件中转），订单、物流与库存走积加，退款、改地址、取消走平台官方接口，固定五步处理，动作经统一接口与 MCP 适配器按风险分级执行，工单是唯一事实来源，人在工作台审核与维护</div>
   </div>
 
   <!-- 五层 -->
@@ -26,9 +26,9 @@
     <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 24px; align-items: stretch;">
       <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 4px;"><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #5a6376;">1 渠道与接入</div><div style="font-size: 12px; color: #9099ab;">所有来信汇成一条队列</div></div>
       <div style="background: #ffffff; border: 1px solid #e7e9f1; border-radius: 8px; padding: 14px 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
-        <div style="display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600;">亚马逊 SP-API · Shopify Admin API · 良仓接口</div><div style="font-size: 12px; color: #5a6376; line-height: 1.5;">亚马逊 2 店 × US / DE / UK、Shopify 2 店的订单、发货、退货；良仓库存、售后出库单、单号与运费</div></div>
+        <div style="display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600;">积加 ERP</div><div style="font-size: 12px; color: #5a6376; line-height: 1.5;">聚合亚马逊与 Shopify 的订单与物流轨迹（Forcome Direct US / CA / MX、Forcome Auto US、forcome.com US / CA、forcome.mx MX），并对接良仓：库存、售后出库单、单号与运费</div></div>
         <div style="display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600;">客服邮箱 Gmail</div><div style="font-size: 12px; color: #5a6376; line-height: 1.5;">亚马逊买家消息经官方邮件中转进入各店铺绑定邮箱，Shopify 每店一个客服邮箱，按收件邮箱识别店铺；直邮。工厂往来不走邮件</div></div>
-        <div style="display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600; color: #5a6376;">预留：积加 ERP 适配器</div><div style="font-size: 12px; color: #9099ab; line-height: 1.5;">第一期不接入；需要时接入统一动作接口，流程不变</div></div>
+        <div style="display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600; color: #5a6376;">亚马逊 SP-API · Shopify Admin API</div><div style="font-size: 12px; color: #9099ab; line-height: 1.5;">只用于写动作：退款、取消（SP-API），退款、改地址、取消、订单备注（Admin API）</div></div>
       </div>
     </div>
 
@@ -57,7 +57,7 @@
         <div style="background: #d1fadf; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600; color: #067647;">只读，自动执行</div><div style="font-size: 12px; color: #067647; line-height: 1.5;">查订单、库存、物流、费用</div></div>
         <div style="background: #f0effd; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600; color: #4338ca;">低风险写，自动执行并留痕</div><div style="font-size: 12px; color: #4338ca; line-height: 1.5;">加备注、写登记台账、向工厂工作台派发任务、向承运商查件</div></div>
         <div style="background: #fef0c7; border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 13px; font-weight: 600; color: #b54708;">高风险写，人工确认后执行</div><div style="font-size: 12px; color: #b54708; line-height: 1.5;">退款、改地址、取消；创建出库单与通知生产厂寄出由报备通过直接触发</div></div>
-        <div style="grid-column: 1 / -1; font-size: 12px; color: #3b4356; background: #ffffff; border: 1px solid #e7e9f1; border-radius: 8px; padding: 8px 12px; line-height: 1.5;"><span style="font-weight: 600; color: #0f1320;">统一动作接口</span> 查订单、物流、库存 · 回复客户 · 创建出库单 · 备注 · 退款 · 改地址 · 取消 → 适配器（MCP 形式）：亚马逊 SP-API、Shopify Admin API、良仓接口、Gmail；接口重试用尽或暂无接口时生成人工操作清单兜底，发起人在后台完成后回填；积加适配器预留</div>
+        <div style="grid-column: 1 / -1; font-size: 12px; color: #3b4356; background: #ffffff; border: 1px solid #e7e9f1; border-radius: 8px; padding: 8px 12px; line-height: 1.5;"><span style="font-weight: 600; color: #0f1320;">统一动作接口</span> 查订单、物流、库存 · 回复客户 · 创建售后出库单 · 备注 · 退款 · 改地址 · 取消 → 适配器（MCP 形式）：积加（读与良仓出库单）、亚马逊 SP-API、Shopify Admin API、Gmail；接口重试用尽或暂无接口时生成人工操作清单兜底，发起人在积加或后台完成后回填</div>
       </div>
     </div>
 
@@ -94,7 +94,8 @@
       <div style="font-size: 12px; color: #5a6376; background: #fbfbfc; border: 1px dashed #d8dce7; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
         <div><span style="font-weight: 600; color: #0f1320;">模型</span> Claude，用于第 3、4 步、译文与摘要；系统提示与知识库做缓存</div>
         <div><span style="font-weight: 600; color: #0f1320;">存储</span> PostgreSQL 加 pgvector；队列 Redis；每步独立任务可重试</div>
-        <div><span style="font-weight: 600; color: #0f1320;">后续</span> 需要时接入积加适配器，流程不变；成员、部门来自钉钉通讯录，提醒走钉钉工作通知</div>
+        <div><span style="font-weight: 600; color: #0f1320;">组织与通知</span> 钉钉开放平台（第一期）：成员与部门从通讯录同步，扫码登录与钉钉内免登，审批与生产厂任务推送工作通知</div>
+        <div><span style="font-weight: 600; color: #0f1320;">后续</span> 需要时再开发良仓直连适配器，作为积加不可用时的备用，流程不变</div>
       </div>
     </div>
   </div>

@@ -8,6 +8,7 @@ from data import *
 from as_common import *
 
 LT = ledger_totals()
+SC = settle_counts()
 LEDGER = [a for a in AFTERSALES if a['status'] != '待确认']  # 12 行，按售后单号升序
 
 
@@ -34,18 +35,18 @@ def filing_cell(a):
 
 
 def p13_table():
-    cols = [('售后单号', 'left'), ('客户', 'left'), ('店铺与站点', 'left'), ('处理方式', 'left'), ('责任', 'left'), ('快递单号', 'left'),
+    cols = [('售后单号', 'left'), ('客户', 'left'), ('店铺与站点', 'left'), ('处理方式', 'left'), ('责任', 'left'), ('生产厂', 'left'), ('快递单号', 'left'),
             ('产品成本', 'right'), ('运费', 'right'), ('额外赔偿', 'right'), ('报备', 'left'), ('FSH / 工厂 %', 'left'), ('协商', 'left'), ('结算', 'left')]
     rows = []
     for a in LEDGER:
         rows.append([nowrap(a['no'], 12.5, T['ink'], 600), ellipsis(a['customer'], 12.5), nowrap(store_site(a), 12, T['ink2']),
-                     cat(a['method']), cat(a['resp']), tracking_cell(a),
+                     cat(a['method']), cat(a['resp']), cat(a['factory']) if a.get('factory') else na(), tracking_cell(a),
                      amt(a['product']), amt(a['freight']), money(a['comp']), filing_cell(a), ratio_txt(a), state(a['nego']), state(a['settle'])])
     lab = lambda t: '<span style="font-size: 12px; font-weight: 500; color: %s;">%s</span>' % (T['ink3'], t)
-    footer = [(nowrap('合计 · %d 单' % LT['count'], 12.5, T['ink'], 700), 'left', 6),
+    footer = [(nowrap('合计 · %d 单' % LT['count'], 12.5, T['ink'], 700), 'left', 7),
               (money(LT['product']), 'right', 1), (money(LT['freight']), 'right', 1), (money(LT['comp']), 'right', 1),
               ('%s %s <span style="color: %s; margin: 0px 6px;">·</span> %s %s' % (lab('FSH 承担'), money(LT['fsh']), T['ink4'], lab('工厂承担'), money(LT['factory'])), 'left', 4)]
-    tpl = '118px 92px 124px 100px 88px minmax(0, 1fr) 62px 60px 64px 116px 80px 64px 60px'
+    tpl = '118px 92px 124px 100px 88px 46px minmax(0, 1fr) 62px 60px 64px 116px 80px 64px 60px'
     return table_span(cols, rows, tpl, footer)
 
 
@@ -70,7 +71,7 @@ def p13_filters():
 
 
 def p13():
-    note = muted('金额统一美元，欧元、英镑按报备当日汇率折算（S-20260911-0020 €44.90 ≈ $49.39）；工厂承担含建议比例估算的部分，以内部结算为准。进行中的单还没发生的字段显示「—」；已完成的单缺字段才标黄「待回填」并可「补登」，记入审计日志。', 12)
+    note = muted('金额统一美元，比索、加元按报备当日汇率折算（S-20260911-0020 MX$889.00 ≈ $49.39）；工厂承担含建议比例估算的部分，以内部结算为准。进行中的单还没发生的字段显示「—」；已完成的单缺字段才标黄「待回填」并可「补登」，记入审计日志。', 12)
     body = as_head('登记台账') + content(p13_filters() + p13_table() + p13_summary() + note, '16px 24px', 12)
     return app('wanglei', '售后', ['售后', '登记台账'], body)
 
@@ -83,7 +84,8 @@ GROUPS = [
 ]
 NOTE = {
     'S-20260904-0013': '09-10 结算', 'S-20260905-0014': '09-10 结算',
-    'S-20260908-0015': '陈工 09-09 接受 50 / 50', 'S-20260910-0017': '陈工 09-10 接受工厂 100%',
+    'S-20260908-0015': '陈工 09-09 接受' + ratio_words(AS['S-20260908-0015']['ratios']),
+    'S-20260910-0017': '陈工 09-10 接受' + ratio_words(AS['S-20260910-0017']['ratios']),
     'S-20260903-0012': '双方负责人商定中', 'S-20260911-0018': '报备通过后发起协商',
     'S-20260911-0019': '等生产厂报价', 'S-20260911-0020': '报备通过后发起协商',
 }
@@ -107,7 +109,7 @@ def p14_table():
                          money(total(a)) if quoted else pending('待报价'), ratio_txt(a), state(a['nego']),
                          nowrap(money(share) if quoted else '待报价', 12.5, T['ink'] if quoted else T['ink4'], 700), ellipsis(NOTE[no], 12, T['ink3'])])
         groups.append((row(state(st) + nowrap(heads[st], 12, T['ink2']), 8), '%d 单 · 小计 <b style="color: %s;">%s</b>' % (len(nos), T['ink'], money(round(sub, 2))), rows))
-    footer = [nowrap('合计 · 8 单', 12.5, T['ink'], 700), '', '', '', '', '', '', money(LT['factory']), nowrap('已确认 %s · 未定 %s' % (money(round(LT['settled'] + LT['pending'], 2)), money(LT['undecided'])), 12, T['ink3'])]
+    footer = [nowrap('合计 · %d 单' % SC['all'], 12.5, T['ink'], 700), '', '', '', '', '', '', money(LT['factory']), nowrap('已确认 %s · 未定 %s' % (money(round(LT['settled'] + LT['pending'], 2)), money(LT['undecided'])), 12, T['ink3'])]
     return group_table(cols, groups, tpl, footer)
 
 
@@ -126,10 +128,10 @@ def p14_batches():
 
 
 def p14():
-    kpis = grid(kpi('工厂承担（含估算）', money(LT['factory']), sub='8 单 · 2026-09 · 以内部结算为准') +
-                kpi('已结算', money(LT['settled']), sub='批次 FQD-A、FZJ-A · 2 单') +
-                kpi('待结算', money(LT['pending']), sub='进入 10-05 生成的 FQD-B · 2 单') +
-                kpi('比例未定', money(LT['undecided']), sub='4 单 · 不进批次'), 4, 12)
+    kpis = grid(kpi('工厂承担（含估算）', money(LT['factory']), sub='%d 单 · 2026-09 · 以内部结算为准' % SC['all']) +
+                kpi('已结算', money(LT['settled']), sub='批次 FQD-A、FZJ-A · %d 单' % SC['settled']) +
+                kpi('待结算', money(LT['pending']), sub='进入 10-05 生成的 FQD-B · %d 单' % SC['pending']) +
+                kpi('比例未定', money(LT['undecided']), sub='%d 单 · 不进批次' % SC['undecided']), 4, 12)
     filters = between(row(filter_chip('生产厂', '全部') + filter_chip('月份', '2026-09', True) + filter_chip('店铺', '全部'), 8),
                       row(btn('导出结算单', 'secondary', 'md', 'download') + btn('提前生成批次 2026-09-FQD-B', 'primary', 'md', 'plus'), 8))
     main = filters + kpis + p14_table()

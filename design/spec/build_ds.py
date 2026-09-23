@@ -19,7 +19,7 @@ colors = grid(''.join([
     sw('主文字', T['ink'], '标题、正文'), sw('次文字', T['ink2'], '按钮文字、表格次要'), sw('辅助文字', T['ink3'], '说明、元信息'), sw('弱文字', T['ink4'], '占位、禁用'),
     sw('强调', T['accent'], '主按钮、选中、链接'), sw('强调底', T['accent_bg'], '选中行、强调标签底'),
 ]), 6, 12) + grid(''.join([
-    sw('青色', T['cyan'], '只作渐变第二色'), col('<div style="height: 44px; border-radius: 9px; background: %s;"></div><div style="font-size: 12px; font-weight: 700; color: %s;">AI 渐变</div><div style="font-size: 11px; color: %s;">#4f46e5 → #06b6d4 · 120°</div><div style="font-size: 11px; color: %s; line-height: 1.4;">只用于 AI 标识（✦）、品牌标、草稿卡顶条</div>' % (GRAD, T['ink'], T['ink3'], T['ink4']), 3),
+    sw('青色', T['cyan'], '只作渐变第二色'), col('<div style="height: 44px; border-radius: 9px; background: %s;"></div><div style="font-size: 12px; font-weight: 700; color: %s;">AI 渐变</div><div style="font-size: 11px; color: %s;">#4f46e5 → #06b6d4 · 120°</div><div style="font-size: 11px; color: %s; line-height: 1.4;">只用于 AI 标识（✦）、品牌标、草稿卡顶条、内部成员头像</div>' % (GRAD, T['ink'], T['ink3'], T['ink4']), 3),
 ]), 6, 12) + grid(''.join([
     sw('成功', T['ok'], '已完成、已批准、通过'), sw('警示', T['warn'], '待处理、待审批、临近超时'), sw('危险', T['bad'], '转人工、驳回、失败、超时'),
     sw('流程', T['flow'], '工厂相关的执行记录'), sw('信息', T['info'], '中性提示横幅'), sw('渠道色', T['amazon'], '亚马逊蓝、Shopify 绿、邮件灰：渠道徽标与按渠道拆分的图表'),
@@ -60,7 +60,7 @@ forms = grid(''.join([
     field('必填 + 前后缀', input_box('11.50', prefix='$', suffix='USD', mono=True), required=True),
     field('下拉选择', select_box('产品质量问题')),
     field('下拉 · 错误', select_box(None, '请选择责任类型', 'error'), required=True, error='请选择责任类型'),
-    field('多行文本 · 计数', textarea_box('驳回原因：运费高于同线路均价 30%，请生产厂改走云途普货。', st='focus', h=72, counter='38 / 200')),
+    field('多行文本 · 计数', textarea_box('驳回原因：运费高于同线路均价 30%，请生产厂改走云途普货。', st='focus', h=72, counter='%d / 200' % len('驳回原因：运费高于同线路均价 30%，请生产厂改走云途普货。'))),
 ]), 4, 16) + grid(''.join([
     col(label('单选 / 复选 / 开关') + row(radio('接受', True) + radio('还价') + radio('拒绝', disabled=True), 16) + row(checkbox('同时发起比例协商', True) + checkbox('短信提醒', False) + checkbox('不可选', False, True), 16) + row(toggle(True, '自动发送') + toggle(False, '待审草稿'), 16), 10),
     col(label('选项卡片（单选的富选项）') + row(radio_card('寄配件', '充电线 FC-V2-CB01 ×1', True, 'AI 建议') + radio_card('调整安装方式', '继续指导，不寄东西'), 8, 'stretch'), 8),
@@ -88,7 +88,7 @@ states = grid(''.join(col(label(n) + row(''.join(state(s) for s in ss), 6, wrap=
 ]), 2, 18) + muted('规则：状态一律带圆点并用语义浅底；分类值一律中性灰；AI 产出一律用渐变 ✦ 徽标（' + ai_badge('AI 摘要') + '）。同一个状态在所有页面颜色相同，映射表在组件库 STATE_TONE。', 12)
 
 feedback = grid(''.join([
-    col(label('页内横幅') + banner('info', '工单已合并到 T-20260902-0071', '原工单只读，新来信会进入主工单。') + banner('success', '已批准，发货单创建成功', '回复已自动发出，SLA 计时停止。') + banner('warning', 'SLA 剩 55 分钟，审批时限 4 小时', '承诺类回复要等审批后才能发出。建议先发一条不含承诺的进展回复。', btn('插入进展回复', 'secondary', 'sm')) + banner('danger', 'Gmail 连接中断，来信暂存队列', '09-11 10:05 起未收取。恢复后按到达顺序处理，SLA 从原到达时间计算。', btn('查看状态', 'secondary', 'sm')), 10),
+    col(label('页内横幅') + banner('info', '工单已合并到 T-20260902-0071', '原工单只读，新来信会进入主工单。') + banner('success', '已批准，出库单创建成功', '回复已自动发出，SLA 计时停止。') + banner('warning', 'SLA 剩 55 分钟，审批时限 4 小时', '承诺类回复要等审批后才能发出。建议先发一条不含承诺的进展回复。', btn('插入进展回复', 'secondary', 'sm')) + banner('danger', 'Gmail 连接中断，来信暂存队列', '09-11 10:05 起未收取。恢复后按到达顺序处理，SLA 从原到达时间计算。', btn('查看状态', 'secondary', 'sm')), 10),
     col(label('浮层提示（右上角，成功 3 秒消失，失败需手动关闭）') + toast('success', '已提交审批', '周敏会在 4 小时内处理，结果会通知你。') + toast('error', '发送失败：Gmail 接口超时', '草稿已保留，系统将在 1 分钟后自动重试。', row(link('立即重试') + link('复制草稿'), 12)) + toast('info', '陈晨正在处理这张工单', '你可以查看，但不能同时编辑回复。') + toast('warning', '草稿已失效', '客户在你编辑期间又来了一封信，请先阅读新消息。'), 10),
     col(label('确认弹窗 / 驳回弹窗') + dialog('驳回这张审批单？', field('驳回原因', textarea_box(None, '写清楚为什么驳回、发起人要怎么改', 'error', 64, '0 / 200'), True, error='请填写驳回原因') + muted('驳回后工单回到提交前状态，售后单退回「待确认」。', 12), btn('取消', 'secondary') + btn('驳回', 'danger'), 420, 'danger', '驳回后发起人会收到通知，绑定的回复不会发出。'), 10),
     col(label('提示气泡 / 下拉菜单') + tooltip('禁用原因：这张工单由陈晨处理中。你可以在工单详情里申请接手。') + menu([('改派', 'handoff', None), ('合并到其他工单', 'merge', None), ('添加标签', 'tag', None), '-', ('关闭工单', 'x_c', 'danger')], 220), 10),
@@ -107,7 +107,7 @@ data_disp = grid(''.join([
 loading = grid(''.join([
     col(label('空状态') + card(empty('inbox', '收件箱已清空', '没有待你处理的工单。新来信会自动出现在这里。', btn('查看全部工单', 'secondary')), pad='0px'), 8),
     col(label('无权限') + card(no_permission('没有访问权限', '「设置」只对客服主管和管理员开放。如需开通，请联系管理员刘洋。'), pad='0px'), 8),
-    col(label('加载失败') + card(load_error('报表加载失败', 'SP-API 接口超时。已显示的数据截止 09-11 09:30。'), pad='0px'), 8),
+    col(label('加载失败') + card(load_error('报表加载失败', '积加接口超时。已显示的数据截止 09-11 09:30。'), pad='0px'), 8),
     col(label('骨架屏（首屏加载 > 300ms 时显示）') + card(skel_rows(4, True), pad='0px') + row(spinner() + muted('局部加载用行内转圈，不遮挡整页'), 8) + progress(62) , 8),
 ]), 4, 20)
 
@@ -116,7 +116,7 @@ copy_rules = table([('场景', 'left'), ('写法', 'left'), ('示例', 'left')],
     ['状态', '名词短语，与状态机名称完全一致', '待审草稿、待审批、等内部'],
     ['时间', '当天只写时分；其他写 月-日 时:分；跨年写年', '10:20 · 09-10 16:00 · 2025-12-30'],
     ['时长', '小时与分钟，SLA 精确到分钟', '5h 40m · 剩 2 个工作日'],
-    ['金额', '币种符号 + 两位小数；欧元订单同时显示折算', '$14.70 · €44.90（≈ $49.39）'],
+    ['金额', '币种符号 + 两位小数；比索、加元订单同时显示折算', '$14.70 · MX$889.00（≈ $49.39）'],
     ['单号', '固定前缀：T 工单、S 售后单、AP 审批单', 'T-20260910-0192 · S-20260911-0018 · AP-20260911-001'],
     ['错误', '发生了什么 + 怎么处理，不道歉、不含糊', '发送失败：Gmail 接口超时。草稿已保留，1 分钟后自动重试。'],
     ['空状态', '说明为什么空 + 下一步', '没有待你处理的工单。新来信会自动出现在这里。'],
@@ -206,7 +206,7 @@ dev_map = grid(col(label('令牌对照') + tok_table, 8) + col(label('Tailwind v
     col(label('组件对照') + cmp_table, 8) + col(label('密度（第一期两档都上线；顶栏「密度」按钮切换，按用户保存；只改字号与间距，不改布局；单位 px）') + dens, 8)
 
 body = col(''.join([
-    sec('1 色彩', '中性色表达层级；靛蓝只用于主操作与选中；靛蓝→青色渐变只用于 AI 与品牌；绿、黄、红、紫只表达状态，不做装饰。', colors),
+    sec('1 色彩', '中性色表达层级；靛蓝只用于主操作与选中；靛蓝→青色渐变只用于 AI 标识、品牌标与内部成员头像；绿、黄、红、紫只表达状态，不做装饰。', colors),
     sec('2 字体与字号', '8 级字号，正文 13px。', type_scale),
     sec('3 间距、圆角、阴影、控件高度', '所有尺寸取自下列刻度。', spacing),
     sec('4 按钮', '每种按钮都有默认、禁用、处理中三态。', buttons),
@@ -222,7 +222,8 @@ body = col(''.join([
 save('DesignSystem.dc.html', board('设计规范', '视觉 v3：顶栏分段导航 + 浅灰底浮动面板 + 靛蓝主色，AI 用靛蓝→青色渐变标识（参考 forcome-support-console.html）。本板定义色彩、字体、间距、组件、状态与研发映射；所有高保真页面只使用这里的组件，开发用 shadcn/ui + Tailwind CSS v4。', body, 1920, 2400))
 
 # ---------------------------------------------------------------- 全局状态
-from data import NOW_LABEL
+from data import NOW_LABEL, TICKETS
+_g7_t = next(t for t in TICKETS if t['no'] == 'T-20260902-0071')  # G7 并发示例：陈晨负责的工单
 page_skel = app('liting', '收件箱', ['收件箱', '待处理'], '<div style="flex: 1; display: flex; gap: 12px; padding: 10px 14px 12px 14px; min-height: 0px;"><div style="width: 308px; background: #ffffff; border: 1px solid %s; border-radius: 16px; overflow: hidden;">%s</div><div style="flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; background: #ffffff; border-radius: 16px;">%s%s%s%s</div><div style="width: 332px; background: #ffffff; border: 1px solid %s; border-radius: 16px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">%s%s%s%s</div></div>' % (
     T['line'], skel_rows(8), skel('50%', 16), skel('100%', 90, 8), skel('100%', 200, 8), skel('40%', 32, 6), T['line'], skel('40%', 10), skel('80%', 10), skel('100%', 120, 8), skel('100%', 80, 8)), w=1440, h=900)
 page_403 = app('liting', '', ['设置'], '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(no_permission('没有访问权限', '「设置」只对客服主管和管理员开放。你当前的角色是坐席。如需开通，请联系管理员刘洋。', row(btn('返回收件箱', 'primary', 'md', 'chev_l') + btn('申请权限', 'secondary'), 8)), pad='8px 24px'))
@@ -237,7 +238,7 @@ def scaled(inner, w=1440, h=900, s=0.5):
 
 toasts_frame = mini(col(toast('success', '已提交审批', '周敏会在 4 小时内处理，结果会通知你。') + toast('error', '保存失败：网络不可用', '你的修改已保存在本机，恢复后自动同步。', link('立即重试')) + toast('info', '有 3 封新来信', '已按 SLA 剩余时间插入收件箱。', link('查看')), 10, 'align-items: flex-end;'), 700, 330, pad='20px')
 confirm_frame = mini('<div style="flex: 1; display: flex; align-items: center; justify-content: center; background: rgba(16,24,40,0.45);">%s</div>' % dialog('关闭这张工单？', muted('关闭后 SLA 停止计时；同一订单 30 天内客户再来信会自动重新打开。', 13) + field('关闭原因', select_box('问题已解决'), True), btn('取消', 'secondary') + btn('关闭工单', 'primary'), 440), 700, 330)
-conflict_frame = mini(col(banner('info', '陈晨正在处理这张工单', '09-11 10:12 开始编辑回复。你可以查看会话和上下文，回复框只读。', row(btn('申请接手', 'secondary', 'sm') + btn('刷新', 'ghost', 'sm', 'refresh'), 6)) + banner('warning', '这张工单在你编辑期间收到新来信', '09-11 10:18 Jonas Weber 又发来 1 封。你的草稿已保留，请阅读新消息后再发送。', btn('查看新消息', 'secondary', 'sm')) + banner('danger', '你没有这个店铺的权限', '工单属于店铺 forcome.eu，你的数据范围是 Forcome Direct、forcome.com。', btn('联系主管', 'secondary', 'sm')), 10), 700, 330, pad='20px')
+conflict_frame = mini(col(banner('info', '陈晨正在处理这张工单', '09-11 10:12 开始编辑回复。你可以查看会话和上下文，回复框只读。', row(btn('申请接手', 'secondary', 'sm') + btn('刷新', 'ghost', 'sm', 'refresh'), 6)) + banner('warning', '这张工单在你编辑期间收到新来信', '09-11 10:18 %s 又发来 1 封。你的草稿已保留，请阅读新消息后再发送。' % _g7_t['customer'], btn('查看新消息', 'secondary', 'sm')) + banner('danger', '你没有这个店铺的权限', '工单属于店铺 forcome.mx，不在你的数据范围内（示例：数据范围仅授权 Forcome Direct、forcome.com 的受限成员）。',btn('联系主管', 'secondary', 'sm')), 10), 700, 330, pad='20px')
 unsaved_frame = mini('<div style="flex: 1; display: flex; align-items: center; justify-content: center; background: rgba(16,24,40,0.45);">%s</div>' % dialog('离开前保存修改？', muted('回复草稿有未发送的修改。离开后草稿会保留 7 天，下次打开这张工单时恢复。', 13), btn('继续编辑', 'secondary') + btn('保留草稿并离开', 'primary'), 440, 'warning'), 700, 330)
 
 # G9 密度切换
@@ -259,10 +260,10 @@ from data import AFTERSALES, total, money
 dens_frame = '<div style="width: 1500px; box-sizing: border-box; padding: 20px; background: %s; display: flex; gap: 24px; align-items: flex-start;">%s%s</div>' % (T['canvas'], dens_col(False), dens_col(True))
 
 gs_body = col(
-    grid(variant('G1 整页加载', '首屏数据超过 300ms 未返回时显示骨架屏，保留外壳与导航；超过 10 秒转为 G4 加载失败。', scaled(page_skel)) +
+    grid(variant('G1 整页加载', '首屏数据超过 300ms 未返回时显示骨架屏，保留外壳与导航；超过 10 秒转为加载失败（第 9 节）。', scaled(page_skel)) +
          variant('G2 无权限（403）', '导航里不显示无权限入口；从链接直接进入时显示本页。按钮回到该角色的默认首页。', scaled(page_403)), 2, 32) +
     grid(variant('G3 找不到（404）', '单号不存在或已按保留策略清除。提供按订单号搜索的出口。', scaled(page_404)) +
-         variant('G4 网络断开 + 集成中断', '浏览器断网：整页提示，未发送的草稿保存在本机。Gmail、SP-API、Shopify 或良仓接口中断：全站顶部红色横幅，仅管理员可关闭。', scaled(page_offline)), 2, 32) +
+         variant('G4 网络断开 + 集成中断', '浏览器断网：整页提示，未发送的草稿保存在本机。Gmail、积加、SP-API 或 Shopify 中断：全站顶部红色横幅，仅管理员可关闭。', scaled(page_offline)), 2, 32) +
     grid(variant('G5 浮层提示', '右上角堆叠，最多 3 条。成功与信息 3 秒消失；失败与警示不自动消失，必须给出重试或下一步。', toasts_frame, 700) +
          variant('G6 二次确认', '关闭工单、驳回、终止流程、执行退款前确认；带原因的操作原因必填。', confirm_frame, 700), 2, 32) +
     grid(variant('G7 并发与数据范围', '同一工单只允许一人编辑回复；编辑期间来新信则草稿失效提醒；访问无权店铺的数据显示范围提示。', conflict_frame, 700) +

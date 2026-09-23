@@ -61,10 +61,15 @@ def sec_head(n, title, required=False, right=''):
     return between(row(num_badge(n) + '<div style="font-size: 14px; font-weight: 700; color: %s;">%s%s</div>' % (T['ink'], title, req), 8), right)
 
 
-def ratio_txt(a, show_state=True):
-    """承担比例 FSH / 工厂；建议比例带「建议」弱标记。"""
-    f, g = a['ratio']
-    s = '%d / %d' % (f, g)
+RATIO_PARTS = RATIO_LABELS
+
+
+def ratio_txt(a, show_state=True, words=False):
+    """承担比例 FSH / 工厂。
+    紧凑表格单元格（表头已写「FSH / 工厂 %」）：三组相同时写一个值，不同时写「按费用项」（prd_c P13）。
+    words=True 用于详情与说明：三组相同写「三组均 FSH x / 工厂 y」，不同时逐组列出（data.ratio_words）。"""
+    u = ratio_uniform(a['ratios'])
+    s = ratio_words(a['ratios']) if words else (('%d / %d' % u) if u else '按费用项')
     if show_state and a['ratio_state'] == '建议':
         return '<span style="white-space: nowrap;">%s <span style="font-size: 11px; color: %s;">建议</span></span>' % (s, T['ink4'])
     return '<span style="white-space: nowrap;">%s</span>' % s

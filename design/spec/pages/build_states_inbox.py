@@ -33,7 +33,7 @@ def i1():
     right = '<div style="width: 332px; flex-shrink: 0; background: #ffffff; border: 1px solid %s; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px;">%s</div>' % (
         T['line'], ''.join(col(skel('30%', 10) + skel('100%', 12) + skel('80%', 12) + skel('90%', 12), 8) + divider() for _ in range(3)))
     page = app('liting', '收件箱', ['收件箱', '待处理'], three_col(q, mid, right))
-    return variant('I1 收件箱加载中', '保留外壳、导航与队列标题，三栏用骨架占位；草稿区显示行内转圈。超过 10 秒转为全局 G4 加载失败。',
+    return variant('I1 收件箱加载中', '保留外壳、导航与队列标题，三栏用骨架占位；草稿区显示行内转圈。超过 10 秒转为加载失败（设计规范第 9 节：原因 + 重试）。',
                    build_inbox_scaled(page), VW, trigger='首屏数据超过 300ms 未返回。')
 
 
@@ -70,10 +70,10 @@ def i3():
 # ---------------------------------------------------------------- I4 AI 未处理
 def i4():
     t = TK['T-20260910-0192']
-    row_html = queue_row(t, True, sla(t['sla_left'], t['sla_level']))
-    row_html = row_html.replace(state('待审草稿'), chip('AI 未处理', 'warning', 11, 'alert'))
-    left = '<div style="width: 320px; flex-shrink: 0; background: #ffffff; border-right: 1px solid %s;">%s%s</div>' % (T['line'], row_html, queue_row(TK['T-20260910-0195']))
-    bn = banner('warning', 'AI 暂不可用，请人工回复', '模型服务 10:05 起不可用。风险拦截已按关键词规则完成，未命中；本来信未生成草稿。恢复后可点「让 AI 起草」。')
+    row_html = queue_row(t, True, sla('23h 58m', 'normal'))
+    row_html = row_html.replace(state('待审草稿'), state('转人工') + chip('AI 未处理', 'warning', 10.5, 'alert'))
+    left = '<div style="width: 308px; flex-shrink: 0; background: #ffffff; border-right: 1px solid %s;">%s%s</div>' % (T['line'], row_html, queue_row(TK['T-20260910-0195']))
+    bn = banner('warning', 'AI 暂不可用，请人工回复', '09-10 16:00 来信时模型服务超时（60 秒未返回）。风险拦截已按关键词规则完成，未命中；本来信未生成草稿，工单记为转人工。恢复后可点「让 AI 起草」。')
     reply = card(row(nowrap('回复语言', 12, T['ink3']) + select_box('English', width='104px', h=28) + tg(False, '用中文写') + divider(True, 16) +
                      btn('插入图片', 'secondary', 'sm', 'image', disabled=True) + btn('插入链接', 'secondary', 'sm', 'link', disabled=True), 8) +
                  textarea_box("Hi Sarah,<br><br>I'm sorry the tracking has been stuck since Sep 5. I'm checking with UPS now", st='focus', h=110, counter='96 / 2000') +
@@ -81,8 +81,8 @@ def i4():
                  pad='12px 16px', gap=10)
     right = '<div style="flex: 1; min-width: 0px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">%s%s</div>' % (bn, reply)
     frame = mini('<div style="flex: 1; display: flex; min-height: 0px;">%s%s</div>' % (left, right), VW, 360)
-    return variant('I4 AI 未处理', '队列行状态处显示「AI 未处理」；中栏黄色横幅说明原因，回复框直接可写，「让 AI 起草」置灰直到恢复。人工回复同样要过回复检查。',
-                   frame, VW, trigger='模型不可用或生成失败（E-03）。')
+    return variant('I4 AI 未处理', '工单状态记为「转人工」并带「AI 未处理」标记，归入转人工分段（6.1）；中栏黄色横幅说明原因，回复框直接可写，「让 AI 起草」置灰直到恢复。人工回复同样要过回复检查。',
+                   frame, VW, trigger='模型不可用或生成失败（E-03）。本例为 Sarah 来信（09-10 16:00）时模型超时、2 分钟后的画面。')
 
 
 # ---------------------------------------------------------------- I5 发送失败
@@ -133,8 +133,8 @@ def i8():
         return '<div style="display: flex; gap: 12px; align-items: flex-start; padding: 8px 0px; border-bottom: 1px solid %s;"><div style="width: 64px; flex-shrink: 0; font-size: 12px; color: %s; padding-top: 1px;">%s</div><div style="flex: 1; min-width: 0px; font-size: 13px; color: %s; line-height: 1.55;">%s</div></div>' % (
             T['line2'], T['ink3'], k, T['ink'], v)
     body = col(line('动作', '良仓创建售后出库单：良仓 US · V2 黑色 ×1 · UPS Next Day Air') +
-               line('报备', '快递费用 <b>$12.40</b>') +
-               line('绑定回复', 'English · A 先补发，发货单创建成功后自动发出') +
+               line('报备', '快递费用 <b>%s</b>' % money(ORDERS['113-4567890-1234567']['resend_freight'])) +
+               line('绑定回复', 'English · A 先补发，出库单创建成功后自动发出') +
                line('售后单', '同时创建：寄配件 · 良仓有货 · 物流问题（FSH 100%，向 UPS 索赔）') +
                line('审批人', '客服主管 周敏 · 时限 4 小时（14:20 前）'), 0) + \
         muted('SLA 剩 5h 40m，长于审批时限，不需要先发进展回复。', 12)
@@ -159,10 +159,10 @@ def i9():
 
 # ---------------------------------------------------------------- I10 搜索无结果
 def i10():
-    filt = between(row(filter_chip('状态', '转人工', True) + filter_chip('渠道') + filter_chip('店铺', 'forcome.eu', True) + filter_chip('意图') + filter_chip('情绪') + btn('清除筛选', 'link', 'sm'), 6),
+    filt = between(row(filter_chip('状态', '转人工', True) + filter_chip('渠道') + filter_chip('店铺', 'forcome.mx', True) + filter_chip('意图') + filter_chip('情绪') + btn('清除筛选', 'link', 'sm'), 6),
                    row(nowrap('排序', 12, T['ink3']) + select_box('SLA 剩余 · 升序', width='148px', h=28), 6))
     cols = [('', 'left'), ('工单号', 'left'), ('主题', 'left'), ('渠道与店铺', 'left'), ('客户', 'left'), ('状态', 'left'), ('SLA 剩余', 'left')]
-    em = empty('search', '没有符合条件的工单', '当前筛选：状态 转人工 · 店铺 forcome.eu。换个条件，或清除筛选后查看全部 13 张。', btn('清除筛选', 'secondary', 'md', 'x'))
+    em = empty('search', '没有符合条件的工单', '当前筛选：状态 转人工 · 店铺 forcome.mx。换个条件，或清除筛选后查看全部 13 张。', btn('清除筛选', 'secondary', 'md', 'x'))
     tbl = table_empty(cols, '16px 116px minmax(0, 1fr) 170px 100px 72px 90px', em)
     frame = mini(col(filt + tbl, 10), VW, 380, pad='20px')
     return variant('I10 搜索无结果', '保留筛选条与表头，表体换成空状态，写明当前条件并给出清除筛选。筛选条件保留在地址栏。',
@@ -172,14 +172,15 @@ def i10():
 # ---------------------------------------------------------------- I11 合并工单
 def i11():
     cur = '<div style="background: %s; border: 1px solid %s; border-radius: 6px; padding: 8px 12px; display: flex; flex-direction: column; gap: 3px;">%s%s</div>' % (
-        T['subtle'], T['line'], row(muted('当前工单', 12) + nowrap('T-20260911-0038', 12, T['ink'], 700) + state('分诊中'), 8), text('Wo bleibt meine Erstattung? · 09-11 10:05 · 无订单号', 13, T['ink2']))
-    opts = radio_card('T-20260902-0071 · Gerät funktioniert nach 2 Wochen nicht mehr', '转人工 · 陈晨 · 订单 302-8811234-9901122 · 最近来信 09-10 11:15', True, None)
+        T['subtle'], T['line'], row(muted('当前工单', 12) + nowrap('T-20260911-0038', 12, T['ink'], 700) + state('分诊中'), 8), text('¿Dónde está mi reembolso? · 10:05 · 无订单号', 13, T['ink2']))
+    main_t = next(t for t in TICKETS if t['no'] == 'T-20260902-0071')
+    opts = radio_card('%s · %s' % (main_t['no'], main_t['subject']),'%s · %s · 订单 %s · 最近来信 %s' % (main_t['status'], main_t['owner'], main_t['order'], main_t['last_in']), True, None)
     body = cur + label('合并到') + opts + \
-        muted('只列出同店铺（Forcome Direct）、同客户（Jonas Weber）的未关闭工单。合并后当前工单变为「已合并」只读，消息与标签并入主工单。', 12)
+        muted('只列出同店铺（Forcome Direct）、同客户（Mateo Rivas）的未关闭工单。合并后当前工单变为「已合并」只读，消息与标签并入主工单。', 12)
     dlg = dialog('合并工单', body, btn('取消', 'secondary') + btn('合并到 T-20260902-0071', 'primary', 'md', 'merge'), 520)
     bg = build_inbox_scaled(build_inbox.p03())
     return variant('I11 合并工单', '选择主工单（单选）；候选只来自同店铺、同客户的未关闭工单；不同店铺的工单不出现。成功后跳转主工单并浮层提示。',
-                   scrim_frame(bg, dlg), VW, trigger='在收件箱或工单列表点「合并」。')
+                   scrim_frame(bg, dlg), VW, trigger='在工单列表对新来信 T-20260911-0038 点「合并」（背景为 P03 画面，仅示意）。')
 
 
 # ---------------------------------------------------------------- I12 合并客户身份
@@ -220,18 +221,18 @@ def i14():
     cols = [('来信', 'left'), ('识别依据', 'left'), ('到达', 'left'), ('SLA', 'left'), ('指定店铺', 'left')]
     rows = [
         [col(text('Tom Harris', 12.5, T['ink'], 600) + ellipsis('Where is my order? Tracking says delivered.', 12, T['ink3']), 1),
-         col(nowrap('亚马逊买家消息 · Gmail', 12, T['ink2']) + nowrap('收件地址 amz-uk@forcome.com 未登记', 11.5, T['warn'], 600), 1),
-         nowrap('09-11 10:02', 12, T['ink2']), col(sla('23h 42m', 'normal') + nowrap('亚马逊 24 小时', 11, T['ink4']), 2),
+         col(nowrap('亚马逊买家消息 · Gmail', 12, T['ink2']) + nowrap('收件地址 amz-ca2@forcome.com 未登记', 11.5, T['warn'], 600), 1),
+         nowrap('10:02', 12, T['ink2']), col(sla('23h 42m', 'normal') + nowrap('亚马逊 24 小时', 11, T['ink4']), 2),
          select_box(None, '选择店铺', width='150px', h=28)],
-        [col(text('Hanna Vogel', 12.5, T['ink'], 600) + ellipsis('Der Filter passt nicht in mein Gerät.', 12, T['ink3']), 1),
-         col(nowrap('邮件 · Gmail', 12, T['ink2']) + nowrap('收件地址 info@forcome.eu 未登记', 11.5, T['warn'], 600), 1),
-         nowrap('09-11 09:47', 12, T['ink2']), col(sla('23h 27m', 'normal') + nowrap('内部目标', 11, T['ink4']), 2),
-         select_box('forcome.eu', st='focus', width='150px', h=28)],
+        [col(text('Lucía Herrera', 12.5, T['ink'], 600) + ellipsis('El filtro no encaja en mi aspiradora.', 12, T['ink3']), 1),
+         col(nowrap('邮件 · Gmail', 12, T['ink2']) + nowrap('收件地址 info@forcome.mx 未登记', 11.5, T['warn'], 600), 1),
+         nowrap('09:47', 12, T['ink2']), col(sla('23h 27m', 'normal') + nowrap('内部目标', 11, T['ink4']), 2),
+         select_box('forcome.mx', st='focus', width='150px', h=28)],
     ]
     tbl = mtable(cols, rows, 'minmax(0, 1.3fr) minmax(0, 1.4fr) 84px 104px 160px', py=10)
     head = between(row(text('未归属店铺', 15, T['ink'], 700) + chip('2', 'warning', 11), 8), row(nowrap('仅客服主管可见', 12, T['ink3']) + btn('去登记店铺', 'secondary', 'sm', 'store'), 8))
     note = banner('warning', '2 封来信识别不出店铺，未生成草稿', 'SLA 按原到达时间照常计时。指定店铺后进入该店铺队列并开始五步处理；新店铺请管理员在「设置 · 渠道与店铺」登记（E-13）。')
-    tail = row(icon('check_c', 14, T['ok_solid'], 2) + nowrap('指定后浮层「已归入 forcome.eu，正在生成草稿」，本行移出列表。', 12, T['ink3']), 6)
+    tail = row(icon('check_c', 14, T['ok_solid'], 2) + nowrap('指定后浮层「已归入 forcome.mx，正在生成草稿」，本行移出列表。', 12, T['ink3']), 6)
     frame = mini(col(head + note + tbl + tail, 12), VW, 400, pad='20px')
     return variant('I14 未归属店铺队列', '客服主管周敏的视角（P04 筛选「未归属店铺」或收件箱提醒进入）。每行显示识别依据（收件地址、卖家 ID）、到达时间、仍在计时的 SLA，行尾「指定店铺」下拉；不生成草稿、不能回复，直到指定店铺。',
                    frame, VW, trigger='收件地址或卖家 ID 未登记（E-13、AC-TK-09、AC-TK-11）。')

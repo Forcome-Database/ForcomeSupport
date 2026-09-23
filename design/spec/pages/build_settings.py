@@ -28,38 +28,38 @@ def ch_card(ic, name, st, lines, foot='', tone='accent', card_tone=None):
 def amazon_card(err=False):
     if err:
         return ch_card('store', '亚马逊 SP-API', state('连接异常'),
-                       ['09-11 10:05 起连续 3 次调用失败：授权令牌已过期', '订单查询暂停，恢复后自动补拉；买家消息不受影响（走 Gmail）'],
+                       ['10:05 起连续 3 次调用失败：授权令牌已过期', '退款与取消暂停，恢复后自动补执行；订单查询走积加、买家消息走 Gmail，不受影响'],
                        row(btn('重新授权', 'primary', 'sm', 'refresh') + btn('查看错误日志', 'ghost', 'sm'), 6), 'bad', 'danger')
-    return ch_card('store', '亚马逊 SP-API', state('已连接'), ['2 个店铺 · 订单、发货与退货信息', '退款、取消（审批后执行）'], '', 'ok')
+    return ch_card('store', '亚马逊 SP-API', state('已连接'), ['2 个店铺 · 退款、取消（审批后执行）', '订单、发货与退货信息由积加同步'], '', 'ok')
 
 
 def shopify_card():
-    return ch_card('store', 'Shopify Admin API', state('已连接'), ['2 个店铺 · 订单查询、订单备注', '退款、改地址、取消（审批后执行）'], '', 'ok')
+    return ch_card('store', 'Shopify Admin API', state('已连接'), ['2 个店铺 · 退款、改地址、取消、订单备注', '订单信息由积加同步'], '', 'ok')
 
 
-def liangcang_card():
-    return ch_card('box', '良仓开放接口', state('已连接'), ['库存查询、创建售后出库单', '回传快递单号与实际运费（范围待确认 Q-21）'], '', 'ok')
+def jijia_card():
+    return ch_card('link', '积加 ERP', state('已连接'), ['订单与物流轨迹（聚合亚马逊、Shopify）', '库存、售后出库单、单号与运费（积加对接良仓）'], '', 'ok')
 
 
 def gmail_card(err=False):
     if err:
         return ch_card('message', 'Gmail', state('连接异常'),
-                       ['support@forcome.eu 授权已失效（10:05 起连续 3 次失败）', '该邮箱来信暂存，回复进入待发队列'],
+                       ['support@forcome.mx 授权已失效（10:05 起连续 3 次失败）', '该邮箱来信暂存，回复进入待发队列'],
                        row(btn('重新授权', 'primary', 'sm', 'refresh') + btn('查看错误日志', 'ghost', 'sm'), 6), 'bad', 'danger')
     return ch_card('message', 'Gmail', state('已连接'), ['4 个邮箱：2 个亚马逊买家消息、2 个 Shopify 客服', '最近推送 10:18'], '', 'ok')
 
 
 def p18_channels():
     im = ch_card('users', '钉钉', state('已连接'), ['通讯录：成员与部门每小时同步 · 最近 10:00', '工作通知推送；扫码登录与钉钉内免登'], '', 'ok')
-    jj = dashed_card(between(row(icon('link', 15, T['ink3']) + nowrap('积加 ERP', 13, T['ink2'], 650), 6), chip('预留 · 暂不接入', 'neutral', 10)) +
-                     muted('统一动作接口已预留积加适配器；需要时接入，流程与页面不变。', 12), '11px 13px', 6)
+    lc = dashed_card(between(row(icon('box', 15, T['ink3']) + nowrap('良仓海外仓', 13, T['ink2'], 650), 6), chip('经积加对接', 'neutral', 10)) +
+                     muted('库存、售后出库单、单号与实际运费都经积加读写，本系统不直连良仓接口。', 12), '11px 13px', 6)
     return '<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: stretch;">%s%s%s%s%s%s</div>' % (
-        amazon_card(), shopify_card(), gmail_card(), liangcang_card(), im, jj)
+        amazon_card(), shopify_card(), gmail_card(), jijia_card(), im, lc)
 
 
 def p18_stores():
     cols = [('店铺', 'left'), ('站点', 'left'), ('进线邮箱', 'left'), ('平台标识', 'left'), ('覆盖项', 'left'), ('状态', 'left')]
-    over = {'amz-direct': '模板 1', 'amz-auto': '签名', 'shop-com': '政策 1', 'shop-eu': '签名'}
+    over = {'amz-direct': '模板 1', 'amz-auto': '签名', 'shop-com': '政策 1', 'shop-mx': '签名'}
     rows = []
     for s_ in STORES:
         amz = s_['platform'] == '亚马逊'
@@ -70,7 +70,7 @@ def p18_stores():
                      nowrap(' · '.join(s_['sites']), 12, T['ink2']), e, sid, nowrap(over[s_['id']], 12, T['ink2']), state('已连接')])
     t = table(cols, rows, '112px 64px minmax(0, 1fr) 150px 52px 64px', dense=True)
     head = between(row(label('店铺') + nowrap('4 个', 12, T['ink3']), 8), btn('新增店铺', 'secondary', 'sm', 'plus'))
-    rule = card(row(icon('info', 16, T['info']) + text('进线识别：亚马逊按买家消息的收件邮箱（每店一个）与发件域名（amazon.com / .de / .co.uk）识别店铺和站点；Shopify 按客服邮箱。识别不出的来信进入「未归属店铺」队列，由客服主管指定店铺，不生成草稿。', 12, T['ink2']), 8, 'flex-start') +
+    rule = card(row(icon('info', 16, T['info']) + text('进线识别：亚马逊按买家消息的收件邮箱（每店一个）与发件域名（amazon.com / .ca / .com.mx）识别店铺和站点；Shopify 按客服邮箱。识别不出的来信进入「未归属店铺」队列，由客服主管指定店铺，不生成草稿。', 12, T['ink2']), 8, 'flex-start') +
                 row(icon('shield', 16, T['ink3']) + text('配置按「全局 → 平台 → 店铺」取值。店铺可覆盖签名、政策口径、模板、素材与链接白名单、SLA 内部目标；意图、风险信号、动作分级只能全局配置。', 12, T['ink2']), 8, 'flex-start'),
                 pad='11px 13px', gap=8)
     return col(head + t + rule, 10)
@@ -78,20 +78,20 @@ def p18_stores():
 
 def p18_mapping():
     A, W, N, M = 'accent', 'warning', 'neutral', 'muted'
-    acts = [('查订单', '只读', ('SP-API', A), ('Admin API', A)), ('查物流', '只读', ('承运商查询', A), ('承运商查询', A)),
-            ('查库存', '只读', ('良仓接口', A), ('良仓接口', A)), ('回复客户', '按发送方式', ('Gmail 中转', A), ('Gmail', A)),
-            ('创建出库单', '高风险', ('良仓接口', A), ('良仓接口', A)), ('订单备注', '低风险', ('系统内备注', N), ('Admin API', A)),
+    acts = [('查订单', '只读', ('积加', A), ('积加', A)), ('查物流', '只读', ('积加', A), ('积加', A)),
+            ('查库存', '只读', ('积加（良仓）', A), ('积加（良仓）', A)), ('回复客户', '按发送方式', ('Gmail 中转', A), ('Gmail', A)),
+            ('创建售后出库单', '高风险', ('积加（良仓）', A), ('积加（良仓）', A)), ('订单备注', '低风险', ('系统内备注', N), ('Admin API', A)),
             ('退款', '高风险', ('SP-API', A), ('Admin API', A)), ('改地址', '高风险', ('平台不支持', M), ('Admin API', A)),
             ('取消', '高风险', ('SP-API', A), ('Admin API', A))]
     rows = [[nowrap(n, 12.5, T['ink'], 600), nowrap(lv, 11.5, T['ink3']), chip(a[0], a[1], 10.5), chip(b[0], b[1], 10.5)] for n, lv, a, b in acts]
-    t = table([('统一动作', 'left'), ('分级', 'left'), ('亚马逊店铺', 'left'), ('Shopify 店铺', 'left')], rows, '64px 58px minmax(0, 1fr) minmax(0, 1fr)', dense=True)
-    head = between(row(label('动作映射') + nowrap('9 个统一动作', 12, T['ink3']), 8), nowrap('积加适配器：预留', 11.5, T['ink4']))
+    t = table([('统一动作', 'left'), ('分级', 'left'), ('亚马逊店铺', 'left'), ('Shopify 店铺', 'left')], rows, '96px 58px minmax(0, 1fr) minmax(0, 1fr)', dense=True)
+    head = between(row(label('动作映射') + nowrap('9 个统一动作', 12, T['ink3']), 8), nowrap('良仓经积加对接', 11.5, T['ink4']))
     return col(head + t, 10)
 
 
 def p18():
     inner = p18_channels() + '<div style="display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start;">%s%s</div>' % (p18_stores(), p18_mapping())
-    return settings_page('liuyang', '渠道与店铺', '渠道与店铺', '亚马逊、Shopify 走官方接口，客户来信统一经 Gmail 收发；积加预留、暂不接入。店铺决定订单匹配、回复身份、签名与数据权限。', save_bar(),
+    return settings_page('liuyang', '渠道与店铺', '渠道与店铺', '订单、物流、库存与良仓出库单经积加；退款、改地址、取消走平台官方接口；客户来信统一经 Gmail 收发。店铺决定订单匹配、回复身份、签名与数据权限。', save_bar(),
                          label('渠道连接') + inner)
 
 
@@ -103,8 +103,8 @@ INTENTS = [
     ('产品咨询', '待审草稿', '80%', '91%', '57', (True, '满足，可放开'), 'off'),
     ('购买咨询', '待审草稿', '80%', '84%', '38', (False, '样本 38 < 50'), 'disabled'),
     ('未收到与异常', '待审草稿', '80%', '78%', '61', (False, '采纳率 78%，需高于 90%'), 'disabled'),
-    ('修改订单', '提交审批', '—', '88%', '22', (False, '含高风险动作'), 'disabled'),
-    ('到货问题', '提交审批', '—', '83%', '31', (False, '含高风险动作'), 'disabled'),
+    ('修改订单', '待审草稿', '—', '88%', '22', (False, '含高风险动作'), 'disabled'),
+    ('到货问题', '待审草稿', '—', '83%', '31', (False, '含高风险动作'), 'disabled'),
     ('产品故障与使用问题', '待审草稿', '80%', '72%', '96', (False, '采纳率 72%，需高于 90%'), 'disabled'),
     ('退货与退款', '待审草稿', '80%', '81%', '45', (False, '采纳率 81%、样本 45 不足'), 'disabled'),
     ('保修与配件购买', '待审草稿', '80%', '86%', '18', (False, '样本 18 < 50'), 'disabled'),
@@ -140,7 +140,7 @@ def p19_content_cap():
     rows = [[channel('邮件', None, 'Shopify 店铺邮箱、直邮'), nowrap('只能来自素材库', 12.5, T['ink2']), nowrap('只能是白名单域名', 12.5, T['ink2']), ellipsis('插入按钮可用；非白名单链接报错', 12.5, T['ink2'])],
             [channel('亚马逊', None, '站内信'), nowrap('不支持', 12.5, T['ink3']), nowrap('不支持', 12.5, T['ink3']), ellipsis('按纯文字生成，插入按钮置灰并说明原因', 12.5, T['ink2'])]]
     t = table(cols, rows, '210px 110px 120px minmax(0, 1fr)', dense=True)
-    wl = row(nowrap('链接白名单 5', 12, T['ink2'], 700) + ''.join(chip(d, 'outline', 11) for d in ['forcome.com', 'forcome.eu', 'youtube.com', 'ups.com', 'yuntrack.com']) +
+    wl = row(nowrap('链接白名单 5', 12, T['ink2'], 700) + ''.join(chip(d, 'outline', 11) for d in ['forcome.com', 'forcome.mx', 'youtube.com', 'ups.com', 'yuntrack.com']) +
              link('添加域名', 12, 'plus'), 6)
     return col(between(label('渠道内容能力'), wl) + t, 10)
 
@@ -159,12 +159,21 @@ def p19_risk():
 
 def p19_as_rules():
     sub = lambda t: '<div style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: %s; margin-top: 4px;">%s</div>' % (T['ink3'], t)
-    resp = ''.join(between(cat(r), row(nowrap(v, 12.5, T['ink'], 600) + nowrap(n, 12, T['ink3']), 6)) for r, v, n in [
-        ('客户使用问题', '100 / 0', '不协商'), ('产品质量问题', '0 / 100', '需协商'),
-        ('物流问题', '100 / 0', '不协商 · FSH 向承运商或良仓索赔'), ('其他', '默认 50 / 50', '人工填写 · 需协商')])
-    rules = (kv('报备类型', '快递费用 · 额外赔偿') + kv('审批人', '客服主管') + kv('时限', '4 小时，剩 1 小时提醒') + kv('金额门槛', '无') +
-             kv('超额补充报备', '实际金额超出报备 10% 以上'))
-    return card(sub('责任类型与建议比例 FSH / 工厂') + resp + divider() + sub('报备规则') + rules,
+    # 四类责任 × 三组费用（prd_b 7.9 表，取 data.RATIO_RULE）
+    tpl = 'minmax(0, 1fr) 58px 58px 58px'
+    cell = lambda t, c=T['ink'], w=600, a='center': '<div style="font-size: 12px; font-weight: %d; color: %s; text-align: %s; white-space: nowrap; font-variant-numeric: tabular-nums;">%s</div>' % (w, c, a, t)
+    head = '<div style="display: grid; grid-template-columns: %s; gap: 6px; padding-bottom: 4px; border-bottom: 1px solid %s;">%s%s</div>' % (
+        tpl, T['line'], cell('责任类型', T['ink3'], 700, 'left'), ''.join(cell(lab, T['ink3'], 700) for lab, _ in RATIO_LABELS))
+    notes = {'客户使用问题': '含顾客购买、使用不当 · 不协商', '产品质量问题': '抱怨索赔 · 需协商',
+             '物流问题': '不协商 · 向承运商或良仓索赔', '其他': '需填写理由 · 默认值 · 需协商'}
+    resp = head
+    for r in ('客户使用问题', '产品质量问题', '物流问题', '其他'):
+        left = col(nowrap(r, 12.5, T['ink'], 600) + nowrap(notes[r], 11, T['ink3']), 1, 'line-height: 1.35;')
+        resp += '<div style="display: grid; grid-template-columns: %s; gap: 6px; align-items: center; padding: 3px 0px; border-bottom: 1px solid %s;"><div style="min-width: 0px;">%s</div>%s</div>' % (
+            tpl, T['line2'], left, ''.join(cell('%d / %d' % RATIO_RULE[r][k]) for _, k in RATIO_LABELS))
+    rules = grid(kv('报备类型', '快递费用 · 额外赔偿') + kv('审批人', '客服主管') + kv('时限', '4 小时，剩 1 小时提醒') + kv('金额门槛', '无') +
+                 '<div style="grid-column: span 2;">%s</div>' % kv('超额补充报备', '实际金额超出报备 10% 以上'), 2, 6, extra='column-gap: 16px;')
+    return card(sub('责任类型与建议比例 FSH / 工厂 · 按三组费用') + col(resp, 0) + divider() + sub('报备规则') + rules,
                 '售后规则', link('编辑', 12, 'edit'), pad='12px 14px', gap=8)
 
 
@@ -176,8 +185,7 @@ def p19():
 
 
 # ================================================================ P20 团队与权限
-MEMBERS = [('liting', 'liting@forcome.com', '10:02'), ('chenchen', 'chenchen@forcome.com', '09:15'), ('zhoumin', 'zhoumin@forcome.com', '10:18'),
-           ('wanglei', 'wanglei@forcome.com', '10:20'), ('zhaoqian', 'zhaoqian@forcome.com', '09-10 18:30'), ('liuyang', 'liuyang@forcome.com', '10:20')]
+MEMBERS = [(k, STAFF[k]['email'], STAFF[k]['last_login']) for k in ('liting', 'chenchen', 'zhoumin', 'wanglei', 'zhaoqian', 'liuyang')]
 
 
 def member_table(sel=None):
@@ -211,24 +219,24 @@ def factory_accounts():
 
 ROLES = ['坐席', '客服主管', '售后负责人', '知识库负责人', '管理员', '生产厂对接人']
 ROLE_HEAD = ['坐席', '客服<br>主管', '售后<br>负责人', '知识库<br>负责人', '管理员', '生产厂<br>对接人']
-MATRIX = [
-    ('查看工单、回复、标签、合并、转人工', ['●', '●', '●', '只读', '', '']),
+MATRIX = [  # prd_d 10.1 功能权限（能力文字与圆点照原文）
+    ('查看工单、回复、标签、合并、转人工、手工新建工单', ['●', '●', '●', '只读', '', '']),
     ('合并与拆分客户身份', ['●', '●', '●', '', '', '']),
     ('改派他人工单、强制接手', ['', '●', '', '', '', '']),
-    ('提交审批单；同时创建售后单（路径 B）', ['●', '●', '●', '', '', '']),
+    ('提交审批单；提交时同时创建售后单（路径 B）', ['●', '●', '●', '', '', '']),
     ('审批含报备的审批单', ['', '●', '', '', '', '']),
     ('审批只含动作的审批单', ['', '●', '●', '', '', '']),
     ('撤回审批单', ['○', '○', '○', '', '', '']),
-    ('执行人工操作清单', ['○', '○', '○', '', '', '']),
+    ('执行人工操作清单（兜底）', ['○', '○', '○', '', '', '']),
     ('查看售后单、登记台账', ['只读', '●', '●', '', '', '']),
     ('登记台账补登', ['', '', '●', '', '', '']),
-    ('确认责任与处理方式、终止售后单', ['', '●', '●', '', '', '']),
-    ('比例协商与重开、退回报价、结算批次', ['', '', '●', '', '', '']),
-    ('维护知识条目、素材库、审核沉淀', ['部分', '部分', '部分', '●', '', '']),
+    ('手工新建售后单、确认责任与处理方式、退回继续排查、终止售后单', ['', '●', '●', '', '', '']),
+    ('发起与录入比例协商、重开协商、退回生产厂报价、生成结算批次', ['', '', '●', '', '', '']),
+    ('维护知识条目、素材库、审核沉淀', ['提交<br>候选', '审核政策<br>规则', '维护<br>排查树', '●', '', '']),
     ('查看报表', ['', '●', '●', '●', '●', '']),
-    ('规则、风险信号、标签库、模板、SLA', ['', '●', '', '', '', '']),
-    ('渠道、店铺、成员、备用审批人、工厂账号', ['', '', '', '', '●', '']),
-    ('工厂工作台（本厂任务）', ['', '', '', '', '', '●']),
+    ('处理规则、发送方式、风险信号、售后规则、标签库、模板、SLA', ['', '●', '', '', '', '']),
+    ('渠道、店铺、动作映射、成员、角色、备用审批人、生产厂账号', ['', '', '', '', '●', '']),
+    ('工厂工作台：本厂任务的报价、回填、答复、结算确认、留言', ['', '', '', '', '', '●']),
 ]
 
 
@@ -238,7 +246,7 @@ def mark(v):
     if v == '○':
         return '<div style="width: 9px; height: 9px; box-sizing: border-box; border-radius: 999px; border: 1.5px solid %s; margin: 0px auto;"></div>' % T['accent']
     if v:
-        return '<div style="font-size: 11px; color: %s; text-align: center; white-space: nowrap;">%s</div>' % (T['ink3'], v)
+        return '<div style="font-size: 11px; color: %s; text-align: center; white-space: nowrap; line-height: 1.3;">%s</div>' % (T['ink3'], v)
     return ''
 
 
@@ -248,20 +256,20 @@ def matrix_half(items):
         tpl, T['line'], T['ink3'], ''.join('<div style="text-align: center;">%s</div>' % h for h in ROLE_HEAD))
     body = ''
     for cap, vals in items:
-        body += '<div style="display: grid; grid-template-columns: %s; gap: 6px; align-items: center; padding: 4px 0px; border-bottom: 1px solid %s;"><div style="font-size: 12px; color: %s; line-height: 1.35;">%s</div>%s</div>' % (
+        body += '<div style="display: grid; grid-template-columns: %s; gap: 6px; align-items: center; padding: 3px 0px; border-bottom: 1px solid %s;"><div style="font-size: 12px; color: %s; line-height: 1.35;">%s</div>%s</div>' % (
             tpl, T['line2'], T['ink2'], cap, ''.join('<div>%s</div>' % mark(v) for v in vals))
     return '<div style="display: flex; flex-direction: column; min-width: 0px;">%s%s</div>' % (head, body)
 
 
 def perm_matrix():
-    legend = row(row(mark('●') + nowrap('有权限', 11, T['ink3']), 4) + row(mark('○') + nowrap('只限自己发起或负责的', 11, T['ink3']), 4) + nowrap('空白：无权限', 11, T['ink3']) +
-                 nowrap('知识库「部分」：坐席提交沉淀候选；客服主管审核政策规则；售后负责人维护排查树', 11, T['ink3']), 14)
-    return card(grid(matrix_half(MATRIX[:9]) + matrix_half(MATRIX[9:]), 2, 28) + legend, '角色权限', nowrap('只读 · 按角色固定', 12, T['ink3']), pad='12px 16px', gap=10)
+    legend = row(row(mark('●') + nowrap('有权限', 11, T['ink3']), 4) + row(mark('○') + nowrap('只能看自己发起或负责的', 11, T['ink3']), 4) + nowrap('空白：无权限', 11, T['ink3']) +
+                 nowrap('系统发起的审批单由关联售后单的负责人撤回', 11, T['ink3']), 14)
+    return card(grid(matrix_half(MATRIX[:10]) + matrix_half(MATRIX[10:]), 2, 28), '角色权限', row(legend + divider(True, 12) + nowrap('只读 · 按角色固定', 12, T['ink3']), 12), pad='12px 16px', gap=10)
 
 
 def p20_body(sel=None):
     left = col(between(row(label('成员') + nowrap('6 人 · 来自钉钉通讯录，10:00 同步', 12, T['ink3']), 8), btn('从钉钉添加', 'primary', 'sm', 'plus')) + member_table(sel), 10)
-    right = col(between(row(label('生产厂账号') + nowrap('2 个生产厂', 12, T['ink3']), 8), btn('添加生产厂成员', 'secondary', 'sm', 'plus')) + factory_accounts(), 10)
+    right = col(between(row(label('生产厂账号') + nowrap('2 个生产厂', 12, T['ink3']), 8), btn('从钉钉添加生产厂成员', 'secondary', 'sm', 'plus')) + factory_accounts(), 10)
     top = '<div style="display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start;">%s%s</div>' % (left, right)
     return top + perm_matrix()
 

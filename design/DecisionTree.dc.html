@@ -36,7 +36,7 @@
         <div style="width: 22px; height: 22px; border-radius: 999px; background: #0f1320; color: #ffffff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center;">1</div>
         <div style="font-size: 14px; font-weight: 600;">接收与关联</div>
       </div>
-      <div style="font-size: 12px; color: #3b4356; line-height: 1.6;">来源识别：客户消息 / 通知与垃圾，工厂往来走工厂工作台不进来信流；按收件邮箱识别店铺（亚马逊另按发件域识别站点）<br>按订单号、亚马逊匿名邮箱、Shopify 邮箱经 SP-API / Admin API 关联订单<br>同一店铺同一订单有未关闭工单则追加，否则新建；无订单时按客户<br>直邮来信核验订单归属前不透露订单详情</div>
+      <div style="font-size: 12px; color: #3b4356; line-height: 1.6;">来源识别：客户消息 / 通知与垃圾，工厂往来走工厂工作台不进来信流；按收件邮箱识别店铺（亚马逊另按发件域识别站点）<br>按订单号、亚马逊匿名邮箱、Shopify 邮箱经积加关联订单<br>同一店铺同一订单有未关闭工单则追加，否则新建；无订单时按客户<br>直邮来信核验订单归属前不透露订单详情</div>
       <div style="margin-top: auto; font-size: 11px; color: #5a6376; background: #f7f8fc; border-radius: 6px; padding: 6px 8px;">关联不上且需要订单信息 → 草稿一次问全订单号与收件邮箱</div>
     </div>
     <div style="display: flex; align-items: center;"><svg width="16" height="16" viewBox="0 0 20 16" fill="none" stroke="#9099ab" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h14"></path><path d="M11 3l5 5-5 5"></path></svg></div>
@@ -63,8 +63,8 @@
         <div style="width: 22px; height: 22px; border-radius: 999px; background: #0f1320; color: #ffffff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center;">4</div>
         <div style="font-size: 14px; font-weight: 600;">回复检查</div>
       </div>
-      <div style="font-size: 12px; color: #3b4356; line-height: 1.6;">事实溯源：每个事实来自订单数据或知识来源<br>政策一致：不承诺政策以外的东西<br>渠道内容能力：亚马逊纯文字，无链接、图片、营销、站外联系方式；邮件可带素材库图片与白名单链接<br>语言匹配客户，德语用正式称呼<br>不泄露成本、生产厂、其他店铺订单、内部备注</div>
-      <div style="margin-top: auto; font-size: 11px; color: #5a6376; background: #f7f8fc; border-radius: 6px; padding: 6px 8px;">任一项不过 → 转人审并标明原因，不允许自动发送</div>
+      <div style="font-size: 12px; color: #3b4356; line-height: 1.6;">事实溯源：每个事实来自订单数据或知识来源<br>政策一致：不承诺政策以外的东西<br>渠道内容能力：亚马逊纯文字，无链接、图片、营销、站外联系方式；邮件可带素材库图片与白名单链接<br>语言匹配客户，西班牙语用 usted 敬语<br>不泄露成本、生产厂、其他店铺订单、内部备注</div>
+      <div style="margin-top: auto; font-size: 11px; color: #5a6376; background: #f7f8fc; border-radius: 6px; padding: 6px 8px;">任一项不过：草稿标出未通过项，发送与提交禁用；置信度低于 50% 时转人工</div>
     </div>
     <div style="display: flex; align-items: center;"><svg width="16" height="16" viewBox="0 0 20 16" fill="none" stroke="#9099ab" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h14"></path><path d="M11 3l5 5-5 5"></path></svg></div>
     <div style="flex: 1; background: #ffffff; border: 1px solid #e7e9f1; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
@@ -73,7 +73,7 @@
         <div style="font-size: 14px; font-weight: 600;">发送方式</div>
       </div>
       <div style="font-size: 12px; color: #3b4356; line-height: 1.6;">输出三种结果之一（「待审批」由坐席提交产生）：<br><span style="color: #067647; font-weight: 600;">自动发送</span>：置信度达标且意图在白名单<br><span style="color: #4338ca; font-weight: 600;">待审草稿</span>：默认，坐席采纳 / 修改 / 拒绝<br><span style="color: #b42318; font-weight: 600;">转人工</span>：风险信号、规则要求、检查不过且置信度极低。<br>草稿承诺补发、退款等动作时在待审草稿上标出审批项，坐席审阅后提交审批，批准且执行成功后自动发出</div>
-      <div style="margin-top: auto; font-size: 11px; color: #5a6376; background: #f7f8fc; border-radius: 6px; padding: 6px 8px;">亚马逊 SLA 保底：剩 4 小时未处理且无风险信号，自动发预审过的进展回复</div>
+      <div style="margin-top: auto; font-size: 11px; color: #5a6376; background: #f7f8fc; border-radius: 6px; padding: 6px 8px;">亚马逊 SLA 保底：剩 4 小时未处理且无风险信号，自动发预审过的进展回复（默认关闭，Q-11 已确认）</div>
     </div>
   </div>
 
@@ -87,7 +87,7 @@
       <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px;">
         <div style="display: flex; gap: 8px; align-items: flex-start;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #d92d20; flex-shrink: 0; margin-top: 5px;"></div><div style="font-size: 12px; line-height: 1.5;"><span style="font-weight: 600;">安全事故</span>：起火、冒烟、过热、烫伤、电池鼓包。最高优先级，人工处理并留档。</div></div>
         <div style="display: flex; gap: 8px; align-items: flex-start;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #d92d20; flex-shrink: 0; margin-top: 5px;"></div><div style="font-size: 12px; line-height: 1.5;"><span style="font-weight: 600;">平台风险</span>：提到 A-to-Z、拒付、差评或 feedback 威胁、投诉到平台、律师或法律。</div></div>
-        <div style="display: flex; gap: 8px; align-items: flex-start;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #f79009; flex-shrink: 0; margin-top: 5px;"></div><div style="font-size: 12px; line-height: 1.5;"><span style="font-weight: 600;">重复联系</span>：同一工单第 2 次来信未解决升一级优先；第 3 次强制人工。</div></div>
+        <div style="display: flex; gap: 8px; align-items: flex-start;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #f79009; flex-shrink: 0; margin-top: 5px;"></div><div style="font-size: 12px; line-height: 1.5;"><span style="font-weight: 600;">重复联系</span>：我方给出结论性回复后，客户就同一问题再次来信计 1 次（排查答复、致谢、确认不计）；1 次升一级优先级，2 次强制转人工（R-TK-03）。</div></div>
         <div style="display: flex; gap: 8px; align-items: flex-start;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #f79009; flex-shrink: 0; margin-top: 5px;"></div><div style="font-size: 12px; line-height: 1.5;"><span style="font-weight: 600;">高价值</span>：订单金额或客户累计消费超过阈值，阈值可配。</div></div>
         <div style="display: flex; gap: 8px; align-items: flex-start;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #f79009; flex-shrink: 0; margin-top: 5px;"></div><div style="font-size: 12px; line-height: 1.5;"><span style="font-weight: 600;">要求真人</span>：客户明确要求与人沟通。</div></div>
         <div style="display: flex; gap: 8px; align-items: flex-start;"><div style="width: 8px; height: 8px; border-radius: 999px; background: #9099ab; flex-shrink: 0; margin-top: 5px;"></div><div style="font-size: 12px; line-height: 1.5;"><span style="font-weight: 600;">无法处理的内容</span>：不支持的语言、乱码、只有附件没有正文。</div></div>
@@ -182,7 +182,7 @@
 
       <div style="border: 1px solid #e7e9f1; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;">
         <div style="display: flex; align-items: center; justify-content: space-between;"><div style="font-size: 13px; font-weight: 600;">发票与收据</div><div style="font-size: 10px; font-weight: 600; color: #4338ca; background: #f0effd; border-radius: 4px; padding: 2px 6px;">售后</div></div>
-        <div style="font-size: 11px; color: #5a6376; line-height: 1.5;">德国站高频<br>需要：订单号<br>查：平台发票<br>动作：生成并附发票（低风险）</div>
+        <div style="font-size: 11px; color: #5a6376; line-height: 1.5;">墨西哥站高频<br>需要：订单号<br>查：平台发票<br>动作：生成并附发票（低风险）</div>
         <div style="margin-top: auto; font-size: 11px; font-weight: 500; color: #067647; background: #d1fadf; border-radius: 4px; padding: 4px 8px;">早期即可自动发送</div>
       </div>
 
@@ -194,7 +194,7 @@
     </div>
 
     <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; border-top: 1px solid #f1f3f9; padding-top: 12px;">
-      <div style="display: flex; align-items: center; gap: 10px; font-size: 12px;"><div style="font-weight: 600; white-space: nowrap;">致谢与确认</div><div style="color: #5a6376;">不是业务意图。亚马逊标记「无需回复」，建议关闭工单。</div></div>
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 12px;"><div style="font-weight: 600; white-space: nowrap;">致谢与确认</div><div style="color: #5a6376;">不是业务意图。亚马逊标记「无需回复」，工单转已解决（7 天后自动关闭）。</div></div>
       <div style="display: flex; align-items: center; gap: 10px; font-size: 12px;"><div style="font-weight: 600; white-space: nowrap;">生产厂与其他供应商邮件</div><div style="color: #5a6376;">在第 1 步识别。来自已登记的生产厂：转人工并提醒改用工厂工作台，不解析报价或单号；其他供应商：转人工。</div></div>
       <div style="display: flex; align-items: center; gap: 10px; font-size: 12px;"><div style="font-weight: 600; white-space: nowrap;">通知与垃圾</div><div style="color: #5a6376;">在第 1 步识别。归档，不建工单。</div></div>
     </div>
@@ -229,7 +229,7 @@
       </div>
       <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; border-top: 1px solid #f1f3f9; padding-top: 10px;">
         <div style="background: #d1fadf; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #067647; line-height: 1.5;"><span style="font-weight: 600;">只读</span>：查订单、库存、物流、费用。自动执行。</div>
-        <div style="background: #f0effd; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #4338ca; line-height: 1.5;"><span style="font-weight: 600;">低风险写</span>：加备注、写登记表、向工厂工作台派发询价单、查件。自动执行并留痕。</div>
+        <div style="background: #f0effd; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #4338ca; line-height: 1.5;"><span style="font-weight: 600;">低风险写</span>：加备注、写登记表、按 SKU 向生产厂派发询价单、查件。自动执行并留痕。</div>
         <div style="background: #fef0c7; border-radius: 6px; padding: 8px 10px; font-size: 11px; color: #b54708; line-height: 1.5;"><span style="font-weight: 600;">高风险写</span>：退款、改地址、取消、创建出库单、通知生产厂寄出。进审批单；含报备由客服主管审批，时限 4 小时，超时标记并通知。</div>
       </div>
     </div>

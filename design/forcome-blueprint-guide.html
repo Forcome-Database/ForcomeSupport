@@ -100,7 +100,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <body>
 <div class="layout">
   <aside>
-    <div class="brand">PRD v2.0 · 目录</div>
+    <div class="brand">PRD v2.4 · 目录</div>
     <nav><a href="#s-0">0 本版关键调整</a><a href="#s-1">1 概述</a><a href="#s-2">2 用户与场景</a><a href="#s-3">3 范围与分期</a><a href="#s-4">4 信息架构与页面清单</a><a href="#s-5">5 核心流程</a><a href="#s-6">6 状态机</a><a href="#s-7">7 业务规则</a><a href="#s-8">8 页面规格</a><a href="#h-9eafdf">8A 状态板规格</a><a href="#s-9">9 异常处理</a><a href="#s-10">10 权限</a><a href="#s-11">11 数据与集成</a><a href="#s-12">12 非功能需求</a><a href="#s-13">13 验收标准</a><a href="#s-14">14 上线与迁移</a><a href="#s-15">15 待确认事项</a><a href="#s-16">16 附录</a></nav>
     <div class="links">
       <a href="https://claude.ai/code/artifact/dda6d1a2-41b4-4c97-8ac6-491808a914b5">设计画布（规范、页面、状态板、流程图）</a>
@@ -123,7 +123,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tbody>
 <tr>
 <td>版本</td>
-<td>v2.0 定稿评审稿 · 2026-09-21</td>
+<td>v2.4 定稿评审稿 · 2026-09-23</td>
 </tr>
 <tr>
 <td>状态</td>
@@ -178,14 +178,14 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>工厂衔接改在系统内完成；FSH 为销售公司、工厂为集团内生产厂，改为工厂工作台与内部结算</td>
 </tr>
 <tr>
-<td><strong>v2.0</strong></td>
+<td>v2.0</td>
 <td>09-21</td>
 <td>定稿重构：补齐术语、状态机、业务规则编号、逐页规格、异常、权限、数据、验收标准；统一示例数据；高保真原型与状态板</td>
 </tr>
 <tr>
-<td><strong>v2.2</strong></td>
+<td>v2.0 修订</td>
 <td>09-22</td>
-<td>客户确认：配件全部由集团内两家生产厂生产，成员与部门从钉钉获取、通知走钉钉（D-16）；亚马逊退款、取消经 SP-API 执行，人工操作清单只作兜底；第一期浅色，舒适与紧凑两档密度（Q-22、Q-23、Q-24 关闭）</td>
+<td>交叉审查修订：第 ⑤ 步输出与审批的衔接、转人工工单审批期间的状态、重复联系计数、备用审批人、工作日历、售后单负责人与发起人、补齐 I14–I15、F8–F9、K11–K14 状态板；流程图与状态机口径统一</td>
 </tr>
 <tr>
 <td>v2.1</td>
@@ -193,9 +193,19 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>客户确认：亚马逊与 Shopify 接官方接口、积加预留不接（D-14）；备用审批人确认；工作日不扣节假日、生产厂两家 FQD 与 FZJ（D-15）；视觉升级为 v3（参考客户提供的 forcome-support-console.html），研发用 shadcn/ui + Tailwind CSS v4（D-10）</td>
 </tr>
 <tr>
-<td>v2.0 修订</td>
+<td>v2.2</td>
 <td>09-22</td>
-<td>交叉审查修订：第 ⑤ 步输出与审批的衔接、转人工工单审批期间的状态、重复联系计数、备用审批人、工作日历、售后单负责人与发起人、补齐 I14–I15、F8–F9、K11–K14 状态板；流程图与状态机口径统一</td>
+<td>客户确认：配件全部由集团内两家生产厂生产，成员与部门从钉钉获取、通知走钉钉（D-16）；亚马逊退款、取消经 SP-API 执行，人工操作清单只作兜底；第一期浅色，舒适与紧凑两档密度（Q-22、Q-23、Q-24 关闭）</td>
+</tr>
+<tr>
+<td>v2.3</td>
+<td>09-22</td>
+<td>全面审查修订：重复联系只计结论性回复之后的再次来信（D-12、R-TK-03）；工作日时限的截止时刻算法（R-CL-02）；撤回审批单按驳回处理，系统发起的报备被驳回或撤回时售后单保持进行中（R-AP-07）；手工新建工单与售后单、P08「退回继续排查」、执行失败补进状态机；分期依赖理顺（3.1、3.2）；新增 Q-25 物流轨迹来源、Q-26 第一阶段回复数据；售后流程图、页面地图、原型与示例数据的漂移逐项修正</td>
+</tr>
+<tr>
+<td><strong>v2.4</strong></td>
+<td>09-23</td>
+<td>客户第三批答复：站点改为美国、加拿大、墨西哥，首批回复语言英语与西班牙语（Q-16、D-18）；订单、物流、库存与良仓售后出库单都经积加，退款、改地址、取消仍走平台官方接口（Q-25、D-17，Q-21 关闭）；承担比例按产品成本、快递物流、其他费用三组分别记录，「顾客购买」归入客户使用问题（Q-03、D-19）；Q-05、Q-06、Q-07、Q-09、Q-11、Q-12、Q-13、Q-14、Q-15 一并确认。示例数据与原型的德国、英国站点整体替换为加拿大、墨西哥，德语示例改为西班牙语</td>
 </tr>
 </tbody>
 </table></div>
@@ -227,7 +237,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>D-03</td>
 <td>所有产生 FSH 费用或寄件的处理都生成售后单，两条创建路径</td>
 <td>旧稿只有产品故障会建售后单，未收到补发、错发换发、免退货退款的费用进不了台账，报表成本不全</td>
-<td>台账覆盖全部售后成本；责任由规则或 AI 建议、人工确认（R-AS-02）</td>
+<td>台账覆盖全部售后成本；责任由规则或 AI 建议、人工确认（R-AS-02）；售后负责人在 P07 手工新建的售后单按路径 A 进入待确认</td>
 </tr>
 <tr>
 <td>D-04</td>
@@ -243,7 +253,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>D-06</td>
-<td>SLA 以每封来信为对象，终点是对它的第一封回复；「工作日」按统一工作日历计算</td>
+<td>SLA 以每封来信为对象，终点是对它的第一封回复；「工作日」按统一工作时间计算</td>
 <td>旧稿未定义 SLA 何时停、等待状态是否计时、工作日是否含节假日，研发无法实现，报表口径不一</td>
 <td>R-SL-01 至 R-SL-07、R-CL-01 至 R-CL-02；承诺类回复需要审批时先发进展回复</td>
 </tr>
@@ -255,7 +265,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>D-08</td>
-<td>比例协商最多 3 轮，超时或拒绝转「待升级」由双方负责人商定</td>
+<td>比例协商最多 3 轮；生产厂拒绝、答复超时，或售后负责人在还价后主动升级，都转「待升级」由双方负责人商定</td>
 <td>旧稿没有终止条件，协商可能无限拖延</td>
 <td>R-AS-06；结算只收比例已确认的售后单</td>
 </tr>
@@ -266,6 +276,12 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>R-AP-02；P20 页头增加「备用审批人」设置，王磊（Q-19 已确认）</td>
 </tr>
 <tr>
+<td>D-10</td>
+<td>视觉采用 v3：56px 顶栏 + 分段导航、浅灰底上的圆角浮动面板、靛蓝主色，AI 产出用靛蓝→青色渐变 ✦ 标识；原型交付为静态高保真 + 状态板 + 逐页交互规格；研发用 shadcn/ui + Tailwind CSS v4</td>
+<td>客户提供参考稿（forcome-support-console.html）并指定技术栈。原型组件与 shadcn 组件一一对应（设计规范第 12 节），令牌可直接写进 globals.css，减少设计到研发的转换</td>
+<td>页面结构不变，组件库 spec/ui.py 统一换肤；第一期只做浅色，舒适与紧凑两档密度都上线（Q-24 已确认，见全局状态 G9）；深色令牌预留</td>
+</tr>
+<tr>
 <td>D-11</td>
 <td>第 ⑤ 步只输出自动发送、待审草稿、转人工；「待审批」只由坐席主动提交产生。转人工工单提交审批后保持「转人工」</td>
 <td>若系统直接判为待审批，审批单没有发起人，「不能自审」「驳回退回发起人」「人工操作清单指派给发起人」都无法执行；转人工工单若改成待审批，风险标记会从转人工队列消失，主管看不到</td>
@@ -273,27 +289,9 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>D-12</td>
-<td>重复联系次数 = 我方回复后问题仍未解决又来信的次数；1 次升优先级，2 次转人工</td>
-<td>旧稿混用「第 N 封来信」与「第 N 次」，规则、验收、页面三处数字对不上</td>
-<td>R-TK-03、R-RS、AC-TK-05；P03 显示「重复联系 1 次」</td>
-</tr>
-<tr>
-<td>D-14</td>
-<td>接入改为官方渠道：亚马逊买家消息走亚马逊邮件中转（店铺绑定邮箱，Gmail API 收发），订单走 SP-API；Shopify 走 Admin API + 客服邮箱；良仓走开放接口；积加只预留适配器，第一期不接</td>
-<td>客户确认（Q-01）。SP-API 的 Messaging 接口只能发固定类型的消息，不能读取买家来信，也不能自由回复，所以亚马逊来信只能从中转邮件收取</td>
-<td>5.1、7.11、11.3、P18 重写；亚马逊退款、取消经 SP-API、Shopify 退款、改地址、取消经 Admin API，批准后都由接口执行（Q-23 已确认）；人工操作清单只在接口失败或暂无接口时兜底</td>
-</tr>
-<tr>
-<td>D-15</td>
-<td>生产厂两家（FQD、FZJ），售后单按配件对应的生产厂派发、协商、结算，结算批次按生产厂分开；工作日不扣节假日</td>
-<td>客户确认（Q-20）</td>
-<td>新增生产厂对象与 SKU 对应关系（R-FT-07）；批次编号 年-月-生产厂-序号；R-CL 简化</td>
-</tr>
-<tr>
-<td>D-16</td>
-<td>账号与组织来自钉钉：成员、部门从钉钉通讯录同步，钉钉扫码登录（钉钉内免登），提醒走钉钉工作通知；本系统只维护角色、店铺数据范围、生产厂归属</td>
-<td>客户确认 FSH 与两家生产厂同属一个集团，用户和部门都在钉钉（Q-22、Q-02）</td>
-<td>不再单独开账号、邀请注册；成员离职随钉钉自动停用；P18 钉钉连接卡、P20 成员表带钉钉部门；工厂工作台手机端在钉钉内打开</td>
+<td>重复联系次数 = 我方给出结论性回复（方案、承诺或拒绝）后，客户就同一问题再次来信的次数；对排查步骤的答复、按要求补充的信息、致谢与确认都不计。1 次升优先级，2 次转人工</td>
+<td>旧稿混用「第 N 封来信」与「第 N 次」，规则、验收、页面三处数字对不上；若把排查步骤的答复也计入，路径 A 排查两轮的工单都会被强制转人工，与售后流程冲突</td>
+<td>R-TK-03、R-RS、AC-TK-05、AC-TK-15；消息增加「回复类型」字段；P03 显示「重复联系 1 次」，P05 为 0 次</td>
 </tr>
 <tr>
 <td>D-13</td>
@@ -302,10 +300,40 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>6.5、11.1；P07 负责人列、P11 元信息</td>
 </tr>
 <tr>
-<td>D-10</td>
-<td>视觉采用 v3：56px 顶栏 + 分段导航、浅灰底上的圆角浮动面板、靛蓝主色，AI 产出用靛蓝→青色渐变 ✦ 标识；原型交付为静态高保真 + 状态板 + 逐页交互规格；研发用 shadcn/ui + Tailwind CSS v4</td>
-<td>客户提供参考稿（forcome-support-console.html）并指定技术栈。原型组件与 shadcn 组件一一对应（设计规范第 12 节），令牌可直接写进 globals.css，减少设计到研发的转换</td>
-<td>页面结构不变，组件库 spec/ui.py 统一换肤；第一期只做浅色，舒适与紧凑两档密度都上线（Q-24 已确认，见全局状态 G9）；深色令牌预留</td>
+<td>D-14</td>
+<td>接入改为官方渠道：亚马逊买家消息走亚马逊邮件中转（店铺绑定邮箱，Gmail API 收发），订单走 SP-API；Shopify 走 Admin API + 客服邮箱；良仓走开放接口；积加只预留适配器，第一期不接（读接口与良仓部分已被 D-17 取代）</td>
+<td>客户确认（Q-01）。SP-API 的 Messaging 接口只能发固定类型的消息，不能读取买家来信，也不能自由回复，所以亚马逊来信只能从中转邮件收取</td>
+<td>5.1、7.11、11.3、P18 重写；亚马逊退款、取消经 SP-API、Shopify 退款、改地址、取消经 Admin API，批准后都由接口执行（Q-23 已确认）；人工操作清单只在接口失败或暂无接口时兜底</td>
+</tr>
+<tr>
+<td>D-15</td>
+<td>生产厂两家（FQD、FZJ），售后单按配件对应的生产厂派发、协商、结算，结算批次按生产厂分开；工作日不扣节假日</td>
+<td>客户确认（Q-20、Q-22）</td>
+<td>新增生产厂对象与 SKU 对应关系（R-FT-07）；批次编号 年-月-生产厂-序号；R-CL 简化</td>
+</tr>
+<tr>
+<td>D-16</td>
+<td>账号与组织来自钉钉：成员、部门从钉钉通讯录同步，钉钉扫码登录（钉钉内免登），提醒走钉钉工作通知；本系统只维护角色、店铺数据范围、生产厂归属</td>
+<td>客户确认 FSH 与两家生产厂同属一个集团，用户和部门都在钉钉（Q-02）</td>
+<td>不再单独开账号、邀请注册；成员离职随钉钉自动停用；P18 钉钉连接卡、P20 成员表带钉钉部门；工厂工作台手机端在钉钉内打开</td>
+</tr>
+<tr>
+<td>D-17</td>
+<td>订单、物流轨迹、库存与良仓售后出库单都经积加；退款、改地址、取消仍走平台官方接口</td>
+<td>客户确认（Q-25）：积加已聚合亚马逊与 Shopify 的订单与物流，并对接良仓，读接口只接一家最省事；写动作涉及资金与履约，仍走平台官方接口（Q-23 已确认）</td>
+<td>5.1 第 ① 步、11.3、P18 渠道卡与动作映射、R-AS-04；本系统不再直连良仓接口（Q-21 关闭）；积加中断时依赖它的查询与动作按 E-01 暂停，可转人工操作清单兜底</td>
+</tr>
+<tr>
+<td>D-18</td>
+<td>站点改为美国、加拿大、墨西哥；首批回复语言英语、西班牙语</td>
+<td>客户确认（Q-16）：业务重心在北美三国</td>
+<td>1.1、R-ST-02 发件域（amazon.com / .ca / .com.mx）、R-LG-02、R-CK 语言一致、知识库模板语言；示例数据与原型的德国、英国站点整体换成加拿大、墨西哥，forcome.eu 改为 forcome.mx，德语示例改为西班牙语，欧元金额改为比索</td>
+</tr>
+<tr>
+<td>D-19</td>
+<td>承担比例按产品成本、快递物流、其他费用三组分别记录</td>
+<td>客户确认（Q-03）给的是按费用项的比例表：质量原因三项都 0 / 100，顾客购买三项都 100 / 0，其他原因三项都 50 / 50。按项记录既符合现在的口径，也允许以后单独调某一项</td>
+<td>R-AS-02、11.1 AfterSales 字段、P08 建议比例、P12 与 F5 按项填写、台账与结算按项计算；「顾客购买」归入责任类型「客户使用问题」</td>
 </tr>
 </tbody>
 </table></div>
@@ -337,7 +365,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 </tbody>
 </table></div>
-<p>业务范围：亚马逊 US / DE / UK 自发货与良仓海外仓；Shopify 独立站；两个平台都是多店铺。客户给出的优先级：报表先行，售后流程其次，AI 回信最后。</p>
+<p>业务范围：亚马逊 US / CA / MX 自发货与良仓海外仓；Shopify 独立站（forcome.com 覆盖 US、CA，forcome.mx 覆盖 MX）；两个平台都是多店铺。客户给出的优先级：报表先行，售后流程其次，AI 回信最后。</p>
 <h3 id="s-1-2">1.2 目标与指标</h3>
 <div class="tw"><table>
 <thead>
@@ -412,7 +440,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <h3 id="s-1-3">1.3 非目标</h3>
 <ul>
 <li>不做面向客户的聊天窗口、电话客服。</li>
-<li>不替代 ERP（积加）、平台后台与良仓的订单、库存、发货管理；只通过官方接口读写必要字段。</li>
+<li>不替代 ERP（积加）、平台后台与良仓的订单、库存、发货管理；只通过积加与平台官方接口读写必要字段。</li>
 <li>不做生产厂的生产、库存管理；工厂工作台只处理售后相关任务。</li>
 <li>第一、二阶段不追求全自动回信；AI 回信在第三阶段替换海帆。</li>
 </ul>
@@ -431,27 +459,27 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>生产厂</td>
-<td>同集团的生产工厂，共两家：FQD（整机及结构件）、FZJ（线材与电源），负责配件供货、直寄与费用分摊，不是外部供应商</td>
+<td>同集团的生产工厂，共两家：FQD（整机、电池、软管、HEPA 滤芯、集尘杯）、FZJ（充电线），负责配件供货、直寄与费用分摊，不是外部供应商；SKU 与生产厂的对应在 P20 维护（R-FT-07）</td>
 </tr>
 <tr>
 <td>良仓</td>
-<td>海外仓，有库存时由它发货</td>
+<td>海外仓，有库存时由它发货；本系统经积加读写它的库存与售后出库单，不直连</td>
 </tr>
 <tr>
 <td>积加</td>
-<td>客户现用的 ERP；本系统在统一动作接口中预留适配器，第一期不接入</td>
+<td>客户现用的 ERP，已聚合亚马逊与 Shopify 的订单与物流并对接良仓；本系统的订单、物流轨迹、库存与良仓售后出库单都经它读写（Q-25）</td>
 </tr>
 <tr>
 <td>SP-API</td>
-<td>亚马逊官方卖家接口：订单、发货、退货信息</td>
+<td>亚马逊官方卖家接口：本系统用于退款、取消订单（订单与物流信息经积加）</td>
 </tr>
 <tr>
 <td>买家消息邮件中转</td>
 <td>亚马逊官方的买家与卖家沟通方式：买家来信转发到店铺绑定的邮箱，回复发往中转地址即送达买家</td>
 </tr>
 <tr>
-<td>良仓接口</td>
-<td>海外仓良仓的开放接口：库存查询、创建售后出库单、回传单号与运费</td>
+<td>物流查询</td>
+<td>承运商轨迹；经积加的物流聚合查询，用于判定停滞满 5 天与超预计送达</td>
 </tr>
 <tr>
 <td>店铺</td>
@@ -462,12 +490,24 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>来信进入的途径：亚马逊买家消息（邮件中转到店铺绑定邮箱）、Shopify 与直邮邮件；都经 Gmail API 收发</td>
 </tr>
 <tr>
+<td>直邮</td>
+<td>客户不经平台消息、直接写到店铺客服邮箱的邮件</td>
+</tr>
+<tr>
 <td>工单</td>
 <td>一个客户就一笔订单（或无订单时就一个话题）的全部往来；编号 T-日期-序号</td>
 </tr>
 <tr>
+<td>重复联系</td>
+<td>我方给出结论性回复（方案、承诺或拒绝）后，客户就同一问题再次来信；次数决定升优先级或转人工（R-TK-03）</td>
+</tr>
+<tr>
 <td>SLA</td>
 <td>对每封客户来信的首次回复时限（R-SL）</td>
+</tr>
+<tr>
+<td>工作日、工作小时</td>
+<td>周一至周五 09:00–18:00（北京时间），不扣节假日；1 个工作日 = 9 个工作小时。生产厂任务、人工操作清单等时限按它计算（R-CL）</td>
 </tr>
 <tr>
 <td>意图</td>
@@ -486,8 +526,16 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>需要人批准才能执行的一组内容：动作、报备、绑定回复；编号 AP-日期-序号</td>
 </tr>
 <tr>
+<td>备用审批人</td>
+<td>发起人恰好是唯一有权审批的人时接收该审批单的人，由管理员在 P20 指定，默认王磊（R-AP-02）</td>
+</tr>
+<tr>
 <td>动作</td>
-<td>系统对外部系统的写操作，例如创建发货单、退款、改地址</td>
+<td>系统对外部系统的写操作，例如创建售后出库单、退款、改地址</td>
+</tr>
+<tr>
+<td>售后出库单</td>
+<td>为售后补发在良仓创建的出库单，批准后经积加创建，良仓回传单号与实际运费</td>
 </tr>
 <tr>
 <td>报备</td>
@@ -495,7 +543,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>人工操作清单</td>
-<td>兜底机制：接口连续执行失败、或某项动作暂无接口（如良仓接口不可用，Q-21）时生成，由发起人按步骤在后台完成并回填</td>
+<td>兜底机制：接口连续执行失败、或某项动作暂无接口时生成，由发起人按步骤在后台或积加完成并回填</td>
 </tr>
 <tr>
 <td>钉钉</td>
@@ -504,6 +552,10 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>售后单</td>
 <td>一次产生费用或寄件的售后处理；编号 S-日期-序号</td>
+</tr>
+<tr>
+<td>当前环节、等待方</td>
+<td>售后单卡在哪一步、在等谁；与售后单主状态分开记录（6.5）</td>
 </tr>
 <tr>
 <td>处理方式</td>
@@ -515,7 +567,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>承担比例</td>
-<td>FSH 与生产厂对一张售后单费用的分摊百分比</td>
+<td>FSH 与生产厂对售后费用的分摊百分比，按产品成本、快递物流、其他费用（额外赔偿 + 其他）三组分别记录（R-AS-02）</td>
 </tr>
 <tr>
 <td>比例协商</td>
@@ -524,6 +576,10 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>内部结算</td>
 <td>FSH 与生产厂按月汇总已确认比例的售后费用</td>
+</tr>
+<tr>
+<td>结算批次</td>
+<td>每个生产厂每月一个，汇总比例已确认的售后单，双方确认后为已结算；编号 年-月-生产厂-序号，例 2026-09-FQD-A</td>
 </tr>
 <tr>
 <td>工厂工作台</td>
@@ -536,7 +592,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tbody>
 </table></div>
 <h3 id="s-1-5">1.5 系统边界</h3>
-<figure class="flow"><figcaption>系统边界</figcaption><div class="fr"><div class="fcol"><div class="fr"><div class="fn src"><b>客户</b><span class="sub">亚马逊买家消息</span></div><div class="fa"><span class="ar">→</span></div><div class="fn sys"><b>亚马逊邮件中转</b><span class="sub">店铺绑定邮箱</span></div></div><div class="fr"><div class="fn src"><b>客户</b><span class="sub">Shopify 邮件</span></div><div class="fa"><span class="ar">→</span></div><div class="fn sys"><b>Gmail</b><span class="sub">Gmail API 收发</span></div></div><div class="fr"><div class="fn src"><b>生产厂</b><span class="sub">FQD、FZJ</span></div><div class="fa"><span class="ar">→</span></div><div class="fn sys"><b>工厂工作台</b><span class="sub">同一系统内</span></div></div></div><div class="fa"><span class="ar">→</span></div><div class="fn hub"><b>Forcome Support</b><span class="sub">工单 · 售后单 · 审批单 · 台账</span></div><div class="fa"><span class="ar">→</span></div><div class="fcol"><div class="fr"><div class="fn sys"><b>统一动作接口</b></div><div class="fa"><span class="ar">→</span></div><div class="fn out"><b>SP-API · Shopify Admin API · 良仓接口</b><span class="sub">人工操作清单兜底；积加预留</span></div></div><div class="fr"><div class="fn sys"><b>钉钉</b><span class="sub">通讯录 · 工作通知 · 登录</span></div><div class="fa"><span class="ar">→</span></div><div class="fn out"><b>审批人 · 生产厂对接人</b></div></div></div></div></figure>
+<figure class="flow"><figcaption>系统边界</figcaption><div class="fr"><div class="fcol"><div class="fr"><div class="fn src"><b>客户</b><span class="sub">亚马逊买家消息</span></div><div class="fa"><span class="ar">→</span></div><div class="fn sys"><b>亚马逊邮件中转</b><span class="sub">店铺绑定邮箱</span></div></div><div class="fr"><div class="fn src"><b>客户</b><span class="sub">Shopify 邮件</span></div><div class="fa"><span class="ar">→</span></div><div class="fn sys"><b>Gmail</b><span class="sub">Gmail API 收发</span></div></div><div class="fr"><div class="fn src"><b>生产厂</b><span class="sub">FQD、FZJ</span></div><div class="fa"><span class="ar">→</span></div><div class="fn sys"><b>工厂工作台</b><span class="sub">同一系统内</span></div></div></div><div class="fa"><span class="ar">→</span></div><div class="fn hub"><b>Forcome Support</b><span class="sub">工单 · 售后单 · 审批单 · 台账</span></div><div class="fa"><span class="ar">→</span></div><div class="fcol"><div class="fr"><div class="fn sys"><b>统一动作接口</b><span class="sub">读</span></div><div class="fa"><span class="ar">→</span></div><div class="fn out"><b>积加</b><span class="sub">订单 · 物流 · 库存 · 良仓出库单</span></div></div><div class="fr"><div class="fn sys"><b>统一动作接口</b><span class="sub">写</span></div><div class="fa"><span class="ar">→</span></div><div class="fn out"><b>SP-API · Shopify Admin API</b><span class="sub">退款 · 改地址 · 取消；人工操作清单兜底</span></div></div><div class="fr"><div class="fn sys"><b>钉钉</b><span class="sub">通讯录 · 工作通知 · 登录</span></div><div class="fa"><span class="ar">→</span></div><div class="fn out"><b>审批人 · 生产厂对接人</b></div></div></div></div></figure>
 <h2 id="s-2">2 用户与场景</h2>
 <h3 id="s-2-1">2.1 角色</h3>
 <div class="tw"><table>
@@ -607,7 +663,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>SC-01</td>
 <td>亚马逊订单物流停滞，客户急用</td>
-<td>P01 审草稿 A 版 → 提交审批 → P15 主管批准 → 良仓接口建出库单 → 回复自动发出</td>
+<td>P01 审草稿 A 版 → 提交审批 → P15 主管批准 → 经积加建良仓出库单 → 回复自动发出</td>
 <td>补发、报备、售后单、回复一次完成</td>
 </tr>
 <tr>
@@ -670,49 +726,49 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>渠道接入</td>
 <td>F-CH-01</td>
-<td>亚马逊：买家消息邮件中转收发（Gmail API）；SP-API 读取订单、发货、退货</td>
+<td>亚马逊：买家消息邮件中转收取（Gmail API）；退款、取消经 SP-API。回复发送随工单在第二阶段上线</td>
 <td><span class="tag bad">P0</span></td>
 <td>一</td>
 </tr>
 <tr>
 <td></td>
 <td>F-CH-02</td>
-<td>Shopify：客服邮箱收发（Gmail API）；Admin API 读取订单；直邮</td>
+<td>Shopify 与直邮：客服邮箱收取（Gmail API）；退款、改地址、取消、订单备注经 Admin API。回复发送随工单在第二阶段上线</td>
 <td><span class="tag bad">P0</span></td>
 <td>一</td>
 </tr>
 <tr>
 <td></td>
 <td>F-CH-03</td>
-<td>店铺识别、去重、未归属店铺队列</td>
+<td>店铺识别、去重、按店铺 + 订单归并为工单（R-TK-01、R-TK-02）、未归属店铺队列</td>
 <td><span class="tag bad">P0</span></td>
 <td>一</td>
 </tr>
 <tr>
 <td></td>
 <td>F-CH-04</td>
-<td>良仓开放接口：库存、售后出库单、单号与运费回传</td>
+<td>积加：订单与物流轨迹（第一阶段）；库存、良仓售后出库单、单号与运费回传（第二阶段）</td>
 <td><span class="tag bad">P0</span></td>
-<td>二</td>
+<td>一、二</td>
 </tr>
 <tr>
 <td>报表</td>
 <td>F-RP-01</td>
-<td>工单、SLA、AI、售后成本报表；按店铺、站点、标签筛选；导出</td>
+<td>第一阶段：工单量、首次回复与 SLA 达标（按邮箱收发时间计算，口径见 Q-26）、售后成本，按店铺、站点筛选，导出；按标签筛选随第二阶段、AI 指标随第三阶段上线</td>
 <td><span class="tag bad">P0</span></td>
 <td>一</td>
 </tr>
 <tr>
 <td>登记台账</td>
 <td>F-LG-01</td>
-<td>售后单统一登记、补登、导出</td>
+<td>售后单统一登记、补登、导出；第一阶段由售后负责人手工登记，第二阶段起由售后流程自动写入</td>
 <td><span class="tag bad">P0</span></td>
 <td>一</td>
 </tr>
 <tr>
 <td>工单</td>
 <td>F-TK-01</td>
-<td>归并、合并、重开、自动关闭、状态机、SLA 计时</td>
+<td>回复发送、手工新建、合并、重开、自动关闭、状态机、SLA 实时计时</td>
 <td><span class="tag bad">P0</span></td>
 <td>二</td>
 </tr>
@@ -768,7 +824,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td></td>
 <td>F-AP-02</td>
-<td>统一动作接口；SP-API、Shopify Admin API、良仓适配器（MCP 形式）；人工操作清单与回填</td>
+<td>统一动作接口；积加、SP-API、Shopify Admin API 适配器（MCP 形式）；人工操作清单与回填</td>
 <td><span class="tag bad">P0</span></td>
 <td>二</td>
 </tr>
@@ -789,7 +845,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td></td>
 <td>F-AI-03</td>
-<td>发送方式配置、放开与熔断</td>
+<td>处理规则页（P19 发送方式与阈值、风险信号、渠道内容能力）、放开与熔断</td>
 <td><span class="tag bad">P0</span></td>
 <td>三</td>
 </tr>
@@ -810,14 +866,21 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>设置</td>
 <td>F-ST-01</td>
-<td>渠道与店铺、动作映射、处理规则、售后规则、标签库、团队与权限、工厂账号</td>
-<td><span class="tag warn">P1</span></td>
-<td>二、三</td>
+<td>渠道与店铺、团队与权限（含备用审批人）</td>
+<td><span class="tag bad">P0</span></td>
+<td>一</td>
+</tr>
+<tr>
+<td></td>
+<td>F-ST-02</td>
+<td>动作映射、售后规则（SKU 与生产厂、责任比例、报备）、标签库、模板、SLA 与工作时间、工厂账号</td>
+<td><span class="tag bad">P0</span></td>
+<td>二</td>
 </tr>
 <tr>
 <td>适配器扩展</td>
 <td>F-MC-01</td>
-<td>积加适配器（预留）</td>
+<td>良仓直连适配器（备用，积加不可用时启用）</td>
 <td><span class="tag mut">P2</span></td>
 <td>未排期</td>
 </tr>
@@ -836,19 +899,19 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tbody>
 <tr>
 <td>一 报表与台账</td>
-<td>F-OR-01、F-CH-01–03、F-RP-01、F-LG-01</td>
+<td>F-OR-01、F-CH-01–04（收取与归并、积加订单与物流）、F-ST-01、F-RP-01（第一阶段范围）、F-LG-01</td>
 <td>报表替代人工导出；当月售后单登记完整率 ≥ 98%</td>
 <td>Leo 出工作版本，yuli 细化流程</td>
 </tr>
 <tr>
 <td>二 售后流程</td>
-<td>F-CH-04、F-TK、F-AS、F-FT、F-AP、F-ST 中的渠道、店铺、团队、工厂账号</td>
+<td>F-CH-04 的库存与出库单、F-TK（含回复发送）、F-AS、F-FT、F-AP、F-ST-02</td>
 <td>售后单人工操作 ≤ 2 次；处理时长缩短 50%；亚马逊 SLA 达标 ≥ 99%</td>
 <td>待定</td>
 </tr>
 <tr>
 <td>三 AI 回信</td>
-<td>F-AI、F-KB、F-ST 中的规则配置</td>
+<td>F-AI（含 P19 处理规则）、F-KB</td>
 <td>采纳率 ≥ 80%；自动发送占比 ≥ 40%；首次回复中位数 ≤ 2 小时；差评率不高于替换前</td>
 <td>待定</td>
 </tr>
@@ -856,7 +919,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </table></div>
 <h2 id="s-4">4 信息架构与页面清单</h2>
 <h3 id="s-4-1">4.1 导航与角色可见性</h3>
-<p>左侧导航 7 个入口。入口按角色显示，没有权限的入口不出现；从链接直接访问无权限页面时显示「无权限」状态（全局状态 G2）。</p>
+<p>顶栏分段导航 7 个入口。入口按角色显示，没有权限的入口不出现；从链接直接访问无权限页面时显示「无权限」状态（全局状态 G2）。</p>
 <div class="tw"><table>
 <thead>
 <tr>
@@ -999,7 +1062,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>收件箱 · 转人工工单</td>
 <td>TicketEscalated</td>
 <td>陈晨 · 坐席</td>
-<td>风险工单人工处理、中文写德语发、先发进展回复；Jonas Weber</td>
+<td>风险工单人工处理、中文写西班牙语发、先发进展回复；Mateo Rivas</td>
 </tr>
 <tr>
 <td>P04</td>
@@ -1062,7 +1125,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>承担比例协商</td>
 <td>AfterSalesNegotiation</td>
 <td>王磊 · 售后负责人</td>
-<td>生产厂还价后的处理；Jonas Weber 电池</td>
+<td>生产厂还价后的处理（按三组费用）；Mateo Rivas 电池</td>
 </tr>
 <tr>
 <td>P13</td>
@@ -1104,7 +1167,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>设置 · 渠道与店铺</td>
 <td>Settings</td>
 <td>刘洋 · 管理员</td>
-<td>亚马逊、Shopify、Gmail、良仓连接，动作映射，店铺</td>
+<td>亚马逊、Shopify、Gmail、积加、钉钉连接，动作映射，店铺</td>
 </tr>
 <tr>
 <td>P19</td>
@@ -1142,12 +1205,12 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>设计规范</td>
 <td>DesignSystem</td>
-<td>色彩、字体、间距、组件、状态标识、文案规范</td>
+<td>色彩、字体、间距、组件、状态标识、文案规范、研发映射（shadcn/ui + Tailwind v4）</td>
 </tr>
 <tr>
 <td>全局状态</td>
 <td>GlobalStates</td>
-<td>G1 整页加载 · G2 无权限 · G3 找不到 · G4 断网与集成中断 · G5 浮层提示 · G6 二次确认 · G7 并发与数据范围 · G8 未保存离开</td>
+<td>G1 整页加载 · G2 无权限 · G3 找不到 · G4 断网与集成中断 · G5 浮层提示 · G6 二次确认 · G7 并发与数据范围 · G8 未保存离开 · G9 密度切换</td>
 </tr>
 <tr>
 <td>收件箱与工单状态</td>
@@ -1157,7 +1220,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>审批状态</td>
 <td>StatesApproval</td>
-<td>A1–A8</td>
+<td>A1–A9</td>
 </tr>
 <tr>
 <td>售后状态</td>
@@ -1232,9 +1295,19 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>P13 · P07 按协商状态筛选（点行进 P12）· P14 定位到待结算组 · P14</td>
 </tr>
 <tr>
+<td>P07</td>
+<td>新建售后单</td>
+<td>选择来源工单后进入 P08（按路径 A 待确认）</td>
+</tr>
+<tr>
 <td>P08</td>
 <td>确认并提交</td>
 <td>对应售后单详情，报备进入 P15</td>
+</tr>
+<tr>
+<td>P08</td>
+<td>退回继续排查</td>
+<td>回到 P07；来源工单回到分诊中，生成下一步排查草稿</td>
 </tr>
 <tr>
 <td>P09–P11</td>
@@ -1291,7 +1364,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>① 接收与关联</td>
 <td>亚马逊买家消息（亚马逊邮件中转到店铺绑定邮箱）、Shopify 与直邮邮件，均经 Gmail API 收取</td>
-<td>去重（Message-ID）；识别店铺（收件邮箱；亚马逊另按发件域 amazon.com / .de / .co.uk 识别站点）；识别来源（客户、平台通知、已登记生产厂、其他供应商）；在该店铺内关联订单（SP-API、Shopify Admin API）与客户；按 R-TK-01 归并到工单</td>
+<td>去重（Message-ID）；识别店铺（收件邮箱；亚马逊另按发件域 amazon.com / .ca / .com.mx 识别站点）；识别来源（客户、平台通知、已登记生产厂、其他供应商）；在该店铺内关联订单（积加）与客户；按 R-TK-01 归并到工单</td>
 <td>工单与消息；SLA 开始计时</td>
 <td>店铺识别不出 → 进「未归属店铺」队列（E-13）；订单关联不上 → 继续处理，草稿里一次问全订单信息</td>
 </tr>
@@ -1371,7 +1444,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </table></div>
 <p>起步白名单：订单查询、发票与收据。放开与熔断规则见 R-SD-02、R-SD-03。</p>
 <h3 id="s-5-3">5.3 审批单流程（动作审批与报备合一）</h3>
-<figure class="flow"><figcaption>审批单流程（动作与报备合一）</figcaption><div class="fr"><div class="fn src"><b>坐席提交或系统发起</b></div><div class="fa"><span class="ar">→</span></div><div class="fn warn"><b>待审批</b><span class="sub">4 小时时限</span></div><div class="fa"><span class="al">批准</span><span class="ar">→</span></div><div class="fn acc"><b>执行中</b><span class="sub">平台与良仓接口 / 工厂工作台 / 人工操作清单</span></div><div class="fa"><span class="al">全部成功</span><span class="ar">→</span></div><div class="fn ok"><b>已执行</b></div><div class="fa"><span class="ar">→</span></div><div class="fn ok"><b>发出绑定回复</b></div></div><div class="fsplit"><div class="fbr"><div class="fr"><div class="fn warn"><b>待审批</b></div><div class="fa"><span class="al">驳回 · 原因必填</span><span class="ar">→</span></div><div class="fn bad"><b>已驳回</b><span class="sub">回复不发出；工单回到提交前状态</span></div></div></div><div class="fbr"><div class="fr"><div class="fn warn"><b>待审批</b></div><div class="fa"><span class="al">发起人撤回</span><span class="ar">→</span></div><div class="fn mut"><b>已撤回</b><span class="sub">工单回到提交前状态</span></div></div></div><div class="fbr"><div class="fr"><div class="fn acc"><b>执行中</b></div><div class="fa"><span class="al">重试 3 次仍失败</span><span class="ar">→</span></div><div class="fn bad"><b>执行失败</b><span class="sub">重试或转人工操作清单</span></div></div></div></div></figure>
+<figure class="flow"><figcaption>审批单流程（动作与报备合一）</figcaption><div class="fr"><div class="fn src"><b>坐席提交或系统发起</b></div><div class="fa"><span class="ar">→</span></div><div class="fn warn"><b>待审批</b><span class="sub">4 小时时限</span></div><div class="fa"><span class="al">批准</span><span class="ar">→</span></div><div class="fn acc"><b>执行中</b><span class="sub">SP-API · Shopify Admin API · 积加（良仓出库单）/ 工厂工作台（人工操作清单仅兜底）</span></div><div class="fa"><span class="al">全部成功</span><span class="ar">→</span></div><div class="fn ok"><b>已执行</b></div><div class="fa"><span class="ar">→</span></div><div class="fn ok"><b>发出绑定回复</b></div></div><div class="fsplit"><div class="fbr"><div class="fr"><div class="fn warn"><b>待审批</b></div><div class="fa"><span class="al">驳回 · 原因必填</span><span class="ar">→</span></div><div class="fn bad"><b>已驳回</b><span class="sub">回复不发出；工单回到提交前状态</span></div></div></div><div class="fbr"><div class="fr"><div class="fn warn"><b>待审批</b></div><div class="fa"><span class="al">发起人撤回</span><span class="ar">→</span></div><div class="fn mut"><b>已撤回</b><span class="sub">与驳回同样处理（R-AP-07）</span></div></div></div><div class="fbr"><div class="fr"><div class="fn acc"><b>执行中</b></div><div class="fa"><span class="al">重试 3 次仍失败</span><span class="ar">→</span></div><div class="fn bad"><b>执行失败</b><span class="sub">重试或转人工操作清单</span></div></div></div></div></figure>
 <p>一张审批单可以同时包含：动作（0 到多项）、报备（0 到多项）、绑定回复（0 或 1 封）。审批人、时限、执行方式见 R-AP。</p>
 <h3 id="s-5-4">5.4 售后流程</h3>
 <p><strong>两条创建路径</strong></p>
@@ -1388,8 +1461,8 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tbody>
 <tr>
 <td>A 产品故障</td>
-<td>排查两轮仍未解决，或客户照片、视频可判定故障</td>
-<td>系统自动创建「待确认」售后单</td>
+<td>排查两轮仍未解决，或客户照片、视频可判定故障；售后负责人也可在 P07 选择来源工单手工新建</td>
+<td>系统自动创建「待确认」售后单；手工新建同样进入待确认</td>
 <td>AI 建议，售后负责人在 P08 确认</td>
 <td>确认后按处理方式推进</td>
 </tr>
@@ -1402,6 +1475,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 </tbody>
 </table></div>
+<p>路径 A 的售后单没有发起人。售后负责人在 P08 认为证据不足、还需排查时点「退回继续排查」（原因必填）：售后单转已取消（原因「退回继续排查」，没有产生费用），来源工单回到分诊中，系统按退回原因与排查树生成下一步排查草稿。</p>
 <p><strong>三种处理方式</strong></p>
 <div class="tw"><table>
 <thead>
@@ -1419,7 +1493,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>寄配件 · 良仓有货（含换新、整机补发）</td>
-<td>按良仓运费试算估算运费 → 报备快递费用（附出库单参数）→ 批准即经良仓接口创建售后出库单 → 良仓发出，接口回传单号与实际运费 → 单号回复客户 → 完成</td>
+<td>按良仓运费试算估算运费 → 报备快递费用（附售后出库单参数）→ 批准即经积加创建良仓售后出库单 → 良仓发出，经积加回传单号与实际运费 → 单号回复客户 → 完成</td>
 <td>报备审批</td>
 </tr>
 <tr>
@@ -1429,14 +1503,14 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>退款或部分补偿</td>
-<td>金额提案 → 报备额外赔偿 → 批准后经接口执行付款（亚马逊 SP-API、Shopify Admin API）→ 回复客户 → 完成</td>
+<td>金额提案 → 报备额外赔偿 → 批准后经接口执行付款（亚马逊 SP-API、Shopify Admin API；重试用尽才转人工操作清单）→ 付款成功后绑定回复自动发出 → 完成</td>
 <td>报备审批</td>
 </tr>
 </tbody>
 </table></div>
 <p>比例协商与寄件、付款并行，客户不等协商结果。</p>
 <h3 id="s-5-5">5.5 比例协商与内部结算</h3>
-<figure class="flow"><figcaption>比例协商与内部结算</figcaption><div class="fr"><div class="fn src"><b>报备通过</b></div><div class="fa"><span class="ar">→</span></div><div class="fn q"><b>需要协商？</b><span class="sub">质量或其他</span></div><div class="fa"><span class="al">是</span><span class="ar">→</span></div><div class="fn acc"><b>待工厂答复</b><span class="sub">3 个工作日</span></div><div class="fa"><span class="al">接受</span><span class="ar">→</span></div><div class="fn ok"><b>已确认</b></div><div class="fa"><span class="ar">→</span></div><div class="fn acc"><b>结算批次</b><span class="sub">每厂每月 5 日</span></div><div class="fa"><span class="al">双方确认</span><span class="ar">→</span></div><div class="fn ok"><b>已结算</b></div></div><div class="fsplit"><div class="fbr"><div class="fr"><div class="fn q"><b>需要协商？</b></div><div class="fa"><span class="al">否</span><span class="ar">→</span></div><div class="fn mut"><b>不适用</b><span class="sub">物流、客户使用</span></div></div></div><div class="fbr"><div class="fr"><div class="fn acc"><b>待工厂答复</b></div><div class="fa"><span class="al">还价</span><span class="ar">→</span></div><div class="fn warn"><b>工厂还价</b><span class="sub">接受 / 再次提案 / 升级</span></div></div></div><div class="fbr"><div class="fr"><div class="fn bad"><b>拒绝 · 超时 · 满 3 轮</b></div><div class="fa"><span class="ar">→</span></div><div class="fn bad"><b>待升级</b></div><div class="fa"><span class="al">双方负责人商定</span><span class="ar">→</span></div><div class="fn ok"><b>录入最终比例</b></div></div></div></div></figure>
+<figure class="flow"><figcaption>比例协商与内部结算</figcaption><div class="fr"><div class="fn src"><b>报备通过</b></div><div class="fa"><span class="ar">→</span></div><div class="fn q"><b>需要协商？</b><span class="sub">质量或其他</span></div><div class="fa"><span class="al">是</span><span class="ar">→</span></div><div class="fn acc"><b>待工厂答复</b><span class="sub">3 个工作日</span></div><div class="fa"><span class="al">接受</span><span class="ar">→</span></div><div class="fn ok"><b>已确认</b></div><div class="fa"><span class="ar">→</span></div><div class="fn acc"><b>结算批次</b><span class="sub">每厂每月 5 日</span></div><div class="fa"><span class="al">双方确认</span><span class="ar">→</span></div><div class="fn ok"><b>已结算</b></div></div><div class="fsplit"><div class="fbr"><div class="fr"><div class="fn q"><b>需要协商？</b></div><div class="fa"><span class="al">否</span><span class="ar">→</span></div><div class="fn mut"><b>不适用</b><span class="sub">物流、客户使用</span></div></div></div><div class="fbr"><div class="fr"><div class="fn acc"><b>待工厂答复</b></div><div class="fa"><span class="al">还价</span><span class="ar">→</span></div><div class="fn warn"><b>工厂还价</b><span class="sub">接受 / 再次提案 / 升级</span></div></div></div><div class="fbr"><div class="fr"><div class="fn bad"><b>拒绝 · 超时 · 满 3 轮 · 主动升级</b></div><div class="fa"><span class="ar">→</span></div><div class="fn bad"><b>待升级</b></div><div class="fa"><span class="al">双方负责人商定</span><span class="ar">→</span></div><div class="fn ok"><b>录入最终比例</b></div></div></div></div></figure>
 <h2 id="s-6">6 状态机</h2>
 <h3 id="s-6-1">6.1 工单</h3>
 <div class="tw"><table>
@@ -1470,13 +1544,13 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>转人工</td>
 <td>需要人工处理</td>
-<td>风险信号、规则、检查不通过且置信度极低、坐席手动转；模型不可用时的「AI 未处理」工单也归入此分段</td>
+<td>风险信号、规则、检查不通过且置信度极低、坐席手动转；模型不可用时工单也记为转人工，另标「AI 未处理」</td>
 <td>收件箱「转人工」</td>
 </tr>
 <tr>
 <td>等客户</td>
 <td>已回复，等客户回信</td>
-<td>回复发出且无后续内部事项</td>
+<td>回复发出且无后续内部事项；坐席手工新建工单并发出首封消息</td>
 <td>收件箱「等待中」</td>
 </tr>
 <tr>
@@ -1525,6 +1599,18 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>新建 / 已关闭（30 天内同订单来信）</td>
 <td>进入处理</td>
 <td>分诊中</td>
+<td>系统</td>
+</tr>
+<tr>
+<td>（无）</td>
+<td>坐席在 P04「新建工单」并发出首封消息</td>
+<td>等客户（没有待回复的来信，不计 SLA）</td>
+<td>坐席</td>
+</tr>
+<tr>
+<td>分诊中</td>
+<td>模型不可用（E-03）</td>
+<td>转人工，标「AI 未处理」</td>
 <td>系统</td>
 </tr>
 <tr>
@@ -1582,6 +1668,12 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>系统</td>
 </tr>
 <tr>
+<td>转人工（挂审批单）</td>
+<td>审批通过但动作执行失败</td>
+<td>保持转人工，工单标「执行失败」</td>
+<td>系统</td>
+</tr>
+<tr>
 <td>转人工</td>
 <td>坐席发送回复（无审批项，且没有挂着未结束的审批单）</td>
 <td>等客户 或 等内部</td>
@@ -1598,6 +1690,12 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>转人工</td>
 <td>转人工</td>
 <td>坐席</td>
+</tr>
+<tr>
+<td>等内部</td>
+<td>关联售后单被「退回继续排查」</td>
+<td>分诊中（生成下一步排查草稿）</td>
+<td>售后负责人</td>
 </tr>
 <tr>
 <td>等客户、等内部、等外部</td>
@@ -1630,6 +1728,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <li>「回复发出」是事件，不是状态。坐席在转人工工单上先发的进展回复（不含审批项）不改变状态，只结束该来信的 SLA 计时。</li>
 <li>系统发起的审批单（例如生产厂报价后自动发起的快递费用报备）挂在售后单上，不改变工单状态。</li>
 <li>工单关闭时仍有未回复的来信，该来信 SLA 计为未达标（R-SL-07）。</li>
+<li>重复联系只在客户来信时判断：看这封来信之前我方最近一封回复是不是结论性回复（R-TK-03）。</li>
 </ol>
 <h3 id="s-6-2">6.2 AI 草稿</h3>
 <div class="tw"><table>
@@ -1695,7 +1794,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>执行失败</td>
 <td>自动重试用尽</td>
-<td>发起人「重试」→ 执行中；「转人工处理」→ 生成人工操作清单；期间工单保持待审批并标「执行失败」</td>
+<td>发起人「重试」→ 执行中；「转人工操作清单」→ 生成人工操作清单；期间工单保持原状态（待审批，或转人工）并标「执行失败」</td>
 </tr>
 <tr>
 <td>已驳回</td>
@@ -1705,7 +1804,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>已撤回</td>
 <td>发起人在批准前撤回（系统发起的由关联售后单负责人撤回）</td>
-<td>终态</td>
+<td>终态；关联工单与售后单按驳回处理（R-AP-07）</td>
 </tr>
 </tbody>
 </table></div>
@@ -1721,7 +1820,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tbody>
 <tr>
 <td>待执行</td>
-<td>审批通过后生成，指派给发起人；4 个工作小时内完成</td>
+<td>接口重试用尽后由发起人转交生成；或该动作暂无接口时审批通过即生成。指派给发起人，4 个工作小时内完成</td>
 </tr>
 <tr>
 <td>已回填</td>
@@ -1747,13 +1846,13 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td><span class="tag warn">待确认</span></td>
 <td>等售后负责人确认责任与处理方式</td>
-<td>路径 A 自动创建；审批单被驳回后退回（路径 B 的单锁定给原发起人，见 R-AP-07）</td>
-<td>确认 → 进行中；取消 → 已取消</td>
+<td>路径 A 自动创建或售后负责人手工新建；确认时提交的审批单、路径 B 的审批单被驳回或撤回后退回（路径 B 的单锁定给原发起人，见 R-AP-07）</td>
+<td>确认 → 进行中；取消或退回继续排查 → 已取消</td>
 </tr>
 <tr>
 <td>进行中</td>
 <td>按处理方式推进，字段「当前环节」「等待方」说明卡在哪</td>
-<td>确认；路径 B 创建</td>
+<td>确认；路径 B 创建；系统发起的报备被驳回或撤回时保持进行中（当前环节「报备审批 · 待重新提交」）</td>
 <td>客户侧完成且登记齐全 → 已完成；终止流程 → 已取消</td>
 </tr>
 <tr>
@@ -1770,8 +1869,9 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 </tbody>
 </table></div>
-<p><strong>负责人与发起人</strong>：售后单负责人 = 按店铺分配的售后负责人（示例四个店铺均为王磊），负责推进和处理例外；路径 B 中提交审批的坐席记为「发起人」，可查看售后单、接收进展通知、在被驳回后重新提交。</p>
-<p><strong>当前环节</strong>显示格式为「环节」或「环节 · 子状态」。环节取值：确认责任与处理方式 · 生产厂报价 · 报备审批 · 良仓发货 · 生产厂寄件 · 单号回复客户 · 执行付款 · 等客户反馈 · 比例协商 · 待内部结算 · 已完成。子状态取值：报备审批 → 快递费用 / 额外赔偿；比例协商 → 待工厂答复 / 工厂还价 / 待升级；已完成 → 已结算 / 向〈承运商或良仓〉索赔中。「在等谁」为当前环节的等待方；「已等」为进入当前环节以来的时长（例：S-20260903-0012 于 09-09 09:00 升级，10:20 时显示「2 天」）。</p>
+<p><strong>负责人与发起人</strong>：售后单负责人 = 按店铺分配的售后负责人（示例四个店铺均为王磊），负责推进和处理例外；路径 B 中提交审批的坐席记为「发起人」，可查看售后单、接收进展通知、在被驳回后重新提交。路径 A（含手工新建）没有发起人。</p>
+<p><strong>生产厂</strong>：只在有生产厂参与（询价、寄件或比例协商）时填写，按配件 SKU 归属（R-FT-07）；良仓发货且无需协商的售后单不填。</p>
+<p><strong>当前环节</strong>显示格式为「环节」或「环节 · 子状态」。环节取值：确认责任与处理方式 · 生产厂报价 · 报备审批 · 良仓发货 · 生产厂寄件 · 单号回复客户 · 执行付款 · 等客户反馈 · 比例协商 · 待内部结算 · 已完成。子状态取值：报备审批 → 快递费用 / 额外赔偿 / 待重新提交；比例协商 → 待工厂答复 / 工厂还价 / 待升级；已完成 → 已结算 / 向〈承运商或良仓〉索赔中。「在等谁」为当前环节的等待方；「已等」为进入当前环节以来的时长（例：S-20260903-0012 于 09-09 09:00 升级，10:20 时显示「2 天」）。</p>
 <h3 id="s-6-6">6.6 比例协商</h3>
 <div class="tw"><table>
 <thead>
@@ -1783,7 +1883,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tbody>
 <tr>
 <td>不适用</td>
-<td>责任为客户使用问题或物流问题，或工厂承担比例为 0</td>
+<td>责任为客户使用问题或物流问题，或三组费用的工厂承担比例都是 0</td>
 </tr>
 <tr>
 <td>未发起</td>
@@ -1795,11 +1895,11 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>工厂还价</td>
-<td>生产厂提出新比例与理由，等 FSH 售后负责人处理</td>
+<td>生产厂按三组费用提出新比例与理由，等 FSH 售后负责人处理</td>
 </tr>
 <tr>
 <td>待升级</td>
-<td>生产厂拒绝、超时、或提案达 3 轮；由双方负责人线下商定</td>
+<td>生产厂拒绝、答复超时、提案达 3 轮，或售后负责人在工厂还价后主动升级；由双方负责人线下商定</td>
 </tr>
 <tr>
 <td>已确认</td>
@@ -1866,7 +1966,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tbody>
 <tr>
 <td>不适用</td>
-<td>工厂承担比例为 0</td>
+<td>三组费用的工厂承担比例都是 0</td>
 </tr>
 <tr>
 <td>未定</td>
@@ -1882,7 +1982,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 </tbody>
 </table></div>
-<p>每个生产厂每月一个批次，编号「年-月-生产厂-序号」（例 2026-09-FQD-A），分别推送各厂对接人确认。批次状态：待生成 → 待确认 → 已结算。批次生成后，其中售后单的比例不能再改；需要调整时在下一批次做冲销（待确认 Q-13）。</p>
+<p>每个生产厂每月一个批次，编号「年-月-生产厂-序号」（例 2026-09-FQD-A），分别推送各厂对接人确认。批次状态：待生成 → 待确认 → 已结算。批次生成后，其中售后单的比例不能再改；需要调整时在下一批次做冲销（Q-13 已确认）；具体付款方式（转账或抵扣货款）由财务定，系统只出批次与金额。</p>
 <h3 id="s-6-8">6.8 工厂任务</h3>
 <div class="tw"><table>
 <thead>
@@ -1914,7 +2014,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 </tbody>
 </table></div>
-<p>任务类型与时限：询价报价 2 个工作日；寄件回填单号 3 个工作日；比例答复 3 个工作日；结算确认 5 个工作日。</p>
+<p>任务类型与时限：询价报价 2 个工作日；寄件回填单号 3 个工作日；比例答复 3 个工作日；结算确认 5 个工作日。截止时刻按 R-CL-02 计算，界面同时显示剩余与截止时刻。</p>
 <h3 id="s-6-9">6.9 渠道连接</h3>
 <p>已连接 · 同步延迟（最近一次同步超过 10 分钟）· 连接异常（连续 3 次失败）· 未连接。连接异常时全站顶部显示红色横幅（G4），来信暂存，恢复后按到达顺序处理。</p>
 <h2 id="s-7">7 业务规则</h2>
@@ -1938,7 +2038,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-TK-03</td>
-<td>重复联系次数 = 我方回复后，客户问题仍未解决又来信的次数（致谢、确认类来信不计）。次数为 1（第 2 封来信）时优先级升一级；次数为 2（第 3 封来信）时强制转人工，原因「重复联系 2 次」。</td>
+<td>重复联系次数 = 我方给出结论性回复（方案、承诺或拒绝）后，客户就同一问题再次来信的次数。对排查步骤的答复、按我方要求补充的信息、致谢与确认都不计。次数为 1 时优先级升一级；次数为 2 时强制转人工，原因「重复联系 2 次」。我方每封回复带「回复类型」：排查步骤、索要信息、进展回复、结论性回复；第 ③ 步随草稿给出，坐席发送前可改，手写回复由坐席发送时选择（默认结论性回复）。</td>
 </tr>
 <tr>
 <td>R-TK-04</td>
@@ -1985,7 +2085,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-SL-06</td>
-<td>SLA 保底：亚马逊来信剩 4 小时仍未处理且无风险信号，自动发一条预审过的进展回复。是否启用待确认（Q-11），默认关闭。</td>
+<td>SLA 保底：亚马逊来信剩 4 小时仍未处理且无风险信号，自动发一条预审过的进展回复。默认关闭（Q-11 已确认）。</td>
 </tr>
 <tr>
 <td>R-SL-07</td>
@@ -1993,11 +2093,11 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-CL-01</td>
-<td>工作时间：工作日为周一至周五，北京时间 09:00–18:00，不扣除节假日、不计调休（客户确认 Q-20）。凡写「工作日」「工作小时」的时限（人工操作清单 4 个工作小时、生产厂任务、比例答复、催办）都按此计算；亚马逊 SLA 与审批 4 小时时限按自然小时。</td>
+<td>工作时间：工作日为周一至周五，北京时间 09:00–18:00，不扣除节假日、不计调休（客户确认 Q-20）；1 个工作日 = 9 个工作小时。凡写「工作日」「工作小时」的时限（人工操作清单 4 个工作小时、生产厂任务、比例答复、催办）都按此计算；亚马逊 SLA 与审批 4 小时时限按自然小时。</td>
 </tr>
 <tr>
 <td>R-CL-02</td>
-<td>FSH 与两家生产厂使用同一工作时间，在 P19「SLA」页由客服主管维护。界面上凡显示工作日时限，同时显示折算后的截止时刻（例：「剩 2 个工作日 · 09-15 周二 08:50 截止」）。</td>
+<td>FSH 与两家生产厂使用同一工作时间，在 P19「SLA」页由客服主管维护。计算：起算时刻为派发时刻，落在非工作时间时取下一个工作时间开始（09:00）；以工作日计的时限，截止时刻 = 起算时刻按工作日顺延 N 天的同一时刻；以工作小时计的时限，在工作时间内累加（例：周五 16:00 生成的人工操作清单，4 个工作小时 → 下周一 11:00）。显示：同时写剩余与截止时刻；剩余 ≥ 9 个工作小时写「剩 N 个工作日」（剩余工作小时 ÷ 9，向上取整），不足 9 个工作小时写「剩 N 个工作小时」（向上取整）。例：周五 09-11 08:50 派发询价（2 个工作日）→ 从 09:00 起算 → 截止 09-15 周二 09:00；10:20 时剩余 16h40m 工作时间，显示「剩 2 个工作日 · 09-15 周二 09:00 截止」。</td>
 </tr>
 </tbody>
 </table></div>
@@ -2042,7 +2142,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>订单查询</td>
 <td>售后</td>
 <td>订单号或收件邮箱</td>
-<td>平台订单（SP-API / Admin API）与物流</td>
+<td>积加订单与物流</td>
 <td>只读</td>
 <td>自动发送</td>
 </tr>
@@ -2052,7 +2152,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>订单号；签收未收到需投递证明</td>
 <td>物流轨迹；停滞满 5 天或超预计送达视为异常</td>
 <td>查件（低风险）、补发（报备快递费用）</td>
-<td>承诺补发时提交审批</td>
+<td>待审草稿（承诺补发时含审批项）</td>
 </tr>
 <tr>
 <td>修改订单</td>
@@ -2060,7 +2160,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>新地址或取消原因</td>
 <td>履约状态</td>
 <td>改地址（仅 Shopify 订单）、取消（高风险，仅未发货）；亚马逊订单平台不允许改地址，未发货时提议取消后重新下单</td>
-<td>提交审批</td>
+<td>待审草稿（含审批项）</td>
 </tr>
 <tr>
 <td>到货问题</td>
@@ -2068,7 +2168,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>照片、实际收到的物品</td>
 <td>订单明细、良仓出库记录</td>
 <td>补发（报备快递费用）、退款</td>
-<td>提交审批</td>
+<td>待审草稿（含审批项）</td>
 </tr>
 <tr>
 <td>产品故障与使用问题</td>
@@ -2084,7 +2184,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>订单号、原因</td>
 <td>站点退货政策与窗口</td>
 <td>退货指引（低风险）；退货退款（高风险）；免退货退款（报备额外赔偿）</td>
-<td>退款时提交审批</td>
+<td>待审草稿（退款时含审批项）</td>
 </tr>
 <tr>
 <td>保修与配件购买</td>
@@ -2112,7 +2212,8 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 </tbody>
 </table></div>
-<p>非业务消息：致谢与确认 → 标记无需回复，工单转已解决；来自已登记生产厂的邮件 → 转人工并提醒改用工厂工作台，不解析其中的报价或单号（R-FT-06）；其他供应商邮件 → 转人工；平台通知与垃圾 → 归档，不建工单。多意图时主意图决定规则，次意图在同一封回复中顺带回答。</p>
+<p>「默认发送方式」只有自动发送、待审草稿、转人工三种；含审批项的草稿由坐席审阅后提交审批（D-11）。</p>
+<p>非业务消息：致谢与确认 → 标记无需回复，工单转已解决（7 天后自动关闭）；来自已登记生产厂的邮件 → 转人工并提醒改用工厂工作台，不解析其中的报价或单号（R-FT-06）；其他供应商邮件 → 转人工；平台通知与垃圾 → 归档，不建工单。多意图时主意图决定规则，次意图在同一封回复中顺带回答。</p>
 <h3 id="s-7-4">7.4 风险信号（R-RS）</h3>
 <div class="tw"><table>
 <thead>
@@ -2140,7 +2241,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>高价值</td>
-<td>订单金额或客户累计消费超过阈值（默认 $300，待确认）</td>
+<td>订单金额或客户累计消费超过阈值（默认 $300，Q-10 默认值已设）</td>
 <td>高</td>
 </tr>
 <tr>
@@ -2179,7 +2280,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>语言一致</td>
-<td>回复语言与客户来信语言一致；德语用正式称呼</td>
+<td>回复语言与客户来信语言一致；西班牙语用 usted 敬语</td>
 </tr>
 <tr>
 <td>不泄露内部信息</td>
@@ -2225,7 +2326,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tbody>
 <tr>
 <td>R-AP-01</td>
-<td>需要审批：高风险动作（退款、改地址、取消、补发、创建售后发货单、通知生产厂寄出）；报备（R-FL）。同一次处理的动作、报备、绑定回复合成一张审批单。</td>
+<td>需要审批：高风险动作（退款、改地址、取消、补发、创建售后出库单、通知生产厂寄出）；报备（R-FL）。同一次处理的动作、报备、绑定回复合成一张审批单。</td>
 </tr>
 <tr>
 <td>R-AP-02</td>
@@ -2237,7 +2338,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-AP-04</td>
-<td>批准后动作按顺序执行：由接口自动执行（亚马逊 SP-API、Shopify Admin API、良仓接口，Q-23 已确认）；需要生产厂的在工厂工作台生成任务。人工操作清单只作兜底：接口重试用尽后发起人转交（R-AP-05），或某项动作暂无接口（如良仓接口不可用，Q-21）。动作与适配器的对应见 P18 动作映射；积加适配器预留。</td>
+<td>批准后动作按顺序执行：由接口自动执行（退款、改地址、取消经亚马逊 SP-API 或 Shopify Admin API，Q-23 已确认；创建良仓售后出库单经积加，Q-25 已确认）；需要生产厂的在工厂工作台生成任务。人工操作清单只作兜底：接口重试用尽后发起人转交（R-AP-05），或某项动作暂无接口。动作与适配器的对应见 P18 动作映射。</td>
 </tr>
 <tr>
 <td>R-AP-05</td>
@@ -2249,7 +2350,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-AP-07</td>
-<td>驳回必须填原因。路径 A 的售后单被驳回：退回「待确认」，售后负责人在 P08 修改后重新提交。路径 B 的售后单被驳回：退回「待确认」并锁定给原发起人，坐席在工单上修改后重新提交，复用同一售后单号；P08 对这类单只读，提示「等坐席重新提交」。</td>
+<td>驳回必须填原因；发起人在批准前撤回，与驳回同样处理。按审批单来源分三种：① 售后负责人在 P08 确认时提交的：售后单退回「待确认」，售后负责人在 P08 修改后重新提交。② 坐席在收件箱提交的（路径 B）：售后单退回「待确认」并锁定给原发起人，坐席在工单上修改后重新提交，复用同一售后单号；P08 对这类单只读，提示「等坐席重新提交」。③ 系统发起的（生产厂报价后的快递费用报备、补充报备）：售后单保持进行中，当前环节「报备审批 · 待重新提交」，售后负责人在售后单详情修改金额后重新提交，或退回生产厂重新报价。</td>
 </tr>
 <tr>
 <td>R-AP-08</td>
@@ -2276,7 +2377,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-FL-03</td>
-<td>与库存分支无关，只要 FSH 出钱就报备。默认无金额门槛（待确认 Q-10）。</td>
+<td>与库存分支无关，只要 FSH 出钱就报备。默认无金额门槛（Q-10 默认值已设）。</td>
 </tr>
 <tr>
 <td>R-FL-04</td>
@@ -2284,11 +2385,11 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-FL-05</td>
-<td>实际金额超出报备金额 10% 以上（良仓回传运费、生产厂回填运费），系统自动发起补充报备；未超出则按实际金额登记。</td>
+<td>实际金额超出报备金额 10% 以上（积加回传的良仓运费、生产厂回填运费），系统自动发起补充报备；未超出则按实际金额登记。</td>
 </tr>
 <tr>
 <td>R-FL-06</td>
-<td>非美元金额（EUR、GBP）同时记录原币与折算美元，汇率取报备当日（来源待确认 Q-14）。原型演示汇率：1 EUR = 1.10 USD，1 GBP = 1.27 USD。</td>
+<td>非美元金额（MXN、CAD）同时记录原币与折算美元，汇率取报备当日中间价，美元结算（Q-14 已确认）。原型演示汇率：1 USD = 18.00 MXN，1 USD = 1.36 CAD。</td>
 </tr>
 </tbody>
 </table></div>
@@ -2311,42 +2412,54 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 </tbody>
 </table></div>
+<p>比例按三组费用分别记录（客户确认 Q-03）：产品成本、快递物流（运费）、其他费用（额外赔偿 + 其他）。</p>
 <div class="tw"><table>
 <thead>
 <tr>
 <th>责任类型</th>
 <th>判定依据</th>
-<th>建议比例 FSH / 工厂</th>
+<th>产品成本 FSH / 工厂</th>
+<th>快递物流</th>
+<th>其他费用</th>
 <th>协商</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>客户使用问题</td>
-<td>按指导调整后解决；照片显示误用</td>
+<td>客户使用问题（含顾客购买、使用不当）</td>
+<td>按指导调整后解决；照片显示误用；保修外自费购买配件</td>
+<td>100 / 0</td>
+<td>100 / 0</td>
 <td>100 / 0</td>
 <td>不适用</td>
 </tr>
 <tr>
-<td>产品质量问题</td>
+<td>产品质量问题（抱怨索赔）</td>
 <td>保修期内失效且排查不成；照片与已知缺陷一致</td>
+<td>0 / 100</td>
+<td>0 / 100</td>
 <td>0 / 100</td>
 <td>需要</td>
 </tr>
 <tr>
 <td>物流问题</td>
 <td>轨迹停滞满 5 天且超预计送达；签收破损；错发漏发</td>
-<td>100 / 0，FSH 向承运商或良仓索赔</td>
-<td>不适用</td>
+<td>100 / 0</td>
+<td>100 / 0</td>
+<td>100 / 0</td>
+<td>不适用，FSH 向承运商或良仓索赔</td>
 </tr>
 <tr>
-<td>其他</td>
-<td>不属以上</td>
-<td>人工填写，默认 50 / 50</td>
+<td>其他（需填写理由）</td>
+<td>不属以上，例如物流损坏后双方分摊、责任不清</td>
+<td>50 / 50</td>
+<td>50 / 50</td>
+<td>50 / 50</td>
 <td>需要</td>
 </tr>
 </tbody>
 </table></div>
+<p>台账与列表等紧凑表格在三组比例相同时写一个值（例「0 / 100」），不同时写「按费用项」并可展开；详情页与说明文字写「三组均 FSH 0 / 工厂 100」，三组不同时逐组列出；工厂承担金额 = 各组费用 × 该组工厂比例之和。</p>
 <div class="tw"><table>
 <thead>
 <tr>
@@ -2361,7 +2474,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-AS-04</td>
-<td>良仓库存在确认时查询；创建发货单时库存已用尽 → 自动切到良仓无货分支，原报备作废，按生产厂报价重新报备，并通知售后负责人。</td>
+<td>良仓库存在确认时经积加查询；创建售后出库单时库存已用尽 → 自动切到良仓无货分支，原报备作废，按生产厂报价重新报备，并通知售后负责人。</td>
 </tr>
 <tr>
 <td>R-AS-05</td>
@@ -2369,7 +2482,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-AS-06</td>
-<td>协商最多 3 轮提案，第 3 轮后未达成一律待升级。</td>
+<td>协商最多 3 轮提案，第 3 轮后未达成一律待升级；任何一轮工厂还价后，售后负责人都可以直接升级。提案、还价、录入最终比例都按三组费用分别给比例。</td>
 </tr>
 <tr>
 <td>R-AS-07</td>
@@ -2402,7 +2515,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 </tbody>
 </table></div>
-<p>白名单起步：各店铺域名、说明书与视频托管域名、承运商查询页。同一排查内容在素材库里同时保存图文版与纯文字版。</p>
+<p>白名单起步：各店铺域名（forcome.com、forcome.mx）、说明书与视频托管域名、承运商查询页。同一排查内容在素材库里同时保存图文版与纯文字版。</p>
 <h3 id="s-7-11">7.11 多店铺（R-ST）</h3>
 <div class="tw"><table>
 <thead>
@@ -2418,7 +2531,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-ST-02</td>
-<td>进线识别：亚马逊按买家消息的收件邮箱识别店铺（每个店铺在卖家后台绑定一个邮箱）、按发件域（amazon.com / .de / .co.uk）识别站点；Shopify 与直邮按客服邮箱。识别不出进「未归属店铺」队列，由客服主管指定。</td>
+<td>进线识别：亚马逊按买家消息的收件邮箱识别店铺（每个店铺在卖家后台绑定一个邮箱）、按发件域（amazon.com / .ca / .com.mx）识别站点；Shopify 与直邮按客服邮箱。识别不出进「未归属店铺」队列，由客服主管指定。</td>
 </tr>
 <tr>
 <td>R-ST-03</td>
@@ -2457,7 +2570,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-LG-02</td>
-<td>回复语言默认等于来信语言。首批支持英语、德语，其他语言待确认（Q-16）；不支持的语言按风险信号「无法处理的内容」转人工。</td>
+<td>回复语言默认等于来信语言。首批支持英语、西班牙语（客户确认 Q-16：站点为美国、加拿大、墨西哥）；不支持的语言按风险信号「无法处理的内容」转人工。</td>
 </tr>
 <tr>
 <td>R-LG-03</td>
@@ -2465,7 +2578,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-LG-04</td>
-<td>对客户的文本里出现时间时，按客户所在时区书写并注明时区（例：「by 14:00 CEST」），不写北京时间；进展回复不写具体时刻（R-SL-05）。</td>
+<td>对客户的文本里出现时间时，按客户所在时区书写并注明时区（例：「by 2:00 PM ET」），不写北京时间；进展回复不写具体时刻（R-SL-05）。</td>
 </tr>
 </tbody>
 </table></div>
@@ -2523,7 +2636,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-FT-02</td>
-<td>可见字段：询价——配件、数量、目的国与邮编、故障描述与照片；寄件——收件人姓名、完整地址、电话（寄件完成 30 天后隐藏）；比例协商——责任类型、判定依据、费用合计及产品成本、运费、额外赔偿、其他四项构成（额外赔偿只显示金额，不显示订单号与售价）；结算确认——批次内售后单号、费用合计、比例、工厂承担金额。不显示客户邮箱、售价、店铺后台信息。</td>
+<td>可见字段：询价——配件、数量、目的国与邮编、故障描述与照片；寄件——收件人姓名、完整地址、电话（寄件完成 30 天后隐藏）；比例协商——责任类型、判定依据、费用合计及产品成本、运费、额外赔偿、其他四项构成，以及按三组费用的比例（额外赔偿只显示金额，不显示订单号与售价）；结算确认——批次内售后单号、费用合计、比例、工厂承担金额。不显示客户邮箱、售价、店铺后台信息。</td>
 </tr>
 <tr>
 <td>R-FT-03</td>
@@ -2555,12 +2668,12 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <p>每页按「布局 → 显示内容 → 操作 → 校验 → 状态」描述。数据全部来自 <code>spec/data.py</code>，时刻为 2026-09-11 10:20。操作表中的「反馈」使用设计规范里的组件：浮层提示（toast）、横幅（banner）、弹窗（dialog）。</p>
 <h3 id="s-P01">P01 收件箱 · 亚马逊工单（Main）</h3>
 <p><strong>登录人</strong> 李婷 · 坐席。<strong>选中工单</strong> T-20260910-0192 Sarah Mitchell。</p>
-<p><strong>布局</strong> 三栏：左侧工单队列 320px；中间会话与草稿；右侧上下文 340px。</p>
+<p><strong>布局</strong> 三栏浮动面板：左侧工单队列 308px；中间会话与草稿；右侧上下文 332px。</p>
 <p><strong>左栏 · 工单队列</strong>
 - 标题「待处理」，右侧「按 SLA 剩余」排序说明，开关「只看我的」。
 - 分段筛选：待审草稿 3 · 转人工 1 · 待审批 2 · 等待中 5 · 全部 11（团队队列，受顶部店铺范围限制）。
 - 行内容：客户名、渠道标识（平台点 + 站点）、SLA 胶囊、主题一行、情绪点 · 意图 · 状态。选中行左侧 3px 靛蓝条；转人工行左侧红条。
-- 行顺序（全部）：Jonas Weber 0h 55m 转人工 · Emily Chen 1h 28m 待审草稿（内部目标）· Sarah Mitchell 5h 40m 待审草稿（选中）· Marcus Lee 11h 10m 待审批 · Olivia Turner 22h 52m 待审草稿 · Priya Raman 待审批（已回复）· Ethan Brooks 等内部 · Laura Bennett 等内部 · Lukas Braun 等内部 · Ana Souza 等内部 · Felix Wagner 等客户。当前分段为「全部」，左栏可滚动，首屏显示前 8 行。</p>
+- 行顺序（全部）：Mateo Rivas 0h 55m 转人工 · Emily Chen 1h 28m 待审草稿（内部目标）· Sarah Mitchell 5h 40m 待审草稿（选中）· Marcus Lee 11h 10m 待审批 · Olivia Turner 22h 52m 待审草稿 · Priya Raman 待审批（已回复）· Ethan Brooks 等内部 · Laura Bennett 等内部 · Diego Salazar 等内部 · Ana Souza 等内部 · Sofía Márquez 等客户。当前分段为「全部」，左栏可滚动，首屏显示前 8 行。</p>
 <p><strong>中栏 · 会话与草稿</strong>
 - 标题区：主题；元信息行：T-20260910-0192 · 渠道「亚马逊 US · Forcome Direct」· 状态「待审草稿」· 优先级「高」· 意图「未收到与异常」· SLA 剩 5h 40m · 负责人李婷；标签「路途急」「物流停滞」+ 添加标签；右侧按钮：合并 · 内部备注 · 更多（改派、转人工、关闭工单）。
 - 对话摘要卡（AI）：9 月 3 日下单 V2 黑色，UPS 自 9 月 5 日无扫描，已超预计送达（9 月 9 日）；客户 9 月 15 日前要用；首次来信，负面，无风险信号。
@@ -2572,10 +2685,10 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
   - 正文（英文）：data.DRAFTS 的 sarah_A；B、C 版正文分别为 sarah_B、sarah_C。B 版只查件，不含承诺，结尾「we'll get back to you with the next step」。
   - 依据：政策 · 物流停滞或超预计送达处理流程 · 政策 · FBM 补发标准 · 历史工单 T-20260614-0117。
   - 回复检查：5 / 5 通过（折叠，点开看明细）。
-  - 需要审批的内容（黄色边框卡）：动作「良仓创建售后出库单：良仓 US · V2 黑色 ×1 · UPS Next Day Air」；报备「快递费用 $12.40」；责任「物流问题（规则：轨迹停滞满 5 天且超预计送达）」；审批人「客服主管」；时限 4 小时。说明：提交后会同时创建售后单，批准后经良仓接口创建出库单，成功即自动发出这封回复。C 版的审批项：报备「额外赔偿 · 退还运费」（金额取 SP-API 订单运费）+ 动作「亚马逊部分退款 · SP-API」；责任同为物流问题。
+  - 需要审批的内容（黄色边框卡）：动作「良仓创建售后出库单：良仓 US · V2 黑色 ×1 · UPS Next Day Air」；报备「快递费用 $12.40」；责任「物流问题（规则：轨迹停滞满 5 天且超预计送达）」；审批人「客服主管」；时限 4 小时。说明：提交后会同时创建售后单，批准后经积加创建良仓出库单，成功即自动发出这封回复。C 版的审批项：报备「额外赔偿 · 退还运费」（金额取积加订单运费）+ 动作「亚马逊部分退款 · SP-API」；责任同为物流问题。
   - 底部按钮：主按钮「提交审批」（带右箭头）；「修改」；「转人工」；右侧文字按钮「拒绝草稿」。</p>
 <p><strong>右栏 · 上下文</strong>
-- 客户：Sarah Mitchell、亚马逊匿名邮箱、历史摘要（AI，3 笔订单 2 张工单，无投诉退款）、「查看客户档案」。
+- 客户：Sarah Mitchell、亚马逊匿名邮箱、历史摘要（AI，取 data.SARAH 摘要：3 笔订单 2 张工单，此前无投诉、无退款）、「查看客户档案」。
 - 订单：113-4567890-1234567 · 已发货 · 超预计送达；商品 V2 黑色 ×1 $49.99 FBM；承运商 UPS 1Z4R28830358229017；最后扫描 09-05 Louisville, KY；预计送达 09-09（已超 2 天）；「在卖家后台打开」。
 - AI 分析：意图、情绪（负面，无风险信号）、语言（英语）、紧急度（高，有明确期限）；「未转人工的原因」一句话。</p>
 <p><strong>操作</strong></p>
@@ -2661,7 +2774,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <p><strong>状态</strong> 加载 I1 · 队列为空 I2 · 草稿生成中 I3 · AI 未处理 I4 · 发送失败 I5 · 他人处理中 I6 · 草稿失效 I7 · 提交审批确认 I8 · SLA 已超时 I9 · 合并 I11 · 已达 5 版上限 I15。</p>
 <h3 id="s-P02">P02 收件箱 · 邮件工单（TicketEmail）</h3>
 <p><strong>登录人</strong> 李婷。<strong>选中工单</strong> T-20260911-0031 Olivia Turner，Shopify · forcome.com，订单 #1063，内部目标剩 22h 52m。</p>
-<p><strong>布局</strong> 与 P01 相同的三栏；左栏选中 Olivia。</p>
+<p><strong>布局</strong> 与 P01 相同的三栏；左栏选中 Olivia。标题区按钮同 P01，Olivia 在该店铺只有这一张未关闭工单，「合并」置灰并悬停说明原因（R-TK-04）。</p>
 <p><strong>中栏</strong>
 - 来信：Olivia Turner · Gmail · support@forcome.com · 09-11 09:12，英文原文可切换中文译文。
 - AI 草稿：版本 A 先排查（选中）· B 直接寄滤芯 · C 退款；置信度 86%。
@@ -2669,7 +2782,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 - 正文：3 个排查步骤 + 内嵌素材图「拆下并清洗 HEPA 滤芯 · IMG-V2-014」+ 链接卡「V2 filter care guide · forcome.com/support/v2-filter · 白名单」+ 结尾说明「晾干后仍无改善请回信，将按保修寄送新滤芯」。
 - 依据：排查树 · 吸力下降 → 清洁滤芯；产品事实 · V2 保修 12 个月；素材库 · IMG-V2-014。
 - 按钮：发送（主按钮，本版无审批项）· 修改 · 转人工 · 拒绝草稿。</p>
-<p><strong>右栏</strong> 工单信息（店铺、渠道、意图、发送方式、负责人、内部目标 SLA）；回复检查 5 / 5（逐项列出，渠道内容能力写明「图片 1 张来自素材库，链接 1 个在白名单」）；排查树路径（当前第 1 步）；订单 #1063 $54.99，已购买 37 天，在 12 个月保修期内。</p>
+<p><strong>右栏</strong> 工单信息（店铺、渠道、意图、发送方式、负责人、内部目标 SLA）；回复检查 5 / 5（逐项列出，渠道内容能力写明「图片 1 张来自素材库，链接 1 个在白名单」）；排查树路径（当前第 1 步）；订单卡默认折叠，标题行显示摘要「#1063 · 保修内」，展开后为 $54.99、08-05 下单、已购买 37 天、在 12 个月保修期内。</p>
 <p><strong>操作</strong></p>
 <div class="tw"><table>
 <thead>
@@ -2699,16 +2812,16 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </table></div>
 <p><strong>状态</strong> 同 P01；另有 I13 链接或图片不合规。</p>
 <h3 id="s-P03">P03 收件箱 · 转人工工单（TicketEscalated）</h3>
-<p><strong>登录人</strong> 陈晨 · 坐席。<strong>选中工单</strong> T-20260902-0071 Jonas Weber，亚马逊 DE · Forcome Direct，SLA 剩 0h 55m。</p>
-<p><strong>布局</strong> 三栏，左栏选中 Jonas。</p>
+<p><strong>登录人</strong> 陈晨 · 坐席。<strong>选中工单</strong> T-20260902-0071 Mateo Rivas，亚马逊 MX · Forcome Direct，SLA 剩 0h 55m。</p>
+<p><strong>布局</strong> 三栏，左栏选中 Mateo。</p>
 <p><strong>中栏</strong>
-- 顶部红色横幅：第 ② 步命中风险信号「平台风险 · 差评威胁」（优先级紧急），原文片段「schlechte Bewertung hinterlassen」；另注「重复联系 1 次」（R-TK-03：次数为 1 只升优先级）。说明：AI 不自动起草，也不会自动发送。
+- 顶部红色横幅：第 ② 步命中风险信号「平台风险 · 差评威胁」（优先级紧急），原文片段「dejar una reseña negativa」；另注「重复联系 1 次」（R-TK-03：次数为 1 只升优先级）。说明：AI 不自动起草，也不会自动发送。
 - 历史折叠条：本工单 09-02 首次来信，已建售后单 S-20260903-0012（电池，生产厂直寄运输中）。
-- 最新来信：德语原文与中文译文并排。
-- 已提交的审批：卡片「AP-20260911-001 · 待审批 · 剩 3h 10m」，内容：报备额外赔偿 €44.90（≈ $49.39，免退货全额退款）；动作「亚马逊退款 €44.90 · SP-API」；绑定德语回复（折叠显示前两行），退款成功后自动发出；「撤回」按钮。
+- 最新来信：西班牙语原文与中文译文并排。
+- 已提交的审批：卡片「AP-20260911-001 · 待审批 · 剩 3h 10m」，内容：报备额外赔偿 MX$889.00（≈ $49.39，免退货全额退款）；动作「亚马逊退款 MX$889.00 · SP-API」；绑定西班牙语回复（折叠显示前两行），退款成功后自动发出；「撤回」按钮。
 - 警示横幅（R-SL-05）：SLA 剩 55 分钟，审批剩 3h 10m，承诺退款的回复会在审批后才发出；建议先发不含承诺的进展回复。按钮「插入进展回复模板」。
-- 回复框（进展回复）：左中文、右德文译文并排；中文「Weber 先生您好，您的退款申请我们已经受理，会尽快给您明确答复。补发的电池仍在运输途中。」；德文译文对应。进展回复不写具体时刻、不作承诺（R-SL-05、R-LG-04）。工具行：回复语言 Deutsch ▾ · 用中文写自动译成德语 · 插入图片 / 链接置灰。按钮：主按钮「发送进展回复」· 让 AI 起草 · 转客服主管。</p>
-<p><strong>右栏</strong> 工单信息（状态转人工 · 挂审批单 AP-20260911-001、意图退货与退款、情绪负面、优先级紧急、负责人陈晨、重复联系 1 次、风险信号）；客户历史摘要（AI）；关联售后单两张（S-20260903-0012 寄配件·良仓无货·比例协商待升级；S-20260911-0020 退款或部分补偿·报备审批中）；订单 302-8811234-9901122 €44.90。</p>
+- 回复框（进展回复）：左中文、右西班牙语译文并排；中文「Rivas 先生您好，您的退款申请我们已经受理，会尽快给您明确答复。补发的电池仍在运输途中。」；西班牙语译文对应。进展回复不写具体时刻、不作承诺（R-SL-05、R-LG-04）。工具行：回复语言 Español ▾ · 用中文写自动译成西班牙语 · 插入图片 / 链接置灰。按钮：主按钮「发送进展回复」· 让 AI 起草 · 转客服主管。</p>
+<p><strong>右栏</strong> 工单信息（状态转人工 · 挂审批单 AP-20260911-001、意图退货与退款、情绪负面、优先级紧急、负责人陈晨、重复联系 1 次、风险信号）；客户历史摘要（AI）；关联售后单两张（S-20260903-0012 寄配件·良仓无货·比例协商待升级；S-20260911-0020 退款或部分补偿·报备审批中）；订单卡默认折叠，标题行显示「MX$889.00 · 08-27 签收」。</p>
 <p><strong>操作</strong></p>
 <div class="tw"><table>
 <thead>
@@ -2721,7 +2834,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tbody>
 <tr>
 <td>插入进展回复模板</td>
-<td>回复框填入该店铺德语进展模板（不含承诺）</td>
+<td>回复框填入该店铺西班牙语进展模板（不含承诺）</td>
 <td>无</td>
 </tr>
 <tr>
@@ -2737,7 +2850,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>撤回审批单</td>
 <td>仅发起人、批准前</td>
-<td>二次确认；审批单「已撤回」，售后单 S-20260911-0020 退回待确认并锁定给陈晨（R-AP-07）；工单保持转人工</td>
+<td>二次确认；审批单「已撤回」，与驳回同样处理：售后单 S-20260911-0020 退回待确认并锁定给陈晨（R-AP-07）；工单保持转人工</td>
 </tr>
 <tr>
 <td>转客服主管</td>
@@ -2755,29 +2868,31 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <li>指标（4 个）：未关闭 11 · 待审草稿 3 · 2 小时内到期 2 · 转人工 1。点击指标即按该条件筛选。</li>
 <li>筛选：状态 · 渠道 · 店铺（含「未归属店铺」，只对客服主管显示）· 意图 · 情绪 · 标签 · 负责人 · 最近来信时间；右侧「按 SLA 剩余」排序（R-SL-04）。</li>
 <li>批量操作条（选中行时出现在表头上方）：已选 2 张 · 改派 · 添加标签 · 合并 · 关闭。</li>
-<li>表格列：选择框 · 工单号 · 主题（含标签）· 渠道与店铺 · 客户 · 意图 · 情绪 · 状态 · 负责人 · SLA 剩余 · 最近来信。行数据为 data.TICKETS 全部 13 行；选中 Sarah、Marcus 两行演示批量条。</li>
+<li>表格列：选择框 · 工单号 · 主题（含标签）· 渠道与店铺 · 客户 · 意图 · 情绪 · 状态 · 负责人 · SLA 剩余 · 最近来信（当天只写时分）。行数据为 data.TICKETS 全部 13 行；选中 Sarah、Marcus 两行演示批量条。</li>
 <li>底部分页：共 13 条 · 1 / 1。</li>
 </ul>
-<p><strong>操作</strong> 点击行跳转（未关闭 → P01，已解决/已关闭 → P05）；批量改派需选择接手人；批量合并仅同店铺同客户可用，否则按钮禁用并提示原因；导出按当前筛选导出 Excel。</p>
+<p><strong>操作</strong> 点击行跳转（未关闭 → P01，已解决/已关闭 → P05）；新建工单：选择店铺、客户（或输入邮箱）、关联订单，写首封消息发出，工单为等客户、不计 SLA（6.1）；批量改派需选择接手人；批量合并仅同店铺同客户可用，否则按钮禁用并提示原因；导出按当前筛选导出 Excel。</p>
 <p><strong>状态</strong> 加载骨架（表格 8 行）；筛选无结果 I10；未归属店铺队列 I14；无权限 G2。</p>
 <h3 id="s-P05">P05 工单详情 · 全程记录（TicketDetail）</h3>
-<p><strong>登录人</strong> 李婷。<strong>工单</strong> T-20260904-0098 Oliver Grant，亚马逊 UK · Forcome Direct，状态已解决（09-17 自动关闭）。</p>
+<p><strong>登录人</strong> 李婷。<strong>工单</strong> T-20260904-0098 Oliver Grant，亚马逊 CA · Forcome Direct，状态已解决（预计 09-17 自动关闭）。</p>
 <p><strong>布局</strong> 标题区 + 左主（时间线）右辅 380px。</p>
 <ul>
-<li>标题区：主题 Charger cable not working；状态已解决；渠道；标签；按钮：重新打开 · 合并 · 内部备注 · 导出记录。</li>
+<li>标题区：主题 Charger cable not working；状态已解决；渠道；标签；按钮：重新打开 · 合并（置灰）· 内部备注 · 导出记录。本例 Oliver 在该店铺没有其他未关闭工单，「合并」置灰，悬停「没有可合并的工单：同店铺同客户无其他未关闭工单」（R-TK-04）。</li>
 <li>时间线（客户来信、我方回复为消息卡；系统与人工事件为分隔线）：</li>
 <li>09-04 10:12 客户来信：充电线插上没反应。</li>
 <li>09-04 10:13 系统：意图产品故障与使用问题，未命中风险信号，生成 3 版草稿，推荐 A 排查。</li>
 <li>09-04 10:40 李婷采用 A 版未修改发出：换插座、检查点烟器保险丝。</li>
-<li>09-04 20:05 客户来信：换插座没用，用自己的 USB-C 线可以充电。</li>
-<li>09-05 09:00 系统：排查树结论「充电线故障」，创建售后单 S-20260905-0014（待确认）。</li>
+<li>09-05 08:58 客户来信：换插座没用，用自己的 USB-C 线可以充电（回复的是排查步骤，不计重复联系）。</li>
+<li>09-05 08:59 系统：排查树结论「充电线故障」，创建售后单 S-20260905-0014（待确认）。</li>
 <li>09-05 09:10 王磊确认：寄配件 · 良仓有货 · 产品质量问题；报备快递费用 $5.90。</li>
-<li>09-05 09:40 周敏批准，经良仓接口创建出库单。</li>
+<li>09-05 09:40 周敏批准，经积加创建良仓出库单。</li>
 <li>09-05 15:20 良仓发出 1Z4R28830358229052。</li>
 <li>09-05 15:30 李婷采用单号回复草稿 A 版发出；工单转等客户。</li>
-<li>09-06 10:05 张工（生产厂 FZJ）在工厂工作台接受工厂 100%；09-10 16:05 结算批次 2026-09-FZJ-A 双方确认，已结算 $7.30。</li>
+<li>09-06 10:05 张工（生产厂 FZJ）在工厂工作台接受承担比例：三组均 FSH 0 / 工厂 100。</li>
 <li>09-10 09:00 客户来信「Thanks, the new cable works!」；系统识别致谢，标记亚马逊无需回复，工单转已解决。</li>
-<li>右栏：工单信息（店铺、意图、情绪、负责人、重复联系 1）；SLA 结果（2 封来信首次回复 28m、19h 25m，均达标）；状态流转（新建 → 待审草稿 → 等客户 → 等内部 → 等客户 → 已解决 → 09-17 关闭）；关联（订单、售后单、审批单 AP-20260905-002）；AI 记录（2 次回复均采纳 A 版未修改，计入采纳率；「标记为 FAQ 候选」）。</li>
+<li>09-10 09:05 李婷把本单标记为 FAQ 候选（K12 待审核）。</li>
+<li>09-10 16:05 结算批次 2026-09-FZJ-A 双方确认，已结算 $7.30。</li>
+<li>右栏：工单信息（店铺、意图、情绪、负责人、重复联系 0 次）；SLA 结果（2 封来信首次回复 28m、6h 32m，均达标；致谢无需回复）；状态流转（新建 → 待审草稿 → 等客户 → 等内部 → 等客户 → 已解决 → 预计 09-17 自动关闭）；关联（订单、售后单、审批单 AP-20260905-002）；AI 记录（2 次回复均采纳 A 版未修改，计入采纳率；FAQ 候选已提交 · 待审核）。</li>
 </ul>
 <p><strong>操作</strong> 重新打开：已解决或关闭 30 天内可用，原因必填，工单回到分诊中；导出记录：导出 PDF。</p>
 <p><strong>状态</strong> 加载骨架；找不到 G3；无权限 G2（其他店铺数据）。</p>
@@ -2798,20 +2913,21 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <li>表格列：售后单号 · 客户 · 渠道与店铺 · 处理方式 · 责任 · 状态 · 当前环节 · 在等谁 · 已等 · 费用合计 · 负责人（按店铺分配的售后负责人，示例均为王磊；路径 B 的单在负责人下方小字显示发起坐席）。13 行来自 data.AFTERSALES，排序：需我处理（待确认、待升级）在前，其次等审批、等生产厂，再按已等时长。</li>
 <li>需我处理的行左侧黄条。</li>
 </ul>
-<p><strong>操作</strong> 点击待确认行 → P08；其他 → P09 / P10 / P11；「新建售后单」→ 选择来源工单后进入 P08。</p>
+<p><strong>操作</strong> 点击待确认行 → P08；其他 → P09 / P10 / P11；「新建售后单」→ 选择来源工单后进入 P08，按路径 A 待确认，没有发起人（5.4）。「已等」列：以工作日计时限的环节同时显示截止时刻（例 S-20260911-0019「1h 30m · 09-15 周二 09:00 截止」，R-CL-02）。</p>
 <p><strong>状态</strong> 加载骨架；筛选无结果 S10。</p>
 <h3 id="s-P08">P08 确认责任与处理方式（AfterSalesConfirm）</h3>
 <p><strong>登录人</strong> 王磊。<strong>售后单</strong> S-20260911-0022 Ethan Brooks，待确认，来源 T-20260911-0035。</p>
 <ul>
-<li>标题区：「确认责任与处理方式 · Ethan Brooks · 充电线不充电」；状态待确认；等待 15 分钟；按钮：查看原工单 · 退回客服继续排查。</li>
+<li>标题区：「确认责任与处理方式 · Ethan Brooks · 充电线不充电」；状态待确认；已等 15m；按钮：查看原工单 · 退回继续排查。</li>
 <li>第 1 项 处理方式（选项卡片，三选一）：调整安装方式 · 寄配件（选中，AI 建议）· 退款或部分补偿。寄配件下展开：配件 FC-V2-CB01 充电线 · 数量 1。</li>
 <li>第 2 项 责任类型（四选一）：产品质量问题（选中，AI 建议）；AI 依据：购买 23 天保修内；换用自己的线可以充电、原装线不行，视频已附；近 30 天同配件 1 起（S-20260905-0014）。改判时出现「改判理由」必填框。</li>
-<li>第 3 项 库存与费用：良仓 US 库存 12 件（良仓接口 10:05 查询）→ 良仓有货；产品成本 $1.40（SKU 成本表）、运费 $5.90（良仓运费试算）、额外赔偿 $0、其他 $0；建议承担比例 FSH 0 / 工厂 100（需要协商）。</li>
-<li>确认后将发生：创建发货单参数 → 报备快递费用 $5.90 交客服主管审批 → 批准即经良仓接口创建出库单，并向生产厂 FZJ 发起比例提案（充电线归 FZJ）。</li>
+<li>第 3 项 库存与费用：良仓 US 库存 12 件（经积加 10:05 查询）→ 良仓有货；产品成本 $1.40（SKU 成本表）、运费 $5.90（良仓运费试算）、额外赔偿 $0、其他 $0；建议承担比例按三组费用列出：产品成本 0 / 100 · 快递物流 0 / 100 · 其他费用 0 / 100（需要协商）。</li>
+<li>确认后将发生：生成售后出库单参数 → 报备快递费用 $5.90 交客服主管审批 → 批准即经积加创建良仓出库单，并向生产厂 FZJ 发起比例提案（充电线归 FZJ）。</li>
 <li>底部按钮：确认并提交报备（主）· 暂存 · 取消售后单（危险描边）。</li>
-<li>右栏：来源工单信息、排查记录（2 轮：09:30 李婷发出第 1 轮，客户 09:42 回复；09:50 第 2 轮，客户 09:58 回复并附视频）、客户原话与附件、同类参考（近 30 天 FC-V2-CB01 售后 1 单 S-20260905-0014，生产厂接受工厂 100%）。</li>
+<li>右栏：来源工单信息、排查记录（2 轮：09:30 李婷发出第 1 轮，客户 09:42 回复；09:50 第 2 轮，客户 10:04 回复并附视频；两轮都是排查步骤，不计重复联系）、客户原话与附件、同类参考（近 30 天 FC-V2-CB01 售后 1 单 S-20260905-0014，生产厂接受三组均 FSH 0 / 工厂 100）。</li>
 <li>路径 B 被驳回、锁定给原发起人的待确认单（R-AP-07）打开 P08 时整页只读，顶部提示「等坐席重新提交」，按钮只保留「查看原工单」。</li>
 </ul>
+<p><strong>操作</strong> 确认并提交报备：进入对应售后单详情，报备进入 P15；退回继续排查：原因必填，售后单转已取消（原因「退回继续排查」），来源工单回到分诊中并生成下一步排查草稿；取消售后单：原因必填。</p>
 <p><strong>校验</strong> 处理方式、责任必选；选退款或部分补偿时金额必填且不超过订单金额；改判必填理由；寄配件数量 1–10。</p>
 <p><strong>状态</strong> 未选必填 S1；库存查询失败 S2。</p>
 <h3 id="s-P09">P09 售后单详情 · 良仓无货（AfterSalesTicket）</h3>
@@ -2819,19 +2935,19 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <ul>
 <li>标题区：「HEPA 滤芯组件补发 · Laura Bennett」；状态进行中；处理方式寄配件 · 良仓无货；责任产品质量问题（已确认）；元信息：原工单 T-20260910-0201 · 订单 111-2233445-5566778 · 负责人王磊；按钮：查看原工单 · 改处理方式 · 终止流程（危险描边）。</li>
 <li>步骤条：确认 08:20 ✓ · 派发询价 08:21 ✓ · 生产厂报价 09:40 ✓ · 报备审批（当前，等周敏，剩 3h 21m）· 生产厂寄件 · 单号回复客户 · 完成。</li>
-<li>并行条：比例协商「未发起」，报备通过后自动发起，建议工厂 100%。</li>
+<li>并行条：比例协商「未发起」，报备通过后自动发起，建议三组均 FSH 0 / 工厂 100。</li>
 <li>左：执行记录（时间、执行者标识、事件）；报备卡：AP-20260911-003 · 快递费用 $11.50 · 等客服主管周敏 · 剩 3h 21m；生产厂报价（产品 $3.20 + 运费 $11.50）旁有「退回报价」（原因必填，工厂任务转「已退回」、回到生产厂待处理，同时撤回本报备）；按钮「催办」（每小时最多 1 次）「撤回并修改」。</li>
 <li>右：登记信息 16 项——处理方式、分支、责任类型、配件、数量、发货方、承运方式、寄出日期、快递单号、产品成本、运费、额外赔偿、其他、报备、承担比例、结算批次（本例快递单号、寄出日期、结算批次等未填）；工厂协同（生产厂 FQD 最近 2 条留言 + 打开沟通）；客户与订单。</li>
 </ul>
-<p><strong>操作</strong> 催办：给审批人推送即时消息；撤回并修改：二次确认后审批单已撤回，可修改金额重提；终止流程：原因必填（S6）；改处理方式：仅在寄出前可用。</p>
-<p><strong>状态</strong> 报备被驳回 S3；生产厂超时 S5；终止确认 S6；客户改地址 S7。</p>
+<p><strong>操作</strong> 催办：给审批人推送钉钉工作通知（同时站内通知），每小时最多 1 次；撤回并修改：二次确认后审批单已撤回，售后单保持进行中，当前环节「报备审批 · 待重新提交」（R-AP-07），修改金额后重新提交；终止流程：原因必填（S6）；改处理方式：仅在寄出前可用。</p>
+<p><strong>状态</strong> 报备被驳回 S3（系统发起的报备，售后单保持进行中）；生产厂超时 S5；终止确认 S6；客户改地址 S7。</p>
 <h3 id="s-P10">P10 售后单详情 · 良仓有货（AfterSalesInStock）</h3>
 <p><strong>登录人</strong> 王磊。<strong>售后单</strong> S-20260910-0017 Marcus Lee，已完成，待内部结算。</p>
 <ul>
 <li>步骤条：确认 · 估算运费 · 报备审批（周敏 09:40 批准）· 良仓创建出库单 · 良仓发出 · 单号回复客户 · 完成（全部 ✓）。</li>
-<li>并行条：比例协商已确认（陈工 09-10 17:10 接受工厂 100%）· 结算：待结算，进入 10-05 生成的批次 2026-09-B。</li>
+<li>并行条：比例协商已确认（陈工 09-10 17:10 接受三组均 FSH 0 / 工厂 100）· 结算：待结算，进入 10-05 生成的批次 2026-09-FQD-B。</li>
 <li>执行记录 9 条；右栏登记信息 16 / 16、工厂协同、客户与订单。</li>
-<li>按钮：查看原工单（T-20260909-0163 · 已解决）· 在良仓后台查看出库单 · 重开协商（批次生成前可用，原因必填，协商回到待工厂答复，见 6.6）。</li>
+<li>按钮：查看原工单（T-20260909-0163 · 已解决）· 在积加查看出库单 · 重开协商（批次生成前可用，原因必填，协商回到待工厂答复，见 6.6）。</li>
 <li>步骤条上非当天的节点带日期（例「09-10 09:40」）。</li>
 </ul>
 <p><strong>状态</strong> 库存用尽自动切换 S4。</p>
@@ -2841,25 +2957,25 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <li>步骤条：确认 · 金额提案 · 报备审批 · 执行付款（Shopify API）· 回复客户 · 完成。</li>
 <li>元信息：原工单 T-20260901-0059（已关闭）· 发起人 陈晨 · 负责人 王磊。</li>
 <li>执行付款卡（已执行）：Shopify Admin API 部分退款 $12.00，外部单号 RF-1049-01，金额与审批一致，09-02 10:11 执行；失败时按 R-AP-05 重试 3 次，仍失败可转人工操作清单。</li>
-<li>右栏：登记信息（额外赔偿 $12.00、FSH 100%、协商不适用、索赔对象 USPS、索赔状态 索赔中）、政策依据（延误超 7 天补偿运费全额）、客户与订单。</li>
+<li>右栏：登记信息（额外赔偿 $12.00、承担比例三组均 FSH 100 / 工厂 0、协商不适用、索赔对象 USPS、索赔状态 索赔中）、政策依据（延误超 7 天补偿运费全额）、客户与订单。</li>
 </ul>
 <h3 id="s-P12">P12 承担比例协商（AfterSalesNegotiation）</h3>
-<p><strong>登录人</strong> 王磊。<strong>售后单</strong> S-20260903-0012 Jonas Weber 电池，协商待升级。</p>
+<p><strong>登录人</strong> 王磊。<strong>售后单</strong> S-20260903-0012 Mateo Rivas 电池，协商待升级。</p>
 <ul>
-<li>左上并排两张卡：FSH 提案（工厂 100%，依据、费用 $23.40 = 产品 $9.80 + 运费 $13.60）；生产厂答复（还价工厂 50%，理由：电池出厂 9 个月属库存老化）。</li>
-<li>你的选择（三张选项卡片）：接受 50 / 50（FSH 承担 $11.70）· 再次提案（第 2 轮，最多 3 轮）· 升级双方负责人（已选，09-09 已升级）。处于待升级时前两张卡置灰，悬停说明「已升级，等双方负责人商定后录入最终比例」。</li>
-<li>录入最终比例表单：FSH %、工厂 %（两者之和必须 100）、商定依据（必填）、商定人（FSH 方、生产厂方）；按钮「录入最终比例」。</li>
+<li>左上并排两张卡：FSH 提案（系统在报备批准时发起，09-03 15:20；三组费用均 FSH 0 / 工厂 100，依据、费用 $23.40 = 产品 $9.80 + 运费 $13.60）；生产厂答复（还价三组费用均 50 / 50，理由：电池出厂 9 个月属库存老化）。</li>
+<li>你的选择（三张选项卡片）：接受 50 / 50（三组费用均 50 / 50，工厂承担 $11.70）· 再次提案（第 2 轮，最多 3 轮）· 升级双方负责人（已选，09-09 已升级）。处于待升级时前两张卡置灰，悬停说明「已升级，等双方负责人商定后录入最终比例」。</li>
+<li>录入最终比例表单：产品成本、快递物流、其他费用各填「工厂承担 %」（0–100 的整数），FSH 承担自动 = 100 − 工厂；商定依据（必填）、商定人（FSH 方、生产厂方）；按钮「录入最终比例」。</li>
 <li>本单沟通：4 条留言（陈工、王磊、系统）。</li>
 <li>右栏：协商信息（轮次、状态、争议金额 $11.70）、费用、证据、提醒（同一工单另有 S-20260911-0020 退款报备审批中，将单独协商）。</li>
 </ul>
-<p><strong>校验</strong> 比例 0–100 整数，两者之和 100（S8）；依据不少于 10 个字。</p>
+<p><strong>校验</strong> 三组比例都必须是 0–100 的整数（S8）；依据不少于 10 个字。</p>
 <h3 id="s-P13">P13 登记台账（AfterSalesLog）</h3>
 <p><strong>登录人</strong> 王磊。页签「登记台账」。</p>
 <ul>
 <li>筛选：日期 2026-09-01 至 09-11 · 店铺 · 处理方式 · 责任 · 报备 · 结算；右侧按钮：列设置 · 导出 Excel。</li>
-<li>表格：12 行（不含待确认的 S-20260911-0022）。列：售后单号 · 客户 · 店铺与站点 · 处理方式 · 责任 · 配件 × 数量 · 快递单号 · 产品成本 · 运费 · 额外赔偿 · 报备 · 承担 FSH / 工厂 · 协商 · 结算。生产厂尚未报价的金额显示「待报价」；还没到寄件环节的进行中单，快递单号等字段显示「—」（不算缺失）；已完成的单缺失字段显示「待回填」并标黄，行内「补登」只对已完成的单可用。列多时默认隐藏「配件 × 数量」，可在「列设置」打开，表格可横向滚动。</li>
+<li>表格：12 行（不含待确认的 S-20260911-0022）。列：售后单号 · 客户 · 店铺与站点 · 处理方式 · 责任 · 生产厂（有生产厂参与时）· 配件 × 数量 · 快递单号 · 产品成本 · 运费 · 额外赔偿 · 报备 · 承担 FSH / 工厂（三组相同时写一个值，不同写「按费用项」）· 协商 · 结算。生产厂尚未报价的金额显示「待报价」；还没到寄件环节的进行中单，快递单号等字段显示「—」（不算缺失）；已完成的单缺失字段显示「待回填」并标黄，行内「补登」只对已完成的单可用。列多时默认隐藏「配件 × 数量」，可在「列设置」打开，表格可横向滚动。</li>
 <li>合计行（用 data.ledger_totals() 计算）：12 单；产品成本 $55.30；运费 $72.10；额外赔偿 $61.39；FSH 承担 $58.85；工厂承担 $129.94（其中已确认 $42.45，含建议比例估算 $87.49）。</li>
-<li>表下说明：金额统一美元，欧元、英镑按报备当日汇率折算（R-FL-06）；工厂承担含建议比例估算的部分，以内部结算为准。</li>
+<li>表下说明：金额统一美元，比索、加元按报备当日汇率折算（R-FL-06）；工厂承担含建议比例估算的部分，以内部结算为准。</li>
 </ul>
 <p><strong>操作</strong> 行内「补登」：售后负责人可补填缺失字段，记入审计；导出按当前筛选。</p>
 <p><strong>状态</strong> 导出中 / 完成 S11。</p>
@@ -2878,7 +2994,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <ul>
 <li>标题「审批」；页签：待我审批 4 · 我发起的 · 人工操作清单 0 · 已处理；右侧说明：含报备的由客服主管审批，时限 4 小时。</li>
 <li>审批单卡（按截止时间升序，第一张展开）：</li>
-<li>AP-20260911-001（展开）：标签「报备 · 额外赔偿」「动作 · SP-API」；Jonas Weber · 亚马逊 DE · Forcome Direct；发起人陈晨 09:30；剩 3h 10m；关联 T-20260902-0071、S-20260911-0020；理由：使用两周故障、补发电池未到、客户要求退款并威胁差评；明细：额外赔偿 €44.90（≈ $49.39），免退货全额退款；动作：经 SP-API 退款，失败自动重试 3 次，仍失败陈晨可转人工操作清单；绑定回复：德语，退款成功后自动发出（可展开看全文与中文译文）；责任：产品质量问题，建议工厂 100%，另行协商。按钮：批准 · 驳回。</li>
+<li>AP-20260911-001（展开）：标签「报备 · 额外赔偿」「动作 · SP-API」；Mateo Rivas · 亚马逊 MX · Forcome Direct；发起人陈晨 09:30；剩 3h 10m；关联 T-20260902-0071、S-20260911-0020；理由：签收后不到一周故障、补发电池未到、客户要求退款并威胁差评；明细：额外赔偿 MX$889.00（≈ $49.39），免退货全额退款；动作：经 SP-API 退款，失败自动重试 3 次，仍失败陈晨可转人工操作清单；绑定回复：西班牙语，退款成功后自动发出（可展开看全文与中文译文）；责任：产品质量问题，建议三组均 FSH 0 / 工厂 100，另行协商。按钮：批准 · 驳回。</li>
 <li>AP-20260911-002：报备快递费用 $8.40 + 良仓创建售后出库单（良仓 US 整机黑色 ×1）；Marcus Lee · Forcome Auto；责任物流问题（良仓错发，向良仓索赔）。</li>
 <li>AP-20260911-003：报备快递费用 $11.50；Laura Bennett；批准后在工厂工作台生成寄件任务并发起比例协商。</li>
 <li>AP-20260911-004：动作「Shopify #1057 改收货地址」→ Shopify Admin API，批准后自动执行；Priya Raman · forcome.com；新地址 1450 Market St, Apt 1104, San Francisco, CA 94103；审批人客服主管或售后负责人。</li>
@@ -2917,7 +3033,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <ul>
 <li>左栏分类：产品事实表 · 政策规则 · 故障排查树 · 模板与素材 · 沉淀问答（带条目数）。</li>
 <li>页签：条目 · 素材库 · 待审核沉淀 3 · 知识缺口 5。</li>
-<li>条目表：标题 · 层 · 适用店铺 · 语言 · 渠道 · 负责人 · 有效期 · 近 30 天命中 · 状态。示例 9 条（data.KB）：物流停滞或超预计送达处理流程（政策，全部店铺）· FBM 补发标准（政策）· 延误补偿规则（政策，forcome.com 覆盖）· 吸力下降排查（排查树）· 充电线不充电排查（排查树）· V2 规格与兼容车型（产品事实）· 进展回复模板 · 德语（模板，Forcome Direct DE）· 拆下并清洗 HEPA 滤芯（素材图，邮件渠道）。</li>
+<li>条目表：标题 · 层 · 适用店铺 · 语言 · 渠道 · 负责人 · 有效期 · 近 30 天命中 · 状态。示例 9 条（data.KB）：物流停滞或超预计送达处理流程（政策，全部店铺）· FBM 补发标准（政策）· 延误补偿规则（政策，forcome.com 覆盖）· 吸力下降排查（排查树）· 充电线不充电排查（排查树）· V2 规格与兼容车型（产品事实）· 进展回复模板 · 西班牙语（模板，Forcome Direct）· 拆下并清洗 HEPA 滤芯（素材图，邮件渠道）· Q3 促销运费政策（政策，即将过期 2026-09-15）。</li>
 <li>右栏：选中条目预览（政策 · 物流停滞或超预计送达处理流程）：正文摘要、适用范围、引用它的最近工单、有效期 2026-12-31、编辑 / 停用。</li>
 </ul>
 <p><strong>操作</strong> 新建条目、上传文档（解析中 K1）、审核沉淀（通过 / 退回，退回需原因）、处理缺口（关联到新条目或标记无需处理）。</p>
@@ -2925,7 +3041,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <h3 id="s-P17">P17 报表（Reports）</h3>
 <p><strong>登录人</strong> 周敏。</p>
 <ul>
-<li>筛选：本周 · 本月 · 自定义；店铺；站点；标签。数据来源说明：工单系统、登记台账、亚马逊 SP-API、Shopify；更新于 10:15。</li>
+<li>筛选：近 7 天（默认，本例 09-05 至 09-11）· 本月 · 自定义；店铺；站点；标签。数据来源说明：工单系统、登记台账、积加（订单与物流）；更新于 10:15。</li>
 <li>指标 5 个：工单量 · 首响中位数 · SLA 达标率（亚马逊）· 草稿采纳率（按 R-SD-04 只算未修改直接发送，另注修改后发送占比）· 自动发送占比（数值为示例，标注「示例数据」）。</li>
 <li>图表：每日工单量（按渠道堆叠）；意图分布；售后成本按责任类型（本月，来自登记台账：产品质量、物流、客户使用、其他四类金额，合计与 P13 一致 $188.79）；工厂承担与结算进度（FQD、FZJ 合计：已结算 $20.50、待结算 $21.95、未定 $87.49）。</li>
 <li>每个图表右上「查看明细」跳到 P04 或 P13 并带筛选。</li>
@@ -2934,18 +3050,18 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <h3 id="s-P18">P18 设置 · 渠道与店铺（Settings）</h3>
 <p><strong>登录人</strong> 刘洋 · 管理员。</p>
 <ul>
-<li>左侧设置菜单 9 项与归属：渠道与店铺、动作映射、工厂账号、团队与权限归管理员；处理规则、售后规则、标签库、模板（通知与签名模板）、SLA 归客服主管。无权的菜单项带锁标，点击显示无权限。P18 同时包含「渠道与店铺」「动作映射」两节，P19 同时包含「处理规则」「售后规则」两节，点击菜单定位到对应节。</li>
-<li>渠道卡（3 × 2）：亚马逊 SP-API（已连接，2 个店铺，订单、发货与退货信息；退款、取消审批后执行）· Shopify Admin API（已连接，2 个店铺，订单查询与备注、退款、改地址、取消）· Gmail（已连接，4 个邮箱：2 个亚马逊买家消息邮箱、2 个 Shopify 客服邮箱）· 良仓开放接口（已连接，库存、售后出库单、单号与运费回传；范围待确认 Q-21）· 钉钉（已连接：通讯录成员与部门每小时同步、工作通知、扫码登录与钉钉内免登）· 积加 ERP（虚线卡：预留、暂不接入）。</li>
-<li>动作映射表：9 个统一动作 × 亚马逊店铺 / Shopify 店铺两列——查订单（SP-API / Admin API）、查物流（承运商查询）、查库存与创建出库单（良仓接口）、回复客户（Gmail 中转 / Gmail）、订单备注（系统内备注 / Admin API）、退款（SP-API / Admin API）、改地址（平台不支持 / Admin API）、取消（SP-API / Admin API）；表头右侧注明「积加适配器：预留」。</li>
-<li>店铺表：4 个店铺（店铺与平台、站点、进线邮箱、平台标识——亚马逊卖家 ID 或 Shopify 店铺域名、覆盖项、状态），按钮「新增店铺」；签名在店铺详情中维护。</li>
+<li>左侧设置菜单 9 项与归属：渠道与店铺、动作映射、工厂账号、团队与权限归管理员；处理规则、售后规则、标签库、模板（通知与签名模板）、SLA 归客服主管。无权的菜单项带锁标，点击显示无权限。P18 同时包含「渠道与店铺」「动作映射」两节，P19 同时包含「处理规则」「售后规则」两节，点击菜单定位到对应节；P20 同时包含「团队与权限」「工厂账号」两节。</li>
+<li>渠道卡（3 × 2）：亚马逊 SP-API（已连接，2 个店铺，退款、取消审批后执行；订单信息由积加同步）· Shopify Admin API（已连接，2 个店铺，退款、改地址、取消、订单备注；订单信息由积加同步）· Gmail（已连接，4 个邮箱：2 个亚马逊买家消息邮箱、2 个 Shopify 客服邮箱）· 积加 ERP（已连接：订单与物流轨迹、库存、良仓售后出库单与单号运费回传，Q-25）· 钉钉（已连接：通讯录成员与部门每小时同步、工作通知、扫码登录与钉钉内免登）· 良仓海外仓（虚线卡：经积加对接，本系统不直连）。</li>
+<li>动作映射表：9 个统一动作 × 亚马逊店铺 / Shopify 店铺两列——查订单（积加）、查物流（积加）、查库存（积加，良仓）、创建售后出库单（积加，良仓）、回复客户（Gmail 中转 / Gmail）、订单备注（系统内备注 / Admin API）、退款（SP-API / Admin API）、改地址（平台不支持 / Admin API）、取消（SP-API / Admin API）；表头右侧注明「良仓经积加对接」。</li>
+<li>店铺表：4 个店铺（Forcome Direct 覆盖 US / CA / MX、Forcome Auto US、forcome.com US / CA、forcome.mx MX；站点、进线邮箱、平台标识——亚马逊卖家 ID 或 Shopify 店铺域名、覆盖项、状态），按钮「新增店铺」；签名在店铺详情中维护。</li>
 </ul>
 <p><strong>操作</strong> 测试连接；新增店铺（K8 校验：店铺名唯一、平台标识必填、邮箱格式）；断开重连（K7）；保存（K6）。</p>
 <h3 id="s-P19">P19 设置 · 处理规则（SettingsRules）</h3>
 <p><strong>登录人</strong> 周敏。</p>
 <ul>
-<li>发送方式与阈值表：12 个意图 × 发送方式 · 置信度阈值 · 近 30 天采纳率 · 样本数 · 放开条件（满足 / 不满足及原因）· 操作。订单查询、发票与收据为自动发送；其余按 R-IN 默认。</li>
+<li>发送方式与阈值表：12 个意图 × 发送方式 · 置信度阈值 · 近 30 天采纳率 · 样本数 · 放开条件（满足 / 不满足及原因）· 操作。订单查询、发票与收据为自动发送；其余按 R-IN 默认（修改订单、到货问题为待审草稿，含高风险动作，开关禁用）。</li>
 <li>风险信号：6 条，各带开关（安全事故、平台风险不可关闭）与优先级。</li>
-<li>售后规则：责任类型建议比例表；报备规则（类型、审批人、时限、门槛、超额 10% 补充报备）。</li>
+<li>售后规则：责任类型建议比例表（四类 × 产品成本、快递物流、其他费用三组）；报备规则（类型、审批人、时限、门槛、超额 10% 补充报备）。</li>
 <li>渠道内容能力：两行（邮件、亚马逊）+ 链接白名单 5 个域名。</li>
 <li>设置菜单「SLA」页（本版未单独出图）：亚马逊 24 小时（自然小时，只读）、Shopify 与邮件内部目标（可按店铺覆盖）、工作时间（R-CL-01、R-CL-02，不扣节假日）。</li>
 </ul>
@@ -2956,15 +3072,15 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <li>成员表（来自钉钉通讯录，10:00 同步）：李婷、陈晨、周敏、王磊、赵倩、刘洋（钉钉部门、角色、数据范围店铺、语言、状态、最近登录）；按钮「从钉钉添加」。</li>
 <li>角色权限矩阵（只读展示，见第 10 节）。</li>
 <li>页头右侧：备用审批人下拉（王磊 · 售后负责人，Q-19 已确认），说明「唯一有权审批的人是发起人时转给此人（R-AP-02）」。</li>
-<li>生产厂账号（2 家）：FQD——陈工（对接人，钉钉成员，分配「生产厂对接人」角色）、刘厂长（负责人，比例升级时的商定人，不分配系统角色）；FZJ——张工（对接人）、周厂长（负责人）。成员都来自钉钉通讯录。每家显示负责的 SKU 范围与「负责的 SKU」入口（R-FT-07）；按钮「新增生产厂账号」。</li>
+<li>生产厂账号（2 家）：FQD——陈工（对接人，钉钉成员，分配「生产厂对接人」角色）、刘厂长（负责人，比例升级时的商定人，不分配系统角色）；FZJ——张工（对接人）、周厂长（负责人）。成员都来自钉钉通讯录。每家显示负责的 SKU 范围与「负责的 SKU」入口（R-FT-07）；按钮「从钉钉添加生产厂成员」。</li>
 </ul>
 <p><strong>操作</strong> 从钉钉添加成员（从钉钉通讯录选人，再分配角色与店铺范围，必填）；停用成员（K10 二次确认，未处理工单需先改派）；成员在钉钉离职后自动停用，其未关闭工单进入客服主管改派队列。</p>
 <h3 id="s-P21">P21 工厂工作台（FactoryPortal）</h3>
 <p><strong>登录人</strong> 陈工 · 生产厂对接人（生产厂 FQD）。只看 FQD 的任务；FZJ 的对接人张工登录后只看 FZJ 的任务。</p>
 <ul>
 <li>外壳：与客服系统相同的顶栏样式，品牌处标「工厂工作台」，导航「待办 · 已完成 · 结算」，范围固定为「生产厂 FQD」；左右两栏为浮动面板。</li>
-<li>左栏待办列表（data.FACTORY_TASKS）：询价 S-20260911-0019（待处理，剩 2 个工作日，选中）· 比例协商 S-20260903-0012（已提交，双方负责人处理中）· 询价 S-20260911-0018（已提交，等 FSH 报备）；已完成 4 项折叠。底部：本月本厂应承担（已确认）$35.15（已结算 $13.20 + 待结算 $21.95），批次 2026-09-FQD-B 10-05 生成。</li>
-<li>中栏任务详情：FSH 的需求（配件软管 FC-V2-HS02 ×2、寄往德国 10115、故障描述与照片 2 张）；报价表单：产品成本（$，必填）· 运费（$，必填）· 承运方式（下拉）· 可寄出日期（不早于今天）· 备注；按钮「提交报价」「无法供货」（需说明原因）。</li>
+<li>左栏待办列表（data.FACTORY_TASKS）：询价 S-20260911-0019（待处理，剩 2 个工作日 · 09-15 周二 09:00 截止，选中）· 比例协商 S-20260903-0012（已提交，双方负责人处理中）· 询价 S-20260911-0018（已提交，等 FSH 报备）；已完成 8 项折叠（询价、寄件、比例答复、结算确认）。当天的时间只写时分。底部：本月本厂应承担（已确认）$35.15（已结算 $13.20 + 待结算 $21.95），批次 2026-09-FQD-B 10-05 生成。</li>
+<li>中栏任务详情：标题行「剩 2 个工作日 · 09-15 周二 09:00 截止」；FSH 的需求（系统 08:50 自动派发；配件软管 FC-V2-HS02 ×2、寄往墨西哥 06600、故障描述与照片 2 张）；报价表单：产品成本（$，必填）· 运费（$，必填）· 承运方式（下拉）· 可寄出日期（不早于今天）· 备注；按钮「提交报价」「无法供货」（需说明原因）。</li>
 <li>右栏本单沟通：系统派发消息 + 输入框（可附图）。</li>
 </ul>
 <p><strong>校验</strong> 金额必填、大于 0、最多两位小数；日期不早于今天；无法供货原因必填。</p>
@@ -2988,7 +3104,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>I1</td>
 <td>收件箱加载中</td>
 <td>首屏 &gt; 300ms</td>
-<td>三栏骨架</td>
+<td>三栏骨架；超过 10 秒转加载失败（设计规范第 9 节）</td>
 </tr>
 <tr>
 <td>I2</td>
@@ -3006,7 +3122,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>I4</td>
 <td>AI 未处理</td>
 <td>模型不可用或生成失败</td>
-<td>黄色横幅「AI 暂不可用，请人工回复」，回复框可直接写</td>
+<td>工单状态为转人工并带「AI 未处理」标记（归入转人工分段）；黄色横幅「AI 暂不可用，请人工回复」，回复框可直接写</td>
 </tr>
 <tr>
 <td>I5</td>
@@ -3109,7 +3225,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>A5</td>
 <td>执行失败</td>
-<td>卡片红色横幅：良仓创建出库单失败，已重试 3 次；按钮「重试」「转人工操作清单」</td>
+<td>卡片红色横幅：良仓创建售后出库单失败，已重试 3 次；按钮「重试」「转人工操作清单」；收件箱对应工单保持原状态并标「执行失败」（AC-AP-12）</td>
 </tr>
 <tr>
 <td>A6</td>
@@ -3125,6 +3241,11 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>A8</td>
 <td>坐席视角</td>
 <td>「我发起的」只读列表，可撤回未批准的单；撤回后工单回到提交前状态</td>
+</tr>
+<tr>
+<td>A9</td>
+<td>转给备用审批人</td>
+<td>王磊视角：「待我审批」出现周敏发起的含报备审批单，卡片标「备用审批人」并写明原因「发起人周敏是唯一的客服主管」（R-AP-02、E-28、AC-AP-03）</td>
 </tr>
 </tbody>
 </table></div>
@@ -3151,17 +3272,17 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>S3</td>
 <td>报备被驳回</td>
-<td>售后单详情顶部红色横幅，显示驳回人、原因、「修改后重新提交」</td>
+<td>系统发起的报备被驳回：售后单详情顶部红色横幅，显示驳回人、原因；售后单保持进行中，当前环节「报备审批 · 待重新提交」，可「修改后重新提交」或「退回生产厂报价」（R-AP-07）</td>
 </tr>
 <tr>
 <td>S4</td>
 <td>库存用尽自动切换</td>
-<td>黄色横幅：发货单创建失败，已切到良仓无货，原报备作废，已派发询价</td>
+<td>黄色横幅：出库单创建失败，已切到良仓无货，原报备作废，已派发询价</td>
 </tr>
 <tr>
 <td>S5</td>
 <td>生产厂超时</td>
-<td>步骤条当前环节标「已催 1 次」「卡住」两种</td>
+<td>步骤条当前环节标「已催 1 次」「卡住」两种；时限：询价 2、寄件 3、比例答复 3、结算确认 5 个工作日，截止时刻按 R-CL-02</td>
 </tr>
 <tr>
 <td>S6</td>
@@ -3176,7 +3297,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>S8</td>
 <td>录入最终比例校验</td>
-<td>两者之和不为 100 时报错</td>
+<td>三组费用各填工厂承担比例，超出 0–100 时报错；FSH 自动补足 100</td>
 </tr>
 <tr>
 <td>S9</td>
@@ -3223,12 +3344,12 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>F4</td>
 <td>回填单号</td>
-<td>寄件任务：显示收件信息，回填单号与实际运费；超报备 10% 时提示将触发补充报备</td>
+<td>寄件任务：显示收件信息与截止时刻，回填单号与实际运费；超报备 10% 时提示将触发补充报备</td>
 </tr>
 <tr>
 <td>F5</td>
 <td>比例答复</td>
-<td>接受 / 还价 / 拒绝，还价与拒绝理由必填</td>
+<td>系统在报备批准时发起的提案；接受 / 还价 / 拒绝，还价按三组费用分别填工厂承担比例，还价与拒绝理由必填</td>
 </tr>
 <tr>
 <td>F6</td>
@@ -3243,7 +3364,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>F8</td>
 <td>结算确认</td>
-<td>批次 2026-09-FQD-B 明细（2 单，工厂承担合计 $21.95）；按钮「确认」与「有异议」（理由必填）</td>
+<td>批次 2026-09-FQD-B 明细（2 单，工厂承担合计 $21.95），5 个工作日内确认（10-12 周一 09:00 截止）；按钮「确认」与「有异议」（理由必填）</td>
 </tr>
 <tr>
 <td>F9</td>
@@ -3275,7 +3396,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>K3</td>
 <td>报表加载中</td>
-<td>指标与图表骨架</td>
+<td>指标与图表骨架；超过 10 秒转加载失败</td>
 </tr>
 <tr>
 <td>K4</td>
@@ -3349,10 +3470,10 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tbody>
 <tr>
 <td>E-01</td>
-<td>平台或良仓接口中断（SP-API、Shopify Admin API、良仓）</td>
+<td>积加或平台接口中断（积加、SP-API、Shopify Admin API）</td>
 <td>连续 3 次调用失败</td>
 <td>依赖该接口的查询与动作暂停，已批准的动作排队；来信不受影响（经 Gmail）</td>
-<td>全站红色横幅（G4），管理员收到即时消息</td>
+<td>全站红色横幅（G4）；管理员、客服主管收到站内通知与钉钉工作通知</td>
 <td>恢复后按顺序执行；SLA 按原到达时间计</td>
 </tr>
 <tr>
@@ -3382,15 +3503,15 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>E-05</td>
 <td>动作执行失败</td>
-<td>平台或良仓接口返回错误</td>
-<td>审批单「执行失败」，绑定回复不发出（R-AP-05、R-AP-06）</td>
-<td>审批卡红色横幅（A5）</td>
+<td>积加或平台接口返回错误</td>
+<td>审批单「执行失败」，绑定回复不发出（R-AP-05、R-AP-06）；工单保持原状态并标「执行失败」</td>
+<td>审批卡红色横幅（A5）；收件箱工单标记</td>
 <td>发起人重试或转人工操作清单</td>
 </tr>
 <tr>
 <td>E-06</td>
-<td>良仓库存在建发货单时已用尽</td>
-<td>良仓接口返回库存不足</td>
+<td>良仓库存在建出库单时已用尽</td>
+<td>积加返回良仓库存不足</td>
 <td>切到良仓无货分支，原报备作废，派发询价（R-AS-04）</td>
 <td>售后单黄色横幅（S4）</td>
 <td>生产厂报价后重新报备</td>
@@ -3405,9 +3526,9 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>E-08</td>
-<td>审批单被驳回</td>
-<td>审批人驳回</td>
-<td>绑定回复不发出；工单回到提交前状态；售后单退回待确认（路径 B 锁定给原发起人，R-AP-07）</td>
+<td>审批单被驳回或撤回</td>
+<td>审批人驳回、发起人撤回</td>
+<td>绑定回复不发出；工单回到提交前状态；售后单按 R-AP-07 处理（退回待确认，路径 B 锁定给原发起人；系统发起的报备保持进行中 · 待重新提交）</td>
 <td>发起人收到通知；售后单红色横幅（S3）</td>
 <td>修改后重新发起</td>
 </tr>
@@ -3431,7 +3552,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>E-11</td>
 <td>流程中客户再来信</td>
 <td>新消息归并到工单</td>
-<td>按 R-TK-03 计重复联系次数，次数达 2 转人工；进行中的草稿失效</td>
+<td>我方上一封是结论性回复时按 R-TK-03 计重复联系，次数达 2 转人工；进行中的草稿失效</td>
 <td>工单新消息高亮（I7）</td>
 <td>坐席阅读后处理</td>
 </tr>
@@ -3493,8 +3614,8 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>E-19</td>
-<td>协商达 3 轮或生产厂拒绝</td>
-<td>协商计数</td>
+<td>协商达 3 轮、生产厂拒绝，或售后负责人主动升级</td>
+<td>协商计数、答复、手动操作</td>
 <td>转「待升级」（R-AS-06）</td>
 <td>协商页红色状态</td>
 <td>双方负责人商定后录入</td>
@@ -3551,7 +3672,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>E-26</td>
 <td>结算批次生成后需要调整比例</td>
 <td>售后负责人发起</td>
-<td>不改原单，在下一批次记冲销（待确认 Q-13）</td>
+<td>不改原单，在下一批次记冲销（Q-13 已确认）</td>
 <td>结算页提示</td>
 <td>—</td>
 </tr>
@@ -3603,6 +3724,14 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>管理员收到站内提醒；P18 钉钉卡显示「同步延迟」</td>
 <td>恢复后自动补同步</td>
 </tr>
+<tr>
+<td>E-33</td>
+<td>物流轨迹查询不可用</td>
+<td>积加的物流查询连续 3 次失败</td>
+<td>「未收到与异常」无法判定停滞天数，按「信息不全」处理；草稿不作补发承诺</td>
+<td>草稿依据标「物流轨迹暂不可用」</td>
+<td>恢复后重新判定</td>
+</tr>
 </tbody>
 </table></div>
 <h2 id="s-10">10 权限</h2>
@@ -3622,7 +3751,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </thead>
 <tbody>
 <tr>
-<td>查看工单、回复、标签、合并、转人工</td>
+<td>查看工单、回复、标签、合并、转人工、手工新建工单</td>
 <td>●</td>
 <td>●</td>
 <td>●</td>
@@ -3712,7 +3841,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td></td>
 </tr>
 <tr>
-<td>确认责任与处理方式、终止售后单</td>
+<td>手工新建售后单、确认责任与处理方式、退回继续排查、终止售后单</td>
 <td></td>
 <td>●</td>
 <td>●</td>
@@ -3846,7 +3975,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tbody>
 <tr>
 <td>店铺 Store</td>
-<td>平台、名称、站点、平台标识（亚马逊卖家 ID / Shopify 店铺域名）、进线邮箱、签名、默认语言、覆盖配置、状态</td>
+<td>平台、名称、站点（US / CA / MX）、平台标识（亚马逊卖家 ID / Shopify 店铺域名）、进线邮箱、签名、默认语言、覆盖配置、状态</td>
 <td>1 店铺 : N 工单</td>
 </tr>
 <tr>
@@ -3871,7 +4000,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>消息 Message</td>
-<td>工单、方向、来源、外部 ID、原文、中文译文、附件、到达时间、SLA 截止、首次回复时间</td>
+<td>工单、方向、来源、外部 ID、原文、中文译文、附件、到达时间、SLA 截止、首次回复时间、回复类型（我方发出：排查步骤 / 索要信息 / 进展回复 / 结论性回复）</td>
 <td>1 工单 : N 消息</td>
 </tr>
 <tr>
@@ -3886,7 +4015,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>审批项 ApprovalItem</td>
-<td>类型（动作 / 报备）、动作类型与参数、报备类型与金额（原币、美元、汇率）、执行方式（SP-API / Shopify Admin API / 良仓接口 / 工厂工作台 / 人工操作清单）、状态（待审批 / 已批准 / 已驳回 / 已作废）、执行结果、重试次数</td>
+<td>类型（动作 / 报备）、动作类型与参数、报备类型与金额（原币、美元、汇率）、执行方式（积加 / SP-API / Shopify Admin API / 工厂工作台 / 人工操作清单）、状态（待审批 / 已批准 / 已驳回 / 已作废）、执行结果、重试次数</td>
 <td>—</td>
 </tr>
 <tr>
@@ -3896,17 +4025,17 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>售后单 AfterSales</td>
-<td>编号、来源工单、创建路径、处理方式、分支、责任类型、判定方式（规则 / AI / 改判及理由）、配件与数量、发货方、承运方式、寄出日期、快递单号、产品成本、运费、额外赔偿、其他、承担比例、比例状态、协商状态、结算状态、结算批次、索赔对象（承运商或良仓）、索赔状态（待发起 / 索赔中 / 已赔付 / 已拒赔）、状态、当前环节（环节 + 子状态）、等待方、进入当前环节时间、负责人（售后负责人）、发起人（路径 B 的坐席）</td>
+<td>编号、来源工单、创建路径（系统自动 / 手工新建 / 路径 B）、生产厂（有生产厂参与时）、处理方式、分支、责任类型、判定方式（规则 / AI / 改判及理由）、配件与数量、发货方、承运方式、寄出日期、快递单号、产品成本、运费、额外赔偿、其他、承担比例（产品成本 / 快递物流 / 其他费用三组各一个 FSH : 工厂）、比例状态、协商状态、结算状态、结算批次、索赔对象（承运商或良仓）、索赔状态（待发起 / 索赔中 / 已赔付 / 已拒赔）、状态、取消原因、当前环节（环节 + 子状态）、等待方、进入当前环节时间、负责人（售后负责人）、发起人（路径 B 的坐席）</td>
 <td>1 工单 : N 售后单</td>
 </tr>
 <tr>
 <td>协商轮次 NegotiationRound</td>
-<td>售后单、轮次、提案方、比例、理由、答复、答复时间</td>
+<td>售后单、轮次、提案方、三组费用的比例、理由、答复、答复时间</td>
 <td>1 售后单 : ≤ 3 轮</td>
 </tr>
 <tr>
 <td>工厂任务 FactoryTask</td>
-<td>生产厂、售后单或结算批次、类型（询价 / 寄件 / 比例协商 / 结算确认）、表单内容、截止（按生产厂工作日历）、催办次数、退回原因、状态</td>
+<td>生产厂、售后单或结算批次、类型（询价 / 寄件 / 比例协商 / 结算确认）、表单内容、截止时刻（按统一工作时间，R-CL-02）、催办次数、退回原因、状态</td>
 <td>1 售后单 : N 任务</td>
 </tr>
 <tr>
@@ -3987,7 +4116,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tbody>
 <tr>
 <td>亚马逊 SP-API</td>
-<td>订单、发货、退货信息</td>
+<td>—</td>
 <td>退款、取消（审批后执行，Q-23 已确认）</td>
 <td>亚马逊适配器（MCP 形式，封装 SP-API）</td>
 <td>第一期</td>
@@ -4001,24 +4130,24 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>Shopify Admin API</td>
-<td>订单、客户、履约状态</td>
+<td>—</td>
 <td>退款、改地址、取消、订单备注</td>
 <td>Shopify 适配器（MCP 形式，封装 Admin API）</td>
 <td>第一期</td>
 </tr>
 <tr>
-<td>良仓开放接口</td>
-<td>库存、出库单状态、快递单号、实际运费</td>
-<td>创建售后出库单</td>
-<td>良仓适配器（MCP 形式）</td>
-<td>范围待确认（Q-21）；不可用时走人工操作清单</td>
+<td>积加 ERP</td>
+<td>订单、物流轨迹（聚合亚马逊与 Shopify）、良仓库存、出库单状态、快递单号、实际运费</td>
+<td>创建良仓售后出库单</td>
+<td>积加适配器（MCP 形式），客户确认 Q-25</td>
+<td>第一期</td>
 </tr>
 <tr>
-<td>积加 ERP</td>
+<td>良仓开放接口</td>
 <td>—</td>
 <td>—</td>
-<td>统一动作接口预留积加适配器</td>
-<td>预留，第一期不接入</td>
+<td>直连适配器备用，积加不可用时再开发（F-MC-01）</td>
+<td>不接入</td>
 </tr>
 <tr>
 <td>Gmail</td>
@@ -4140,11 +4269,11 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>安全</td>
-<td>按角色与店铺鉴权，后端校验，不依赖前端隐藏；生产厂账号与客服账号隔离；敏感字段按 10.3 控制</td>
+<td>按角色与店铺鉴权，后端校验，不依赖前端隐藏；生产厂对接人只能进入工厂工作台，后端按生产厂过滤数据；敏感字段按 10.3 控制</td>
 </tr>
 <tr>
 <td>合规</td>
-<td>亚马逊回复不含外链、营销、站外联系方式；亚马逊买家 PII 按亚马逊数据保护政策期限清除；DE、UK 客户按 GDPR 处理删除请求（30 天内）并可导出处理记录</td>
+<td>亚马逊回复不含外链、营销、站外联系方式；亚马逊买家 PII 按亚马逊数据保护政策期限清除；加州客户按 CCPA、墨西哥客户按 LFPDPPP 处理删除请求（30 天内）并可导出处理记录</td>
 </tr>
 <tr>
 <td>审计</td>
@@ -4152,7 +4281,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>兼容</td>
-<td>Chrome、Edge 最新两个版本；最小分辨率 1440 × 900；工厂工作台支持手机浏览器</td>
+<td>Chrome、Edge 最新两个版本；最小分辨率 1440 × 900；工厂工作台支持手机端（钉钉内打开）</td>
 </tr>
 <tr>
 <td>前端技术栈</td>
@@ -4164,11 +4293,11 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>时间</td>
-<td>界面统一北京时间；对客户的文本按客户时区书写并注明时区（R-LG-04）。亚马逊 SLA 与审批 4 小时时限按自然小时；「工作日」「工作小时」按工作日历计算（R-CL-01、R-CL-02）</td>
+<td>界面统一北京时间；对客户的文本按客户时区书写并注明时区（R-LG-04）。亚马逊 SLA 与审批 4 小时时限按自然小时；「工作日」「工作小时」按统一工作时间计算（R-CL-01、R-CL-02）</td>
 </tr>
 <tr>
 <td>语言</td>
-<td>界面中文；客户内容多语言，首批回复语言英语、德语</td>
+<td>界面中文；客户内容多语言，首批回复语言英语、西班牙语（Q-16 已确认）</td>
 </tr>
 </tbody>
 </table></div>
@@ -4189,7 +4318,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>AC-TK-01</td>
 <td>同一订单已有未关闭工单</td>
 <td>客户再来一封信</td>
-<td>追加到原工单，不新建（R-TK-01）；若我方已回复且问题未解决，重复联系次数 +1（R-TK-03）</td>
+<td>追加到原工单，不新建（R-TK-01）；若我方上一封回复为结论性回复，重复联系次数 +1；上一封为排查步骤、索要信息或进展回复时不计（R-TK-03）</td>
 </tr>
 <tr>
 <td>AC-TK-02</td>
@@ -4211,8 +4340,8 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>AC-TK-05</td>
-<td>工单重复联系次数已为 1，我方回复后问题仍未解决</td>
-<td>客户第 3 封来信到达</td>
+<td>工单重复联系次数已为 1，我方又给出结论性回复</td>
+<td>客户就同一问题再次来信</td>
 <td>重复联系次数变为 2，转人工，原因「重复联系 2 次」；次数为 1 时只升优先级不转人工</td>
 </tr>
 <tr>
@@ -4265,9 +4394,21 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>AC-TK-14</td>
-<td>amz-direct@forcome.com 收到亚马逊中转的买家来信（发件域 amazon.de）</td>
+<td>amz-direct@forcome.com 收到亚马逊中转的买家来信（发件域 amazon.com.mx）</td>
 <td>系统处理</td>
-<td>归属 Forcome Direct、站点 DE，建工单并开始 SLA 计时</td>
+<td>归属 Forcome Direct、站点 MX，建工单并开始 SLA 计时</td>
+</tr>
+<tr>
+<td>AC-TK-15</td>
+<td>我方上一封回复为排查步骤（回复类型「排查步骤」）</td>
+<td>客户回信「还是不充电」</td>
+<td>重复联系次数不变，优先级不变；按排查树继续或按路径 A 创建售后单</td>
+</tr>
+<tr>
+<td>AC-TK-16</td>
+<td>坐席在 P04 新建工单并发出首封消息</td>
+<td>查看工单</td>
+<td>状态等客户，没有 SLA 计时；客户回信后按正常来信处理</td>
 </tr>
 </tbody>
 </table></div>
@@ -4284,7 +4425,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tbody>
 <tr>
 <td>AC-AI-01</td>
-<td>来信含「schlechte Bewertung」</td>
+<td>来信含「reseña negativa」</td>
 <td>系统处理</td>
 <td>转人工，信号「平台风险 · 差评威胁」，不生成草稿</td>
 </tr>
@@ -4332,9 +4473,9 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>AC-AI-09</td>
-<td>坐席用中文修改德语草稿</td>
+<td>坐席用中文修改西班牙语草稿</td>
 <td>提交</td>
-<td>显示德语译文与中文回译供确认</td>
+<td>显示西班牙语译文与中文回译供确认</td>
 </tr>
 <tr>
 <td>AC-AI-10</td>
@@ -4399,7 +4540,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>AC-AP-05</td>
-<td>良仓接口连续失败</td>
+<td>积加接口连续失败</td>
 <td>批准后执行</td>
 <td>自动重试 3 次后执行失败，回复不发出，发起人收到通知</td>
 </tr>
@@ -4422,14 +4563,8 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>经 SP-API 退款，成功后绑定回复自动发出，不生成人工操作清单</td>
 </tr>
 <tr>
-<td>AC-AP-14</td>
-<td>SP-API 退款连续失败 3 次</td>
-<td>发起人点「转人工操作清单」</td>
-<td>生成清单指派给发起人，4 个工作小时内回填；回填成功后绑定回复发出</td>
-</tr>
-<tr>
 <td>AC-AP-09</td>
-<td>回填退款金额 €40.00，审批金额 €44.90</td>
+<td>回填退款金额 MX$800.00，审批金额 MX$889.00</td>
 <td>提交回填</td>
 <td>不允许提交，要求差异说明并由原审批人确认</td>
 </tr>
@@ -4449,13 +4584,31 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>AC-AP-12</td>
 <td>审批单已批准，接口动作执行失败</td>
 <td>查看工单</td>
-<td>工单保持待审批并标「执行失败」，绑定回复未发出</td>
+<td>工单保持原状态（待审批，或转人工）并标「执行失败」，绑定回复未发出</td>
 </tr>
 <tr>
 <td>AC-AP-13</td>
 <td>Shopify 订单改地址的审批单</td>
 <td>批准</td>
 <td>经 Shopify Admin API 修改成功后绑定回复自动发出，不生成人工操作清单</td>
+</tr>
+<tr>
+<td>AC-AP-14</td>
+<td>SP-API 退款连续失败 3 次</td>
+<td>发起人点「转人工操作清单」</td>
+<td>生成清单指派给发起人，4 个工作小时内回填；回填成功后绑定回复发出</td>
+</tr>
+<tr>
+<td>AC-AP-15</td>
+<td>路径 B 的审批单待审批</td>
+<td>发起人撤回</td>
+<td>审批单已撤回；售后单退回待确认并锁定给发起人，与驳回相同</td>
+</tr>
+<tr>
+<td>AC-AP-16</td>
+<td>生产厂报价后系统发起的快递费用报备</td>
+<td>售后负责人「撤回并修改」，或审批人驳回</td>
+<td>售后单保持进行中，当前环节「报备审批 · 待重新提交」；修改金额后可重新提交</td>
 </tr>
 </tbody>
 </table></div>
@@ -4492,11 +4645,11 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>AC-AS-04</td>
 <td>良仓有货，报备通过</td>
 <td>系统执行</td>
-<td>直接经良仓接口创建出库单，不再二次确认</td>
+<td>直接经积加创建良仓出库单，不再二次确认</td>
 </tr>
 <tr>
 <td>AC-AS-05</td>
-<td>建发货单时库存不足</td>
+<td>建出库单时库存不足</td>
 <td>系统执行</td>
 <td>切良仓无货，原报备作废，派发询价，售后负责人收到通知</td>
 </tr>
@@ -4532,9 +4685,9 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>AC-AS-11</td>
-<td>录入最终比例 60 / 30</td>
+<td>录入最终比例时产品成本的工厂承担填 130</td>
 <td>提交</td>
-<td>报错「两者之和须为 100」</td>
+<td>报错「比例为 0–100 的整数」；填 50 后 FSH 自动显示 50</td>
 </tr>
 <tr>
 <td>AC-AS-12</td>
@@ -4576,7 +4729,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>AC-AS-18</td>
 <td>生产厂打开比例协商任务</td>
 <td>查看</td>
-<td>看到费用合计与四项构成；额外赔偿只显示金额，看不到订单号与售价</td>
+<td>看到费用合计、四项构成与三组比例；额外赔偿只显示金额，看不到订单号与售价</td>
 </tr>
 <tr>
 <td>AC-AS-19</td>
@@ -4613,6 +4766,24 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>FQD、FZJ 在 9 月都有比例已确认的售后单</td>
 <td>生成 9 月结算批次</td>
 <td>生成两个批次（2026-09-FQD-x、2026-09-FZJ-x），分别推送各自对接人确认</td>
+</tr>
+<tr>
+<td>AC-AS-25</td>
+<td>待确认售后单</td>
+<td>王磊在 P08 点「退回继续排查」并填原因</td>
+<td>售后单已取消（原因「退回继续排查」）；来源工单回到分诊中并生成下一步排查草稿</td>
+</tr>
+<tr>
+<td>AC-AS-26</td>
+<td>询价任务周五 09-11 08:50 派发，时限 2 个工作日</td>
+<td>10:20 查看 P21</td>
+<td>显示「剩 2 个工作日 · 09-15 周二 09:00 截止」（R-CL-02）</td>
+</tr>
+<tr>
+<td>AC-AS-27</td>
+<td>王磊在 P07 新建售后单并选择来源工单</td>
+<td>保存</td>
+<td>售后单为待确认，没有发起人，进入 P08</td>
 </tr>
 </tbody>
 </table></div>
@@ -4702,7 +4873,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>知识准备</td>
-<td>上线前完成：前十个高频故障排查树、各站点政策规则、德语与英语进展回复模板</td>
+<td>上线前完成：前十个高频故障排查树（先用模拟数据，Q-09）、各站点政策规则、英语与西班牙语进展回复模板</td>
 </tr>
 <tr>
 <td>钉钉接入</td>
@@ -4736,13 +4907,13 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>Q-01</td>
 <td>渠道与动作的接入方式</td>
 <td>进线、订单、动作执行</td>
-<td>亚马逊、Shopify 接官方接口（买家消息邮件中转 + SP-API；Admin API + 客服邮箱），良仓接开放接口；积加预留适配器，第一期不接（D-14）</td>
+<td>买家消息经亚马逊邮件中转 + Gmail；订单、物流、库存与良仓出库单经积加；退款、改地址、取消经 SP-API 与 Admin API（D-14、D-17）</td>
 <td>客户</td>
 <td>已确认</td>
 </tr>
 <tr>
 <td>Q-02</td>
-<td>即时通讯工具与生产厂对接人</td>
+<td>通知渠道与组织来源</td>
 <td>提醒推送、成员来源</td>
 <td>钉钉；成员与部门从钉钉通讯录同步（D-16）</td>
 <td>客户</td>
@@ -4752,9 +4923,9 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>Q-03</td>
 <td>各责任类型的默认承担比例</td>
 <td>协商起点</td>
-<td>质量 0 / 100，物流与使用 100 / 0，其他 50 / 50</td>
+<td>按产品成本、快递物流、其他费用三组分别记：质量原因三组都 0 / 100，顾客购买与使用不当（客户使用问题）、物流问题三组都 100 / 0，其他原因三组都 50 / 50（D-19）</td>
 <td>FSH、生产厂</td>
-<td><span class="tag warn">待确认</span></td>
+<td>已确认</td>
 </tr>
 <tr>
 <td>Q-04</td>
@@ -4768,9 +4939,9 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>Q-05</td>
 <td>店铺清单：账号、站点、客服邮箱、是否同品牌同政策</td>
 <td>店铺表、覆盖配置</td>
-<td>示例 4 个店铺</td>
+<td>按示例 4 个店铺（Forcome Direct US / CA / MX、Forcome Auto US、forcome.com US / CA、forcome.mx MX）；上线前补真实账号与邮箱</td>
 <td>客户运营</td>
-<td><span class="tag warn">待提供</span></td>
+<td>已确认</td>
 </tr>
 <tr>
 <td>Q-06</td>
@@ -4778,7 +4949,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>能否给亚马逊客户发图示</td>
 <td>不发，按纯文字（R-CC）</td>
 <td>客户运营</td>
-<td><span class="tag warn">待确认</span></td>
+<td>已确认</td>
 </tr>
 <tr>
 <td>Q-07</td>
@@ -4786,7 +4957,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>标签与报表口径</td>
 <td>路途急、物流停滞、差评风险、批发</td>
 <td>客户客服</td>
-<td><span class="tag warn">待提供</span></td>
+<td>已确认</td>
 </tr>
 <tr>
 <td>Q-08</td>
@@ -4800,9 +4971,9 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>Q-09</td>
 <td>前十个高频故障症状</td>
 <td>故障排查树</td>
-<td>吸力下降、不充电、异响、滤芯发黄</td>
+<td>先用模拟数据（吸力下降、不充电、异响、滤芯发黄）；上线前由客户补真实症状清单</td>
 <td>客户客服、生产厂</td>
-<td><span class="tag warn">待提供</span></td>
+<td>已确认</td>
 </tr>
 <tr>
 <td>Q-10</td>
@@ -4816,9 +4987,9 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>Q-11</td>
 <td>是否启用 SLA 保底进展回复</td>
 <td>亚马逊回复质量</td>
-<td>关闭</td>
+<td>默认关闭</td>
 <td>客户运营</td>
-<td><span class="tag warn">待确认</span></td>
+<td>已确认</td>
 </tr>
 <tr>
 <td>Q-12</td>
@@ -4826,15 +4997,15 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>安全事故信号的后续流程</td>
 <td>转人工并留档</td>
 <td>客户售后</td>
-<td><span class="tag warn">待确认</span></td>
+<td>已确认</td>
 </tr>
 <tr>
 <td>Q-13</td>
 <td>内部结算方式（转账或抵扣货款）；批次后调整比例的冲销规则</td>
 <td>结算流程与台账</td>
-<td>下一批次冲销</td>
+<td>批次后调整在下一批次冲销；具体付款方式由财务定，系统只出批次与金额</td>
 <td>FSH 财务、生产厂</td>
-<td><span class="tag warn">待确认</span></td>
+<td>已确认</td>
 </tr>
 <tr>
 <td>Q-14</td>
@@ -4842,23 +5013,23 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>报备与台账金额</td>
 <td>报备当日中间价，美元结算</td>
 <td>FSH 财务</td>
-<td><span class="tag warn">待确认</span></td>
+<td>已确认</td>
 </tr>
 <tr>
 <td>Q-15</td>
 <td>内部目标 SLA 是否按工作时间计</td>
 <td>邮件渠道 SLA 显示</td>
-<td>自然小时 24 小时</td>
+<td>按自然小时计，24 小时</td>
 <td>客户客服</td>
-<td><span class="tag warn">待确认</span></td>
+<td>已确认</td>
 </tr>
 <tr>
 <td>Q-16</td>
-<td>英语、德语以外首批回复语言</td>
-<td>语言支持与知识模板</td>
-<td>仅英语、德语</td>
+<td>站点范围与首批回复语言</td>
+<td>业务范围、语言支持与知识模板</td>
+<td>站点为美国、加拿大、墨西哥；首批回复语言英语、西班牙语（D-18）</td>
 <td>客户运营</td>
-<td><span class="tag warn">待确认</span></td>
+<td>已确认</td>
 </tr>
 <tr>
 <td>Q-17</td>
@@ -4894,11 +5065,11 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>Q-21</td>
-<td>良仓开放接口范围：库存查询、创建售后出库单、回传单号与实际运费</td>
+<td>良仓开放接口范围</td>
 <td>良仓动作能否自动执行</td>
-<td>按可用设计；不可用时对应动作走人工操作清单</td>
+<td>不直连良仓：库存、售后出库单、单号与运费都经积加（Q-25 已确认）；积加不可用时走人工操作清单</td>
 <td>客户 IT、良仓</td>
-<td><span class="tag warn">待确认</span></td>
+<td>已关闭</td>
 </tr>
 <tr>
 <td>Q-22</td>
@@ -4923,6 +5094,22 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>只做浅色；舒适与紧凑两档密度都上线</td>
 <td>客户</td>
 <td>已确认</td>
+</tr>
+<tr>
+<td>Q-25</td>
+<td>订单、物流、库存的查询来源</td>
+<td>第 ① 步订单关联、查物流、查库存、创建良仓出库单</td>
+<td>都走积加：积加已聚合亚马逊与 Shopify 的订单与物流，并对接良仓（D-17）</td>
+<td>客户</td>
+<td>已确认</td>
+</tr>
+<tr>
+<td>Q-26</td>
+<td>第一阶段报表能否拿到回复数据</td>
+<td>F-RP-01 第一阶段的首次回复与 SLA 指标</td>
+<td>只统计经店铺邮箱发出的回复；在卖家后台或海帆以外渠道直接回复的无法统计，第二阶段起回复全部经本系统发出后完整</td>
+<td>客户客服</td>
+<td><span class="tag warn">待确认</span></td>
 </tr>
 </tbody>
 </table></div>
@@ -4961,11 +5148,11 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>早期视觉方向 A、B、C</td>
-<td>画布「视觉方向」页（历史探索，已由 v3 取代）</td>
+<td>画布「早期视觉方向（已由 v3 取代）」页，仅作历史存档</td>
 </tr>
 <tr>
 <td>决策记录</td>
-<td>决策记录文档（决策 1–23）</td>
+<td>决策记录文档（决策 1–27）</td>
 </tr>
 <tr>
 <td>组件库与示例数据</td>

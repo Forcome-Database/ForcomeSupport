@@ -79,9 +79,17 @@ def _sla_pct(t):
     return int((int(m.group(1)) * 60 + int(m.group(2))) * 100 / (24 * 60)) if m else 0
 
 
+def merge_btn(t, size='sm'):
+    """「合并」按钮（R-TK-04）：按 data.merge_candidates 判断；同店铺同客户没有其他未关闭工单时置灰，悬停说明原因。"""
+    if merge_candidates(t['no']):
+        return btn('合并', 'secondary', size, 'merge')
+    why = '%s 在 %s 没有其他未关闭的工单，无可合并对象（合并仅限同店铺、同客户）' % (t['customer'], t['store'])
+    return '<div title="%s" style="display: inline-flex; flex-shrink: 0; cursor: not-allowed;">%s</div>' % (why, btn('合并', 'secondary', size, 'merge', disabled=True))
+
+
 def conv_head(t, owner_av, tags=None, actions=None, sla_label=None):
     """会话标题区（三行）：主题 + 操作 / 编号 · 渠道与店铺 · 负责人 | SLA 胶囊 / 状态 · 优先级 · 意图 · 标签。"""
-    acts = actions if actions is not None else (btn('合并', 'secondary', 'sm', 'merge') + btn('内部备注', 'secondary', 'sm', 'message') + icon_btn('more', 'secondary', 28))
+    acts = actions if actions is not None else (merge_btn(t) + btn('内部备注', 'secondary', 'sm', 'message') + icon_btn('more', 'secondary', 28))
     r1 = between('<div style="flex: 1; min-width: 0px;">%s</div>' % ellipsis(t['subject'], 17, T['ink'], 650), row(acts, 6))
     lbl = sla_label or ('内部目标' if t.get('sla_kind') else '亚马逊 24h SLA' if t['channel'] == '亚马逊' else 'SLA')
     tg_ = ''.join(pill(x) for x in (t['tags'] if tags is None else tags))
@@ -217,6 +225,8 @@ def draft_card(meta, tabs_html, toolbar, body, evid='', check='', approval='', f
 
 def customer_msg(name, meta, body, av, toggle_html=None, kind='in', extra=''):
     ex = (spacer() + toggle_html) if toggle_html else ''
+    if not av:  # 客户头像：灰色渐变 + 姓名首字母（内部成员用品牌渐变）
+        av = avatar(''.join(w[0] for w in name.split()[:2]).upper(), 'customer', 28)
     return message(name, meta, body, kind, av, extra + ex)
 
 
@@ -289,8 +299,8 @@ def sarah_body():
 def sarah_approval():
     return approval_needed([
         ('动作', '良仓创建售后出库单：良仓 US · V2 黑色 ×1 · UPS Next Day Air'),
-        [('报备', '快递费用 <span style="font-weight: 700;">$12.40</span>'), ('责任', '物流问题（规则：轨迹停滞满 5 天且超预计送达）')],
-    ], '提交后会同时创建售后单。批准后经良仓接口创建出库单，成功即自动发出这封回复。')
+        [('报备', '快递费用 <span style="font-weight: 700;">%s</span>' % money(ORDERS['113-4567890-1234567']['resend_freight'])), ('责任', '物流问题（规则：轨迹停滞满 5 天且超预计送达）')],
+    ], '提交后会同时创建售后单。批准后经积加创建良仓出库单，成功即自动发出这封回复。')
 
 
 def sarah_msg(toggle_on='原文'):

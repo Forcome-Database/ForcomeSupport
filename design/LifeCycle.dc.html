@@ -71,14 +71,14 @@
     </div>
     <div style="border-bottom: 1px solid #e7e9f1; border-right: 1px solid #f1f3f9; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
       <div style="background: #f0effd; color: #4338ca; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">先按故障排查树给步骤；判定保修期</div>
-      <div style="background: #ede9fe; color: #5b21b6; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">排查不成：识别配件，创建售后单，查良仓库存</div>
+      <div style="background: #ede9fe; color: #5b21b6; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">排查不成：系统建待确认售后单，售后负责人确认后查良仓库存</div>
     </div>
     <div style="border-bottom: 1px solid #e7e9f1; border-right: 1px solid #f1f3f9; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
       <div style="background: #ede9fe; color: #5b21b6; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">流程引擎推进无货 / 有货分支：工厂工作台派发询价与寄件任务、生产厂回填、催办超时</div>
       <div style="background: #f0effd; color: #4338ca; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">退货指引按站点政策；单号回复客户</div>
     </div>
     <div style="border-bottom: 1px solid #e7e9f1; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
-      <div style="background: #f0effd; color: #4338ca; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">致谢标记「无需回复」，建议关闭</div>
+      <div style="background: #f0effd; color: #4338ca; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">致谢标记「无需回复」，转已解决</div>
       <div style="background: #f0effd; color: #4338ca; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">已解决工单生成 FAQ 候选；客户档案跨渠道合并</div>
     </div>
 
@@ -86,7 +86,7 @@
     <div style="border-bottom: 1px solid #e7e9f1; border-right: 1px solid #e7e9f1; padding: 12px; font-size: 12px; font-weight: 600; color: #0f1320; display: flex; flex-direction: column; gap: 2px;">人工介入<span style="font-size: 11px; font-weight: 400; color: #9099ab;">审批与兜底</span></div>
     <div style="border-bottom: 1px solid #e7e9f1; border-right: 1px solid #f1f3f9; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
       <div style="background: #fef0c7; color: #b54708; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">批发与合作转销售</div>
-      <div style="background: #fef0c7; color: #b54708; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">草稿人审，采纳率 ≥ 90% 且样本 ≥ 50 封后放开</div>
+      <div style="background: #fef0c7; color: #b54708; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">草稿人审，采纳率高于 90% 且不少于 50 封后放开（R-SD-02）</div>
     </div>
     <div style="border-bottom: 1px solid #e7e9f1; border-right: 1px solid #f1f3f9; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
       <div style="background: #fef0c7; color: #b54708; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">改地址、取消订单提交审批单，批准后执行</div>
@@ -115,7 +115,7 @@
       <div style="background: #d1fadf; color: #067647; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">售前高频问题 → 产品页与 FAQ</div>
     </div>
     <div style="border-right: 1px solid #f1f3f9; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
-      <div style="background: #d1fadf; color: #067647; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">订单快照：SP-API 与 Shopify Admin API</div>
+      <div style="background: #d1fadf; color: #067647; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">订单快照：经积加同步（聚合亚马逊与 Shopify）</div>
     </div>
     <div style="border-right: 1px solid #f1f3f9; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
       <div style="background: #d1fadf; color: #067647; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45;">物流轨迹、查件记录、承运商时效</div>
@@ -138,7 +138,7 @@
     <div style="font-weight: 600; color: #b42318; background: #fee4e2; border-radius: 4px; padding: 3px 8px;">贯穿所有阶段</div>
     <div>风险拦截先于意图判断：安全事故、平台风险、高价值、要求真人、无法处理的内容命中即转人工；重复联系 1 次升优先级，2 次转人工</div>
     <div style="color: #d8dce7;">·</div>
-    <div>亚马逊 24 小时回复 SLA 从来信起计时，含周末；剩 4 小时未处理且无风险信号时自动发预审过的进展回复（是否启用待确认）</div>
+    <div>亚马逊 24 小时回复 SLA 从来信起计时，含周末；剩 4 小时未处理且无风险信号时自动发预审过的进展回复（默认关闭，Q-11 已确认）</div>
   </div>
 
   <!-- 工单状态机 -->
@@ -175,7 +175,7 @@
       <div style="background: #0f1320; color: #ffffff; border-radius: 8px; padding: 10px 12px; font-size: 12px; font-weight: 600; white-space: nowrap;">已关闭</div>
     </div>
     <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
-      <div style="font-size: 12px; color: #3b4356; line-height: 1.5; background: #f7f8fc; border-radius: 6px; padding: 8px 10px;"><span style="font-weight: 600; color: #0f1320;">客户再来信</span>：任何等待状态回到「分诊中」，我方已回复且问题未解决时重复联系次数加一；1 次升优先级，2 次强制转人工。</div>
+      <div style="font-size: 12px; color: #3b4356; line-height: 1.5; background: #f7f8fc; border-radius: 6px; padding: 8px 10px;"><span style="font-weight: 600; color: #0f1320;">客户再来信</span>：任何等待状态回到「分诊中」；我方给出结论性回复（方案、承诺、拒绝）后就同一问题再来信，重复联系加一，排查答复、补充信息、致谢不计；1 次升优先级，2 次强制转人工。</div>
       <div style="font-size: 12px; color: #3b4356; line-height: 1.5; background: #f7f8fc; border-radius: 6px; padding: 8px 10px;"><span style="font-weight: 600; color: #0f1320;">已关闭后来信</span>：30 天内同一订单重新打开原工单，否则新建并关联客户档案。</div>
       <div style="font-size: 12px; color: #3b4356; line-height: 1.5; background: #ede9fe; border-radius: 6px; padding: 8px 10px;"><span style="font-weight: 600; color: #5b21b6;">售后单子流程</span>：待确认 → 进行中 → 已完成 / 已取消；比例协商与内部结算另行推进，不改变主状态。单号回复发出后工单转等客户；客户确认或致谢转已解决，7 天无来信自动关闭。</div>
     </div>
@@ -206,9 +206,9 @@
     <div style="background: #ffffff; border: 1px solid #e7e9f1; border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;">
       <div style="font-size: 13px; font-weight: 600;">闭环三：成本与质量回流</div>
       <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #3b4356; line-height: 1.5;">
-        <div>登记台账汇总产品成本、运费、额外赔偿，按确认比例算工厂应付</div>
+        <div>登记台账汇总产品成本、运费、额外赔偿，按确认比例算工厂承担</div>
         <div style="text-align: center; color: #9099ab; line-height: 1;">↓</div>
-        <div>报表按配件、站点、责任类型出成本；月度按确认比例向工厂对账</div>
+        <div>报表按配件、站点、责任类型出成本；每个生产厂每月一个批次内部结算</div>
         <div style="text-align: center; color: #9099ab; line-height: 1;">↓</div>
         <div>高频故障症状反馈产品和工厂，减少下一批次的售后</div>
       </div>

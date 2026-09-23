@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""StatesApproval.dc.html —— 审批状态 A1–A8。"""
+"""StatesApproval.dc.html —— 审批状态 A1–A9。"""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -50,12 +50,12 @@ def a1():
 
 # ---------------------------------------------------------------- A2 批准确认
 def a2():
-    quote = '<div style="font-size: 12px; color: %s; line-height: 1.55; border-left: 2px solid %s; padding-left: 10px; margin-top: 4px;">%s</div>' % (T['ink2'], T['accent_line'], DRAFTS['jonas_bound_de'])
+    quote = '<div style="font-size: 12px; color: %s; line-height: 1.55; border-left: 2px solid %s; padding-left: 10px; margin-top: 4px;">%s</div>' % (T['ink2'], T['accent_line'], DRAFTS['mateo_bound_es'])
     body = col(label('批准后按顺序执行') +
-               step_line(1, '报备通过：额外赔偿 <b>€44.90</b>（≈ $49.39）写入登记台账', '售后单 S-20260911-0020 进入「执行付款」') +
-               step_line(2, '经 SP-API 退款 €44.90（Forcome Direct · DE）', '失败按 1、5、15 分钟自动重试 3 次；仍失败时陈晨可转人工操作清单') +
-               step_line(3, '退款成功后，自动发出德语绑定回复', quote) +
-               step_line(4, '在工厂工作台发起比例提案：建议工厂承担 100%', '与退款并行，客户不等协商结果'), 12)
+               step_line(1, '报备通过：额外赔偿 <b>MX$889.00</b>（≈ $49.39）写入登记台账', '售后单 S-20260911-0020 进入「执行付款」') +
+               step_line(2, '经 SP-API 退款 MX$889.00（Forcome Direct · MX）', '失败按 1、5、15 分钟自动重试 3 次；仍失败时陈晨可转人工操作清单') +
+               step_line(3, '退款成功后，自动发出西班牙语绑定回复', quote) +
+               step_line(4, '在工厂工作台发起比例提案：建议' + ratio_words([x for x in AFTERSALES if x['no'] == 'S-20260911-0020'][0]['ratios']), '与退款并行，客户不等协商结果'), 12)
     dlg = dialog('批准 AP-20260911-001？', body, btn('取消', 'secondary') + btn('批准并退款', 'primary', 'md', 'check'), 560, None,
                  '审批单转「执行中」，每一步的结果写入执行日志。')
     return variant('A2 批准确认', '弹窗按执行顺序列出批准后发生的动作与绑定回复；主按钮文案写清结果。确认后浮层「已批准，正在经 SP-API 退款」。',
@@ -66,7 +66,7 @@ def a2():
 def a3():
     body = field('驳回原因', textarea_box(None, '写清楚为什么驳回、发起人要怎么改', 'error', 76, '0 / 200'), True, error='请填写驳回原因') + \
         muted('驳回后：陈晨收到通知，绑定回复不会发出；工单 T-20260902-0071 回到提交前的「转人工」；售后单 S-20260911-0020 退回「待确认」并锁定给陈晨，修改后重新提交时沿用同一单号。', 12)
-    dlg = dialog('驳回 AP-20260911-001？', body, btn('取消', 'secondary') + btn('驳回', 'danger', 'md', 'x'), 480, 'danger', '报备额外赔偿 €44.90 · Jonas Weber · 发起人陈晨')
+    dlg = dialog('驳回 AP-20260911-001？', body, btn('取消', 'secondary') + btn('驳回', 'danger', 'md', 'x'), 480, 'danger', '报备额外赔偿 MX$889.00 · Mateo Rivas · 发起人陈晨')
     return variant('A3 驳回', '原因必填，未填就点「驳回」时文本框报错；弹窗写明驳回后工单回到提交前状态、售后单退回待确认（R-AP-07）。',
                    scrim_frame(scaled(P.p15(), 1440, 900, S), dlg), VW, trigger='点「驳回」。本例为未填原因直接提交后的画面。')
 
@@ -79,7 +79,7 @@ def a4():
         T['bad_bg'], T['bad_line'], T['ink2'], icon('bell', 14, T['bad'], 2), T['bad'])
     c = P.ap_card_collapsed(a, ch, sm, '待审批', 'danger', '已超时 20m', notified, 'danger')
     other = P.ap_card_collapsed(P.AP['AP-20260911-003'], P.AP_SUMMARY['AP-20260911-003'][0], P.AP_SUMMARY['AP-20260911-003'][1], '待审批', 'danger', '已超时 27m')
-    frame = mini(col(between(nowrap('待我审批 · 14:08', 12, T['ink3'], 600), nowrap('按截止时间', 12, T['ink3'])) + c + other, 10), VW, 356, pad='20px')
+    frame = mini(col(between(nowrap('待我审批 · 14:08', 12, T['ink3'], 600), nowrap('按截止时间', 12, T['ink3'])) + other + c, 10), VW, 356, pad='20px')
     return variant('A4 审批超时', '剩余胶囊变红「已超时 N」，卡片红色描边并写明超时时刻与已通知的人；剩 1 小时时已提醒过审批人。「已超时」只是标记，统计时保留。',
                    frame, VW, trigger='待审批超过 4 小时（本例为 14:08 的画面）。')
 
@@ -87,29 +87,33 @@ def a4():
 # ---------------------------------------------------------------- A5 执行失败
 def a5():
     a = P.AP['AP-20260911-002']
-    head = between(row(nowrap(a['no'], 14, T['ink'], 700) + cat('报备 · 快递费用') + cat('动作 · 良仓接口'), 8),
+    head = between(row(nowrap(a['no'], 14, T['ink'], 700) + cat('报备 · 快递费用') + cat('动作 · 积加'), 8),
                    row(state('执行失败') + nowrap('周敏 10:51 批准', 12, T['ink3']), 8))
-    bn = banner('danger', '良仓创建售后出库单失败，已自动重试 3 次', '10:52 首次失败，按 1、5、15 分钟重试仍失败（最后一次 11:13）。良仓接口返回：出库单服务超时。绑定回复未发出。')
+    bn = banner('danger', '良仓出库单创建失败，已自动重试 3 次', '10:52 首次失败，按 1、5、15 分钟重试仍失败（最后一次 11:13）。积加返回：良仓出库单服务超时。绑定回复未发出。')
     steps = col(exec_step('ok', '报备快递费用 $8.40 已登记', '写入登记台账 · S-20260911-0021') +
                 exec_step('fail', '良仓创建售后出库单：良仓 US · 整机黑色 ×1', '4 次尝试均失败 · 11:13') +
-                exec_step('todo', '发出英语绑定回复', '等发货单创建成功'), 10)
+                exec_step('todo', '发出英语绑定回复', '等出库单创建成功'), 10)
     foot = P.draft_like_foot(btn('重试', 'primary', 'md', 'refresh') + btn('转人工操作清单', 'secondary', 'md', 'handoff'),
-                             nowrap('转人工后由你在良仓后台手工创建出库单，回填单号即视为成功', 12, T['ink3']))
+                             nowrap('转人工后由你在积加手工创建良仓出库单，回填单号即视为成功', 12, T['ink3']))
     c = card(head + P.ap_meta(a) + bn + steps + foot, pad='14px 18px', gap=11, tone='danger')
-    frame = mini(c, VW, 404, pad='20px')
+    t = [x for x in TICKETS if x['no'] == 'T-20260910-0195'][0]
+    inbox = card(row(icon('inbox', 15, T['ink3']) + nowrap('收件箱同步标记', 12, T['ink3'], 600) + divider(True, 12) + nowrap(t['no'], 12.5, T['ink'], 600) +
+                     nowrap(t['customer'], 12.5, T['ink2']) + state('待审批') + chip('执行失败', 'danger', 10.5, 'alert') + spacer() +
+                     nowrap('工单保持原状态，绑定回复未发出（AC-AP-12）', 12, T['ink3']), 8), pad='10px 16px')
+    frame = mini(col(c + inbox, 10), VW, 462, pad='20px')
     return variant('A5 执行失败', '卡片顶部红色横幅写明失败的动作、重试次数与返回原因；逐项显示已成功 / 失败 / 未执行；发起人可「重试」或「转人工操作清单」。',
                    frame, VW, trigger='自动执行按 1、5、15 分钟重试 3 次后仍失败（发起人李婷的视角）。')
 
 
 # ---------------------------------------------------------------- A6 / A7 人工操作清单回填
 def manual_head():
-    return between(row(icon('handoff', 16, T['ink2'], 2) + text('亚马逊退款 €44.90', 14, T['ink'], 700) + state('待执行'), 8),
+    return between(row(icon('handoff', 16, T['ink2'], 2) + text('亚马逊退款 MX$889.00', 14, T['ink'], 700) + state('待执行'), 8),
                    row(sla('剩 3h 45m', 'warning') + nowrap('4 个工作小时 · 10:45 生成 · 14:45 截止', 12, T['ink3']), 8)) + \
-        row(nowrap('AP-20260911-001', 12, T['accent'], 600) + nowrap('Jonas Weber', 12, T['ink2']) + channel('亚马逊', 'DE', 'Forcome Direct') + nowrap('订单 302-8811234-9901122', 12, T['ink3']), 8)
+        row(nowrap('AP-20260911-001', 12, T['accent'], 600) + nowrap('Mateo Rivas', 12, T['ink2']) + channel('亚马逊', 'MX', 'Forcome Direct') + nowrap('订单 302-8811234-9901122', 12, T['ink3']), 8)
 
 
 def manual_steps(done=3):
-    items = ['登录亚马逊卖家中心，切换到 Forcome Direct · DE', '订单 302-8811234-9901122 →「退款」', '全额退款 €44.90，备注填 AP-20260911-001', '提交后截图退款确认页']
+    items = ['登录亚马逊卖家中心，切换到 Forcome Direct · MX', '订单 302-8811234-9901122 →「退款」', '全额退款 MX$889.00，备注填 AP-20260911-001', '提交后截图退款确认页']
     return col(''.join(checkbox('<span style="color: %s;">%d. %s</span>' % (T['ink'] if i >= done else T['ink3'], i + 1, t), i < done) for i, t in enumerate(items)), 10)
 
 
@@ -121,9 +125,9 @@ def upload_box():
 
 def a6():
     form = col(field('外部单号', input_box('302-8811234-9901122-R1', st='focus', mono=True), True, hint='卖家中心退款记录里的退款编号') +
-               field('退款金额', input_box('44.90', prefix='€', suffix='EUR', mono=True), True, hint='与审批金额 €44.90 一致') +
+               field('退款金额', input_box('889.00', prefix='MX$', suffix='MXN', mono=True), True, hint='与审批金额 MX$889.00 一致') +
                field('截图', upload_box(), True), 12)
-    foot = P.draft_like_foot(btn('回填完成', 'primary', 'md', 'check') + btn('暂存', 'secondary', 'md'), nowrap('回填完成即视为动作成功，德语回复自动发出', 12, T['ink3']))
+    foot = P.draft_like_foot(btn('回填完成', 'primary', 'md', 'check') + btn('暂存', 'secondary', 'md'), nowrap('回填完成即视为动作成功，西班牙语回复自动发出', 12, T['ink3']))
     body = '<div style="display: flex; gap: 20px;"><div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 10px;">%s%s</div><div style="width: 1px; background: %s;"></div><div style="width: 380px; flex-shrink: 0;">%s</div></div>' % (
         label('操作步骤'), manual_steps(3), T['line2'], form)
     c = card(manual_head() + body + foot, pad='14px 18px', gap=12)
@@ -134,9 +138,9 @@ def a6():
 
 def a7():
     form = col(field('外部单号', input_box('302-8811234-9901122-R1', mono=True), True) +
-               field('退款金额', input_box('40.00', st='error', prefix='€', suffix='EUR', mono=True), True, error='回填金额 €40.00 与审批金额 €44.90 不一致') +
-               field('差异说明', textarea_box('卖家中心只允许退商品金额 €40.00，运费 €4.90 需另走「运费退款」，已提交申请。', st='focus', h=64, counter='45 / 200'), True), 12)
-    warn = banner('warning', '提交后需原审批人周敏确认', '确认前该动作不算成功，德语回复不会发出。')
+               field('退款金额', input_box('800.00', st='error', prefix='MX$', suffix='MXN', mono=True), True, error='回填金额 MX$800.00 与审批金额 MX$889.00 不一致') +
+               field('差异说明', textarea_box('卖家中心只允许退商品金额 MX$800.00，运费 MX$89.00 需另走「运费退款」，已提交申请。', st='focus', h=64, counter='%d / 200' % len('卖家中心只允许退商品金额 MX$800.00，运费 MX$89.00 需另走「运费退款」，已提交申请。')), True), 12)
+    warn = banner('warning', '提交后需原审批人周敏确认', '确认前该动作不算成功，西班牙语回复不会发出。')
     foot = P.draft_like_foot(btn('提交并请周敏确认', 'primary', 'md', 'send') + btn('暂存', 'secondary', 'md'), '')
     body = '<div style="display: flex; gap: 20px;"><div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 10px;">%s%s%s</div><div style="width: 1px; background: %s;"></div><div style="width: 380px; flex-shrink: 0;">%s</div></div>' % (
         label('操作步骤'), manual_steps(4), warn, T['line2'], form)
@@ -164,13 +168,25 @@ def a8():
                    frame, VW, trigger='坐席李婷进入「审批」。')
 
 
+# ---------------------------------------------------------------- A9 转给备用审批人
+def a9():
+    a = dict(P.AP['AP-20260911-001'], by='周敏')
+    top = '<div style="display: flex; align-items: center; gap: 8px; background: %s; border: 1px solid %s; border-radius: 6px; padding: 7px 12px; font-size: 12px; color: %s;">%s<span><b style="color: %s;">备用审批人：王磊</b>　发起人周敏是团队唯一的客服主管，不能审批自己发起的报备，系统已转给你（R-AP-02）。</span></div>' % (
+        T['accent_bg'], T['accent_line'], T['ink2'], icon('user', 14, T['accent'], 2), T['accent_ink'])
+    c = P.ap_card_expanded(a, top=top)
+    head = between(row(avatar('磊', 'amber', 20) + nowrap('王磊 · 售后负责人 · 待我审批', 12, T['ink3'], 600), 6), nowrap('按截止时间', 12, T['ink3']))
+    frame = mini(col(head + c, 10), VW, 470, pad='20px')
+    return variant('A9 转给备用审批人', '卡片顶部写明「备用审批人：王磊」与转来的原因；王磊按客服主管的权限审批这张含报备的单。周敏打开 P15 时这张单在「我发起的」，没有批准按钮（AC-AP-03、E-28）。',
+                   frame, VW, trigger='团队只有一位客服主管周敏，且含报备的审批单由周敏本人发起（本例假设 AP-20260911-001 由周敏接手后提交）。')
+
+
 def build():
-    vs = [a1(), a2(), a3(), a4(), a5(), a6(), a7(), a8()]
+    vs = [a1(), a2(), a3(), a4(), a5(), a6(), a7(), a8(), a9()]
     rows_ = ''
     for k in range(0, len(vs), 2):
         rows_ += grid(''.join(vs[k:k + 2]), template='%dpx %dpx' % (VW, VW), gap=32, extra='align-items: start;')
     leg = row(state('待审批') + state('执行中') + state('已执行') + state('执行失败') + state('已驳回') + state('已撤回') + state('待执行') + state('已回填') + sla('已超时 20m', 'danger'), 6)
-    return board('审批状态', 'P15 审批页的空、批准确认、驳回、超时、执行失败、人工操作清单回填与坐席视角。审批单把动作、报备、绑定回复合成一张。演示时刻 %s（A4、A5 为当天稍后的画面）。' % NOW_LABEL,
+    return board('审批状态', 'P15 审批页的空、批准确认、驳回、超时、执行失败、人工操作清单回填、坐席视角与备用审批人。审批单把动作、报备、绑定回复合成一张。演示时刻 %s（A4、A5 为当天稍后的画面）。' % NOW_LABEL,
                  col(rows_, 36), 1920, 800, leg)
 
 

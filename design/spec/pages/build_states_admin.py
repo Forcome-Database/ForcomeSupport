@@ -27,7 +27,7 @@ def k1():
         btn('选择文件', 'secondary', 'sm', 'plus'))
     st = lambda ic, t, c: row(icon(ic, 14, c, 2) + nowrap(t, 12, c, 600), 5)
     items = (
-        up_item('V2 用户手册（德语）.pdf', '4.2 MB', row(nowrap('上传中 62%', 12, T['accent_ink'], 600) + icon('x', 14, T['ink4']), 8), progress(62)) +
+        up_item('V2 用户手册（西班牙语）.pdf', '4.2 MB', row(nowrap('上传中 62%', 12, T['accent_ink'], 600) + icon('x', 14, T['ink4']), 8), progress(62)) +
         up_item('保修条款 2026.docx', '380 KB', row(spinner(14) + nowrap('解析中', 12, T['ink2'], 600), 6), muted('正在识别段落与表格，约 1 分钟。', 12)) +
         up_item('V2 故障图集.pdf', '12.6 MB', st('x_c', '解析失败', T['bad']),
                 between(text('文件已加密，无法读取文字。请去除密码后重新上传。', 12, T['bad']), row(btn('重试', 'secondary', 'sm', 'refresh') + btn('删除', 'ghost', 'sm'), 6)), ic_color=T['bad']) +
@@ -46,16 +46,16 @@ def k2():
 
 # ---------------------------------------------------------------- K3 报表加载中 / K4 报表无数据
 def report_page(kpis, main, filters):
-    body = page_head('报表', '工单、SLA、AI 与售后成本 · 数据来源：工单系统、登记台账、亚马逊 SP-API、Shopify', btn('导出', 'secondary', 'md', 'download')) + \
+    body = page_head('报表', '工单、SLA、AI 与售后成本 · 数据来源：工单系统、登记台账、积加（订单与物流）', btn('导出', 'secondary', 'md', 'download')) + \
         content(filters + kpis + main, '16px 24px', 14)
     return app('zhoumin', '报表', ['报表', '概览'], body)
 
 
 def rep_filters(active=False):
     if active:
-        return row(seg(['本周', '本月', '自定义'], '本周') + filter_chip('店铺', 'forcome.eu', True) + filter_chip('站点', '全部') + filter_chip('标签', '批发', True) +
+        return row(seg(['近 7 天', '本月', '自定义'], '近 7 天') + filter_chip('店铺', 'forcome.mx', True) + filter_chip('站点', '全部') + filter_chip('标签', '批发', True) +
                    link('清除筛选', 12), 8)
-    return row(seg(['本周', '本月', '自定义'], '本周') + filter_chip('店铺', '全部') + filter_chip('站点', '全部') + filter_chip('标签') + row(spinner(14) + nowrap('正在加载 · 数据截至 10:15', 12, T['ink3']), 6), 8)
+    return row(seg(['近 7 天', '本月', '自定义'], '近 7 天') + filter_chip('店铺', '全部') + filter_chip('站点', '全部') + filter_chip('标签') + row(spinner(14) + nowrap('正在加载 · 数据截至 10:15', 12, T['ink3']), 6), 8)
 
 
 def k3():
@@ -67,18 +67,18 @@ def k3():
 
 def k4():
     ks = grid(''.join(kpi(k, '—', sub='所选范围无数据') for k in ['工单量', '首响中位数', 'SLA 达标率（亚马逊）', '草稿采纳率', '自动发送占比']), 5, 12)
-    main = card(empty('chart', '所选范围没有数据', '本周 forcome.eu 没有带「批发」标签的工单。调整时间、店铺或标签后再看。',
+    main = card(empty('chart', '所选范围没有数据', '近 7 天 forcome.mx 没有带「批发」标签的工单。调整时间、店铺或标签后再看。',
                       row(btn('调整筛选', 'primary', 'md', 'filter') + btn('清除筛选', 'secondary'), 8)), pad='60px 24px', style='flex: 1;')
     return scaled(report_page(ks, main, rep_filters(True)), 1440, 900, 0.6)
 
 
 # ---------------------------------------------------------------- K5 导出
 def k5():
-    prog = '<div style="width: 360px; box-sizing: border-box; display: flex; gap: 10px; align-items: flex-start; background: #ffffff; border: 1px solid %s; border-radius: 8px; padding: 12px 14px; box-shadow: %s;">%s<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 6px;"><div style="font-size: 13px; font-weight: 700; color: %s;">正在生成报表</div><div style="font-size: 12px; color: %s;">本周 · 全部店铺 · 5 项指标与 4 张图表明细 · 40%%</div>%s</div></div>' % (
+    prog = '<div style="width: 360px; box-sizing: border-box; display: flex; gap: 10px; align-items: flex-start; background: #ffffff; border: 1px solid %s; border-radius: 8px; padding: 12px 14px; box-shadow: %s;">%s<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 6px;"><div style="font-size: 13px; font-weight: 700; color: %s;">正在生成报表</div><div style="font-size: 12px; color: %s;">近 7 天 · 全部店铺 · 5 项指标与 4 张图表明细 · 40%%</div>%s</div></div>' % (
         T['line'], SHADOW_MD, spinner(18), T['ink'], T['ink3'], progress(40))
-    left = col(cap('生成中') + row(seg(['本周', '本月', '自定义'], '本周') + btn('导出中', 'secondary', 'md', loading=True), 8) + prog, 12)
-    done = toast('success', '报表已导出', '报表_本周_0905-0911.xlsx · 含明细与图表数据。文件保留 7 天。', row(link('下载', 12, 'download') + link('查看导出记录', 12), 12))
-    right = col(cap('完成') + row(seg(['本周', '本月', '自定义'], '本周') + btn('导出', 'secondary', 'md', 'download'), 8) + done, 12)
+    left = col(cap('生成中') + row(seg(['近 7 天', '本月', '自定义'], '近 7 天') + btn('导出中', 'secondary', 'md', loading=True), 8) + prog, 12)
+    done = toast('success', '报表已导出', '报表_近7天_0905-0911.xlsx · 含明细与图表数据。文件保留 7 天。', row(link('下载', 12, 'download') + link('查看导出记录', 12), 12))
+    right = col(cap('完成') + row(seg(['近 7 天', '本月', '自定义'], '近 7 天') + btn('导出', 'secondary', 'md', 'download'), 8) + done, 12)
     return frame(grid(left + right, 2, 24))
 
 
@@ -99,7 +99,7 @@ def k6():
 
 # ---------------------------------------------------------------- K7 渠道断开
 def k7():
-    top = banner('danger', 'Gmail 连接中断：support@forcome.eu', '09-11 10:05 起连续 3 次失败，授权已失效。该邮箱来信暂存，回复进入待发队列；恢复后自动补拉，SLA 按原到达时间计算。',
+    top = banner('danger', 'Gmail 连接中断：support@forcome.mx', '10:05 起连续 3 次失败，授权已失效。该邮箱来信暂存，回复进入待发队列；恢复后自动补拉，SLA 按原到达时间计算。',
                  btn('查看渠道状态', 'secondary', 'sm'))
     im = BS.ch_card('users', '钉钉', state('已连接'), ['通讯录同步 · 工作通知 · 登录'], '', 'ok')
     cards = '<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: stretch;">%s%s%s</div>' % (
@@ -109,12 +109,12 @@ def k7():
 
 # ---------------------------------------------------------------- K8 新增店铺校验
 def k8():
-    body = grid(field('平台', select_box('Shopify'), True) + field('站点', select_box('US'), True) +
+    body = grid(field('平台', select_box('Shopify'), True) + field('站点', select_box('MX'), True) +
                 field('店铺名', input_box('forcome.com', st='error'), True, error='店铺名已存在，请换一个') +
-                field('Shopify 店铺域名', input_box(None, '例如 forcome-uk.myshopify.com', 'error'), True, error='请填写店铺域名') +
+                field('Shopify 店铺域名', input_box(None, '例如 forcome-mx.myshopify.com', 'error'), True, error='请填写店铺域名') +
                 field('客服邮箱', input_box('support@forcome', st='error'), True, error='邮箱格式不正确，例如 support@forcome.com') +
                 field('签名', input_box('Forcome Support'), hint='回复末尾使用，可在店铺覆盖项里修改'), 2, 14)
-    dlg = dialog('新增店铺', body, btn('取消', 'secondary') + btn('保存店铺', 'primary'), 560, None, '保存后可在处理规则里设置该店铺的覆盖项。')
+    dlg = dialog('新增店铺', body, btn('取消', 'secondary') + btn('保存店铺', 'primary'), 560, None, '保存后在店铺表里维护该店铺的覆盖项：签名、政策口径、模板、白名单、SLA 内部目标。')
     return overlay(scaled(BS.p18(), 1440, 900, 0.6), dlg, W, 540)
 
 
@@ -190,8 +190,8 @@ def k12():
 def k13():
     from common import mtable
     gaps = [('V2 是否兼容 Tesla Model Y 的 12V 插座', 'T-20260910-0176', '置信度低于 60%', 3, '09-10'),
-            ('UK 站配件的插头与充电器规格', 'T-20260909-0131', '置信度低于 60%', 2, '09-09'),
-            ('DE 站退货后退款的到账时间', 'T-20260909-0128', '拒绝原因：知识错误', 1, '09-09'),
+            ('MX 站软管断裂能否单独补发配件', 'T-20260910-0188', '置信度低于 60%', 2, '09-10'),
+            ('MX 站亚马逊退货后退款的到账时间', 'T-20260909-0128', '拒绝原因：知识错误', 1, '09-09'),
             ('客户威胁差评时的退款口径', 'T-20260902-0071', '转人工', 1, '09-10'),
             ('批发 200 台的报价口径', 'T-20260909-0142', '转人工', 1, '09-09')]
     tone = {'置信度低于 60%': 'warning', '拒绝原因：知识错误': 'danger', '转人工': 'neutral'}
@@ -220,11 +220,11 @@ def build():
     body = col(
         grid(V('K1 文档解析', '上传中显示进度；解析中转圈；解析失败写明原因并可重试或删除；解析完成生成待审核条目。', k1(), '知识库负责人上传文档') +
              V('K2 待审核沉淀为空', '页签计数为 0，空状态说明沉淀从哪里来，并给出知识缺口入口。', k2(), '没有坐席提交的 FAQ 候选'), 2, 32) +
-        grid(V('K3 报表加载中', '保留筛选与标题，指标与图表显示骨架；超过 10 秒转加载失败（G4）。', k3(), '打开报表或切换筛选，数据超过 300ms 未返回') +
+        grid(V('K3 报表加载中', '保留筛选与标题，指标与图表显示骨架；超过 10 秒转加载失败（设计规范第 9 节）。', k3(), '打开报表或切换筛选，数据超过 300ms 未返回') +
              V('K4 报表无数据', '所选范围无数据时指标显示「—」，主区给出调整筛选与清除筛选。', k4(), '筛选组合没有任何工单或售后单（AC-RP-03）'), 2, 32) +
         grid(V('K5 导出', '生成中按钮进入处理中并显示进度；完成后成功浮层给出下载链接，文件保留 7 天。', k5(), '报表或台账点「导出」') +
              V('K6 设置保存', '修改后显示未保存计数与「保存修改」；成功浮层并记审计日志；失败保留修改、可重试。修改阈值需二次确认。', k6(), '在设置页修改后点「保存修改」'), 2, 32) +
-        grid(V('K7 渠道断开', '全站顶部红色横幅（G4）；渠道卡转「连接异常」并写明原因与暂存情况，提供重新授权。', k7(), 'Gmail、SP-API、Shopify 或良仓接口连续 3 次失败，或授权失效') +
+        grid(V('K7 渠道断开', '全站顶部红色横幅（G4）；渠道卡转「连接异常」并写明原因与暂存情况，提供重新授权。', k7(), 'Gmail、积加、SP-API 或 Shopify 连续 3 次失败，或授权失效') +
              V('K8 新增店铺校验', '店铺名唯一、店铺标识（亚马逊卖家 ID 或 Shopify 店铺域名）必填、邮箱格式正确；保存时校验全部，错误写明怎么改（AC-ST-01）。', k8(), '管理员在 P18 点「新增店铺」并保存'), 2, 32) +
         grid(V('K9 放开自动发送不可用', '条件不满足时开关禁用，悬停写明差距（R-SD-02、AC-AI-11）；满足后开关恢复可用。', k9(), '某意图近 30 天采纳率不高于 90% 或样本少于 50') +
              V('K10 停用成员', '手动停用需二次确认，有未关闭工单时必须先选接手人改派（AC-ST-02）；成员在钉钉离职后自动停用，其未关闭工单进入客服主管的改派队列（AC-ST-05）。', k10(), '管理员在 P20 成员行「更多」中点「停用」'), 2, 32) +
