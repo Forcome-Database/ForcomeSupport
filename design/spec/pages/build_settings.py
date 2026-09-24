@@ -86,8 +86,8 @@ def jijia_card():
 def gmail_card(err=False):
     if err:
         return ch_card('message', 'Gmail', state('连接异常'),
-                       ['support@forcome.mx 授权已失效（10:05 起连续 3 次失败）', '该邮箱来信暂存，回复进入待发队列'],
-                       row(btn('重新授权', 'primary', 'sm', 'refresh') + btn('查看错误日志', 'ghost', 'sm'), 6), 'bad', 'danger', sync=CHANNEL_SYNC['Gmail 异常'])
+                       ['support@forcome.mx 访问失败（10:05 起连续 3 次）：请检查全域委派范围与邮箱状态', '该邮箱来信暂存，恢复后自动补拉；回复进入待发队列'],
+                       row(btn('重新检测', 'primary', 'sm', 'refresh') + btn('查看错误日志', 'ghost', 'sm'), 6), 'bad', 'danger', sync=CHANNEL_SYNC['Gmail 异常'])
     return ch_card('message', 'Gmail', state('已连接'), ['4 个邮箱：2 个亚马逊买家消息、2 个 Shopify 客服', '新邮件推送，实时收取'], '', 'ok', sync=CHANNEL_SYNC['Gmail'])
 
 
@@ -128,7 +128,7 @@ def p18_stores():
 
 def p18(h=900):
     inner = col(label('渠道连接') + p18_channels(), 10) + p18_stores()
-    return spage('liuyang', '渠道与店铺', '渠道与店铺', '订单、物流、库存与易仓出库单经积加；退款、改地址、取消走平台官方接口；客户来信统一经 Gmail 收发。店铺在右侧抽屉里新增与编辑。', '',
+    return spage('liuyang', '渠道与店铺', '渠道与店铺', '订单由平台直读；库存、易仓出库单与运费经积加；物流轨迹经 17TRACK；退款、改地址、取消走平台官方接口；客户来信统一经 Gmail 收发。店铺在右侧抽屉里新增与编辑。', '',
                  inner, h=h)
 
 
