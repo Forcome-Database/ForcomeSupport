@@ -19,7 +19,7 @@ Label: wayfinder:map
   - 账号：Shopify、钉钉、Gmail（Google Workspace）管理权限已有；积加开放接口、亚马逊 SP-API 尚未开通。
   - 模型：Claude 经 NewAPI 网关接入（2026-09-24 用户决定）；调用合规与网络问题不在考虑范围内。模型层必须同时适配 Claude、OpenAI GPT 与任意 OpenAI 兼容接口，不绑定单一厂商；接入层用 Vercel AI SDK（ADR [0001](../../docs/adr/0001-模型接入层用VercelAISDK.md)）。
 - **PRD 已锁定、不再讨论**：前端 shadcn/ui + Tailwind CSS v4（D-10）；读走积加、写走 SP-API 与 Shopify Admin API、来信走 Gmail、组织与通知走钉钉（D-14、D-16、D-17）；适配器为 MCP 形式（F-AP-02）；审计保留 ≥ 2 年；三期交付顺序 报表与台账 → 售后流程 → AI 回信。
-- **已定 ADR**：[0001 模型接入层用 Vercel AI SDK](../../docs/adr/0001-模型接入层用VercelAISDK.md)；[0002 按记账方选择外部数据来源](../../docs/adr/0002-按记账方选择外部数据来源.md)；[0003 内网零入站与工厂工作台单一公网入口](../../docs/adr/0003-内网零入站与工厂工作台单一公网入口.md)；[0004 不设个人信息脱敏与留存限制](../../docs/adr/0004-不设个人信息脱敏与留存限制.md)。
+- **已定 ADR**：[0001 模型接入层用 Vercel AI SDK](../../docs/adr/0001-模型接入层用VercelAISDK.md)；[0002 按记账方选择外部数据来源](../../docs/adr/0002-按记账方选择外部数据来源.md)；[0003 内网零入站与工厂工作台单一公网入口](../../docs/adr/0003-内网零入站与工厂工作台单一公网入口.md)；[0004 不设个人信息脱敏与留存限制](../../docs/adr/0004-不设个人信息脱敏与留存限制.md)；[0005 模块化单体与强制模块边界](../../docs/adr/0005-模块化单体与强制模块边界.md)。
 - **合规**：整个方案不考虑合规问题，按最佳体验设计（2026-09-24 用户决定，ADR [0004](../../docs/adr/0004-不设个人信息脱敏与留存限制.md)）。
 - **已知风险**：SP-API 没有直接的自发货退款、取消接口，已由调研确认改走 Feeds 异步。
 
@@ -33,6 +33,7 @@ Label: wayfinder:map
 - [调研：物流轨迹来源](issues/15-tracking-source.md)：推荐 17TRACK 聚合 + 主动轮询（覆盖本项目全部承运商，约 70–120 美元/月，无需公网入口）；不建议逐家直连承运商；退路为「超预计送达满 3 个工作日仍无签收」
 - [调研：多模型接入能力差异（Claude、OpenAI GPT、OpenAI 兼容接口、NewAPI 网关）](issues/16-llm-compat.md)：经 NewAPI 调 Claude 用 Anthropic 原生 /v1/messages（OpenAI 格式会丢结构化输出、strict 工具与缓存断点）；GPT 用 Responses、其他兼容接口用 Chat Completions；推荐两家官方 SDK + 自写薄适配层与能力配置表，结构化输出四档降级
 - [讨论：部署拓扑与数据合规](issues/05-deploy-topology.md)：大陆公司服务器，境内直连、境外经固定代理；外部系统零入站，唯一公网入口是工厂工作台；不考虑合规；每日备份；生产加开发测试两套环境
+- [讨论：架构形态与代码仓库结构](issues/06-architecture-shape.md)：模块化单体，9 个业务模块加 integration、core；lint 强制边界，跨模块走发件箱事件；pnpm workspace；api 与 worker 两个容器
 
 ## Not yet specified
 
