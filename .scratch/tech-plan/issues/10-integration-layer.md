@@ -1,6 +1,6 @@
 Title: 讨论：集成层设计与「MCP 形式」的含义
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: 01, 02, 03, 15
 Map: ../map.md
 
@@ -13,3 +13,14 @@ Map: ../map.md
 已定：外部数据来源按记账方分工（ADR 0002）：补发、出库、易仓库存、运费与订单读取经积加；退款、取消、改地址走 SP-API（Feeds 异步）与 Shopify Admin API；轨迹走 17TRACK；来信走 Gmail。
 
 要定：「MCP 形式」是指每个适配器做成独立 MCP 服务器、供 AI 代理以工具调用，还是内部统一接口、对 AI 暴露为工具；统一动作的接口形状（9 个动作）、店铺凭据隔离（R-ST-03）；接口失败时转人工操作清单（R-AP-04、R-AP-05）的衔接；积加与 SP-API 能力缺口的兜底方案；外部调用经代理的统一出口。
+
+## Answer
+
+2026-09-24 用户同意全部推荐，详见 ADR [0009 统一动作接口对齐 MCP 形状的进程内适配器](../../../docs/adr/0009-统一动作接口对齐MCP形状的进程内适配器.md)。
+
+- **「MCP 形式」**：进程内适配器，动作定义的形状对齐 MCP 工具规范，不拆成独立的 MCP 服务；第三期只把只读动作交给模型作工具。
+- **接口**：9 个动作，每个一份定义（分级、zod 输入输出、`execute`）；结果分 succeeded、pending、failed_retryable、failed_permanent、unknown。Gmail、钉钉、17TRACK 是普通客户端，不走动作接口。
+- **映射与凭据**：映射存在数据库、由 P22 编辑；凭据只在 integration 内按店铺取用。
+- **缺口**：按步骤模板生成人工操作清单；亚马逊改地址由草稿引导买家取消后重新下单。
+- **出站**：统一 HTTP 客户端 + `HTTPS_PROXY`；按系统限流；每次调用写调用记录。
+- **Fake**：每个适配器配假实现，按店铺切换；开发测试环境默认用 Fake。
