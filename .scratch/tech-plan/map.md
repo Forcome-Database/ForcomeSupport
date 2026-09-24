@@ -42,6 +42,7 @@ Label: wayfinder:map
 - [调研：订单数据的准实时来源（SP-API 非受限订单接口、Shopify Admin API、第三方聚合平台）](issues/19-order-source.md)：推荐亚马逊订单走 SP-API v2026-01-01 非受限角色（ORDER_CHANGE 经 SQS + 增量兜底），Shopify 走 Admin API，买家姓名与地址仍取积加；不接聚合平台；MFN 单号能否读到待实测
 - [调研：领星能否替代积加](issues/20-lingxing.md)：不建议替代，也不建议作补充数据源（读不到亚马逊收件人、时效未公布）；优势是运费约 30 分钟、可接口取消补发；是否换 ERP 由客户决定
 - [讨论：第一期报表的数据来源与同步](issues/12-phase1-reporting-data.md)：订单改为平台直读（ADR 0011），新增 order 模块；第一期 7 个页面，17TRACK 推到第二期；首次回复按 Gmail 线程反推；报表直查业务表；台账即售后单；历史走同一流程导入
+- [调研：电商客服 AI 工作流与模型应用](issues/21-llm-uses-and-approaches.md)：保留五步流水线，R-IN 升级为「意图流程」；上下文由代码预取装配、来信按不可信输入隔离；治理以代码为主；用途 11 个（第二期 4 个）；不加网关、可观测平台、向量库
 
 ## Not yet specified
 

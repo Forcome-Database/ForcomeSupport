@@ -1,6 +1,6 @@
 Title: 讨论：模型接入层设计
 Type: grilling
-Status: open
+Status: claimed
 Blocked by: 07, 16, 21
 Map: ../map.md
 
