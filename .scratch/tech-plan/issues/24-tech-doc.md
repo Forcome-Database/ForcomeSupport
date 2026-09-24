@@ -1,6 +1,6 @@
 Title: 事务：汇总技术方案总文档
 Type: task
-Status: open
+Status: claimed
 Blocked by: 23
 Map: ../map.md
 
