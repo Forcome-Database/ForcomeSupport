@@ -1,6 +1,6 @@
 Title: 讨论：模型接入层设计
 Type: grilling
-Status: claimed
+Status: resolved
 Blocked by: 07, 16, 21
 Map: ../map.md
 
@@ -19,3 +19,15 @@ Map: ../map.md
 ## Comments
 
 2026-09-24：第一轮提出 Q1 按五个用途调用、Q2 配置存库加管理员「模型」页、Q3 60 秒时限与熔断、Q4 完整调用记录、Q5 提示词随代码、Q6 第二期随译文摘要落地。用户要求先调研用途全集与更智能的方案，已拆出「调研：电商客服 AI 工作流与模型应用」，本待办等它。
+
+## Answer
+
+2026-09-24 用户同意按「调研：电商客服 AI 工作流与模型应用」修订后的第一轮，详见 ADR [0012 模型按用途配置，不引入网关与可观测平台](../../../docs/adr/0012-模型按用途配置不引入网关与可观测平台.md)。
+
+- **用途**：11 个（triage、draft、check、translate、summarize、extract、assess、knowledge、judge、embed、rerank），业务只按用途调用；每个用途各自配置主备模型、推理强度、输出上限、时限、提示词与模式版本。
+- **配置**：存数据库，AI SDK `customProvider` 重建；新增管理员「模型」页（PRD 新增）。
+- **时限与熔断**：60 秒只管 triage + draft；按「用途 × 模型」熔断；NewAPI 管渠道、应用管模型。
+- **调用记录**：自有表，含上下文清单与完整的请求和响应，长期保留，兼作评测样本与成本数据源。
+- **提示词**：两层；业务内容的维护方式归「讨论：AI 处理的编排与治理」。
+- **节奏**：第二期上线接入层 + 4 个用途；第三期上线其余 7 个用途并建好回归集。
+- **组件**：pgvector、自写评测；不加 LiteLLM、Portkey、OpenRouter、Langfuse、专用向量库。
