@@ -39,6 +39,7 @@ Label: wayfinder:map
 - [讨论：后台任务与流程引擎](issues/09-jobs-workflow.md)：pg-boss（任务表即发件箱，无 Redis）；状态机手写迁移表；时限每分钟扫描；工作日历为前后端共用的纯函数包
 - [讨论：集成层设计与「MCP 形式」的含义](issues/10-integration-layer.md)：进程内适配器、形状对齐 MCP，不拆独立服务；9 个动作结果含 pending 异步回执；映射存库；缺口转人工操作清单；每个适配器配 Fake
 - [讨论：身份与权限](issues/11-identity-access.md)：服务端会话；6 个固定角色，能力矩阵前后端共用；店铺范围与生产厂隔离在应用层强制（不用 RLS）；钉钉版本待确认
+- [调研：订单数据的准实时来源（SP-API 非受限订单接口、Shopify Admin API、第三方聚合平台）](issues/19-order-source.md)：推荐亚马逊订单走 SP-API v2026-01-01 非受限角色（ORDER_CHANGE 经 SQS + 增量兜底），Shopify 走 Admin API，买家姓名与地址仍取积加；不接聚合平台；MFN 单号能否读到待实测
 
 ## Not yet specified
 
