@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""把 spec/prd_a..d.md 合成为 design/forcome-blueprint-guide.html（PRD v2.8）。"""
+"""把 spec/prd_a..d.md 合成为 design/forcome-blueprint-guide.html（PRD v2.9）。"""
 import io, os, re, hashlib
 import markdown
 

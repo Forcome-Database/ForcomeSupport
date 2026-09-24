@@ -26,3 +26,9 @@ Map: ../map.md
 - Shopify：在 Dev Dashboard 建自建应用时，申请受保护客户数据（客户邮箱、地址）；确认两个店铺的套餐与是否同一组织（`research/order-source` O-5）。
 - 积加问题清单追加：开放接口的订单为何是「隔天」，具体慢的是订单、发货单号、运费还是统计数据（`research/order-source` O-6）；订单详情里的亚马逊收件地址能否满足补发（O-7）。
 - 开通后第一周实测：`ORDER_CHANGE` 延迟（O-1）、积加标发的 MFN 单号能否在 `packages[]` 读到（O-2）、非受限角色下各 `includedData` 是否正常（O-3）。
+
+2026-09-24（交叉审查复核后补充）：
+- Shopify 自建应用另申请 `read_all_orders`（默认只能读 60 天，90 天回补与老订单售后都需要）。
+- 运维：第一期就需要内网 HTTPS 域名与证书（Secure Cookie、钉钉扫码与免登都要求）；提供 `NO_PROXY` 境内域名清单；NAS 用于 WAL 归档。
+- 开发测试环境：独立的 Pub/Sub 订阅、SQS 队列与一个 Gmail 测试邮箱。
+- FSH：上线前抽样验证海帆发出的回信是否出现在店铺邮箱「已发送」并带回复邮件头（PRD Q-26）；提供 SKU 与生产厂归属表（第一期台账种子数据）。

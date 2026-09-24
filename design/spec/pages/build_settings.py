@@ -70,17 +70,17 @@ def ch_card(ic, name, st, lines, foot='', tone='accent', card_tone=None, sync=No
 def amazon_card(err=False):
     if err:
         return ch_card('store', '亚马逊 SP-API', state('连接异常'),
-                       ['10:05 起连续 3 次调用失败：授权令牌已过期', '退款与取消暂停，恢复后自动补执行；订单查询走积加、买家消息走 Gmail，不受影响'],
+                       ['10:05 起连续 3 次调用失败：授权令牌已过期', '退款、取消与订单同步暂停，恢复后自动补执行与补拉；买家消息走 Gmail，不受影响'],
                        row(btn('重新授权', 'primary', 'sm', 'refresh') + btn('查看错误日志', 'ghost', 'sm'), 6), 'bad', 'danger', sync=CHANNEL_SYNC['SP-API 异常'])
-    return ch_card('store', '亚马逊 SP-API', state('已连接'), ['2 个店铺 · 退款、取消（审批后执行）', '订单、发货与退货信息由积加同步'], '', 'ok', sync=CHANNEL_SYNC['SP-API'])
+    return ch_card('store', '亚马逊 SP-API', state('已连接'), ['2 个店铺 · 退款、取消（审批后执行）', '订单经 SP-API 准实时同步（订单通知队列 SQS）'], '', 'ok', sync=CHANNEL_SYNC['SP-API'])
 
 
 def shopify_card():
-    return ch_card('store', 'Shopify Admin API', state('已连接'), ['2 个店铺 · 退款、改地址、取消、订单备注', '订单信息由积加同步'], '', 'ok', sync=CHANNEL_SYNC['Shopify'])
+    return ch_card('store', 'Shopify Admin API', state('已连接'), ['2 个店铺 · 退款、改地址、取消、订单备注', '订单经 Admin API 准实时同步'], '', 'ok', sync=CHANNEL_SYNC['Shopify'])
 
 
 def jijia_card():
-    return ch_card('link', '积加 ERP', state('已连接'), ['订单与物流轨迹（聚合亚马逊、Shopify）', '库存、售后出库单、单号与运费（积加对接易仓）'], '', 'ok', sync=CHANNEL_SYNC['积加'])
+    return ch_card('link', '积加 ERP', state('已连接'), ['亚马逊订单收件人', '库存、售后出库单、单号与运费（积加对接易仓）'], '', 'ok', sync=CHANNEL_SYNC['积加'])
 
 
 def gmail_card(err=False):
