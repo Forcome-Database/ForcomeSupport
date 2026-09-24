@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""StatesApproval.dc.html —— 审批状态 A1–A9。"""
+"""StatesApproval.dc.html —— 审批状态 A1–A10。"""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -50,7 +50,9 @@ def a1():
 
 # ---------------------------------------------------------------- A2 批准确认
 def a2():
-    quote = '<div style="font-size: 12px; color: %s; line-height: 1.55; border-left: 2px solid %s; padding-left: 10px; margin-top: 4px;">%s</div>' % (T['ink2'], T['accent_line'], DRAFTS['mateo_bound_es'])
+    zh = '<div style="display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 5px 8px; border-radius: 6px; background: %s; min-width: 0px;">%s%s%s<div style="flex: 1; min-width: 0px; font-size: 12px; color: %s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">%s</div></div>' % (
+        T['subtle'], icon('chev_r', 13, T['ink3'], 2), nowrap('中文译文', 12, T['ink2'], 600), ai_badge('译文', 11), T['ink4'], DRAFTS['mateo_bound_zh'])
+    quote = '<div style="font-size: 12px; color: %s; line-height: 1.55; border-left: 2px solid %s; padding-left: 10px; margin-top: 4px;">%s</div>%s' % (T['ink2'], T['accent_line'], DRAFTS['mateo_bound_es'], zh)
     body = col(label('批准后按顺序执行') +
                step_line(1, '报备通过：额外赔偿 <b>MX$889.00</b>（≈ $49.39）写入登记台账', '售后单 S-20260911-0020 进入「执行付款」') +
                step_line(2, '经 SP-API 退款 MX$889.00（Forcome Direct · MX）', '失败按 1、5、15 分钟自动重试 3 次；仍失败时陈晨可转人工操作清单') +
@@ -58,7 +60,7 @@ def a2():
                step_line(4, '在工厂工作台发起比例提案：建议' + ratio_words([x for x in AFTERSALES if x['no'] == 'S-20260911-0020'][0]['ratios']), '与退款并行，客户不等协商结果'), 12)
     dlg = dialog('批准 AP-20260911-001？', body, btn('取消', 'secondary') + btn('批准并退款', 'primary', 'md', 'check'), 560, None,
                  '审批单转「执行中」，每一步的结果写入执行日志。')
-    return variant('A2 批准确认', '弹窗按执行顺序列出批准后发生的动作与绑定回复；主按钮文案写清结果。确认后浮层「已批准，正在经 SP-API 退款」。',
+    return variant('A2 批准确认', '批准执行不可逆，仍弹确认（按 A 同样弹出）：按执行顺序列出批准后发生的动作与绑定回复，西语回复下带可展开的「中文译文」（✦ AI 翻译，默认折叠）；主按钮文案写清结果。确认后浮层「已批准 001，下一张 002」并自动展开下一张。',
                    scrim_frame(scaled(P.p15(), 1440, 900, S), dlg), VW, trigger='在待我审批卡片上点「批准」。')
 
 
@@ -77,10 +79,12 @@ def a4():
     ch, sm = P.AP_SUMMARY['AP-20260911-004']
     notified = '<div style="display: flex; align-items: center; gap: 8px; background: %s; border: 1px solid %s; border-radius: 6px; padding: 7px 12px; font-size: 12px; color: %s;">%s<span><b style="color: %s;">13:48 已超时</b>，已通知：李婷（发起人）、王磊（售后负责人，同样可审批）。超时后仍可批准或驳回。</span></div>' % (
         T['bad_bg'], T['bad_line'], T['ink2'], icon('bell', 14, T['bad'], 2), T['bad'])
-    c = P.ap_card_collapsed(a, ch, sm, '待审批', 'danger', '已超时 20m', notified, 'danger')
-    other = P.ap_card_collapsed(P.AP['AP-20260911-003'], P.AP_SUMMARY['AP-20260911-003'][0], P.AP_SUMMARY['AP-20260911-003'][1], '待审批', 'danger', '已超时 27m')
-    frame = mini(col(between(nowrap('待我审批 · 14:08', 12, T['ink3'], 600), nowrap('按截止时间', 12, T['ink3'])) + other + c, 10), VW, 356, pad='20px')
-    return variant('A4 审批超时', '剩余胶囊变红「已超时 N」，卡片红色描边并写明超时时刻与已通知的人；剩 1 小时时已提醒过审批人。「已超时」只是标记，统计时保留。',
+    c = P.ap_card_collapsed(a, ch, sm, None, None, '已超时 20m', notified, 'danger')
+    other = P.ap_card_collapsed(P.AP['AP-20260911-003'], P.AP_SUMMARY['AP-20260911-003'][0], P.AP_SUMMARY['AP-20260911-003'][1], None, None, '已超时 27m', tone='danger')
+    leg = row(sla('剩 3h 10m', 'normal') + nowrap('> 1 小时', 11, T['ink4']) + sla('剩 48m', 'warning') + nowrap('≤ 1 小时', 11, T['ink4']) +
+              sla('已超时 20m', 'danger') + nowrap('超时', 11, T['ink4']), 6)
+    frame = mini(col(between(nowrap('待我审批 · 14:08', 12, T['ink3'], 600), leg) + other + c, 10), VW, 384, pad='20px')
+    return variant('A4 审批超时', '倒计时颜色：剩余 > 1 小时灰、≤ 1 小时黄、已超时红。超时后卡片红色描边并写明超时时刻与已通知的人；剩 1 小时时已同时提醒审批人与备用审批人王磊（R-AP-03，见 A10）。「已超时」只是标记，统计时保留。',
                    frame, VW, trigger='待审批超过 4 小时（本例为 14:08 的画面）。')
 
 
@@ -97,8 +101,8 @@ def a5():
                              nowrap('转人工后由你在积加手工创建良仓出库单，回填单号即视为成功', 12, T['ink3']))
     c = card(head + P.ap_meta(a) + bn + steps + foot, pad='14px 18px', gap=11, tone='danger')
     t = [x for x in TICKETS if x['no'] == 'T-20260910-0195'][0]
-    inbox = card(row(icon('inbox', 15, T['ink3']) + nowrap('收件箱同步标记', 12, T['ink3'], 600) + divider(True, 12) + nowrap(t['no'], 12.5, T['ink'], 600) +
-                     nowrap(t['customer'], 12.5, T['ink2']) + state('待审批') + chip('执行失败', 'danger', 10.5, 'alert') + spacer() +
+    inbox = card(row(icon('inbox', 15, T['ink3']) + nowrap('收件箱同步标记', 12, T['ink3'], 600) + divider(True, 12) + nowrap(t['no'], 13, T['ink'], 600) +
+                     nowrap(t['customer'], 13, T['ink2']) + state('待审批') + chip('执行失败', 'danger', 11, 'alert') + spacer() +
                      nowrap('工单保持原状态，绑定回复未发出（AC-AP-12）', 12, T['ink3']), 8), pad='10px 16px')
     frame = mini(col(c + inbox, 10), VW, 462, pad='20px')
     return variant('A5 执行失败', '卡片顶部红色横幅写明失败的动作、重试次数与返回原因；逐项显示已成功 / 失败 / 未执行；发起人可「重试」或「转人工操作清单」。',
@@ -156,16 +160,19 @@ def a8():
     head = '<div style="background: #ffffff; padding: 14px 20px 0px 20px; border-bottom: 1px solid %s; display: flex; flex-direction: column; gap: 6px;">%s%s</div>' % (
         T['line'], between(text('审批', 18, T['ink'], 700), row(avatar('婷', 'green', 20) + nowrap('李婷 · 坐席', 12, T['ink3']), 6)), '<div style="margin-bottom: -1px;">%s</div>' % tabs_html.replace('border-bottom: 1px solid %s;">' % T['line'], 'border-bottom: 0px;">', 1))
     rows = []
-    for no, what in (('AP-20260911-002', '报备快递费用 $8.40 + 良仓创建售后出库单'), ('AP-20260911-004', 'Shopify #1057 改收货地址 · Shopify Admin API')):
+    for no, what, withdrawn in (('AP-20260911-002', '报备快递费用 $8.40 + 良仓创建售后出库单', True), ('AP-20260911-004', 'Shopify #1057 改收货地址 · Shopify Admin API', False)):
         a = P.AP[no]
-        rows.append([nowrap(no, 12.5, T['accent'], 600), col(text(a['customer'], 12.5, T['ink'], 600) + ellipsis(what, 12, T['ink3']), 1), state('待审批'),
-                     sla('剩 ' + a['left'], 'warning'), nowrap(a['approver'], 12, T['ink2']), btn('撤回', 'secondary', 'sm')])
+        rows.append([nowrap(no, 13, T['accent'], 600), col(text(a['customer'], 13, T['ink'], 600) + ellipsis(what, 12, T['ink3']), 1),
+                     state('已撤回' if withdrawn else '待审批'),
+                     nowrap('—', 12, T['ink4']) if withdrawn else sla('剩 ' + a['left'], P.left_level_of('剩 ' + a['left'])), nowrap(a['approver'], 12, T['ink2']),
+                     btn('撤回', 'secondary', 'sm', disabled=True, reason='已撤回，可在浮层内撤销') if withdrawn else btn('撤回', 'secondary', 'sm')])
     tbl = mtable([('审批单', 'left'), ('客户与内容', 'left'), ('状态', 'left'), ('剩余', 'left'), ('审批人', 'left'), ('', 'right')], rows,
-                 '128px minmax(0, 1fr) 72px 96px 140px 60px', py=10)
-    note = banner('info', '你发起的审批单只读', '批准前可以撤回；撤回后审批单「已撤回」，工单回到提交前状态（一般为「待审草稿」，转人工工单仍为「转人工」），可修改后重新提交。')
-    frame = mini(head + '<div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">%s%s</div>' % (note, tbl), VW, 352)
-    return variant('A8 坐席视角', '坐席没有「待我审批」页签；「我发起的」只读，未批准的单可撤回（二次确认）；人工操作清单页签显示指派给自己的待执行项。',
-                   frame, VW, trigger='坐席李婷进入「审批」。')
+                 '128px minmax(0, 1fr) 72px 96px 140px 60px', py=10, bars={0: 'accent'})
+    note = banner('info', '你发起的审批单只读', '批准前可以撤回：点「撤回」直接执行，5 秒内可撤销；撤回后工单回到提交前状态（一般为「待审草稿」，转人工工单仍为「转人工」），可修改后重新提交。')
+    ts = '<div style="position: absolute; right: 20px; bottom: 14px;">%s</div>' % toast('success', '已撤回 AP-20260911-002', '工单 T-20260910-0195 回到「待审草稿」', undo=5, remain=4)
+    frame = mini(head + '<div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">%s%s</div>%s' % (note, tbl, ts), VW, 452)
+    return variant('A8 坐席视角 · 撤回', '坐席没有「待我审批」页签；「我发起的」只读。撤回可逆：不弹二次确认，直接执行并出现撤销浮层（5 秒倒计时，窗口内不自动消失），撤销后恢复「待审批」；人工操作清单页签显示指派给自己的待执行项。',
+                   frame, VW, trigger='坐席李婷在「我发起的」点 AP-20260911-002 的「撤回」后 1 秒。')
 
 
 # ---------------------------------------------------------------- A9 转给备用审批人
@@ -180,13 +187,32 @@ def a9():
                    frame, VW, trigger='团队只有一位客服主管周敏，且含报备的审批单由周敏本人发起（本例假设 AP-20260911-001 由周敏接手后提交）。')
 
 
+# ---------------------------------------------------------------- A10 剩 1 小时提醒备用审批人 + 处理锁（R-AP-03）
+def a10():
+    a = P.AP['AP-20260911-001']
+    ch = cat('报备 · 额外赔偿') + cat('动作 · SP-API')
+    sm = '报备额外赔偿 MX$889.00（与退款为同一笔）+ SP-API 亚马逊退款；退款成功后自动发出西语绑定回复。'
+    tl = APPROVAL_LOCK_DEMO  # 时间线：提醒 → 周敏视角 → 加锁 → 王磊进入
+    remind = '<div style="display: flex; align-items: center; gap: 8px; background: %s; border: 1px solid %s; border-radius: 6px; padding: 7px 12px; font-size: 12px; color: %s;">%s<span><b style="color: %s;">%s 剩 1 小时</b>，已提醒审批人周敏，并同时提醒备用审批人王磊（钉钉工作通知）。两人都可审批，谁先打开谁加处理锁。</span></div>' % (
+        T['warn_bg'], T['warn_line'], T['ink2'], icon('bell', 14, T['warn'], 2), T['warn'], tl['remind'])
+    c1 = P.ap_card_collapsed(a, ch, sm, None, None, '剩 58m', remind, 'warning')
+    why = '周敏正在处理这张单，你现在只读'
+    acts = row(btn('批准', 'secondary', 'sm', 'check', disabled=True, reason=why) + btn('驳回', 'secondary', 'sm', 'x', disabled=True, reason=why), 6)
+    lk = P.lock_line('周敏正在处理 · %s 起' % tl['lock'], '你现在只读，按钮置灰，防止重复审批；周敏关闭或 10 分钟无操作后释放')
+    c2 = P.ap_card_collapsed(a, ch, sm, None, None, '剩 55m', lk, None, acts)
+    capf = lambda t: row(avatar(t[0], 'amber' if t[0] == '磊' else 'accent', 20) + nowrap(t[1], 12, T['ink3'], 600), 6)
+    frame = mini(col(capf(('敏', '周敏 · 客服主管 · %s' % tl['view'])) + c1 + capf(('磊', '王磊 · 售后负责人（备用审批人）· %s' % tl['backup'])) + c2, 10), VW, 470, pad='20px')
+    return variant('A10 剩 1 小时提醒备用审批人 + 处理锁（新增）', '剩 1 小时时倒计时转黄，同时提醒审批人与备用审批人王磊（R-AP-03）。审批单被打开即加处理锁：其他审批人看到「周敏正在处理 · 起始时刻」，批准、驳回置灰并说明原因（悬停可见），只读防重复审批。',
+                   frame, VW, trigger='待审批剩 1 小时（%s）；随后周敏 %s 打开这张单，王磊 %s 从提醒进入。' % (tl['remind'], tl['lock'], tl['backup']))
+
+
 def build():
-    vs = [a1(), a2(), a3(), a4(), a5(), a6(), a7(), a8(), a9()]
+    vs = [a1(), a2(), a3(), a4(), a5(), a6(), a7(), a8(), a9(), a10()]
     rows_ = ''
     for k in range(0, len(vs), 2):
         rows_ += grid(''.join(vs[k:k + 2]), template='%dpx %dpx' % (VW, VW), gap=32, extra='align-items: start;')
-    leg = row(state('待审批') + state('执行中') + state('已执行') + state('执行失败') + state('已驳回') + state('已撤回') + state('待执行') + state('已回填') + sla('已超时 20m', 'danger'), 6)
-    return board('审批状态', 'P15 审批页的空、批准确认、驳回、超时、执行失败、人工操作清单回填、坐席视角与备用审批人。审批单把动作、报备、绑定回复合成一张。演示时刻 %s（A4、A5 为当天稍后的画面）。' % NOW_LABEL,
+    leg = row(state('待审批') + state('执行中') + state('已执行') + state('执行失败') + state('已驳回') + state('已撤回') + state('待执行') + state('已回填') + sla('剩 3h 10m', 'normal') + sla('剩 48m', 'warning') + sla('已超时 20m', 'danger'), 6)
+    return board('审批状态', 'P15 审批页的空、批准确认、驳回、超时、执行失败、人工操作清单回填、坐席撤回、备用审批人、剩 1 小时提醒与处理锁（A1–A10）。审批单把动作、报备、绑定回复合成一张。演示时刻 %s（A4、A5、A10 为当天稍后的画面）。' % NOW_LABEL,
                  col(rows_, 36), 1920, 800, leg)
 
 

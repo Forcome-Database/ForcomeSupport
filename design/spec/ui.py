@@ -15,7 +15,7 @@ Forcome Support 组件库（高保真原型唯一样式来源）
     save('Main.dc.html', html)
 """
 import io, os
-from data import STAFF, NAV_BY_ROLE, FACTORY_NAV, BADGES
+from data import STAFF, NAV_BY_ROLE, FACTORY_NAV, BADGES, USD_MXN, USD_CAD, RATIO_LABELS, money, total, fsh_share, factory_share, _parts
 
 DESIGN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -24,27 +24,36 @@ T = {
     # 背景与线（shadcn：--background / --card / --muted / --border / --input）
     'canvas': '#f5f6fa', 'surface': '#ffffff', 'subtle': '#f7f8fc', 'hover': '#f1f3f9', 'track': '#f1f3f9',
     'line': '#e7e9f1', 'line2': '#eff1f7', 'line_strong': '#d8dce7',
-    # 文字（--foreground / --muted-foreground）
-    'ink': '#0f1320', 'ink2': '#3b4356', 'ink3': '#5a6376', 'ink4': '#9099ab',
+    # 文字（--foreground / --muted-foreground）。ink4 白底 5.11:1、画布底 4.74:1；ink5 只用于占位符与禁用（不承载信息）
+    'ink': '#0f1320', 'ink2': '#3b4356', 'ink3': '#5a6376', 'ink4': '#656e82', 'ink5': '#9099ab',
     # 主色（--primary / --ring / --accent）
     'accent': '#4f46e5', 'accent_hover': '#4338ca', 'accent_ink': '#4338ca', 'accent_bg': '#f0effd', 'accent_line': '#d3d1f9',
     'cyan': '#06b6d4',
     # 语义色（--success / --warning / --destructive / --info，自定义 @theme 变量）
-    'ok': '#0b8554', 'ok_bg': '#e7f5ee', 'ok_line': '#bfe4d2', 'ok_solid': '#0f9960',
-    'warn': '#a9620a', 'warn_bg': '#faf0e2', 'warn_line': '#efd4aa', 'warn_solid': '#c2740a',
-    'bad': '#c8313b', 'bad_bg': '#fcedee', 'bad_line': '#f4c8cb', 'bad_solid': '#dc3b45',
+    # 文字色（ok / warn / bad / info）用于浅底上的字与图标；实心色（*_solid）用于白字的实心底、圆点、进度与色条，白字 ≥ 4.5:1
+    'ok': '#0a7a4c', 'ok_bg': '#e7f5ee', 'ok_line': '#bfe4d2', 'ok_solid': '#0b7a4d',
+    'warn': '#94560a', 'warn_bg': '#faf0e2', 'warn_line': '#efd4aa', 'warn_solid': '#a65f06',
+    'bad': '#c8313b', 'bad_bg': '#fcedee', 'bad_line': '#f4c8cb', 'bad_solid': '#c8313b',
     'flow': '#6d28d9', 'flow_bg': '#f4f1fe', 'flow_line': '#ddd6fe',
-    'info': '#2563eb', 'info_bg': '#e9f0fe', 'info_line': '#c5d6fb',
-    # 渠道识别色（徽标）
-    'amazon': '#2563eb', 'shopify': '#0f9960', 'mail': '#5a6376',
+    'info': '#0e7490', 'info_bg': '#e7f6f9', 'info_line': '#b9e3ec',
+    # 渠道识别色（徽标）：亚马逊品牌橙、Shopify 绿、邮件灰；与主色靛蓝、信息青分开
+    'amazon': '#b45309', 'amazon_bg': '#fff5ea', 'amazon_line': '#f6d9b5', 'shopify': '#0b7a4d', 'mail': '#5a6376',
 }
-SHADOW_XS = '0 1px 2px rgba(16,20,35,0.04)'
+SHADOW_XS = '0 1px 2px rgba(16,20,35,0.07)'
 SHADOW_CARD = '0 12px 32px -18px rgba(16,20,35,0.24)'
 SHADOW_MD = '0 16px 36px -14px rgba(16,20,35,0.28)'
 SHADOW_LG = '0 28px 64px -20px rgba(16,20,35,0.40)'
 SHADOW_POP = '0 8px 18px -8px rgba(79,70,229,0.5)'
 GRAD = 'linear-gradient(120deg, #4f46e5, #06b6d4)'
-R = {'panel': 16, 'card': 13, 'ctrl': 9, 'chip': 6}  # 圆角：面板 / 卡片 / 控件 / 徽标（shadcn --radius = 0.8rem 派生）
+R = {'panel': 16, 'card': 12, 'ctrl': 8, 'chip': 6}  # 圆角：面板 / 卡片 / 控件 / 徽标（shadcn --radius = 0.75rem 派生）
+FS_SCALE = (11, 12, 13, 14, 16, 20, 24)  # 字号刻度；规范板展示大字另可用 28 / 32
+
+
+def _fs(x):
+    """把任意字号收敛到 FS_SCALE（中文最小 11；等距时取大的一档；≥ 26 的展示大字取整保留）。"""
+    if x >= 26:
+        return int(round(x))
+    return min(FS_SCALE, key=lambda s: (abs(s - x), -s))
 FONT = '"Inter", "PingFang SC", "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif'
 
 # 状态 → 色调（全站唯一映射；页面里显示状态一律用 state()）
@@ -186,7 +195,7 @@ def grid(content, cols=2, gap=12, template=None, extra=''):
 
 
 def text(t, size=13, color=None, weight=400, extra=''):
-    return '<div style="font-size: %spx; font-weight: %d; color: %s; line-height: 1.5;%s">%s</div>' % (size, weight, color or T['ink'], (' ' + extra) if extra else '', t)
+    return '<div style="font-size: %spx; font-weight: %d; color: %s; line-height: 1.5;%s">%s</div>' % (_fs(size), weight, color or T['ink'], (' ' + extra) if extra else '', t)
 
 
 def muted(t, size=12, extra=''):
@@ -198,21 +207,21 @@ def strong(t, size=13, color=None):
 
 
 def nowrap(t, size=12, color=None, weight=400):
-    return '<div style="font-size: %spx; font-weight: %d; color: %s; white-space: nowrap;">%s</div>' % (size, weight, color or T['ink3'], t)
+    return '<div style="font-size: %spx; font-weight: %d; color: %s; white-space: nowrap;">%s</div>' % (_fs(size), weight, color or T['ink3'], t)
 
 
 def ellipsis(t, size=13, color=None, weight=400):
-    return '<div style="font-size: %spx; font-weight: %d; color: %s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0px;">%s</div>' % (size, weight, color or T['ink'], t)
+    return '<div style="font-size: %spx; font-weight: %d; color: %s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0px;">%s</div>' % (_fs(size), weight, color or T['ink'], t)
 
 
 def link(t, size=12, icon_name=None):
     ic = icon(icon_name, 14, T['accent']) if icon_name else ''
-    return '<div style="display: inline-flex; align-items: center; gap: 4px; font-size: %spx; font-weight: 500; color: %s; white-space: nowrap;">%s%s</div>' % (size, T['accent'], t, ic)
+    return '<div style="display: inline-flex; align-items: center; gap: 4px; font-size: %spx; font-weight: 500; color: %s; white-space: nowrap;">%s%s</div>' % (_fs(size), T['accent'], t, ic)
 
 
 def label(t, extra=''):
-    """区块小标题：11.5px 半粗，字距。"""
-    return '<div style="font-size: 11.5px; font-weight: 650; letter-spacing: 0.03em; color: %s;%s">%s</div>' % (T['ink3'], (' ' + extra) if extra else '', t)
+    """区块小标题：12px 半粗，字距。"""
+    return '<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.03em; color: %s;%s">%s</div>' % (T['ink3'], (' ' + extra) if extra else '', t)
 
 
 def divider(vertical=False, h=16):
@@ -226,7 +235,7 @@ def spacer():
 
 
 def kbd(k):
-    return '<div style="font-size: 10.5px; font-weight: 500; color: %s; background: #ffffff; border: 1px solid %s; border-radius: 5px; padding: 0px 5px; line-height: 16px;">%s</div>' % (T['ink4'], T['line'], k)
+    return '<div style="font-size: 11px; font-weight: 500; color: %s; background: #ffffff; border: 1px solid %s; border-radius: 6px; padding: 0px 5px; line-height: 16px;">%s</div>' % (T['ink4'], T['line'], k)
 
 
 # ================================================================ 徽标与状态
@@ -234,7 +243,7 @@ def chip(t, tone='neutral', size=11, icon_name=None, dot=False):
     fg, bg, bd = TONES[tone]
     ic = icon(icon_name, 12, fg, 2) if icon_name else ''
     d = '<div style="width: 5px; height: 5px; border-radius: 999px; background: %s;"></div>' % fg if dot else ''
-    return '<div style="display: inline-flex; align-items: center; gap: 5px; font-size: %spx; font-weight: 600; color: %s; background: %s; border: 1px solid %s; border-radius: 6px; padding: 0px 7px; white-space: nowrap; line-height: 18px; flex-shrink: 0;">%s%s%s</div>' % (size, fg, bg, bd, d, ic, t)
+    return '<div style="display: inline-flex; align-items: center; gap: 5px; font-size: %spx; font-weight: 600; color: %s; background: %s; border: 1px solid %s; border-radius: 6px; padding: 0px 7px; white-space: nowrap; line-height: 18px; flex-shrink: 0;">%s%s%s</div>' % (_fs(size), fg, bg, bd, d, ic, t)
 
 
 def state(t, size=11, suffix=''):
@@ -251,15 +260,15 @@ def cat(t, size=11):
 def pill(t, active=False):
     """坐席手工标签：浅灰圆角徽标（选中为主色浅底）。"""
     fg, bg = (T['accent_ink'], T['accent_bg']) if active else (T['ink2'], T['track'])
-    return '<div style="display: inline-flex; align-items: center; font-size: 11px; font-weight: 550; color: %s; background: %s; border-radius: 6px; padding: 1px 7px; white-space: nowrap; line-height: 18px;">%s</div>' % (fg, bg, t)
+    return '<div style="display: inline-flex; align-items: center; font-size: 11px; font-weight: 500; color: %s; background: %s; border-radius: 6px; padding: 1px 7px; white-space: nowrap; line-height: 18px;">%s</div>' % (fg, bg, t)
 
 
 def channel(platform, site=None, store=None, size=11):
-    """渠道标识：平台徽标（亚马逊蓝、Shopify 绿、邮件灰）+ 店铺名。"""
-    fg, bg = {'亚马逊': (T['info'], T['info_bg']), 'Shopify': (T['ok'], T['ok_bg'])}.get(platform, (T['ink3'], T['track']))
+    """渠道标识：平台徽标（亚马逊橙、Shopify 绿、邮件灰）+ 店铺名。"""
+    fg, bg = {'亚马逊': (T['amazon'], T['amazon_bg']), 'Shopify': (T['ok'], T['ok_bg'])}.get(platform, (T['ink3'], T['track']))
     t = platform + (' ' + site if site else '')
-    b = '<div style="font-size: %spx; font-weight: 650; color: %s; background: %s; border-radius: 6px; padding: 0px 6px; line-height: 18px; white-space: nowrap; letter-spacing: 0.01em;">%s</div>' % (size - 0.5, fg, bg, t)
-    s_ = '<div style="font-size: %spx; color: %s; white-space: nowrap;">%s</div>' % (size + 0.5, T['ink3'], store) if store else ''
+    b = '<div style="font-size: %spx; font-weight: 600; color: %s; background: %s; border-radius: 6px; padding: 0px 6px; line-height: 18px; white-space: nowrap; letter-spacing: 0.01em;">%s</div>' % (_fs(size), fg, bg, t)
+    s_ = '<div style="font-size: %spx; color: %s; white-space: nowrap;">%s</div>' % (_fs(size + 1), T['ink3'], store) if store else ''
     return '<div style="display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;">%s%s</div>' % (b, s_)
 
 
@@ -272,24 +281,24 @@ def sentiment(s, show_text=True):
 def sla(t, level='normal', size=11):
     """SLA 剩余时间。level: danger ≤ 2h，warning ≤ 6h，normal，none（已回复/无 SLA）。"""
     if level == 'none':
-        return '<div style="font-size: %spx; color: %s; white-space: nowrap;">%s</div>' % (size, T['ink4'], t)
+        return '<div style="font-size: %spx; color: %s; white-space: nowrap;">%s</div>' % (_fs(size), T['ink4'], t)
     fg, bg = {'danger': (T['bad'], T['bad_bg']), 'warning': (T['warn'], T['warn_bg']), 'normal': (T['ink2'], T['track'])}[level]
-    return '<div style="display: inline-flex; align-items: center; gap: 4px; font-size: %spx; font-weight: 650; color: %s; background: %s; border-radius: 7px; padding: 0px 7px; line-height: 20px; white-space: nowrap; font-variant-numeric: tabular-nums;">%s%s</div>' % (size, fg, bg, icon('clock', 11, fg, 2), t)
+    return '<div style="display: inline-flex; align-items: center; gap: 4px; font-size: %spx; font-weight: 600; color: %s; background: %s; border-radius: 6px; padding: 0px 7px; line-height: 20px; white-space: nowrap; font-variant-numeric: tabular-nums;">%s%s</div>' % (_fs(size), fg, bg, icon('clock', 11, fg, 2), t)
 
 
 def sla_meter(label_, t, level='normal', pct=50):
     """SLA 胶囊（带进度条）：用于会话标题区。pct 为剩余比例。"""
     fg = {'danger': T['bad'], 'warning': T['warn'], 'normal': T['ok']}[level]
     tc = {'danger': T['bad'], 'warning': T['warn'], 'normal': T['ink2']}[level]
-    return ('<div style="display: inline-flex; align-items: center; gap: 8px; padding: 4px 9px; border-radius: 9px; background: %s; white-space: nowrap;">'
-            '<div style="font-size: 10.8px; color: %s; font-weight: 500;">%s</div><div style="font-size: 12px; font-weight: 650; color: %s; font-variant-numeric: tabular-nums;">%s</div>'
-            '<div style="width: 52px; height: 4px; border-radius: 99px; background: rgba(15,19,32,0.09); overflow: hidden;"><div style="width: %d%%; height: 100%%; border-radius: 99px; background: %s;"></div></div></div>') % (
+    return ('<div style="display: inline-flex; align-items: center; gap: 8px; padding: 4px 9px; border-radius: 8px; background: %s; white-space: nowrap;">'
+            '<div style="font-size: 11px; color: %s; font-weight: 500;">%s</div><div style="font-size: 12px; font-weight: 600; color: %s; font-variant-numeric: tabular-nums;">%s</div>'
+            '<div style="width: 52px; height: 4px; border-radius: 999px; background: rgba(15,19,32,0.09); overflow: hidden;"><div style="width: %d%%; height: 100%%; border-radius: 999px; background: %s;"></div></div></div>') % (
         T['track'], T['ink4'], label_, tc, t, max(6, min(100, pct)), fg)
 
 
-def ai_badge(t='AI', size=10.8):
+def ai_badge(t='AI', size=11):
     """AI 标识：靛蓝→青色渐变小徽标（全站 AI 产出统一用它，不用于其他含义）。"""
-    return '<div style="display: inline-flex; align-items: center; gap: 4px; font-size: %spx; font-weight: 650; color: #ffffff; background: %s; border-radius: 6px; padding: 0px 7px; line-height: 18px; white-space: nowrap; letter-spacing: 0.02em; flex-shrink: 0;">✦ %s</div>' % (size, GRAD, t)
+    return '<div style="display: inline-flex; align-items: center; gap: 4px; font-size: %spx; font-weight: 600; color: #ffffff; background: %s; border-radius: 6px; padding: 0px 7px; line-height: 18px; white-space: nowrap; letter-spacing: 0.02em; flex-shrink: 0;">✦ %s</div>' % (_fs(size), GRAD, t)
 
 
 def priority(p):
@@ -300,23 +309,32 @@ def priority(p):
 def avatar(ch, tone='accent', size=28):
     """头像：内部成员用渐变（accent），其他色调为浅底。"""
     if tone in ('accent', 'grad'):
-        return '<div style="width: %dpx; height: %dpx; border-radius: 999px; background: %s; color: #ffffff; font-size: %dpx; font-weight: 650; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (size, size, GRAD, int(size * 0.42), ch)
+        return '<div style="width: %dpx; height: %dpx; border-radius: 999px; background: %s; color: #ffffff; font-size: %dpx; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (size, size, GRAD, max(11, int(size * 0.42)), ch)
     if tone == 'customer':
-        return '<div style="width: %dpx; height: %dpx; border-radius: 999px; background: linear-gradient(140deg, #8b93a8, #5a6376); color: #ffffff; font-size: %dpx; font-weight: 650; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (size, size, int(size * 0.4), ch)
+        return '<div style="width: %dpx; height: %dpx; border-radius: 999px; background: linear-gradient(140deg, #8b93a8, #5a6376); color: #ffffff; font-size: %dpx; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (size, size, max(11, int(size * 0.4)), ch)
     fg, bg = {'amber': (T['warn'], T['warn_bg']), 'green': (T['ok'], T['ok_bg']),
               'grey': (T['ink2'], T['track']), 'rose': (T['bad'], T['bad_bg']), 'violet': (T['flow'], T['flow_bg'])}[tone]
-    return '<div style="width: %dpx; height: %dpx; border-radius: 999px; background: %s; color: %s; font-size: %dpx; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (size, size, bg, fg, int(size * 0.42), ch)
+    return '<div style="width: %dpx; height: %dpx; border-radius: 999px; background: %s; color: %s; font-size: %dpx; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (size, size, bg, fg, max(11, int(size * 0.42)), ch)
 
 
 def badge_count(n, tone='danger'):
     bg = {'danger': T['bad_solid'], 'accent': T['accent'], 'muted': T['ink4']}[tone]
-    return '<div style="min-width: 16px; height: 16px; box-sizing: border-box; border-radius: 999px; background: %s; color: #ffffff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0px 4px;">%s</div>' % (bg, n)
+    return '<div style="min-width: 16px; height: 16px; box-sizing: border-box; border-radius: 999px; background: %s; color: #ffffff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0px 4px;">%s</div>' % (bg, n)
 
 
 # ================================================================ 按钮
-def btn(t, kind='secondary', size='md', icon_name=None, icon_right=None, disabled=False, loading=False, full=False):
-    """按钮（shadcn Button：default / outline / ghost / destructive / link；另加 warn、accent_outline 两个变体）。"""
-    h, fs, px = {'sm': (28, 12, 10), 'md': (32, 12.5, 12), 'lg': (36, 13.5, 16)}[size]
+BTN_HOVER = {  # 悬停 / 按下 的底色（按下另加 1px 内阴影）
+    'primary': (T['accent_hover'], '#3730a3'), 'secondary': (T['hover'], '#e7e9f1'), 'ghost': (T['hover'], '#e7e9f1'),
+    'danger': ('#c8313b', '#b1252f'), 'danger_outline': (T['bad_bg'], '#f9dadd'), 'accent_outline': ('#e6e4fb', '#dcd9f9'),
+    'warn': ('#915204', '#7c4603'), 'link': ('transparent', 'transparent'),
+}
+FOCUS_RING = '0 0 0 2px #ffffff, 0 0 0 4px %s' % T['accent']  # focus-visible：2px 主色焦点环、2px 偏移（Tailwind ring-2 ring-offset-2）
+
+
+def btn(t, kind='secondary', size='md', icon_name=None, icon_right=None, disabled=False, loading=False, full=False, reason=None, st=None):
+    """按钮（shadcn Button：default / outline / ghost / destructive / link；另加 warn、accent_outline 两个变体）。
+    disabled=True 时必须给 reason（禁用原因），外层包 title 悬停说明；st：None / 'hover' / 'active' / 'focus'（规范板演示交互态）。"""
+    h, fs, px = {'sm': (28, 12, 10), 'md': (32, 13, 12), 'lg': (36, 14, 16)}[size]
     styles = {
         'primary': ('#ffffff', T['accent'], T['accent']),
         'secondary': (T['ink2'], '#ffffff', T['line_strong']),
@@ -329,13 +347,23 @@ def btn(t, kind='secondary', size='md', icon_name=None, icon_right=None, disable
     }
     fg, bg, bd = styles[kind]
     if disabled:
-        fg, bg, bd = T['ink4'], T['track'], T['track']
+        fg, bg, bd = T['ink5'], T['track'], T['track']
     shadow = ''
     if not disabled:
         if kind == 'primary':
             shadow = ' box-shadow: %s;' % SHADOW_POP
         elif kind in ('secondary', 'danger_outline'):
             shadow = ' box-shadow: %s;' % SHADOW_XS
+        if st in ('hover', 'active'):
+            bg = BTN_HOVER[kind][0 if st == 'hover' else 1]
+            if kind in ('primary', 'danger', 'warn'):
+                bd = bg
+            if kind == 'link':
+                shadow = ' text-decoration: underline; text-underline-offset: 3px;'
+            elif st == 'active':
+                shadow = ' box-shadow: inset 0 1px 2px rgba(16,20,35,0.18);'
+        elif st == 'focus':
+            shadow = ' box-shadow: %s;' % FOCUS_RING
     ic = ''
     if loading:
         ic = '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="%s" stroke-width="2.2" stroke-linecap="round" style="flex-shrink: 0;"><circle cx="10" cy="10" r="7" stroke-opacity="0.25"></circle><path d="M10 3a7 7 0 0 1 7 7"></path></svg>' % fg
@@ -346,8 +374,11 @@ def btn(t, kind='secondary', size='md', icon_name=None, icon_right=None, disable
     w = ' width: 100%; justify-content: center;' if full else ''
     op = ' opacity: 0.85;' if loading else ''
     fw = 600 if kind in ('primary', 'danger', 'warn', 'link', 'accent_outline') else 500
-    return '<div style="height: %dpx; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; font-size: %spx; font-weight: %d; color: %s; background: %s; border: 1px solid %s; border-radius: 9px; padding: %s; white-space: nowrap; flex-shrink: 0;%s%s%s">%s%s%s</div>' % (
+    html = '<div style="height: %dpx; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; font-size: %spx; font-weight: %d; color: %s; background: %s; border: 1px solid %s; border-radius: 8px; padding: %s; white-space: nowrap; flex-shrink: 0;%s%s%s">%s%s%s</div>' % (
         h, fs, fw, fg, bg, bd, pad, shadow, w, op, ic, t, icr)
+    if disabled and reason:
+        return '<div title="%s" style="display: inline-flex; flex-shrink: 0; cursor: not-allowed;%s">%s</div>' % (reason, ' width: 100%;' if full else '', html)
+    return html
 
 
 def icon_btn(name, tone='ghost', size=32, title=None, badge=None, active=False):
@@ -357,7 +388,7 @@ def icon_btn(name, tone='ghost', size=32, title=None, badge=None, active=False):
     if active:
         bd, bg, c = T['accent_line'], T['accent_bg'], T['accent_ink']
     b = '<div style="position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 999px; background: %s; border: 1.5px solid #ffffff;"></div>' % T['bad_solid'] if badge else ''
-    return '<div style="position: relative; width: %dpx; height: %dpx; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s%s</div>' % (size, size, bd, bg, icon(name, 16, c), b)
+    return '<div style="position: relative; width: %dpx; height: %dpx; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s%s</div>' % (size, size, bd, bg, icon(name, 16, c), b)
 
 
 def btn_group(items):
@@ -366,20 +397,22 @@ def btn_group(items):
 
 # ================================================================ 表单
 def input_box(value=None, placeholder='', st='default', prefix=None, suffix=None, width=None, h=32, icon_name=None, mono=False):
-    """st: default / focus / error / disabled / readonly（shadcn Input）"""
-    bd = {'default': T['line_strong'], 'focus': T['accent'], 'error': T['bad_solid'], 'disabled': T['line'], 'readonly': T['line']}[st]
+    """st: default / hover / focus（输入中）/ focus_visible（键盘聚焦）/ error / disabled / readonly（shadcn Input）。占位符与禁用用 ink5。"""
+    bd = {'default': T['line_strong'], 'hover': '#b9bfcd', 'focus': T['accent'], 'focus_visible': T['accent'], 'error': T['bad_solid'], 'disabled': T['line'], 'readonly': T['line']}[st]
     bg = {'disabled': T['subtle'], 'readonly': T['subtle']}.get(st, '#ffffff')
     ring = ' box-shadow: 0 0 0 3px %s;' % ('rgba(79,70,229,0.14)' if st == 'focus' else 'rgba(220,59,69,0.12)') if st in ('focus', 'error') else ''
-    color = T['ink'] if value else T['ink4']
+    if st == 'focus_visible':
+        ring = ' box-shadow: %s;' % FOCUS_RING
+    color = T['ink'] if value else T['ink5']
     if st == 'disabled':
-        color = T['ink4']
+        color = T['ink5']
     w = 'width: %s;' % width if width else 'width: 100%;'
     pre = '<div style="font-size: 13px; color: %s; flex-shrink: 0;">%s</div>' % (T['ink3'], prefix) if prefix else ''
     suf = '<div style="font-size: 12px; color: %s; flex-shrink: 0;">%s</div>' % (T['ink4'], suffix) if suffix else ''
     ic = icon(icon_name, 16, T['ink4']) if icon_name else ''
     ff = ' font-variant-numeric: tabular-nums;' if mono else ''
     caret = '<div style="width: 1px; height: 16px; background: %s; margin-left: -6px;"></div>' % T['accent'] if st == 'focus' else ''
-    return '<div style="%s height: %dpx; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 9px; display: flex; align-items: center; gap: 8px; padding: 0px 10px;%s">%s%s<div style="flex: 1; min-width: 0px; font-size: 13px; color: %s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;%s">%s</div>%s%s</div>' % (
+    return '<div style="%s height: %dpx; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 8px; display: flex; align-items: center; gap: 8px; padding: 0px 10px;%s">%s%s<div style="flex: 1; min-width: 0px; font-size: 13px; color: %s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;%s">%s</div>%s%s</div>' % (
         w, h, bd, bg, ring, ic, pre, color, ff, value or placeholder, caret, suf)
 
 
@@ -388,16 +421,16 @@ def select_box(value=None, placeholder='请选择', st='default', width=None, h=
     bg = T['subtle'] if st == 'disabled' else '#ffffff'
     ring = ' box-shadow: 0 0 0 3px %s;' % ('rgba(79,70,229,0.14)' if st == 'focus' else 'rgba(220,59,69,0.12)') if st in ('focus', 'error') else ''
     w = 'width: %s;' % width if width else 'width: 100%;'
-    return '<div style="%s height: %dpx; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 9px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0px 10px;%s"><div style="font-size: 13px; color: %s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">%s</div>%s</div>' % (
-        w, h, bd, bg, ring, T['ink'] if value else T['ink4'], value or placeholder, icon('chev_d', 14, T['ink4']))
+    return '<div style="%s height: %dpx; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0px 10px;%s"><div style="font-size: 13px; color: %s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">%s</div>%s</div>' % (
+        w, h, bd, bg, ring, T['ink'] if value else T['ink5'], value or placeholder, icon('chev_d', 14, T['ink4']))
 
 
 def textarea_box(value=None, placeholder='', st='default', h=88, counter=None):
     bd = {'default': T['line_strong'], 'focus': T['accent'], 'error': T['bad_solid'], 'disabled': T['line']}[st]
     ring = ' box-shadow: 0 0 0 3px %s;' % ('rgba(79,70,229,0.14)' if st == 'focus' else 'rgba(220,59,69,0.12)') if st in ('focus', 'error') else ''
     cnt = '<div style="position: absolute; right: 10px; bottom: 6px; font-size: 11px; color: %s;">%s</div>' % (T['bad'] if st == 'error' else T['ink4'], counter) if counter else ''
-    return '<div style="position: relative; min-height: %dpx; box-sizing: border-box; border: 1px solid %s; background: #ffffff; border-radius: 9px; padding: 8px 10px 20px 10px; font-size: 13px; line-height: 1.55; color: %s;%s">%s%s</div>' % (
-        h, bd, T['ink'] if value else T['ink4'], ring, value or placeholder, cnt)
+    return '<div style="position: relative; min-height: %dpx; box-sizing: border-box; border: 1px solid %s; background: #ffffff; border-radius: 8px; padding: 8px 10px 20px 10px; font-size: 13px; line-height: 1.55; color: %s;%s">%s%s</div>' % (
+        h, bd, T['ink'] if value else T['ink5'], ring, value or placeholder, cnt)
 
 
 def field(lbl, control, required=False, hint=None, error=None, extra=''):
@@ -413,13 +446,13 @@ def field(lbl, control, required=False, hint=None, error=None, extra=''):
 
 def radio(t, checked=False, disabled=False):
     ring = 'border: 5px solid %s;' % T['accent'] if checked else 'border: 1.5px solid %s;' % (T['line'] if disabled else T['line_strong'])
-    return '<div style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: %s;"><div style="width: 16px; height: 16px; box-sizing: border-box; border-radius: 999px; background: #ffffff; %s flex-shrink: 0;"></div>%s</div>' % (T['ink4'] if disabled else T['ink'], ring, t)
+    return '<div style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: %s;"><div style="width: 16px; height: 16px; box-sizing: border-box; border-radius: 999px; background: #ffffff; %s flex-shrink: 0;"></div>%s</div>' % (T['ink5'] if disabled else T['ink'], ring, t)
 
 
 def checkbox(t, checked=False, disabled=False):
-    box = '<div style="width: 16px; height: 16px; box-sizing: border-box; border-radius: 5px; background: %s; border: 1.5px solid %s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (
+    box = '<div style="width: 16px; height: 16px; box-sizing: border-box; border-radius: 6px; background: %s; border: 1.5px solid %s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (
         T['accent'] if checked else '#ffffff', T['accent'] if checked else T['line_strong'], icon('check', 12, '#ffffff', 2.5) if checked else '')
-    return '<div style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: %s;">%s%s</div>' % (T['ink4'] if disabled else T['ink'], box, t)
+    return '<div style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: %s;">%s%s</div>' % (T['ink5'] if disabled else T['ink'], box, t)
 
 
 def toggle(on=True, t=None):
@@ -437,20 +470,20 @@ def radio_card(title, desc=None, selected=False, badge=None, disabled=False, ext
     b = ai_badge(badge, 10) if badge else ''
     d = '<div style="font-size: 12px; color: %s; line-height: 1.5;">%s</div>' % (T['ink3'], desc) if desc else ''
     sh = ' box-shadow: 0 0 0 3px rgba(79,70,229,0.10);' if selected else ''
-    return '<div style="flex: 1; min-width: 0px; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 12px; padding: 10px 12px; display: flex; gap: 10px; align-items: flex-start;%s">%s<div style="display: flex; flex-direction: column; gap: 3px; min-width: 0px;"><div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"><div style="font-size: 13px; font-weight: 650; color: %s;">%s</div>%s</div>%s%s</div></div>' % (
+    return '<div style="flex: 1; min-width: 0px; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 12px; padding: 10px 12px; display: flex; gap: 10px; align-items: flex-start;%s">%s<div style="display: flex; flex-direction: column; gap: 3px; min-width: 0px;"><div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"><div style="font-size: 13px; font-weight: 600; color: %s;">%s</div>%s</div>%s%s</div></div>' % (
         bd, bg, sh, dot, T['ink4'] if disabled else T['ink'], title, b, d, extra_html)
 
 
 def seg(items, active, size='md'):
     """分段控件（shadcn ToggleGroup / Tabs 胶囊样式）。"""
-    fs, py = (11.5, 3) if size == 'sm' else (12.5, 4)
+    fs, py = (12, 3) if size == 'sm' else (13, 4)
     out = ''
     for it in items:
         if it == active:
-            out += '<div style="font-size: %spx; font-weight: 650; color: %s; background: #ffffff; border: 1px solid %s; border-radius: 7px; padding: %dpx 10px; box-shadow: %s; white-space: nowrap;">%s</div>' % (fs, T['accent_ink'], T['line'], py - 1, SHADOW_XS, it)
+            out += '<div style="font-size: %spx; font-weight: 600; color: %s; background: #ffffff; border: 1px solid %s; border-radius: 6px; padding: %dpx 10px; box-shadow: %s; white-space: nowrap;">%s</div>' % (fs, T['accent_ink'], T['line'], py - 1, SHADOW_XS, it)
         else:
             out += '<div style="font-size: %spx; font-weight: 500; color: %s; padding: %dpx 10px; white-space: nowrap;">%s</div>' % (fs, T['ink3'], py, it)
-    return '<div style="display: inline-flex; align-items: center; gap: 2px; background: %s; border-radius: 9px; padding: 3px;">%s</div>' % (T['track'], out)
+    return '<div style="display: inline-flex; align-items: center; gap: 2px; background: %s; border-radius: 8px; padding: 3px;">%s</div>' % (T['track'], out)
 
 
 def tabs(items, active, size=13):
@@ -458,16 +491,16 @@ def tabs(items, active, size=13):
     out = ''
     for name, cnt in items:
         on = name == active
-        c = '<div style="font-size: 10.5px; font-weight: 650; color: %s; background: %s; border-radius: 5px; padding: 0px 5px; line-height: 16px;">%s</div>' % (
+        c = '<div style="font-size: 11px; font-weight: 600; color: %s; background: %s; border-radius: 6px; padding: 0px 5px; line-height: 16px;">%s</div>' % (
             T['accent_ink'] if on else T['ink4'], T['accent_bg'] if on else T['track'], cnt) if cnt is not None else ''
         u = '<div style="position: absolute; left: 4px; right: 4px; bottom: -1px; height: 2px; border-radius: 2px 2px 0px 0px; background: %s;"></div>' % T['accent'] if on else ''
         out += '<div style="position: relative; display: flex; align-items: center; gap: 6px; font-size: %spx; font-weight: %d; color: %s; padding: 10px 4px 11px 4px; white-space: nowrap;">%s%s%s</div>' % (
-            size, 650 if on else 500, T['accent_ink'] if on else T['ink3'], name, c, u)
+            size, 600 if on else 500, T['accent_ink'] if on else T['ink3'], name, c, u)
     return '<div style="display: flex; align-items: center; gap: 16px; border-bottom: 1px solid %s;">%s</div>' % (T['line'], out)
 
 
 def filter_chip(lbl, value=None, active=False):
-    v = '<span style="font-weight: 650; color: %s;">%s</span>' % (T['accent_ink'] if active else T['ink'], value) if value else ''
+    v = '<span style="font-weight: 600; color: %s;">%s</span>' % (T['accent_ink'] if active else T['ink'], value) if value else ''
     bd = T['accent_line'] if active else T['line']
     bg = T['accent_bg'] if active else '#ffffff'
     return '<div style="height: 28px; box-sizing: border-box; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: %s; background: %s; border: 1px solid %s; border-radius: 8px; padding: 0px 8px 0px 10px; white-space: nowrap;">%s%s%s</div>' % (
@@ -476,8 +509,8 @@ def filter_chip(lbl, value=None, active=False):
 
 def search_box(placeholder='搜索', width='260px', value=None, shortcut=True):
     k = row(kbd('Ctrl') + kbd('K'), 3) if shortcut else ''
-    return '<div style="width: %s; height: 32px; box-sizing: border-box; background: %s; border: 1px solid %s; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0px 8px 0px 10px;"><div style="display: flex; align-items: center; gap: 8px; min-width: 0px;">%s<div style="font-size: 12.5px; color: %s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">%s</div></div>%s</div>' % (
-        width, '#ffffff' if value else T['subtle'], T['line'], icon('search', 15, T['ink4']), T['ink'] if value else T['ink4'], value or placeholder, k)
+    return '<div style="width: %s; height: 32px; box-sizing: border-box; background: %s; border: 1px solid %s; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0px 8px 0px 10px;"><div style="display: flex; align-items: center; gap: 8px; min-width: 0px;">%s<div style="font-size: 13px; color: %s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">%s</div></div>%s</div>' % (
+        width, '#ffffff' if value else T['subtle'], T['line'], icon('search', 15, T['ink4']), T['ink'] if value else T['ink5'], value or placeholder, k)
 
 
 # ================================================================ 容器
@@ -488,7 +521,7 @@ def card(body, title=None, extra=None, pad='14px 16px', gap=10, tone=None, style
     head = ''
     if title is not None:
         head = between(label(title) if isinstance(title, str) and not title.startswith('<') else title, extra or '')
-    return '<div style="background: %s; border: 1px solid %s; border-radius: 13px; padding: %s; display: flex; flex-direction: column; gap: %dpx; box-shadow: %s;%s">%s%s</div>' % (
+    return '<div style="background: %s; border: 1px solid %s; border-radius: 12px; padding: %s; display: flex; flex-direction: column; gap: %dpx; box-shadow: %s;%s">%s%s</div>' % (
         bg, bd, pad, gap, SHADOW_XS, (' ' + style) if style else '', head, body)
 
 
@@ -514,16 +547,16 @@ def stat(k, v, sub=None, tone=None, size=13):
 def kpi(k, v, delta=None, delta_tone='muted', sub=None):
     dc = {'success': T['ok'], 'danger': T['bad'], 'warning': T['warn'], 'muted': T['ink3']}[delta_tone]
     d = '<div style="font-size: 12px; font-weight: 600; color: %s;">%s</div>' % (dc, delta) if delta else ''
-    s = '<div style="font-size: 11.5px; color: %s;">%s</div>' % (T['ink4'], sub) if sub else ''
+    s = '<div style="font-size: 12px; color: %s;">%s</div>' % (T['ink4'], sub) if sub else ''
     return card('<div style="font-size: 12px; color: %s;">%s</div><div style="display: flex; align-items: baseline; gap: 8px;"><div style="font-size: 24px; font-weight: 700; color: %s; font-variant-numeric: tabular-nums; letter-spacing: -0.01em;">%s</div>%s</div>%s' % (T['ink3'], k, T['ink'], v, d, s), pad='12px 16px', gap=2)
 
 
-def table(cols, rows, template, sel=None, dense=False, footer=None, head_bg=None, row_tones=None, py=None, fs=12.5):
+def table(cols, rows, template, sel=None, dense=False, footer=None, head_bg=None, row_tones=None, py=None, fs=13):
     """cols: [(标题, 'left'|'right')]；rows: [[cell_html...]]；template: grid-template-columns 字符串。
     sel: 选中行下标；row_tones: {下标: 'warning'|'danger'} 行首色条。（shadcn Table + TanStack Table）"""
     py = py if py is not None else (8 if dense else 10)
     head = ''.join('<div style="text-align: %s; min-width: 0px;">%s</div>' % (a, c) for c, a in cols)
-    out = '<div style="display: grid; grid-template-columns: %s; gap: 12px; padding: 9px 16px; background: %s; border-bottom: 1px solid %s; font-size: 11px; font-weight: 650; color: %s; letter-spacing: 0.02em; white-space: nowrap;">%s</div>' % (
+    out = '<div style="display: grid; grid-template-columns: %s; gap: 12px; padding: 9px 16px; background: %s; border-bottom: 1px solid %s; font-size: 11px; font-weight: 600; color: %s; letter-spacing: 0.02em; white-space: nowrap;">%s</div>' % (
         template, head_bg or T['subtle'], T['line'], T['ink4'], head)
     for i, r in enumerate(rows):
         bg = T['accent_bg'] if sel == i else '#ffffff'
@@ -536,9 +569,9 @@ def table(cols, rows, template, sel=None, dense=False, footer=None, head_bg=None
             template, py, bg, T['line2'], fs, T['ink'], bar, cells)
     if footer:
         cells = ''.join('<div style="text-align: %s; min-width: 0px;">%s</div>' % (cols[j][1], c) for j, c in enumerate(footer))
-        out += '<div style="display: grid; grid-template-columns: %s; gap: 12px; padding: 10px 16px; background: %s; font-size: 12.5px; font-weight: 650; color: %s; align-items: center; font-variant-numeric: tabular-nums;">%s</div>' % (
+        out += '<div style="display: grid; grid-template-columns: %s; gap: 12px; padding: 10px 16px; background: %s; font-size: 13px; font-weight: 600; color: %s; align-items: center; font-variant-numeric: tabular-nums;">%s</div>' % (
             template, T['subtle'], T['ink'], cells)
-    return '<div style="background: #ffffff; border: 1px solid %s; border-radius: 13px; overflow: hidden; display: flex; flex-direction: column; box-shadow: %s;">%s</div>' % (T['line'], SHADOW_XS, out)
+    return '<div style="background: #ffffff; border: 1px solid %s; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: %s;">%s</div>' % (T['line'], SHADOW_XS, out)
 
 
 def pagination(total_text, page=1, pages=1):
@@ -583,7 +616,7 @@ def log_item(time_, actor, body, last=False):
 
 
 def event_line(time_, t):
-    return '<div style="display: flex; align-items: center; gap: 10px;"><div style="flex: 1; height: 1px; background: %s;"></div><div style="font-size: 11.5px; color: %s; white-space: nowrap;"><span style="color: %s; font-variant-numeric: tabular-nums;">%s</span> · %s</div><div style="flex: 1; height: 1px; background: %s;"></div></div>' % (
+    return '<div style="display: flex; align-items: center; gap: 10px;"><div style="flex: 1; height: 1px; background: %s;"></div><div style="font-size: 12px; color: %s; white-space: nowrap;"><span style="color: %s; font-variant-numeric: tabular-nums;">%s</span> · %s</div><div style="flex: 1; height: 1px; background: %s;"></div></div>' % (
         T['line'], T['ink3'], T['ink4'], time_, t, T['line'])
 
 
@@ -591,32 +624,40 @@ def message(name, meta, body, kind='in', av=None, extra_head=''):
     """kind: in 客户来信 / out 我方回复 / note 内部备注 / draft AI 草稿（气泡左上角小圆角）"""
     bg, bd = {'in': ('#ffffff', T['line']), 'out': ('#f6f5fe', T['accent_line']), 'note': ('#fdf8f0', T['warn_line']), 'draft': ('#ffffff', T['accent_line'])}[kind]
     a = av or ''
-    return '<div style="display: flex; gap: 10px; align-items: flex-start;">%s<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 6px;"><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><div style="font-size: 12.8px; font-weight: 650; color: %s;">%s</div><div style="font-size: 11.5px; color: %s;">%s</div>%s</div><div style="background: %s; border: 1px solid %s; border-radius: 4px 13px 13px 13px; padding: 9px 13px; font-size: 13px; line-height: 1.6; color: %s; box-shadow: %s;">%s</div></div></div>' % (
+    return '<div style="display: flex; gap: 10px; align-items: flex-start;">%s<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 6px;"><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><div style="font-size: 13px; font-weight: 600; color: %s;">%s</div><div style="font-size: 12px; color: %s;">%s</div>%s</div><div style="background: %s; border: 1px solid %s; border-radius: 4px 12px 12px 12px; padding: 9px 13px; font-size: 13px; line-height: 1.6; color: %s; box-shadow: %s;">%s</div></div></div>' % (
         a, T['ink'], name, T['ink4'], meta, extra_head, bg, bd, T['ink'], SHADOW_XS, body)
 
 
 # ================================================================ 反馈
 def banner(kind, title, desc=None, action=None, dismiss=False):
     """页内横幅（shadcn Alert）。kind: info / success / warning / danger"""
-    fg, bg, bd, ib = {'info': (T['info'], '#f1f5fe', T['info_line'], T['info_bg']), 'success': (T['ok'], '#f1f9f5', T['ok_line'], T['ok_bg']),
+    fg, bg, bd, ib = {'info': (T['info'], '#f0f9fb', T['info_line'], T['info_bg']), 'success': (T['ok'], '#f1f9f5', T['ok_line'], T['ok_bg']),
                       'warning': (T['warn'], '#fcf5eb', T['warn_line'], '#f6e3c6'), 'danger': (T['bad'], '#fdf2f3', T['bad_line'], '#f9dadd')}[kind]
     ic = {'info': 'info', 'success': 'check_c', 'warning': 'alert', 'danger': 'alert'}[kind]
     d = '<div style="font-size: 12px; color: %s; line-height: 1.55;">%s</div>' % (T['ink2'], desc) if desc else ''
     a = action or ''
     x = icon('x', 14, T['ink4']) if dismiss else ''
     dot = '<div style="width: 24px; height: 24px; border-radius: 999px; background: %s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (ib, icon(ic, 14, fg, 2))
-    return '<div style="display: flex; align-items: flex-start; gap: 10px; background: %s; border: 1px solid %s; border-radius: 13px; padding: 10px 12px;">%s<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 2px; padding-top: 2px;"><div style="font-size: 13px; font-weight: 650; color: %s;">%s</div>%s</div>%s%s</div>' % (
+    return '<div style="display: flex; align-items: flex-start; gap: 10px; background: %s; border: 1px solid %s; border-radius: 12px; padding: 10px 12px;">%s<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 2px; padding-top: 2px;"><div style="font-size: 13px; font-weight: 600; color: %s;">%s</div>%s</div>%s%s</div>' % (
         bg, bd, dot, T['ink'] if kind != 'danger' else fg, title, d, a, x)
 
 
-def toast(kind, title, desc=None, action=None):
-    """浮层提示（shadcn Sonner）：3 秒自动消失，失败类不自动消失。"""
-    fg = {'success': T['ok_solid'], 'error': T['bad_solid'], 'info': T['accent'], 'warning': T['warn_solid']}[kind]
-    ic = {'success': 'check_c', 'error': 'x_c', 'info': 'info', 'warning': 'alert'}[kind]
+def toast(kind, title, desc=None, action=None, undo=None, remain=None):
+    """浮层提示（shadcn Sonner）：成功与信息 3 秒自动消失，失败与警示不自动消失。
+    kind：success / error / info / warning / neutral（「重试后成功」等：中性灰 + 信息图标）。
+    undo：可逆操作的撤销窗口秒数（True 视为 5）。给出时右侧显示「撤销」按钮与倒计时条，窗口内不自动消失；remain 为画面上剩余秒数（默认等于 undo）。"""
+    fg = {'success': T['ok_solid'], 'error': T['bad_solid'], 'info': T['accent'], 'warning': T['warn_solid'], 'neutral': T['ink3']}[kind]
+    ic = {'success': 'check_c', 'error': 'x_c', 'info': 'info', 'warning': 'alert', 'neutral': 'info'}[kind]
     d = '<div style="font-size: 12px; color: %s; line-height: 1.5;">%s</div>' % (T['ink3'], desc) if desc else ''
     a = '<div style="padding-top: 2px;">%s</div>' % action if action else ''
-    return '<div style="width: 360px; box-sizing: border-box; display: flex; gap: 10px; align-items: flex-start; background: #ffffff; border: 1px solid %s; border-radius: 12px; padding: 12px 14px; box-shadow: %s;">%s<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 13px; font-weight: 650; color: %s;">%s</div>%s%s</div>%s</div>' % (
-        T['line'], SHADOW_MD, icon(ic, 18, fg, 2), T['ink'], title, d, a, icon('x', 14, T['ink4']))
+    right, bar = icon('x', 14, T['ink4']), ''
+    if undo:
+        secs = 5 if undo is True else int(undo)
+        left = secs if remain is None else remain
+        right = row(nowrap('%ds' % left, 12, T['ink4']) + btn('撤销', 'secondary', 'sm', 'history'), 8)
+        bar = '<div style="position: absolute; left: 0px; bottom: 0px; height: 3px; width: %d%%; background: %s;"></div>' % (int(left * 100 / secs), T['accent'])
+    return '<div style="position: relative; overflow: hidden; width: 360px; box-sizing: border-box; display: flex; gap: 10px; align-items: %s; background: #ffffff; border: 1px solid %s; border-radius: 12px; padding: 12px 14px; box-shadow: %s;">%s<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 13px; font-weight: 600; color: %s;">%s</div>%s%s</div>%s%s</div>' % (
+        'center' if undo and not desc else 'flex-start', T['line'], SHADOW_MD, icon(ic, 18, fg, 2), T['ink'], title, d, a, right, bar)
 
 
 def dialog(title, body, footer, width=480, tone=None, desc=None):
@@ -626,8 +667,8 @@ def dialog(title, body, footer, width=480, tone=None, desc=None):
         ic = '<div style="width: 36px; height: 36px; border-radius: 12px; background: %s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (T['bad_bg'], icon('alert', 18, T['bad'], 2))
     elif tone == 'warning':
         ic = '<div style="width: 36px; height: 36px; border-radius: 12px; background: %s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (T['warn_bg'], icon('alert', 18, T['warn'], 2))
-    d = '<div style="font-size: 12.5px; color: %s; line-height: 1.55;">%s</div>' % (T['ink3'], desc) if desc else ''
-    return '<div style="width: %dpx; box-sizing: border-box; background: #ffffff; border-radius: 16px; box-shadow: %s; display: flex; flex-direction: column; overflow: hidden;"><div style="padding: 18px 20px 0px 20px; display: flex; gap: 12px; align-items: flex-start;">%s<div style="flex: 1; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 15.5px; font-weight: 650; color: %s;">%s</div>%s</div>%s</div><div style="padding: 14px 20px 18px 20px; display: flex; flex-direction: column; gap: 12px;">%s</div><div style="padding: 12px 20px; border-top: 1px solid %s; display: flex; justify-content: flex-end; gap: 8px; background: %s;">%s</div></div>' % (
+    d = '<div style="font-size: 13px; color: %s; line-height: 1.55;">%s</div>' % (T['ink3'], desc) if desc else ''
+    return '<div style="width: %dpx; box-sizing: border-box; background: #ffffff; border-radius: 16px; box-shadow: %s; display: flex; flex-direction: column; overflow: hidden;"><div style="padding: 18px 20px 0px 20px; display: flex; gap: 12px; align-items: flex-start;">%s<div style="flex: 1; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 16px; font-weight: 600; color: %s;">%s</div>%s</div>%s</div><div style="padding: 14px 20px 18px 20px; display: flex; flex-direction: column; gap: 12px;">%s</div><div style="padding: 12px 20px; border-top: 1px solid %s; display: flex; justify-content: flex-end; gap: 8px; background: %s;">%s</div></div>' % (
         width, SHADOW_LG, ic, T['ink'], title, d, icon('x', 16, T['ink4']), body, T['line2'], T['subtle'], footer)
 
 
@@ -638,9 +679,9 @@ def scrim(content, dlg, w=1440, h=900):
 
 def empty(icon_name, title, desc=None, action=None, compact=False):
     s_ = 38 if compact else 44
-    d = '<div style="font-size: 12.5px; color: %s; line-height: 1.6; text-align: center; max-width: 340px;">%s</div>' % (T['ink3'], desc) if desc else ''
+    d = '<div style="font-size: 13px; color: %s; line-height: 1.6; text-align: center; max-width: 340px;">%s</div>' % (T['ink3'], desc) if desc else ''
     a = '<div style="margin-top: 6px;">%s</div>' % action if action else ''
-    return '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: %s;"><div style="width: %dpx; height: %dpx; border-radius: 12px; background: %s; display: flex; align-items: center; justify-content: center; margin-bottom: 4px;">%s</div><div style="font-size: 14px; font-weight: 650; color: %s;">%s</div>%s%s</div>' % (
+    return '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: %s;"><div style="width: %dpx; height: %dpx; border-radius: 12px; background: %s; display: flex; align-items: center; justify-content: center; margin-bottom: 4px;">%s</div><div style="font-size: 14px; font-weight: 600; color: %s;">%s</div>%s%s</div>' % (
         '20px' if compact else '36px 24px', s_, s_, T['accent_bg'], icon(icon_name, 20, T['accent_ink']), T['ink'], title, d, a)
 
 
@@ -652,7 +693,7 @@ def load_error(title='加载失败', desc='网络或服务暂时不可用，已�
     return empty('wifi_off', title, desc, action or btn('重试', 'secondary', 'md', 'refresh'))
 
 
-def skel(w='100%', h=10, r=5):
+def skel(w='100%', h=10, r=6):
     return '<div style="width: %s; height: %dpx; border-radius: %dpx; background: linear-gradient(90deg, #eceef5 0%%, #f5f6fa 50%%, #eceef5 100%%); flex-shrink: 0;"></div>' % (w, h, r)
 
 
@@ -688,8 +729,121 @@ def menu(items, width=200):
             continue
         t, ic, tone = it
         c = {'danger': T['bad'], 'muted': T['ink4']}.get(tone, T['ink2'])
-        out += '<div style="display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 7px; font-size: 13px; color: %s;">%s%s</div>' % (c, icon(ic, 15, c) if ic else '', t)
+        out += '<div style="display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; font-size: 13px; color: %s;">%s%s</div>' % (c, icon(ic, 15, c) if ic else '', t)
     return '<div style="width: %dpx; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; box-shadow: %s; padding: 5px;">%s</div>' % (width, T['line'], SHADOW_MD, out)
+
+
+# ================================================================ 卡点、费用、保存栏、多币种金额（快捷键只用于顶部搜索，见 search_box 的 kbd）
+def blocker(waiting_on, left=None, can_do=None, why_not=None, level='normal', since=None):
+    """「当前卡点」横条（详情页步骤条上方）：在等谁 · 还剩多久 · 你可以做什么 · 不能做时为什么。
+    waiting_on：在等谁、等什么（如「客服主管 周敏 审批报备」）；left：剩余时间（如「3h 10m」，None 不显示）；
+    level：剩余时间色调 normal / warning / danger（同 sla()）；since：已等待时长（可选，如「39m」）；
+    can_do：当前用户可做的操作（btn() / link() 拼好的 HTML）；why_not：不能操作时的原因（灰色锁图标 + 文案）。"""
+    bar = {'normal': T['accent'], 'warning': T['warn_solid'], 'danger': T['bad_solid']}[level]
+    ib, ic = {'normal': (T['accent_bg'], T['accent_ink']), 'warning': (T['warn_bg'], T['warn']), 'danger': (T['bad_bg'], T['bad'])}[level]
+    dot = '<div style="width: 28px; height: 28px; border-radius: 999px; background: %s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (ib, icon('clock', 15, ic, 2))
+    seg_ = lambda k, v: '<div style="display: flex; flex-direction: column; gap: 1px; min-width: 0px;"><div style="font-size: 11px; color: %s; white-space: nowrap;">%s</div>%s</div>' % (T['ink4'], k, v)
+    parts = seg_('当前卡点 · 在等', '<div style="font-size: 13px; font-weight: 600; color: %s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px;">%s</div>' % (T['ink'], waiting_on))
+    if left:
+        parts += divider(True, 28) + seg_('还剩', sla(left, level, 12))
+    if since:
+        parts += divider(True, 28) + seg_('已等待', nowrap(since, 13, T['ink2'], 600))
+    right = ''
+    if why_not:
+        right += '<div style="display: flex; align-items: center; gap: 6px; min-width: 0px;">%s<div style="font-size: 12px; color: %s; line-height: 1.45;">%s</div></div>' % (icon('lock', 14, T['ink4']), T['ink3'], why_not)
+    if can_do:
+        right += row(can_do, 8)
+    return '<div style="display: flex; align-items: center; gap: 12px; background: #ffffff; border: 1px solid %s; border-radius: 12px; padding: 10px 14px 10px 12px; box-shadow: inset 3px 0 0 %s, %s;">%s<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">%s</div><div style="flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0px; justify-content: flex-end;">%s</div></div>' % (
+        T['line'], bar, SHADOW_XS, dot, parts, right)
+
+
+CURRENCY = {'USD': ('$', 1.0), 'MXN': ('MX$', USD_MXN), 'CAD': ('CA$', USD_CAD)}
+
+
+def money_cur(amount, currency='USD', usd=None):
+    """多币种金额（文案规范）：美元写 $14.70；比索、加元写原币并附美元折算，如 MX$889.00（≈ $49.39）。
+    usd 不给时按 data.USD_MXN / USD_CAD 折算。amount=None 显示「待报价」。"""
+    if amount is None or currency == 'USD':
+        return money(amount)
+    sym, rate = CURRENCY[currency]
+    u = usd if usd is not None else round(amount / rate, 2)
+    return '%s%s（≈ %s）' % (sym, format(amount, ',.2f'), money(u))
+
+
+def fee_amt(x, st='confirmed', size=13, weight=400, orig=None):
+    """费用金额的三种状态：estimate 估算（浅色、前缀 ≈）/ confirmed 已确认（常规）/ settled 已结算（金额后带绿勾）。
+    x 为美元金额，None 显示「待报价」；orig 为原币写法（如 'MX$889.00'），给出时显示「MX$889.00（≈ $49.39）」。"""
+    if x is None:
+        return nowrap('待报价', size, T['ink4'])
+    v = '%s（≈ %s）' % (orig, money(x)) if orig else money(x)
+    if st == 'estimate':
+        return nowrap('≈ ' + v, size, T['ink3'], weight)
+    if st == 'settled':
+        return '<div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px;">%s%s</div>' % (nowrap(v, size, T['ink'], weight), icon('check_c', 13, T['ok'], 2))
+    return nowrap(v, size, T['ink'], weight)
+
+
+def fee_states(a):
+    """由售后单推出（费用状态, 承担金额状态）：已结算 → settled；报备已批准 → 费用 confirmed；
+    比例「已确认」或「不适用」且费用已确认 → 承担 confirmed；其余为 estimate（报备待审批、未报价、比例为建议）。"""
+    if a.get('settle') == '已结算':
+        return 'settled', 'settled'
+    fil = a.get('filing')
+    cost = 'confirmed' if (fil and fil[1] == '已批准') or (not fil and total(a) == 0) else 'estimate'
+    share = 'confirmed' if cost == 'confirmed' and a.get('ratio_state') in ('已确认', '不适用') else 'estimate'
+    return cost, share
+
+
+def fee_card(a, title='费用与承担', cost_state=None, share_state=None, batch=None, extra=None, filing_override=None):
+    """「费用与承担」卡（shadcn Card + Table）：直接吃 data.AFTERSALES 的售后单字典。
+    上：产品成本 + 运费 + 额外赔偿 + 其他 = 合计；中：按三组比例（产品成本 / 快递物流 / 其他费用 = 额外赔偿 + 其他）拆 FSH 与工厂金额；
+    下：报备、比例协商、结算批次。cost_state / share_state 覆盖 fee_states() 推出的金额状态；batch 覆盖 a['batch']；extra 为标题右侧 HTML；
+    filing_override 为「报备」行的值 HTML（如待确认单「快递费用 $5.90 · 确认后发起」），不传时按 a['filing'] 显示。"""
+    cs0, ss0 = fee_states(a)
+    cs, ss = cost_state or cs0, share_state or ss0
+    quoted = a['product'] is not None
+    rows_ = ''.join(kv(k, fee_amt(v, cs, 13, 400, o), bold=False) for k, v, o in (
+        ('产品成本', a['product'], None), ('运费', a['freight'], None), ('额外赔偿', a['comp'], a.get('comp_orig')), ('其他', a['other'], None)))
+    rows_ += divider() + kv('合计', fee_amt(total(a) if quoted else None, cs, 13, 700), bold=False)
+    tpl = 'minmax(0, 1fr) 76px 76px 76px'
+    cell = lambda h, al='right': '<div style="text-align: %s; min-width: 0px; display: flex; flex-direction: column; align-items: %s;">%s</div>' % (al, 'flex-end' if al == 'right' else 'flex-start', h)
+    head = '<div style="display: grid; grid-template-columns: %s; gap: 8px; font-size: 11px; font-weight: 600; color: %s; padding-bottom: 4px; border-bottom: 1px solid %s;">%s</div>' % (
+        tpl, T['ink4'], T['line2'], ''.join(cell(x, al) for x, al in (('费用组', 'left'), ('金额', 'right'), ('FSH', 'right'), (a.get('factory') or '工厂', 'right'))))
+    p, r = _parts(a), a['ratios']
+    body_ = ''
+    for lab, k in RATIO_LABELS:
+        f_, c_ = r[k]
+        pct = lambda n: '<div style="font-size: 11px; color: %s; white-space: nowrap;">%d%%</div>' % (T['ink4'], n)
+        body_ += '<div style="display: grid; grid-template-columns: %s; gap: 8px; align-items: start;">%s</div>' % (tpl, ''.join([
+            cell(nowrap(lab, 12, T['ink2']), 'left'), cell(fee_amt(p[k] if quoted else None, cs, 12)),
+            cell(fee_amt(round(p[k] * f_ / 100.0, 2) if quoted else None, ss, 12) + pct(f_)), cell(fee_amt(round(p[k] * c_ / 100.0, 2) if quoted else None, ss, 12) + pct(c_))]))
+    body_ += '<div style="display: grid; grid-template-columns: %s; gap: 8px; padding-top: 6px; border-top: 1px solid %s;">%s</div>' % (tpl, T['line2'], ''.join([
+        cell(nowrap('承担合计', 12, T['ink'], 600), 'left'), cell(fee_amt(total(a) if quoted else None, cs, 12, 600)),
+        cell(fee_amt(fsh_share(a) if quoted else None, ss, 12, 600)), cell(fee_amt(factory_share(a) if quoted else None, ss, 12, 600))]))
+    ratio_chip = {'建议': chip('建议比例', 'warning', 11, dot=True), '已确认': state('已确认'), '不适用': state('不适用')}.get(a.get('ratio_state'), '')
+    split = between(label('承担拆分 · 三组比例'), ratio_chip) + col(head + body_, 4)
+    fil = a.get('filing')
+    b = batch if batch is not None else a.get('batch')
+    fil_html = filing_override if filing_override is not None else (row(nowrap(fil[0], 12, T['ink2']) + state(fil[1]), 6) if fil else nowrap('无需报备', 12, T['ink4']))
+    foot = kv('报备', fil_html, bold=False) + \
+        kv('比例协商', state(a.get('nego', '不适用')), bold=False) + \
+        kv('结算批次', row((nowrap(b, 12, T['ink2']) if b else '') + state(a.get('settle', '不适用')), 6), bold=False)
+    legend_ = row(fee_amt(1, 'estimate', 11).replace('$1.00', '估算') + fee_amt(1, 'confirmed', 11).replace('$1.00', '已确认') + fee_amt(1, 'settled', 11).replace('$1.00', '已结算'), 10)
+    return card(col(rows_, 4) + divider() + split + divider() + col(foot, 4), title, extra if extra is not None else legend_, pad='12px 16px', gap=10)
+
+
+def save_bar(dirty_count, note=None, save_label='保存', discard_label='放弃'):
+    """设置页吸底保存栏（实现为 position: sticky; bottom: 0）：「有 N 项未保存修改 · 放弃 · 保存」。
+    dirty_count=0 时显示「没有未保存的修改」，两个按钮置灰；note 为左侧补充说明（如「修改阈值需二次确认并记入审计日志」）。"""
+    if dirty_count:
+        left = row('<div style="width: 7px; height: 7px; border-radius: 999px; background: %s; flex-shrink: 0;"></div>' % T['warn_solid'] +
+                   nowrap('有 %d 项未保存修改' % dirty_count, 13, T['ink'], 600) + (nowrap(note, 12, T['ink3']) if note else ''), 8)
+        right = btn(discard_label, 'ghost') + btn(save_label, 'primary', 'md', 'check')
+    else:
+        left = row(nowrap('没有未保存的修改', 13, T['ink4']) + (nowrap(note, 12, T['ink3']) if note else ''), 8)
+        right = btn(discard_label, 'ghost', disabled=True, reason='没有需要放弃的修改') + btn(save_label, 'primary', 'md', 'check', disabled=True, reason='没有需要保存的修改')
+    return '<div style="flex-shrink: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #ffffff; border-top: 1px solid %s; box-shadow: 0 -10px 24px -18px rgba(16,20,35,0.28); padding: 10px 24px;">%s%s</div>' % (
+        T['line'], left, row(right, 8))
 
 
 # ================================================================ 页面外壳
@@ -699,8 +853,8 @@ AV_TONE = {'坐席': 'green', '客服主管': 'accent', '售后负责人': 'ambe
 
 
 def _brand(sub_='Support'):
-    return ('<div style="display: flex; align-items: center; gap: 9px; flex-shrink: 0;"><div style="width: 28px; height: 28px; border-radius: 9px; background: %s; color: #ffffff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: %s;">F</div>'
-            '<div style="font-size: 14.5px; font-weight: 650; color: %s; letter-spacing: -0.01em;">Forcome</div><div style="font-size: 12.5px; font-weight: 450; color: %s; margin-left: -3px; white-space: nowrap;">%s</div></div>') % (
+    return ('<div style="display: flex; align-items: center; gap: 9px; flex-shrink: 0;"><div style="width: 28px; height: 28px; border-radius: 8px; background: %s; color: #ffffff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: %s;">F</div>'
+            '<div style="font-size: 14px; font-weight: 600; color: %s; letter-spacing: -0.01em;">Forcome</div><div style="font-size: 13px; font-weight: 400; color: %s; margin-left: -3px; white-space: nowrap;">%s</div></div>') % (
         GRAD, SHADOW_POP, T['ink'], T['ink4'], sub_)
 
 
@@ -711,20 +865,20 @@ def _segnav(items, active, badges=None):
         on = n == active
         b = ''
         if badges.get(n):
-            b = '<div style="font-size: 10.4px; font-weight: 650; color: %s; background: %s; border-radius: 5px; padding: 0px 5px; line-height: 16px;">%s</div>' % (T['accent_ink'], T['accent_bg'], badges[n])
+            b = '<div style="font-size: 11px; font-weight: 600; color: %s; background: %s; border-radius: 6px; padding: 0px 5px; line-height: 16px;">%s</div>' % (T['accent_ink'], T['accent_bg'], badges[n])
         if on:
-            out += '<div style="display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 8px; font-size: 12.7px; font-weight: 650; color: %s; background: #ffffff; border: 1px solid %s; box-shadow: %s; white-space: nowrap;">%s%s</div>' % (T['accent_ink'], T['line'], SHADOW_XS, n, b)
+            out += '<div style="display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: %s; background: #ffffff; border: 1px solid %s; box-shadow: %s; white-space: nowrap;">%s%s</div>' % (T['accent_ink'], T['line'], SHADOW_XS, n, b)
         else:
-            out += '<div style="display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; font-size: 12.7px; font-weight: 500; color: %s; white-space: nowrap;">%s%s</div>' % (T['ink3'], n, b)
-    return '<div style="display: flex; align-items: center; gap: 2px; background: %s; padding: 3px; border-radius: 10px; flex-shrink: 0;">%s</div>' % (T['track'], out)
+            out += '<div style="display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: %s; white-space: nowrap;">%s%s</div>' % (T['ink3'], n, b)
+    return '<div style="display: flex; align-items: center; gap: 2px; background: %s; padding: 3px; border-radius: 8px; flex-shrink: 0;">%s</div>' % (T['track'], out)
 
 
 def _topbar(items, active, user, badges=None, scope='全部店铺', show_scope=True, right_extra='', search_ph='搜索工单、订单号、客户邮箱', brand_sub='Support', scope_label='店铺', scope_fixed=False):
     """56px 白色顶栏：品牌 · 分段导航 · 店铺范围 · 搜索（Ctrl K 命令面板）· 密度（舒适 / 紧凑）· 通知 · 当前用户。第一期只有浅色，不放主题切换。"""
-    scope_html = '<div style="height: 32px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; border: 1px solid %s; border-radius: 10px; padding: 0px 10px; background: #ffffff; white-space: nowrap;">%s<div style="font-size: 12px; color: %s;">%s：<span style="font-weight: 650; color: %s;">%s</span></div>%s</div>' % (
+    scope_html = '<div style="height: 32px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; border: 1px solid %s; border-radius: 8px; padding: 0px 10px; background: #ffffff; white-space: nowrap;">%s<div style="font-size: 12px; color: %s;">%s：<span style="font-weight: 600; color: %s;">%s</span></div>%s</div>' % (
         T['line'], icon('lock' if scope_fixed else 'store', 14, T['ink4']), T['ink3'], scope_label, T['ink'], scope, '' if scope_fixed else icon('chev_d', 12, T['ink4'])) if show_scope else ''
     role = {'知识库负责人': '知识库', '售后负责人': '售后负责人', '生产厂对接人': '生产厂对接人', '生产厂负责人': '生产厂负责人'}.get(user['role'], user['role'])
-    me = '<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">%s<div style="display: flex; flex-direction: column; line-height: 1.25;"><div style="font-size: 12.5px; font-weight: 650; color: %s; white-space: nowrap;">%s</div><div style="font-size: 11px; color: %s; white-space: nowrap;">%s</div></div></div>' % (
+    me = '<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">%s<div style="display: flex; flex-direction: column; line-height: 1.25;"><div style="font-size: 13px; font-weight: 600; color: %s; white-space: nowrap;">%s</div><div style="font-size: 11px; color: %s; white-space: nowrap;">%s</div></div></div>' % (
         avatar(user['avatar'], 'grad', 30), T['ink'], user['name'], T['ink4'], role)
     right = right_extra + scope_html + search_box(search_ph, '240px') + icon_btn('rows', size=32) + icon_btn('bell', size=32, badge=True) + me
     return '<div style="height: 56px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border-bottom: 1px solid %s; display: flex; align-items: center; gap: 16px; padding: 0px 16px;">%s%s<div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">%s</div></div>' % (
@@ -752,20 +906,20 @@ def factory_app(active, crumbs, body, badges=None, w=1440, h=900, user_key='chen
 
 def page_head(title, desc=None, actions='', tabs_html='', chips=''):
     """列表页标题区（直接落在浅灰底上）。"""
-    d = '<div style="font-size: 12.5px; color: %s;">%s</div>' % (T['ink3'], desc) if desc else ''
+    d = '<div style="font-size: 13px; color: %s;">%s</div>' % (T['ink3'], desc) if desc else ''
     ch = '<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">%s</div>' % chips if chips else ''
     t = '<div style="margin-top: 2px;">%s</div>' % tabs_html if tabs_html else ''
     return '<div style="padding: 16px 24px %s 24px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">%s%s</div>' % (
         '0px' if tabs_html else '2px',
-        between(col('<div style="font-size: 19px; font-weight: 700; color: %s; letter-spacing: -0.015em;">%s</div>%s%s' % (T['ink'], title, d, ch), 4), row(actions, 8), 'flex-end'), t)
+        between(col('<div style="font-size: 20px; font-weight: 700; color: %s; letter-spacing: -0.015em;">%s</div>%s%s' % (T['ink'], title, d, ch), 4), row(actions, 8), 'flex-end'), t)
 
 
 def detail_head(title, chips='', actions='', meta='', below=''):
-    """详情页标题区（浅灰底上，标题 17.6px）。"""
+    """详情页标题区（浅灰底上，标题 20px）。"""
     m = '<div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12px; color: %s;">%s</div>' % (T['ink3'], meta) if meta else ''
     b = below or ''
-    return '<div style="padding: 16px 24px 4px 24px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">%s%s</div>' % (
-        between(col('<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;"><div style="font-size: 17.6px; font-weight: 650; color: %s; letter-spacing: -0.015em;">%s</div>%s</div>%s' % (T['ink'], title, chips, m), 6), row(actions, 8), 'flex-start'), b)
+    return '<div style="padding: 14px 24px 4px 24px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;">%s%s</div>' % (
+        between(col('<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;"><div style="font-size: 20px; font-weight: 600; color: %s; letter-spacing: -0.015em; line-height: 1.2;">%s</div>%s</div>%s' % (T['ink'], title, chips, m), 4), row(actions, 8), 'flex-start'), b)
 
 
 def content(inner, pad='16px 24px', gap=14, scroll=False):
@@ -787,9 +941,9 @@ def board(title, desc, body, w=1920, h=1200, legend=''):
 def variant(title, spec, frame_html, w=None, trigger=None):
     """状态板里的一个变体：编号标题 + 触发条件 + 画面。"""
     ww = 'width: %dpx;' % w if w else ''
-    tr = '<div style="font-size: 12px; color: %s; line-height: 1.55;"><span style="font-weight: 650; color: %s;">触发：</span>%s</div>' % (T['ink3'], T['ink2'], trigger) if trigger else ''
-    sp = '<div style="font-size: 12px; color: %s; line-height: 1.55;"><span style="font-weight: 650; color: %s;">规格：</span>%s</div>' % (T['ink3'], T['ink2'], spec) if spec else ''
-    return '<div style="%s display: flex; flex-direction: column; gap: 8px; min-width: 0px;"><div style="font-size: 14px; font-weight: 650; color: %s;">%s</div>%s%s<div style="align-self: flex-start; border: 1px solid %s; border-radius: 14px; overflow: hidden; background: #ffffff; box-shadow: %s;">%s</div></div>' % (
+    tr = '<div style="font-size: 12px; color: %s; line-height: 1.55;"><span style="font-weight: 600; color: %s;">触发：</span>%s</div>' % (T['ink3'], T['ink2'], trigger) if trigger else ''
+    sp = '<div style="font-size: 12px; color: %s; line-height: 1.55;"><span style="font-weight: 600; color: %s;">规格：</span>%s</div>' % (T['ink3'], T['ink2'], spec) if spec else ''
+    return '<div style="%s display: flex; flex-direction: column; gap: 8px; min-width: 0px;"><div style="font-size: 14px; font-weight: 600; color: %s;">%s</div>%s%s<div style="align-self: flex-start; border: 1px solid %s; border-radius: 12px; overflow: hidden; background: #ffffff; box-shadow: %s;">%s</div></div>' % (
         ww, T['ink'], title, tr, sp, T['line'], SHADOW_CARD, frame_html)
 
 

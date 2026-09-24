@@ -25,14 +25,14 @@ STAFF = {
     'wanglei':  {'name': '王磊', 'avatar': '磊', 'role': '售后负责人', 'stores': '全部店铺', 'dept': 'FSH / 售后部', 'email': 'wanglei@forcome.com', 'last_login': '10:20'},
     'zhaoqian': {'name': '赵倩', 'avatar': '倩', 'role': '知识库负责人', 'stores': '全部店铺', 'dept': 'FSH / 客服部', 'email': 'zhaoqian@forcome.com', 'last_login': '09-10 18:30'},
     'liuyang':  {'name': '刘洋', 'avatar': '洋', 'role': '管理员', 'stores': '全部店铺', 'dept': 'FSH / 信息部', 'email': 'liuyang@forcome.com', 'last_login': '10:20'},
-    'chengong': {'name': '陈工', 'avatar': '陈', 'role': '生产厂对接人', 'factory': 'FQD', 'dept': 'FQD / 品质部'},
+    'chengong': {'name': '陈工', 'avatar': '陈', 'role': '生产厂对接人', 'factory': 'FQD', 'dept': 'FQD / 品质部', 'last_login': '09:40'},
     'liucz':    {'name': '刘厂长', 'avatar': '刘', 'role': '生产厂负责人', 'factory': 'FQD'},
-    'zhanggong': {'name': '张工', 'avatar': '张', 'role': '生产厂对接人', 'factory': 'FZJ', 'dept': 'FZJ / 品质部'},
+    'zhanggong': {'name': '张工', 'avatar': '张', 'role': '生产厂对接人', 'factory': 'FZJ', 'dept': 'FZJ / 品质部', 'last_login': '09-10 16:05'},
     'zhoucz':   {'name': '周厂长', 'avatar': '周', 'role': '生产厂负责人', 'factory': 'FZJ'},
 }
 
 # ---------------------------------------------------------------- 生产厂（集团内部，两家）
-# 配件与整机全部由集团内这两家生产厂生产；售后单按 SKU 归属派发、协商、结算。SKU 清单在 P20「工厂账号」配置，上线前导入（下列为示例）。
+# 配件与整机全部由集团内这两家生产厂生产；售后单按 SKU 归属派发、协商、结算。SKU 清单在 P24「工厂账号」配置，上线前导入（下列为示例）。
 FACTORIES = {
     'FQD': {'code': 'FQD', 'scope': '整机及结构件：整机、电池、软管、HEPA 滤芯、集尘杯', 'contact': '陈工', 'head': '刘厂长'},
     'FZJ': {'code': 'FZJ', 'scope': '线材与电源：充电线', 'contact': '张工', 'head': '周厂长'},
@@ -258,6 +258,16 @@ APPROVAL_LOG_TODAY = [
     ('08:21', '向生产厂 FQD 派发询价单', '系统 · 自动', 'S-20260911-0018', 'success'),
     ('08:02', '亚马逊退款 MX$539.00 执行成功', 'SP-API · 自动', 'T-20260909-0128 · AP-20260910-011', 'success'),
 ]
+# P15 执行日志的显示口径：「失败后重试成功」按中性灰 + 信息图标显示（不是失败，也不需要关注）。时刻 → (色调, 说明)
+APPROVAL_LOG_OVERRIDE = {'10:12': ('neutral', '重试后成功（首次积加接口超时）')}
+# AP-20260911-004 改收货地址（Shopify #1057，同在旧金山）：(字段, 原值, 新值)，P15 逐字段对比
+PRIYA_ADDRESS_DIFF = [('街道', '2210 Mission St', '1450 Market St'), ('门牌', 'Apt 3', 'Apt 1104'), ('城市', 'San Francisco', 'San Francisco'),
+                      ('州', 'CA', 'CA'), ('邮编', '94110', '94103')]
+# StatesApproval A10：AP-20260911-001 剩 1 小时提醒（remind）→ 周敏视角截图（view）→ 周敏打开加锁（lock）→ 王磊从提醒进入（backup）
+APPROVAL_LOCK_DEMO = {'remind': '12:30', 'view': '12:32', 'lock': '12:33', 'backup': '12:35'}
+
+# StatesInbox I11 合并工单：演示时刻 NOW 之后到达的新来信（不在 TICKETS 里，P03 的 10:20 画面仍「没有其他未关闭工单」）
+MERGE_DEMO = {'no': 'T-20260911-0038', 'at': '10:31', 'subject': '¿Dónde está mi reembolso?'}
 
 # ---------------------------------------------------------------- 工厂任务（factory：FQD / FZJ）
 FACTORY_TASKS = [
@@ -306,12 +316,28 @@ QUOTES = {
     'S-20260911-0019': {'product': 5.20, 'freight': 12.80, 'carrier': '云途专线', 'ship_date': '2026-09-14', 'at': '10:22',
                         'memo': '批次号 HS-2608，现货。'},
 }
+# 报价参考（P21 ✦ 参考行，仅参考，仍由对接人填写）：该配件近 3 次报价（每根，USD）与寄往各国的运费区间
+QUOTE_REF = {'FC-V2-HS02': {'unit': (2.40, 2.70), 'freight': {'MX': (11.90, 13.60)}}}
 INVENTORY = {  # 良仓 US 库存（经积加查询时刻）
     ('FC-V2-CB01', '09-11 10:05'): 12,
     ('FC-V2-DC01', '09-10 09:20'): 8,
 }
 AI_CONFIDENCE = {'S-20260911-0022': '88%'}  # P08 责任建议置信度
+# AI 内容的「生成时间 · 依据」（R-AI-01），均早于演示时刻 NOW；键为页面位置
+AI_MADE = {
+    'P08_preselect': '10:06 生成 · 依据来信、积加订单与「充电线不充电排查」',    # S-20260911-0022 10:05 创建后
+    'P12_basis': '09-11 09:02 生成 · 依据本单沟通与 S-20260908-0015',  # S-20260903-0012 升级后商定依据
+    'P21_quote_ref': '08:50 生成 · 依据近 3 次报价与运费记录',                  # 询价单 08:50 派发时
+    'P13_backfill': '10:16 生成 · 依据积加良仓出库单',                           # 积加最近同步 10:16（CHANNEL_SYNC）
+    'K13_draft': '10:08 生成 · 依据 2 条缺口来信与「FBM 补发标准」',              # K13 第一簇点「✦ AI 起草条目」后
+}
 HISTORY_APPROVALS = {'S-20260905-0014': 'AP-20260905-002', 'S-20260910-0017': 'AP-20260910-003', 'S-20260902-0011': 'AP-20260902-004'}
+# P07「已等」离时限远近：未列出的为常规；S-20260903-0012 升级后商定时限 09-14 周一 09:00，剩不到 1 个工作日（黄）
+AS_WAIT_LEVEL = {'S-20260903-0012': 'warning'}
+# P12 商定依据的 AI 草稿（依据本单沟通 + 相近单据的协商结论）
+NEGO_AI_BASIS = {'S-20260903-0012': '保修期内失效，但电池出厂到签收已 9 个月，有库存老化因素；参照 S-20260908-0015（同为电池寄配件，责任「其他」，按三组均 FSH 50 / 工厂 50 结案），建议三组均 FSH 50 / 工厂 50。'}
+# P13「待回填」预填：这些单的快递单号没有自动回写（良仓回传延迟），积加出库单里已有单号（即 AFTERSALES 的 tracking），台账给出核对补登建议
+LEDGER_BACKFILL = ['S-20260909-0016']
 
 
 # ---------------------------------------------------------------- 计算函数
@@ -417,6 +443,26 @@ BADGES = {
 # 收件箱队列计数（团队队列，全部店铺）
 QUEUE_COUNTS = {'待审草稿': 3, '转人工': 1, '待审批': 2, '等待中': 5, '全部': 11}
 
+# ---------------------------------------------------------------- 收件箱队列与工单列表顺序
+# 收件箱左栏「全部」分段的行顺序（prd_c P01：按 SLA 剩余升序，无 SLA 的按到达时间）
+INBOX_QUEUE_ORDER = ['T-20260902-0071', 'T-20260910-0176', 'T-20260910-0192', 'T-20260910-0195', 'T-20260911-0031',
+                     'T-20260910-0170', 'T-20260911-0035', 'T-20260910-0201', 'T-20260910-0188', 'T-20260909-0142',
+                     'T-20260909-0128']
+# 默认分段「需处理」= 待审草稿 + 转人工（按 SLA 升序）；计数由 QUEUE_COUNTS 推出
+INBOX_NEED_ORDER = [n for n in INBOX_QUEUE_ORDER if {t['no']: t for t in TICKETS}[n]['status'] in ('待审草稿', '转人工')]
+INBOX_SEG_COUNTS = dict(QUEUE_COUNTS, 需处理=QUEUE_COUNTS['待审草稿'] + QUEUE_COUNTS['转人工'])
+# P04 工单列表：按 SLA 剩余升序；已解决的排在最后（按最近来信倒序）
+TICKET_LIST_ORDER = INBOX_QUEUE_ORDER + ['T-20260904-0098', 'T-20260909-0131']
+
+
+def owner_load():
+    """P04「推荐负责人」：各负责人当前负载（未关闭、已分配的工单数），按 TICKETS 顺序计。"""
+    out = {}
+    for t in TICKETS:
+        if t['status'] not in ('已解决',) + CLOSED and t['owner'] != '未分配':
+            out[t['owner']] = out.get(t['owner'], 0) + 1
+    return out
+
 # ---------------------------------------------------------------- 草稿与回复正文
 DRAFTS = {
     'sarah_A': ("Hi Sarah,\n\nI'm sorry the tracking has been stuck. UPS shows order 113-4567890-1234567 left the Louisville hub on Sep 5 "
@@ -445,8 +491,31 @@ DRAFTS = {
     'mateo_bound_zh': 'Rivas 先生您好，非常抱歉。我们今天已为您全额退款 MX$889.00。补发的电池您可以留用，无需退回。',
     'marcus_bound': ("Hi Marcus, sorry about the wrong color. We're sending the black V2 today via UPS Ground, arriving in 3-5 business days. "
                      "Please keep the grey unit, no return needed."),
-    'priya_address_old': '88 Pine St, Seattle, WA 98101',
+    'priya_address_old': '2210 Mission St, Apt 3, San Francisco, CA 94110',  # 与 PRIYA_ADDRESS_DIFF 一致
     'priya_address_new': '1450 Market St, Apt 1104, San Francisco, CA 94103',
+    # StatesInbox I7 草稿失效：旧稿（A 版）承诺句、坐席在旧稿里加的一句、新来信后重新生成的新稿
+    'sarah_A_stale': ("Since you need it before Tuesday, we won't wait on the carrier: a replacement ships Friday, Sep 11 via UPS Next Day Air "
+                      "and arrives Monday, Sep 14."),
+    'sarah_edit': "You'll get the new tracking number by email tonight.",
+    'sarah_new': 'Thanks for checking in, Sarah. Your replacement ships today via UPS Next Day Air and arrives Monday, Sep 14, before your Tuesday trip.',
+}
+
+# ---------------------------------------------------------------- 客户来信正文（收件箱中栏）
+MSG_IN = {
+    'sarah_en': ("Hi, I ordered the car vacuum on Sep 3 and tracking hasn't updated since Sep 5. It was due yesterday. "
+                 "Is the package lost? I need it before my road trip next Tuesday. Order 113-4567890-1234567."),
+    'sarah_zh': '你好，我 9 月 3 日买了车载吸尘器，物流从 9 月 5 日起就没更新，本应昨天送到。包裹丢了吗？下周二自驾出行前我一定要用上。订单 113-4567890-1234567。',
+    'sarah_followup': 'Any update on this? I leave Tuesday morning and really need it before then.',  # 10:18 新来信（StatesInbox I7）
+    'olivia_en': ("Hi, my V2 worked great at first, but after a few weeks the suction got really weak. I empty the dust cup after "
+                  "every use. Is something broken? Order #1063."),
+}
+
+# ---------------------------------------------------------------- AI 草稿头部：推荐理由与置信度（置信度 ⓘ 悬停说明依据齐全度与同类历史采纳率）
+DRAFT_AI = {
+    'T-20260910-0192': {'reason': '客户 9 月 15 日（周二）前要用，UPS 已 6 天无扫描，查件来不及，先补发', 'basis': '物流停滞流程 · FBM 补发标准',
+                        'conf': '82%', 'conf_why': '依据齐全 3 / 3 · 同类历史采纳率 91%（示例值）'},
+    'T-20260911-0031': {'reason': '症状是「几周后吸力变弱」，排查树首步即清洁滤芯，多数可自行解决；不行再寄滤芯',
+                        'conf': '86%', 'conf_why': '依据齐全 3 / 3 · 同类历史采纳率 88%（示例值）'},
 }
 
 # ---------------------------------------------------------------- 客户档案：Sarah Mitchell
@@ -460,7 +529,26 @@ SARAH = {
     'tickets': [('T-20260910-0192', '未收到与异常', '待审草稿', '09-10'), ('T-20260614-0117', '订单查询', '已关闭', '06-14')],
     'summary': '3 笔订单，2 张工单。6 月问过一次物流进度，此前无投诉、无退款。这次是第一次负面来信，原因是包裹停滞且有明确用车期限。',
     'summary_short': '3 笔订单、2 张工单。6 月问过一次物流进度，此前无投诉、无退款。这次是第一次负面来信。',  # 收件箱右栏用的短版
+    'summary_basis': '09-10 16:01 生成 · 依据 3 笔订单与 2 张工单',
 }
+# 订单 → 关联工单（P06 订单卡；06-10 那笔对应 06-14 的物流查询工单；Shopify #0988 无工单）
+ORDER_TICKET = {'113-4567890-1234567': 'T-20260910-0192', '112-7788001-3344556': 'T-20260614-0117'}
+
+# ---------------------------------------------------------------- 客户卡：Olivia Turner（P02）、Mateo Rivas（P03）
+OLIVIA = {'email': 'olivia.turner@example.com',
+          'summary': 'forcome.com 客户，1 笔订单 #1063（08-05，$54.99，保修期内）。首次来信，无投诉、无退款记录。',
+          'summary_basis': '09-11 09:13 生成 · 依据 1 笔订单与 1 张工单'}
+MATEO = {'email': 'mateo.r.8k3p@marketplace.amazon.com.mx',
+         'summary': '亚马逊 MX 客户，1 笔订单 MX$889.00（≈ $49.39）。09-02 首次来信反映机器不工作，已补发电池；本次在我方答应补发后再次来信，要求退款并威胁差评。',
+         'summary_basis': '09-10 11:16 生成 · 依据 1 笔订单与 2 封来信'}
+
+# ---------------------------------------------------------------- 未归属店铺队列（StatesInbox I14）：收件地址或卖家 ID 未登记的来信与 AI 推荐店铺
+UNASSIGNED_MAIL = [
+    {'customer': 'Tom Harris', 'subject': 'Where is my order? Tracking says delivered.', 'source': '买家消息 · amz-ca2@forcome.com 未登记',
+     'store': 'Forcome Direct CA', 'basis': '收件地址前缀 amz-、买家历史订单', 'at': '10:02', 'sla': '23h 42m'},
+    {'customer': 'Lucía Herrera', 'subject': 'El filtro no encaja en mi aspiradora.', 'source': '邮件 · info@forcome.mx 未登记',
+     'store': 'forcome.mx', 'basis': '收件地址域名、买家历史订单', 'at': '09:47', 'sla': '23h 27m · 内部'},
+]
 
 # ---------------------------------------------------------------- 知识库示例
 KB = [
@@ -475,6 +563,29 @@ KB = [
     ('Q3 促销运费政策', '政策规则', '全部店铺', '英', '全部', '周敏', '2026-09-15', 9, '即将过期'),
 ]
 KB_COUNTS = {'产品事实表': 42, '政策规则': 36, '故障排查树': 12, '模板与素材': 118, '沉淀问答': 64, '待审核沉淀': 3, '知识缺口': 5}
+# 待审核沉淀（P16 摘要卡与 StatesAdmin K12 共用）：(问题, 来源工单, 提交人 · 日期)
+KB_REVIEW = [('充电线不充电：先换插座、查保险丝，再换线测试', 'T-20260904-0098', '李婷 · 09-10'),
+             ('HEPA 滤芯多久更换一次', 'T-20260909-0131', '李婷 · 09-09'),
+             ('软管接口松脱的重新安装方法', 'T-20260908-0140', '陈晨 · 09-08')]
+# 知识缺口按问题聚类（4 个缺口聚成 3 簇，页签计数 KB_COUNTS['知识缺口'] 由此推出；P16 摘要卡与 StatesAdmin K13 共用）：(簇名, 站点, 语言, [(问题, 来源工单, 原因, 最近)])
+KB_GAP_CLUSTERS = [
+    ('墨西哥站电池运输限制', 'MX', '西语', [
+        ('¿Por qué la batería de repuesto tarda tanto en llegar?', 'T-20260902-0071', '转人工', '09-10'),
+        ('La batería quedó retenida en aduana, ¿qué hago?', 'T-20260909-0150', '置信度低于 60%', '09-09')]),
+    ('V2 与 Model Y 12V 插座兼容', 'US', '英语', [
+        ('Does the V2 fit the 12V socket in a Tesla Model Y?', 'T-20260910-0176', '置信度低于 60%', '09-10')]),
+    ('墨西哥站亚马逊退货退款到账时间', 'MX', '西语', [
+        ('¿Cuándo recibo el reembolso después de la devolución?', 'T-20260909-0128', '拒绝原因：知识错误', '09-09')]),
+]
+KB_COUNTS['知识缺口'] = sum(len(c[3]) for c in KB_GAP_CLUSTERS)
+# 素材库（StatesAdmin K11、K14）：(名称, 编号, 近 30 天引用次数, 纯文字版步骤)；图文版与纯文字版成对保存
+KB_ASSETS = [('拆下并清洗 HEPA 滤芯', 'IMG-V2-014', 15, ['Twist the dust cup counterclockwise and lift it off.', 'Pull the HEPA filter straight out.',
+                                                    'Rinse it under cold water. No soap.', 'Air-dry for 24 hours before refitting.']),
+             ('点烟器保险丝检查', 'IMG-V2-009', 11, ['Unscrew the silver tip of the 12V plug.', 'Check the glass fuse for a broken wire.',
+                                                 'Fit a new 10A fuse and screw the tip back on.']),
+             ('集尘杯卡扣安装', 'IMG-V2-017', 8, ['Line up the arrow on the cup with the arrow on the body.', 'Push the cup in until it clicks.',
+                                                'Tug it gently to check it is locked.']),
+             ('软管接口重新安装', 'IMG-V2-021', 6, ['Press the release button and pull the hose off.', 'Push the hose back in until the latch clicks.'])]
 
 # ---------------------------------------------------------------- 报表示例（近 7 天 09-05 至 09-11，标注为示例数据）
 REPORT = {
@@ -486,6 +597,83 @@ REPORT = {
     'daily': [('09-05', 38, 14), ('09-06', 41, 17), ('09-07', 29, 9), ('09-08', 22, 8), ('09-09', 45, 19), ('09-10', 52, 21), ('09-11', 30, 12)],
     'intents': [('订单查询', 31), ('退货与退款', 18), ('产品故障与使用问题', 16), ('产品咨询', 14), ('未收到与异常', 9), ('其他', 12)],
 }
+
+
+def intent_counts(total_n, intents):
+    """P17 意图分布单数：按百分比把工单总量分到各意图（最大余数法，保证单数之和 = 总量）。"""
+    raw = [(n, p, total_n * p / 100.0) for n, p in intents]
+    base = [int(x) for _, _, x in raw]
+    rest = total_n - sum(base)
+    order = sorted(range(len(raw)), key=lambda i: -(raw[i][2] - base[i]))
+    for i in order[:rest]:
+        base[i] += 1
+    return {raw[i][0]: base[i] for i in range(len(raw))}
+
+
+# ---------------------------------------------------------------- 设置示例（P18–P20 与 StatesAdmin）
+# 渠道卡「最近同步」时刻（P18）；「异常」为 K7 连接异常画面里的最后一次成功同步
+CHANNEL_SYNC = {'SP-API': '10:12', 'SP-API 异常': '10:02', 'Shopify': '10:15', '积加': '10:16', 'Gmail': '10:18', 'Gmail 异常': '10:04',
+                '钉钉': '10:00', '良仓': '10:16'}
+# 关闭风险信号的影响（P19 二次确认提示）：近 30 天约少转人工的封数
+RISK_OFF_IMPACT = {'重复联系': 23, '高价值': 14}
+# 发送方式与阈值（P19、StatesAdmin K6/K9）
+# 放开条件：('ok', 文字) 已放开或满足；('hard', 文字) 硬规则，灰锁不可改；('wait', [(指标, 当前, 要求, 进度%)]) 暂不满足，黄色 + 进度
+SEND_RULES = [
+    # 意图, 发送方式, 阈值, 采纳率, 样本, 放开条件, 开关: on / off / disabled
+    ('订单查询', '自动发送', '85%', '96%', '212', ('ok', '已放开 · 09-01'), 'on'),
+    ('发票与收据', '自动发送', '90%', '98%', '64', ('ok', '已放开 · 09-01'), 'on'),
+    ('产品咨询', '待审草稿', '80%', '91%', '57', ('ok', '满足，可放开'), 'off'),
+    ('购买咨询', '待审草稿', '80%', '84%', '38', ('wait', [('样本', '38', '50', 76)]), 'disabled'),
+    ('未收到与异常', '待审草稿', '80%', '78%', '61', ('wait', [('采纳率', '78%', '90%', 87)]), 'disabled'),
+    ('修改订单', '待审草稿', '—', '88%', '22', ('hard', '含高风险动作'), 'disabled'),
+    ('到货问题', '待审草稿', '—', '83%', '31', ('hard', '含高风险动作'), 'disabled'),
+    ('产品故障与使用问题', '待审草稿', '80%', '72%', '96', ('wait', [('采纳率', '72%', '90%', 80)]), 'disabled'),
+    ('退货与退款', '待审草稿', '80%', '81%', '45', ('wait', [('采纳率', '81%', '90%', 90), ('样本', '45', '50', 90)]), 'disabled'),
+    ('保修与配件购买', '待审草稿', '80%', '86%', '18', ('wait', [('样本', '18', '50', 36)]), 'disabled'),
+    ('批发与合作', '转人工', '—', '—', '—', ('hard', '规则为转人工'), 'disabled'),
+    ('评价与反馈', '转人工', '—', '—', '—', ('hard', '规则为转人工'), 'disabled'),
+]
+SEND_RULE_EDITS = {'产品咨询': ('80%', '85%')}  # P19 示例：1 项未保存修改（阈值 旧 → 新）
+
+# 店铺覆盖项（P18 店铺表「覆盖项」列）：店铺 id → 已覆盖的配置
+STORE_OVERRIDES = {'amz-direct': ['模板 1'], 'amz-auto': ['签名'], 'shop-com': ['政策口径 1'], 'shop-mx': ['签名']}
+
+# 动作映射（P22）：统一动作, 分级, 亚马逊店铺 (接口, 色调) 或 None（平台不支持）, Shopify 店铺 (接口, 色调)
+# 分级：只读 / 低风险 / 高风险 / 按发送方式；良仓出库单与库存经积加对接
+ACTION_MAP = [
+    ('查订单', '只读', ('积加', 'accent'), ('积加', 'accent')),
+    ('查物流', '只读', ('积加', 'accent'), ('积加', 'accent')),
+    ('查库存', '只读', ('积加（良仓）', 'accent'), ('积加（良仓）', 'accent')),
+    ('回复客户', '按发送方式', ('Gmail 中转', 'accent'), ('Gmail', 'accent')),
+    ('创建售后出库单', '高风险', ('积加（良仓）', 'accent'), ('积加（良仓）', 'accent')),
+    ('订单备注', '低风险', ('系统内备注', 'neutral'), ('Admin API', 'accent')),
+    ('退款', '高风险', ('SP-API', 'accent'), ('Admin API', 'accent')),
+    ('改地址', '高风险', None, ('Admin API', 'accent')),
+    ('取消', '高风险', ('SP-API', 'accent'), ('Admin API', 'accent')),
+]
+ACTION_UNSUPPORTED = {'改地址': '亚马逊 SP-API 不提供改地址接口，由坐席在卖家后台人工处理'}
+
+# 风险信号（P19「风险信号」页签，StatesAdmin K15）：名称, 命中条件, 优先级, 开关 lock（硬规则）/ on, 关闭影响（RISK_OFF_IMPACT）
+RISK_SIGNALS = [
+    ('安全事故', '起火、冒烟、过热、烫伤、电池鼓包', '紧急', 'lock'),
+    ('平台风险', 'A-to-Z、拒付、差评威胁、投诉到平台、律师', '紧急', 'lock'),
+    ('重复联系', '重复联系 2 次（1 次只升优先级）', '高', 'on'),
+    ('高价值', '订单或累计消费超过 $300', '高', 'on'),
+    ('要求真人', '客户明确要求与人沟通', '高', 'on'),
+    ('无法处理的内容', '不支持的语言、乱码、只有附件', '普通', 'on'),
+]
+
+# 渠道内容能力（P19「渠道内容能力」页签，StatesAdmin K16）
+LINK_WHITELIST = ['forcome.com', 'forcome.mx', 'youtube.com', 'ups.com', 'yuntrack.com']
+
+# 售后规则（P23）：责任类型说明（是否协商、含义）与报备规则
+RESP_NOTES = {'客户使用问题': ('不协商', '含顾客购买、使用不当'), '产品质量问题': ('需协商', '抱怨索赔'),
+              '物流问题': ('不协商', '向承运商或良仓索赔'), '其他': ('需协商', '需填写理由；默认值')}
+FILING_RULES = [('报备类型', '快递费用 · 额外赔偿'), ('审批人', '客服主管'), ('时限', '4 小时，剩 1 小时提醒'), ('金额门槛', '无'),
+                ('超额补充报备', '实际金额超出报备 10% 以上')]
+
+# SKU 类别（P24 工厂账号「负责的 SKU」表）；SKU 归属见 PART_FACTORY，名称见 PARTS
+PART_CATEGORY = {'FC-V2-BLK': '整机', 'FC-V2-BT01': '电源', 'FC-V2-HS02': '结构件', 'FC-V2-HF01': '滤材', 'FC-V2-DC01': '结构件', 'FC-V2-CB01': '线材'}
 
 
 def cost_by_resp():

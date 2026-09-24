@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""把 spec/prd_a..d.md 合成为 design/forcome-blueprint-guide.html（PRD v2.4）。"""
+"""把 spec/prd_a..d.md 合成为 design/forcome-blueprint-guide.html（PRD v2.6）。"""
 import io, os, re, hashlib
 import markdown
 
@@ -202,7 +202,7 @@ page = '''<!doctype html>
 <body>
 <div class="layout">
   <aside>
-    <div class="brand">PRD v2.4 · 目录</div>
+    <div class="brand">PRD v2.6 · 目录</div>
     <nav>%s</nav>
     <div class="links">
       <a href="%s">设计画布（规范、页面、状态板、流程图）</a>

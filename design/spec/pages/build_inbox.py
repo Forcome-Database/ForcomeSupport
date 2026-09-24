@@ -15,33 +15,40 @@ def p01_middle():
     summary = ai_summary('9 月 3 日下单 V2 黑色，UPS 自 9 月 5 日无扫描，已超预计送达（9 月 9 日）。客户 9 月 15 日前要用。首次来信，情绪负面，未命中风险信号。')
     msg = sarah_msg()
     tabs_html = ver_tabs(SARAH_VERSIONS, 'A', sarah_huan())
+    reason = ai_reason(SARAH_REASON)
     toolbar = draft_toolbar('English', False, media=False, hint='亚马逊站内信不支持图片和链接')
     ev = evidence([('政策 · 物流停滞或超预计送达处理流程', 'book'), ('政策 · FBM 补发标准', 'book'), ('历史工单 · T-20260614-0117', 'history')])
-    foot = draft_foot(btn('提交审批', 'primary', 'md', icon_right='arrow_r') + btn('修改', 'secondary', 'md', 'edit') + btn('转人工', 'secondary', 'md', 'handoff'),
-                      btn('拒绝草稿', 'ghost', 'md', 'x_c'))
-    dc = draft_card('09-10 16:01 生成 · 置信度 <b style="color: %s;">82%%</b> · 3 条依据' % T['ink2'], tabs_html, toolbar, sarah_body(), ev, check_row(),
-                    sarah_approval(), foot, gap=7)
-    return middle(head, summary + msg + dc, pad='10px 20px', gap=8)
+    foot = act_foot(btn('提交审批', 'primary', 'md', icon_right='arrow_r'))
+    dc = draft_card('09-10 16:01 生成 · %s · 3 条依据' % conf(SARAH_AI['conf'], SARAH_CONF_WHY), tabs_html + reason, toolbar, sarah_body(legend=True), ev, check_row(),
+                    sarah_approval(), foot, gap=6)
+    return middle(head, summary + msg + dc, pad='10px 20px', gap=6)
+
+
+def cust_sec(name, av, email, summary, basis):
+    """右栏「客户」卡：头像 + 姓名 + 邮箱 / ✦ AI 摘要（生成时间 · 依据）。P01–P03 共用。"""
+    return rsec('客户', col(row(avatar(av, 'customer', 32) + col(text(name, 13, T['ink'], 700) + ellipsis(email, 12, T['ink3']), 0, 'min-width: 0px;'), 10) +
+                          ai_note('<span style="color: %s; font-weight: 700;">✦ </span>%s<div style="font-size: 11px; color: %s; margin-top: 2px;">%s</div>' % (
+                              T['accent'], summary, T['ink4'], basis)), 10),
+                extra=link('客户档案', 12, 'chev_r'))
 
 
 def p01_right():
     ident = SARAH['identities'][0]
-    cust = rsec('客户', col(row(avatar('S', 'grey', 32) + col(text('Sarah Mitchell', 13, T['ink'], 700) + ellipsis(ident[1], 12, T['ink3']), 0, 'min-width: 0px;'), 10) +
-                          ai_note(SARAH['summary_short']), 10),
-                extra=link('查看客户档案', 12, 'chev_r'))
+    cust = cust_sec('Sarah Mitchell', 'SM', ident[1], SARAH['summary_short'], SARAH['summary_basis'])
     o = SARAH['orders'][0]
     order = rsec('订单', col(
-        between(nowrap(o[0], 13, T['ink'], 700), row(state('已发货') + chip('超预计送达', 'warning'), 4)) +
-        col(kv('商品', 'V2 黑色 ×1 · $49.99') + kv('配送方式', 'FBM · 良仓 US') + kv('下单', '09-03') +
+        col(nowrap(o[0], 13, T['ink'], 700) + row(state('已发货') + chip('超预计送达', 'warning'), 4), 4) +
+        col(kv('商品', 'V2 黑色 ×1 · $49.99') + kv('配送', 'FBM · 良仓 US · 09-03 下单') +
             kv('承运商', '%s %s' % (ORDERS[o[0]]['carrier'], ORDERS[o[0]]['tracking'])) + kv('最后扫描', '09-05 Louisville, KY') +
             kv('预计送达', '09-09（已超 2 天）', 'warning'), 4), 8),
-        extra=link('在卖家后台打开', 12, 'external'))
+        extra=link('卖家后台', 12, 'external'))
+    rel = rsec('关联售后 / 审批', '', extra=nowrap('暂无 · 提交审批时创建', 11, T['ink4']), collapsed=True)
+    info = rsec('工单信息', '', extra=nowrap('亚马逊 24h SLA · 李婷', 11, T['ink4']), collapsed=True)
     ai = rsec('AI 分析', col(
-        kv('意图', cat('未收到与异常')) + kv('情绪', sentiment('负面')) + kv('风险信号', '未命中', 'muted') + kv('语言', '英语') +
-        kv('紧急度', '高 · 9 月 15 日前要用') + kv('发送方式', '待审草稿 → 提交审批'), 6) +
-        '<div style="border-top: 1px solid %s; padding-top: 10px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 12px; font-weight: 600; color: %s;">未转人工的原因</div><div style="font-size: 12px; color: %s; line-height: 1.55;">首次来信，未命中安全、平台、重复联系、高价值等风险信号；诉求明确，按政策可补发，由坐席审阅后提交审批。</div></div>' % (
-            T['line2'], T['ink2'], T['ink3']), last=True)
-    return right_column(cust + order + ai)
+        kv('情绪', sentiment('负面')) + kv('风险信号', '未命中', 'muted') + kv('紧急度', '高 · 9 月 15 日前要用') + kv('语言', '英语'), 6) +
+        '<div style="border-top: 1px solid %s; padding-top: 10px; display: flex; flex-direction: column; gap: 3px;"><div style="font-size: 12px; font-weight: 600; color: %s;">未转人工的原因</div><div style="font-size: 12px; color: %s; line-height: 1.55;">首次来信，未命中任何风险信号；诉求明确，按政策可补发，由坐席审阅后提交审批。</div></div>' % (
+            T['line2'], T['ink2'], T['ink3']), last=True, ai=True, extra=nowrap('09-10 16:00', 11, T['ink4']))
+    return right_column(cust + order + rel + info + ai)
 
 
 def p01():
@@ -77,41 +84,37 @@ def olivia_body():
     steps = ''.join('<div style="display: flex; gap: 8px;"><div style="width: 16px; flex-shrink: 0; color: %s; font-weight: 600;">%d.</div><div>%s</div></div>' % (T['ink3'], i + 1, s)
                     for i, s in enumerate(DRAFTS['olivia_steps']))
     return body_box(paras(DRAFTS['olivia_A']) + '<div style="display: flex; flex-direction: column; gap: 2px;">%s</div>' % steps +
-                    grid(media_card() + link_card(), 2, 10) + paras(DRAFTS['olivia_end']), gap=8)
+                    grid(media_card() + link_card(), 2, 10) + paras(DRAFTS['olivia_end']), gap=6, hint=EDIT_HINT)
+
+
+# P02 客户卡取 data.OLIVIA；推荐理由与置信度取 data.DRAFT_AI
+OLIVIA_AI = DRAFT_AI['T-20260911-0031']
 
 
 def p02_middle():
     t = TK['T-20260911-0031']
     head = conv_head(t, '婷')
     msg = customer_msg('Olivia Turner', 'Gmail · support@forcome.com · 09-11 09:12', MSG_IN['olivia_en'], '', seg(['原文', '中文译文'], '原文', 'sm'))
-    tabs_html = ver_tabs([('A', 'A 先排查', ai_badge('推荐', 9.5)), ('B', 'B 直接寄滤芯', ''), ('C', 'C 退款', '')], 'A', btn('换一版', 'ghost', 'sm', 'refresh'))
+    tabs_html = ver_tabs([('A', 'A 先排查', ai_badge('推荐', 11)), ('B', 'B 直接寄滤芯', ''), ('C', 'C 退款', '')], 'A', btn('换一版', 'ghost', 'sm', 'refresh'))
     toolbar = draft_toolbar('English', False, media=True, lib=True)
     ev = evidence([('排查树 · 吸力下降 → 清洁滤芯', 'book'), ('产品事实 · V2 保修 12 个月', 'book'), ('素材库 · IMG-V2-014', 'image')])
-    foot = draft_foot(btn('发送', 'primary', 'md', 'send') + btn('修改', 'secondary', 'md', 'edit') + btn('转人工', 'secondary', 'md', 'handoff') +
-                      nowrap('以 support@forcome.com 发出', 11, T['ink4']),
-                      btn('拒绝草稿', 'ghost', 'md', 'x_c'))
-    dc = draft_card('09-11 09:13 生成 · 置信度 <b style="color: %s;">86%%</b> · 3 条依据' % T['ink2'], tabs_html, toolbar, olivia_body(), ev, check_row(), '', foot)
-    return middle(head, msg + dc, pad='12px 20px', gap=10)
+    foot = act_foot(btn('发送', 'primary', 'md', 'send'), extra=nowrap('以 support@forcome.com 发出', 11, T['ink4']), note='发送后自动打开下一张')
+    dc = draft_card('09-11 09:13 生成 · %s · 3 条依据' % conf(OLIVIA_AI['conf'], OLIVIA_AI['conf_why']), tabs_html + ai_reason(OLIVIA_AI['reason']), toolbar, olivia_body(), ev, check_row(), '', foot)
+    return middle(head, msg + dc, pad='10px 20px', gap=8)
 
 
 def p02_right():
-    info = rsec('工单信息', col(
-        kv('店铺', 'forcome.com') + kv('渠道', channel('Shopify', 'US')) + kv('进线', 'Gmail · support@forcome.com') +
-        kv('意图', cat('产品故障与使用问题')) + kv('发送方式', '待审草稿（本版无审批项）') + kv('负责人', '李婷') +
-        kv('内部目标 SLA', sla('22h 52m', 'normal')), 6))
-    chk = rsec('回复检查', check_list([
-        ('事实有来源', '3 条事实均可追溯到排查树、产品事实与素材库', True),
-        ('不越政策', '保修内寄送新滤芯，在保修条款之内', True),
-        ('渠道内容能力', '图片 1 张来自素材库，链接 1 个在白名单', True),
-        ('语言一致', '来信英语，回复英语', True),
-        ('不泄露内部信息', '未出现内部备注、成本、生产厂', True),
-    ]), extra=chip('5 / 5 通过', 'success', 11, 'check'))
-    tree = rsec('排查树路径', vsteps([('清洁并晾干 HEPA 滤芯', 'current'), ('检查集尘杯密封圈', 'todo'), ('检查软管与吸口是否堵塞', 'todo'),
-                                   ('仍未解决：创建售后单（寄滤芯）', 'todo')]), extra=nowrap('吸力下降排查 · 第 1 步', 11, T['ink3']))
+    t = TK['T-20260911-0031']
+    cust = cust_sec('Olivia Turner', 'OT', OLIVIA['email'], OLIVIA['summary'], OLIVIA['summary_basis'])
     order = rsec('订单', col(between(nowrap('#1063', 13, T['ink'], 700), state('已签收')) +
                            kv('商品', '%s · %s' % (ORDERS['#1063']['item'], ORDERS['#1063']['amount'])) + kv('下单', ORDERS['#1063']['date']) + kv('保修', '保修期内 · 已购买 %s' % ORDERS['#1063']['age'], 'success'), 4),
-                 extra=nowrap('#1063 · 保修内', 11.5, T['ink3']), last=True, collapsed=True)
-    return right_column(info + chk + tree + order)
+                 extra=link('Shopify 后台', 12, 'external'))
+    rel = rsec('关联售后 / 审批', '', extra=nowrap('暂无', 11, T['ink4']), collapsed=True)
+    info = rsec('工单信息', col(
+        kv('进线', 'Gmail · support@forcome.com') + kv('发送方式', '直接发送（本版无审批项）') + kv('内部目标 SLA', sla(t['sla_left'] + ' · 内部', 'normal')), 6))
+    tree = rsec('排查树路径', vsteps([('清洁并晾干 HEPA 滤芯', 'current'), ('检查集尘杯密封圈', 'todo'), ('检查软管与吸口是否堵塞', 'todo'),
+                                   ('仍未解决：创建售后单（寄滤芯）', 'todo')]), extra=nowrap('吸力下降排查 · 第 1 步', 11, T['ink3']), last=True)
+    return right_column(cust + order + rel + info + tree)
 
 
 def p02():
@@ -144,12 +147,13 @@ def mateo_msg():
 
 
 def progress_reply():
+    why = '亚马逊站内信不支持图片和链接'
     tb = row(nowrap('回复语言', 12, T['ink3']) + select_box('Español', width='104px', h=28) + tg(True, '用中文写，自动译成西班牙语') + divider(True, 16) +
-             btn('插入图片', 'secondary', 'sm', 'image', disabled=True) + btn('插入链接', 'secondary', 'sm', 'link', disabled=True) +
+             btn('插入图片', 'secondary', 'sm', 'image', disabled=True, reason=why) + btn('插入链接', 'secondary', 'sm', 'link', disabled=True, reason=why) +
              row(icon('info', 13, T['ink4']) + nowrap('站内信不支持', 11, T['ink3']), 4), 8)
-    zh = col(nowrap('中文（可编辑）', 11, T['ink3'], 600) + textarea_box(DRAFTS['mateo_progress_zh'], st='focus', h=84, counter='%d / 1000' % len(DRAFTS['mateo_progress_zh'])), 4)
+    zh = col(row(nowrap('中文（可编辑）', 11, T['ink3'], 600) + chip('来自模板 · 进展回复（不含承诺）', 'muted', 11, 'book'), 6) + textarea_box(DRAFTS['mateo_progress_zh'], st='focus', h=84, counter='%d / 1000' % len(DRAFTS['mateo_progress_zh'])), 4)
     es = col(between(nowrap('西班牙语译文 · 将发送', 11, T['ink3'], 600), link('查看回译', 11)) +
-             '<div style="min-height: 84px; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 9px; padding: 8px 10px; font-size: 12.5px; line-height: 1.5; color: %s;">%s</div>' % (
+             '<div style="min-height: 84px; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.5; color: %s;">%s</div>' % (
                  T['line'], T['subtle'], T['ink'], DRAFTS['mateo_progress_es']), 4)
     foot = draft_foot(btn('发送进展回复', 'primary', 'md', 'send') + btn('让 AI 起草', 'secondary', 'md', 'spark') + btn('转客服主管', 'secondary', 'md', 'handoff'),
                       nowrap('经亚马逊买家消息以 Forcome Direct 发出', 11, T['ink4']))
@@ -158,32 +162,32 @@ def progress_reply():
 
 def p03_middle():
     t = MATEO_T
-    head = conv_head(t, '晨', actions=merge_btn(t) + btn('内部备注', 'secondary', 'sm', 'message') + icon_btn('more', 'secondary', 28))
+    head = conv_head(t, '晨', tags=[], actions=merge_btn(t) + btn('内部备注', 'secondary', 'sm', 'message') + icon_btn('more', 'secondary', 28))
     risk = banner('danger', '命中风险信号：平台风险 · 差评威胁 · 已转人工',
                   '原文「…<b>dejar una reseña negativa</b>」，优先级紧急；另：重复联系 1 次。AI 不自动起草，也不自动发送。')
     hist = '<div style="display: flex; align-items: center; gap: 8px; padding: 0px 2px;">%s<div style="font-size: 12px; color: %s; flex: 1; min-width: 0px;">本工单 09-02 首次来信，已建售后单 <span style="color: %s; font-weight: 600;">S-20260903-0012</span>（电池，生产厂直寄运输中）</div>%s</div>' % (
         icon('history', 15, T['ink3']), T['ink2'], T['accent'], link('展开历史', 12, 'chev_d'))
-    warn = banner('warning', 'SLA 剩 55 分钟，审批还剩 3h 10m', '承诺退款的回复要在审批后才发出。建议先发一条不含承诺的进展回复。', btn('插入进展回复模板', 'secondary', 'sm', 'book'))
+    warn = banner('warning', 'SLA 剩 55 分钟，审批还剩 3h 10m', '承诺退款的回复要在审批后才发出。建议先发一条不含承诺的进展回复（已插入下方回复框）。',
+                  btn('已插入 · 重新插入', 'secondary', 'sm', 'check'))
     return middle(head, risk + hist + mateo_msg() + mateo_submitted() + warn + progress_reply(), pad='8px 18px', gap=7)
 
 
 def p03_right():
-    info = rsec('工单信息', col(
-        kv('意图', cat('退货与退款')) + kv('情绪', sentiment('负面')) + kv('优先级', priority('紧急')) + kv('负责人', '陈晨') +
-        kv('审批单', row(nowrap('AP-20260911-001', 12, T['accent'], 600) + state('待审批'), 6)) +
-        kv('重复联系', '1 次', 'warning') + kv('风险信号', chip('平台风险 · 差评威胁', 'danger')) + kv('语言', '西班牙语 · usted 敬语'), 6))
-    hist = rsec('客户历史', ai_note('亚马逊 MX 客户，1 笔订单 MX$889.00（≈ $49.39）。09-02 首次来信反映机器不工作，已补发电池（生产厂直寄，运输中）。本次在我方答应补发后再次来信（重复联系 1 次），要求退款并威胁差评。'))
+    cust = cust_sec('Mateo Rivas', 'MR', MATEO['email'], MATEO['summary'], MATEO['summary_basis'])
+    o = ORDERS['302-8811234-9901122']
+    order = rsec('订单', '', extra=nowrap('%s · %s 签收' % (o['amount'], o['delivered']), 12, T['ink3']), collapsed=True)
+    AS = {a['no']: a for a in AFTERSALES}
 
-    def as_card(no, tags, st, step):
-        return '<div style="border: 1px solid %s; border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px;">%s%s%s</div>' % (
-            T['line'], between(nowrap(no, 12, T['accent'], 700), st), row(tags, 4, wrap=True), muted(step, 12))
-    rel = rsec('关联售后单', col(
-        as_card('S-20260903-0012', cat('寄配件') + cat('良仓无货') + cat('产品质量问题'), row(state('已完成'), 4), '比例协商：待升级 · 单号已回复客户') +
-        as_card('S-20260911-0020', cat('退款或部分补偿') + cat('产品质量问题'), state('进行中'), '当前环节：报备审批 · 额外赔偿 · 等周敏'), 8), extra=nowrap('2 张', 11, T['ink3']))
-    order = rsec('订单', col(between(nowrap('302-8811234-9901122', 13, T['ink'], 700), state('已签收')) +
-                           kv('商品', '%s · %s' % (ORDERS['302-8811234-9901122']['item'], ORDERS['302-8811234-9901122']['amount'])) + kv('站点', '亚马逊 MX · Forcome Direct') + kv('签收', ORDERS['302-8811234-9901122']['delivered']), 4),
-                 extra=nowrap('%s · %s 签收' % (ORDERS['302-8811234-9901122']['amount'], ORDERS['302-8811234-9901122']['delivered']), 11.5, T['ink3']), last=True, collapsed=True)
-    return right_column(info + hist + rel + order)
+    def as_card(no, st, line1, line2):
+        return '<div style="border: 1px solid %s; border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px;">%s%s%s</div>' % (
+            T['line'], between(nowrap(no, 12, T['accent'], 700), st), text(line1, 12, T['ink'], 600), muted(line2, 12))
+    a1, a2 = AS['S-20260903-0012'], AS['S-20260911-0020']
+    rel = rsec('关联售后 / 审批', col(
+        as_card(a1['no'], state(a1['status']), '%s寄件 · 运输中 · %s' % (PARTS[a1['part']], a1['tracking']), '比例协商待升级（内部，不影响客户）') +
+        as_card(a2['no'], state(a2['status']), '全额退款 %s · 待审批' % a2['comp_orig'], '%s · 额外赔偿报备 · 等周敏' % a2['approval']), 8), extra=nowrap('2 张', 11, T['ink3']))
+    info = rsec('工单信息', col(
+        kv('情绪', sentiment('负面')) + kv('重复联系', '1 次', 'warning') + kv('语言', '西班牙语 · usted 敬语'), 6), last=True)
+    return right_column(cust + order + rel + info)
 
 
 def p03():

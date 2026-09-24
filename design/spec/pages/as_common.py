@@ -6,6 +6,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ui import *
 from data import *
+from data import _parts
 
 AS = {a['no']: a for a in AFTERSALES}
 STORE = {s['name']: s for s in STORES}
@@ -32,8 +33,8 @@ N_SETTLE = sum(1 for a in AFTERSALES if a['settle'] == '待结算')
 
 
 def as_tabs(active):
-    """售后模块页签条（P07、P13、P14 共用）。"""
-    return tabs([('售后单', N_ALL), ('登记台账', None), ('待协商', N_NEGO), ('待结算', N_SETTLE), ('内部结算', None)], active)
+    """售后模块页签条（P07、P13、P14 共用）。「待协商」「待结算」改为 P07 的快捷筛选，不再是页签。"""
+    return tabs([('售后单', N_ALL), ('登记台账', None), ('内部结算', None)], active)
 
 
 def as_head(active, actions=''):
@@ -73,6 +74,78 @@ def ratio_txt(a, show_state=True, words=False):
     if show_state and a['ratio_state'] == '建议':
         return '<span style="white-space: nowrap;">%s <span style="font-size: 11px; color: %s;">建议</span></span>' % (s, T['ink4'])
     return '<span style="white-space: nowrap;">%s</span>' % s
+
+
+def share_words(a, fac=None, parts=None):
+    """比例一律带金额（FSH 在前、工厂在后）：「FSH $0.00 · 工厂 $14.70（三组均 0 / 100）」。
+    fac：工厂名（如 'FZJ'），默认「工厂」；parts：自定义比例 dict 时按它计算（如生产厂还价）。"""
+    r = parts or a['ratios']
+    p = _parts(a)
+    f = round(sum(p[k] * r[k][0] / 100.0 for k in p), 2)
+    c = round(sum(p[k] * r[k][1] / 100.0 for k in p), 2)
+    u = ratio_uniform(r)
+    return 'FSH %s · %s %s（%s）' % (money(f), fac or '工厂', money(c), ('三组均 %d / %d' % u) if u else '按费用项')
+
+
+def cur_cell(a, st='confirmed', size=13, weight=400, amount=None):
+    """表格金额单元格：比索、加元原币单独一行，下方小字「≈ $49.39」（窄列里的 money_cur 写法）。"""
+    x = total(a) if amount is None else amount
+    if a.get('comp_orig') and amount is None:
+        pre = '≈ ' if st == 'estimate' else ''
+        return '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0px;">%s%s</div>' % (
+            nowrap(pre + a['comp_orig'], size, T['ink3'] if st == 'estimate' else T['ink'], weight), nowrap('≈ %s' % money(x), 11, T['ink4']))
+    return fee_amt(x if a['product'] is not None else None, st, size, weight)
+
+
+def pager(total_text):
+    """分页（单页时上一页 / 下一页置灰并给出原因）。"""
+    return between(muted(total_text), row(btn('上一页', 'secondary', 'sm', disabled=True, reason='已是第一页') + nowrap('1 / 1', 12, T['ink2']) +
+                                          btn('下一页', 'secondary', 'sm', disabled=True, reason='已是最后一页'), 8))
+
+
+# ---------------------------------------------------------------- 执行记录：执行者 = 中性标签 + 头像（「自动」并入「系统」）
+ACTORS = {'系统': ('系', 'grey'), '王磊': ('磊', 'grad'), '周敏': ('敏', 'grad'), '李婷': ('婷', 'grad'), '陈晨': ('晨', 'grad'),
+          '陈工': ('陈', 'amber'), '刘厂长': ('刘', 'amber'), '良仓': ('良', 'grey')}
+
+
+def actor_tag(name):
+    name = '系统' if name == '自动' else name
+    av, tone = ACTORS.get(name, (name[0], 'grey'))
+    return '<div style="display: inline-flex; align-items: center; gap: 5px; background: %s; border-radius: 999px; padding: 1px 8px 1px 2px; flex-shrink: 0;">%s<div style="font-size: 11px; font-weight: 600; color: %s; white-space: nowrap;">%s</div></div>' % (
+        T['track'], avatar(av, tone, 18), T['ink2'], name)
+
+
+def log_row(time_, actor, body):
+    return '<div style="display: flex; gap: 10px; align-items: flex-start;"><div style="width: 84px; flex-shrink: 0; font-size: 12px; color: %s; padding-top: 2px; font-variant-numeric: tabular-nums;">%s</div><div style="width: 68px; flex-shrink: 0;">%s</div><div style="flex: 1; min-width: 0px; font-size: 13px; color: %s; line-height: 1.55;">%s</div></div>' % (
+        T['ink4'], time_, actor_tag(actor), T['ink'], body)
+
+
+# ---------------------------------------------------------------- 登记信息：单列分组 + 进度只计应填未填
+def reg_groups(groups, cols=4, folded=None, title='登记信息', extra=''):
+    """groups: [(小标题, [(键, 值 html, st)])]；st：1 已填 / 0 应填未填（显示「待回填」）/ None 未到环节或不适用（不计入进度）。
+    每组一列（标签左、值右），组并排；folded=(条数, 说明) 时底部显示「9 项不适用 ▾」折叠行。"""
+    counted = [f for _, fs in groups for f in fs if f[2] is not None]
+    n = sum(1 for f in counted if f[2])
+    tot = len(counted)
+    later = sum(1 for _, fs in groups for f in fs if f[2] is None)
+    cols_html = ''
+    for sub, fs in groups:
+        rows_ = ''
+        for k, v, st in fs:
+            val = pending() if st == 0 else v
+            rows_ += '<div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 20px; font-size: 12px;"><div style="color: %s; white-space: nowrap;">%s</div><div style="font-weight: 600; color: %s; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; min-width: 0px;">%s</div></div>' % (
+                T['ink3'], k, T['ink'], val)
+        cols_html += '<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0px;"><div style="font-size: 11px; font-weight: 700; color: %s; letter-spacing: 0.04em; padding-bottom: 3px; border-bottom: 1px solid %s;">%s</div>%s</div>' % (
+            T['ink4'], T['line2'], sub, rows_)
+    ok = n == tot
+    tail = nowrap('· %d 项未到环节，不计入' % later, 12, T['ink4']) if later and not folded else ''
+    head = between(label(title), row('<div style="width: 64px;">%s</div>' % progress(int(round(n * 100.0 / max(tot, 1))), 'success' if ok else 'warning', 4) +
+                                     nowrap('已填 %d / %d' % (n, tot), 12, T['ok'] if ok else T['warn'], 600) + tail, 8))
+    fold = ''
+    if folded:
+        fold = '<div style="display: flex; align-items: center; gap: 6px; border-top: 1px dashed %s; padding-top: 7px; font-size: 12px; color: %s;"><span style="font-weight: 600; color: %s;">%d 项不适用</span>%s<span>%s</span></div>' % (
+            T['line'], T['ink4'], T['ink3'], folded[0], icon('chev_d', 13, T['ink4']), folded[1])
+    return card(head + grid(cols_html, cols, 20) + fold + extra, pad='12px 16px', gap=10)
 
 
 def flow_steps(items, tone='accent'):
@@ -155,30 +228,30 @@ def group_table(cols, groups, template, footer=None):
             T['canvas'], T['line'], T['ink2'], gt, T['ink3'], gr)
         for r in rows:
             cells = ''.join('<div style="text-align: %s; min-width: 0px;">%s</div>' % (cols[j][1], c) for j, c in enumerate(r))
-            out += '<div style="display: grid; grid-template-columns: %s; gap: 12px; padding: 9px 16px; background: #ffffff; border-bottom: 1px solid %s; font-size: 12.5px; color: %s; align-items: center; font-variant-numeric: tabular-nums;">%s</div>' % (
+            out += '<div style="display: grid; grid-template-columns: %s; gap: 12px; padding: 9px 16px; background: #ffffff; border-bottom: 1px solid %s; font-size: 13px; color: %s; align-items: center; font-variant-numeric: tabular-nums;">%s</div>' % (
                 template, T['line2'], T['ink'], cells)
     if footer:
         cells = ''.join('<div style="text-align: %s; min-width: 0px;">%s</div>' % (cols[j][1], c) for j, c in enumerate(footer))
-        out += '<div style="display: grid; grid-template-columns: %s; gap: 12px; padding: 10px 16px; background: %s; font-size: 12.5px; font-weight: 700; color: %s; align-items: center; font-variant-numeric: tabular-nums;">%s</div>' % (
+        out += '<div style="display: grid; grid-template-columns: %s; gap: 12px; padding: 10px 16px; background: %s; font-size: 13px; font-weight: 700; color: %s; align-items: center; font-variant-numeric: tabular-nums;">%s</div>' % (
             template, T['subtle'], T['ink'], cells)
     return '<div style="background: #ffffff; border: 1px solid %s; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; box-shadow: %s;">%s</div>' % (T['line'], SHADOW_XS, out)
 
 
-def table_span(cols, rows, template, footer, dense=True, row_tones=None):
+def table_span(cols, rows, template, footer, dense=True, row_tones=None, gap=12):
     """与 ui.table 同样式，合计行的格子可跨列。footer: [(html, 'left'|'right', 跨列数)]"""
     py = 8 if dense else 10
     head = ''.join('<div style="text-align: %s; min-width: 0px;">%s</div>' % (a, c) for c, a in cols)
-    out = '<div style="display: grid; grid-template-columns: %s; gap: 12px; padding: 9px 16px; background: %s; border-bottom: 1px solid %s; font-size: 11px; font-weight: 700; color: %s; letter-spacing: 0.02em; white-space: nowrap;">%s</div>' % (
-        template, T['subtle'], T['line'], T['ink3'], head)
+    out = '<div style="display: grid; grid-template-columns: %s; gap: %dpx; padding: 9px 16px; background: %s; border-bottom: 1px solid %s; font-size: 11px; font-weight: 700; color: %s; letter-spacing: 0.02em; white-space: nowrap;">%s</div>' % (
+        template, gap, T['subtle'], T['line'], T['ink3'], head)
     for i, r in enumerate(rows):
         tone = (row_tones or {}).get(i)
         bar = 'box-shadow: inset 3px 0 0 %s;' % {'warning': T['warn_solid'], 'danger': T['bad_solid'], 'accent': T['accent']}[tone] if tone else ''
         cells = ''.join('<div style="text-align: %s; min-width: 0px;">%s</div>' % (cols[j][1], c) for j, c in enumerate(r))
-        out += '<div style="display: grid; grid-template-columns: %s; gap: 12px; padding: %dpx 16px; background: #ffffff; border-bottom: 1px solid %s; font-size: 12.5px; color: %s; align-items: center; font-variant-numeric: tabular-nums; %s">%s</div>' % (
-            template, py, T['line2'], T['ink'], bar, cells)
+        out += '<div style="display: grid; grid-template-columns: %s; gap: %dpx; padding: %dpx 16px; background: #ffffff; border-bottom: 1px solid %s; font-size: 13px; color: %s; align-items: center; font-variant-numeric: tabular-nums; %s">%s</div>' % (
+            template, gap, py, T['line2'], T['ink'], bar, cells)
     cells = ''.join('<div style="text-align: %s; min-width: 0px; grid-column: span %d;">%s</div>' % (a, n, c) for c, a, n in footer)
-    out += '<div style="display: grid; grid-template-columns: %s; gap: 12px; padding: 10px 16px; background: %s; font-size: 12.5px; font-weight: 700; color: %s; align-items: center; font-variant-numeric: tabular-nums;">%s</div>' % (
-        template, T['subtle'], T['ink'], cells)
+    out += '<div style="display: grid; grid-template-columns: %s; gap: %dpx; padding: 10px 16px; background: %s; font-size: 13px; font-weight: 700; color: %s; align-items: center; font-variant-numeric: tabular-nums;">%s</div>' % (
+        template, gap, T['subtle'], T['ink'], cells)
     return '<div style="background: #ffffff; border: 1px solid %s; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; box-shadow: %s;">%s</div>' % (T['line'], SHADOW_XS, out)
 
 
@@ -214,7 +287,7 @@ def toast_at(inner, t, w, h, top=16, right=16):
 
 def img_thumb(t, w=72, h=54):
     """附件图片缩略图占位。"""
-    return '<div style="width: %dpx; height: %dpx; box-sizing: border-box; border: 1px solid %s; border-radius: 6px; background: %s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; flex-shrink: 0;">%s<div style="font-size: 10px; color: %s; white-space: nowrap;">%s</div></div>' % (
+    return '<div style="width: %dpx; height: %dpx; box-sizing: border-box; border: 1px solid %s; border-radius: 6px; background: %s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; flex-shrink: 0;">%s<div style="font-size: 11px; color: %s; white-space: nowrap;">%s</div></div>' % (
         w, h, T['line'], T['subtle'], icon('image', 16, T['ink4']), T['ink3'], t)
 
 
@@ -224,18 +297,18 @@ def bullet(t, color=None):
 
 
 # ---------------------------------------------------------------- 售后单详情版式（P09–P11 共用）
-def as_detail(user, crumbs, title, chips, meta, actions, steps, par_items, left, right, par_right='', banner_html=None, right_w=400):
-    """售后单详情：标题区（标题、状态、元信息、按钮）+ 步骤条 + 并行条；下方左执行记录、右登记信息。"""
-    below = '<div style="padding: 2px 0px 0px 0px;">%s</div>' % stepper(steps) + parallel_bar(par_items, par_right)
+def as_detail(user, crumbs, title, chips, meta, actions, steps, par_items, left, right, par_right='', banner_html=None, right_w=400, blocker_html=None):
+    """售后单详情：标题区（标题 + 状态徽标；分支、责任、渠道、店铺并入元信息行）+ 当前卡点 + 步骤条 + 并行条；下方左执行记录、右费用与承担。"""
+    below = (blocker_html or '') + '<div style="padding: 2px 0px 0px 0px;">%s</div>' % stepper(steps) + parallel_bar(par_items, par_right)
     head = detail_head(title, chips, actions, meta, col(below, 10))
     bn = '<div style="padding: 12px 24px 0px 24px; flex-shrink: 0;">%s</div>' % banner_html if banner_html else ''
-    body = head + bn + two_col(left, right, right_w, 16, '14px 24px 16px 24px')
+    body = head + bn + two_col(left, right, right_w, 16, '12px 24px 16px 24px')
     return app(user, '售后', crumbs, body)
 
 
 def log_card(items, title='执行记录', extra=None):
-    """执行记录卡。items: [(时间, 执行者, 内容)]"""
-    body = col(''.join(log_item(t, w, b) for t, w, b in items), 9)
+    """执行记录卡。items: [(时间, 执行者姓名或「系统」, 内容)]；执行者为中性标签 + 头像。"""
+    body = col(''.join(log_row(t, w, b) for t, w, b in items), 8)
     return card(body, title, extra, pad='12px 16px', gap=10)
 
 

@@ -26,7 +26,8 @@ ROWS_HIFI = [
             ('AfterSalesInStock', 'P10 售后单详情 · 良仓有货'), ('AfterSalesRefund', 'P11 售后单详情 · 部分补偿'), ('AfterSalesNegotiation', 'P12 承担比例协商'),
             ('AfterSalesLog', 'P13 登记台账'), ('AfterSalesSettlement', 'P14 内部结算')]),
     ('审批、知识库、报表、设置、工厂工作台', [('Actions', 'P15 审批'), ('KnowledgeBase', 'P16 知识库'), ('Reports', 'P17 报表'), ('Settings', 'P18 设置 · 渠道与店铺'),
-                                ('SettingsRules', 'P19 设置 · 处理规则'), ('SettingsTeam', 'P20 设置 · 团队与权限'), ('FactoryPortal', 'P21 工厂工作台')]),
+                                ('SettingsActions', 'P22 设置 · 动作映射'), ('SettingsRules', 'P19 设置 · 处理规则'), ('SettingsAfterSales', 'P23 设置 · 售后规则'),
+                                ('SettingsTeam', 'P20 设置 · 团队与权限'), ('SettingsFactory', 'P24 设置 · 工厂账号'), ('FactoryPortal', 'P21 工厂工作台')]),
 ]
 STATES = [('StatesInbox', '状态板 · 收件箱与工单'), ('StatesApproval', '状态板 · 审批'), ('StatesAfterSales', '状态板 · 售后'),
           ('StatesFactory', '状态板 · 工厂工作台'), ('StatesAdmin', '状态板 · 知识库、报表、设置')]
@@ -71,7 +72,7 @@ def main(seed=False):
     for n, t in SPEC:
         w, _ = add(n, x, 0, t, 'page-0')
         x += w + GAP_X
-    notes.append({'id': 'note-ds', 'x': x, 'y': 0, 'w': 360, 'page': 'page-0', 'text': '怎么用这一页\n\n设计规范：色彩、字体、间距、组件、状态标识、文案规则。全部高保真页面只用这里的组件，研发实现以组件库 spec/ui.py 为准；与 shadcn/ui + Tailwind CSS v4 的令牌和组件对照见第 12 节。\n\n全局状态：加载、无权限、找不到、断网、集成中断、浮层提示、二次确认、并发、未保存离开、密度切换（G1–G9）。每个页面都适用。\n\n页面地图：21 个页面的跳转关系与 7 条关键用户路径，编号与 PRD 第 4、8 节一致。'})
+    notes.append({'id': 'note-ds', 'x': x, 'y': 0, 'w': 360, 'page': 'page-0', 'text': '怎么用这一页\n\n设计规范：色彩、字体、间距、组件、状态标识、文案规则。全部高保真页面只用这里的组件，研发实现以组件库 spec/ui.py 为准；与 shadcn/ui + Tailwind CSS v4 的令牌和组件对照见第 12 节。\n\n全局状态：加载、无权限、找不到、断网、集成中断、浮层提示、二次确认、并发、未保存离开、密度切换（G1–G9）。每个页面都适用。\n\n页面地图：24 个页面的跳转关系与 7 条关键用户路径，编号与 PRD 第 4、8 节一致。'})
 
     # 高保真页面
     y = 0

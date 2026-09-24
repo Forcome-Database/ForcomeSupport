@@ -6,7 +6,7 @@ from ui import *
 from data import *
 
 
-def mtable(cols, rows, template, selected=(), bars=None, dense=True, footer=None, fs='12.5px', py=None):
+def mtable(cols, rows, template, selected=(), bars=None, dense=True, footer=None, fs='13px', py=None):
     """table() 的多选版：selected 为选中行下标集合（浅靛蓝底 + 左侧靛蓝条）；bars: {下标: 'warning'|'danger'|'accent'}。
     其余样式与 ui.table 完全一致。"""
     py = py if py is not None else (8 if dense else 10)
@@ -27,7 +27,7 @@ def mtable(cols, rows, template, selected=(), bars=None, dense=True, footer=None
             template, py, bg, T['line2'], fs, T['ink'], bar, cells)
     if footer:
         cells = ''.join('<div style="text-align: %s; min-width: 0px;">%s</div>' % (cols[j][1], c) for j, c in enumerate(footer))
-        out += '<div style="display: grid; grid-template-columns: %s; gap: 12px; padding: 10px 16px; background: %s; font-size: 12.5px; font-weight: 700; color: %s; align-items: center; font-variant-numeric: tabular-nums;">%s</div>' % (
+        out += '<div style="display: grid; grid-template-columns: %s; gap: 12px; padding: 10px 16px; background: %s; font-size: 13px; font-weight: 700; color: %s; align-items: center; font-variant-numeric: tabular-nums;">%s</div>' % (
             template, T['subtle'], T['ink'], cells)
     return '<div style="background: #ffffff; border: 1px solid %s; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; box-shadow: %s;">%s</div>' % (T['line'], SHADOW_XS, out)
 
