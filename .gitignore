@@ -8,3 +8,6 @@ __pycache__/
 
 # 临时局部截图（shot_doc.py 输出）
 design/spec/shots/doc_*.png
+
+# 代理的临时工作树
+.claude/worktrees/
