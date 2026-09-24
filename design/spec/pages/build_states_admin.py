@@ -47,7 +47,7 @@ def k2():
 
 # ---------------------------------------------------------------- K3 报表加载中 / K4 报表无数据
 def report_page(kpis, main, filters):
-    body = page_head('报表', '工单、SLA、AI 与售后成本 · 数据来源：工单系统、登记台账、积加（订单与物流）', btn('导出', 'secondary', 'md', 'download')) + \
+    body = page_head('报表', '工单、SLA、AI 与售后成本 · 数据来源：工单系统、登记台账、平台订单', btn('导出', 'secondary', 'md', 'download')) + \
         content(filters + kpis + main, '16px 24px', 14)
     return app('zhoumin', '报表', ['报表', '概览'], body)
 

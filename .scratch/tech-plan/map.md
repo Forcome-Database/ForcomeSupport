@@ -15,7 +15,7 @@ Label: wayfinder:map
   - 团队：TypeScript 小团队，以 AI 编程代理（Claude Code 按待办实现）为主，1–2 人把关。
   - 时间：第一期 6–8 周上线。
   - 部署：私有化部署在公司服务器，经代理访问外部接口；有运维，前期 Docker Compose。
-  - 海外仓：是「易仓」（已作为三方仓接入积加），PRD 与原型中的「良仓」为错名，待全局更正。
+  - 海外仓：是「易仓」（已作为三方仓接入积加），PRD 与原型中的「良仓」为错名，已在 PRD v2.7 全局更正。
   - 账号：Shopify、钉钉、Gmail（Google Workspace）管理权限已有；积加开放接口、亚马逊 SP-API 尚未开通。
   - 模型：Claude 经 NewAPI 网关接入（2026-09-24 用户决定）；调用合规与网络问题不在考虑范围内。模型层必须同时适配 Claude、OpenAI GPT 与任意 OpenAI 兼容接口，不绑定单一厂商；接入层用 Vercel AI SDK（ADR [0001](../../docs/adr/0001-模型接入层用VercelAISDK.md)）。
 - **PRD 已锁定、不再讨论**：前端 shadcn/ui + Tailwind CSS v4（D-10）；读走积加（订单读取已由 ADR 0011 改为平台直读）、写走 SP-API 与 Shopify Admin API、来信走 Gmail、组织与通知走钉钉（D-14、D-16、D-17）；适配器为 MCP 形式（F-AP-02）；审计保留 ≥ 2 年；三期交付顺序 报表与台账 → 售后流程 → AI 回信。
@@ -46,6 +46,7 @@ Label: wayfinder:map
 - [讨论：模型接入层设计](issues/17-llm-gateway-layer.md)：11 个用途、业务只按用途调用；配置存库加管理员「模型」页；60 秒只管 triage + draft，按用途 × 模型熔断；完整调用记录；提示词分两层；第二期上线 4 个用途
 - [讨论：工程与运维](issues/18-eng-ops.md)：GitHub + Actions，内网自托管运行器部署；PR 门槛含边界 lint 与真实 PG 集成测试；动态凭据加密存库；restic 备份到 NAS；监控先确认运维现状
 - [讨论：AI 处理的编排与治理](issues/22-ai-orchestration.md)：五步流水线不上智能体；R-IN 升级为意图流程（P19 处理说明页签）；7 段上下文；治理以代码为主，承诺与审批项双向对账；可复算置信度；一次调用生成 3 版；回归集门控
+- [事务：PRD 回写与升版](issues/23-prd-writeback.md)：PRD v2.8，新增 D-21，42 处回写加原型 5 处口径；停滞判定统一为「或」；P19 处理说明、P25、P26 三个画板待出图
 
 ## Not yet specified
 

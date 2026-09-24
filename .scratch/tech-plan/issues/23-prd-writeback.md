@@ -1,6 +1,6 @@
 Title: 事务：PRD 回写与升版
 Type: task
-Status: open
+Status: resolved
 Map: ../map.md
 
 # 事务：PRD 回写与升版
@@ -22,3 +22,12 @@ Map: ../map.md
 - 全局把「良仓」更正为「易仓」（需用户确认）。
 
 这是人工与代理协作的事务（HITL）：代理逐条起草修改，用户确认业务口径后落盘。
+
+## Answer
+
+2026-09-24 完成，PRD 升为 v2.8，新增决策 D-21 汇总本次回写。
+
+- **用户定的口径**：停滞判定统一按 R-IN「停滞满 5 天**或**超预计送达」；「良仓」已在 v2.7 全局改为「易仓」，本次无需再改。
+- **PRD 四个源文件共 42 处替换**：术语（积加、SP-API、物流查询）、系统边界图、F-CH-04、F-AP-02、第一阶段交付与页面、设置菜单 11 项与页面清单新增 P25 模型、P26 系统状态、5.1 ① 订单关联、R-IN 订单查询、R-RS 新增「疑似提示注入」及关键词与模型并行、紧急度、R-SD-05 置信度、R-SD-06 回归门槛、R-AP-04 与 R-AP-05 的 Feeds 异步、R-AS-02 物流问题判定、P17、P18、P19「处理说明」页签、P22 查订单与查物流、改地址悬停说明、E-33、10.3、12 合规、11.1 紧急度、11.3 集成表（新增 17TRACK 行）、Q-01、Q-23、Q-25。
+- **原型同步 5 处**：`data.py` 改地址说明、`build_aftersales.py`、`inbox_parts.py`（停滞「或」）、`build_approval_kb_reports.py`、`build_states_admin.py`（报表数据来源）。重新生成页面、PRD（`forcome-blueprint-guide.html`）与画布合集（`forcome-support-blueprint.html`），渲染检查全部通过。
+- **未完成，记入 WORKPLAN**：P19「处理说明」页签、P25、P26 三个画板未出图；决策记录未加 D-21 条目；画布与 PRD 未重新发布。

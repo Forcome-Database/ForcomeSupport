@@ -651,7 +651,7 @@ ACTION_MAP = [
     ('改地址', '高风险', None, ('Admin API', 'accent')),
     ('取消', '高风险', ('SP-API', 'accent'), ('Admin API', 'accent')),
 ]
-ACTION_UNSUPPORTED = {'改地址': '亚马逊 SP-API 不提供改地址接口，由坐席在卖家后台人工处理'}
+ACTION_UNSUPPORTED = {'改地址': '亚马逊不允许卖家改地址：草稿引导买家取消后重新下单'}
 
 # 风险信号（P19「风险信号」页签，StatesAdmin K15）：名称, 命中条件, 优先级, 开关 lock（硬规则）/ on, 关闭影响（RISK_OFF_IMPACT）
 RISK_SIGNALS = [

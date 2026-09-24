@@ -330,7 +330,7 @@ def chart_card(title, sub, body, extra=None, tag=''):
 
 
 def p17():
-    head = page_head('报表', '数据来源：工单系统、登记台账、积加（订单与物流） ·更新于 10:15', btn('导出', 'secondary', 'md', 'download'))
+    head = page_head('报表', '数据来源：工单系统、登记台账、平台订单 ·更新于 10:15', btn('导出', 'secondary', 'md', 'download'))
     filt = between(row(seg(['近 7 天', '本月', '自定义'], '近 7 天') + nowrap('09-05 至 09-11', 12, T['ink3']) + divider(True, 16) +
                        filter_chip('店铺', '全部') + filter_chip('站点', '全部') + filter_chip('标签'), 8),
                    chip('指标为示例数据', 'warning', 11, 'info'))
