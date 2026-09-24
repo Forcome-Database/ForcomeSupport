@@ -1,0 +1,10 @@
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 工具运行时产生的临时文件
+.playwright-mcp/
+.firecrawl/
+
+# 临时局部截图（shot_doc.py 输出）
+design/spec/shots/doc_*.png
