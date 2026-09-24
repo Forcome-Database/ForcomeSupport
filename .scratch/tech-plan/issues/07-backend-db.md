@@ -24,3 +24,9 @@ Map: ../map.md
 - **审计**：应用层在同一事务内写入，记完整的前后值。
 - **实时**：SSE + PostgreSQL `LISTEN/NOTIFY`。
 - **Compose**：`caddy`、`api`、`worker`、`migrate`、`postgres`；附件存本地卷。Redis 待「讨论：后台任务与流程引擎」决定。
+
+## Comments
+
+2026-09-24（交叉审查复核后修订，见 `reviews/复核结论.md`、PRD D-22）：
+- 锁的「最后活动时间」是最后一次用户操作的时间，心跳只证明连接在、不续期（原 Answer 未区分）。
+- 新增：收信去重用「邮箱 + Gmail 消息 ID」唯一约束，归并按合并键取 advisory lock（ADR 0006 修订）。
