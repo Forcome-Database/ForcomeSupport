@@ -1,9 +1,9 @@
-Title: 调研：本项目的模型用途全集与更智能的接入方案
+Title: 调研：电商客服 AI 工作流与模型应用
 Type: research
 Status: claimed
 Map: ../map.md
 
-# 调研：本项目的模型用途全集与更智能的接入方案
+# 调研：电商客服 AI 工作流与模型应用
 
 ## Question
 
@@ -20,3 +20,7 @@ Map: ../map.md
 约束：私有化部署在中国大陆公司服务器、只出站；模型经 NewAPI 网关，须同时适配 Claude、OpenAI GPT 与 OpenAI 兼容接口；接入层已定 Vercel AI SDK（ADR 0001）；数据约 300 封来信/天；团队以 AI 编程代理开发为主，偏好少组件；不考虑合规。
 
 结论要回答：用途清单（建议的用途枚举与分阶段）；对「讨论：模型接入层设计」第一轮各题的修改建议；推荐引入或不引入哪些组件及理由。
+
+## Comments
+
+2026-09-24：用户调整方向，重心改为「主流电商客服平台及类似场景的工作流 / agent 架构，以及 LLM 在其中的嵌入与应用」：逐家调研 Intercom Fin、Zendesk AI Agents、Gorgias、Sierra、Decagon、Salesforce Agentforce、Shopify Inbox 与 Sidekick，以及国内的店小蜜、言犀、晓多、智齿等（工作流形态、LLM 嵌入环节、动作授权与审批、人机协作、评测闭环、公开效果数据），提炼可借鉴的模式，对照 PRD 五步处理与 12 条处理规则给出保留、调整、新增建议和用途清单。网关、可观测性、向量检索压缩为一节。报告改为 `docs/research/电商客服AI工作流与模型应用.md`。
