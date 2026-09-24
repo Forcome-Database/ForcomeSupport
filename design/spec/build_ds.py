@@ -69,7 +69,7 @@ forms = grid(''.join([
     field('聚焦 · 输入中', input_box('1Z4R2883', st='focus')),
     field('键盘聚焦 focus-visible', input_box('1Z4R2883', st='focus_visible'), hint='Tab 进入时：2px 主色焦点环、2px 偏移'),
     field('错误', input_box('abc', st='error'), error='快递单号只能包含字母和数字，长度 10–30 位'),
-    field('禁用', input_box('良仓 US', st='disabled'), hint='由系统根据库存自动选择'),
+    field('禁用', input_box('易仓 US', st='disabled'), hint='由系统根据库存自动选择'),
     field('必填 + 前后缀', input_box('11.50', prefix='$', suffix='USD', mono=True), required=True),
     field('下拉选择', select_box('产品质量问题')),
     field('下拉 · 错误', select_box(None, '请选择责任类型', 'error'), required=True, error='请选择责任类型'),
@@ -103,7 +103,7 @@ states = grid(''.join(col(label(n) + row(''.join(state(s) for s in ss), 6, wrap=
 feedback = grid(''.join([
     col(label('页内横幅') + banner('info', '工单已合并到 T-20260902-0071', '原工单只读，新来信会进入主工单。') + banner('success', '已批准，出库单创建成功', '回复已自动发出，SLA 计时停止。') + banner('warning', 'SLA 剩 55 分钟，审批时限 4 小时', '承诺类回复要等审批后才能发出。建议先发一条不含承诺的进展回复。', btn('插入进展回复', 'secondary', 'sm')) + banner('danger', 'Gmail 连接中断，来信暂存队列', '09-11 10:05 起未收取。恢复后按到达顺序处理，SLA 从原到达时间计算。', btn('查看状态', 'secondary', 'sm')), 10),
     col(label('浮层提示（右上角，成功 3 秒消失，失败需手动关闭）') + toast('success', '已提交审批', '周敏会在 4 小时内处理，结果会通知你。') + toast('error', '发送失败：Gmail 接口超时', '草稿已保留，系统将在 1 分钟后自动重试。', row(link('立即重试') + link('复制草稿'), 12)) + toast('info', '陈晨正在处理这张工单', '你可以查看，但不能同时编辑回复。') + toast('warning', '草稿已失效', '客户在你编辑期间又来了一封信，请先阅读新消息。') +
-        toast('neutral', '查询良仓库存：第 2 次重试成功', '积加接口首次超时，结果已更新。') +
+        toast('neutral', '查询易仓库存：第 2 次重试成功', '积加接口首次超时，结果已更新。') +
         label('可撤销浮层 · toast(..., undo=5)（可逆操作不弹确认）', 'margin-top: 4px;') + toast('success', '已关闭工单 T-20260910-0192', undo=5, remain=3) + toast('success', '已驳回报备 AP-20260911-003', '已通知发起人王磊。', undo=5), 10),
     col(label('确认弹窗（只用于不可逆操作；危险确认默认焦点在「取消」）') + dialog('驳回这张审批单？', field('驳回原因', textarea_box(None, '写清楚为什么驳回、发起人要怎么改', 'error', 64, '0 / 200'), True, error='请填写驳回原因') + muted('驳回后工单回到提交前状态，售后单退回「待确认」。驳回可撤销，确认框只用于收集必填原因。', 12), btn('取消', 'secondary', st='focus') + btn('驳回', 'danger'), 420, 'danger', '驳回后发起人会收到通知，绑定的回复不会发出。') +
         dialog('执行退款 MX$889.00？', muted('退款经 SP-API 立即发给买家，执行后不能撤销。', 13) + kv('订单', '302-8811234-9901122') + kv('金额', money_cur(889.00, 'MXN')), btn('取消', 'secondary', st='focus') + btn('执行退款', 'danger'), 420, 'danger'), 10),

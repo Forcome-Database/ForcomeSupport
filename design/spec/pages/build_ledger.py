@@ -11,7 +11,7 @@ LT = ledger_totals()
 SC = settle_counts()
 LEDGER = [a for a in AFTERSALES if a['status'] != '待确认']  # 12 行，按售后单号升序
 
-# P13「待回填」预填建议（data.LEDGER_BACKFILL）：这些单的快递单号没有自动回写（良仓回传延迟），积加出库单里已有单号（AFTERSALES 的 tracking），
+# P13「待回填」预填建议（data.LEDGER_BACKFILL）：这些单的快递单号没有自动回写（易仓回传延迟），积加出库单里已有单号（AFTERSALES 的 tracking），
 # 台账显示「✦ 积加有单号 1Z… · 核对补登」，核对后一键补登（记入审计日志）。
 BACKFILL = {no: AS[no]['tracking'] for no in LEDGER_BACKFILL}
 LEDGER = [dict(a, tracking=None) if a['no'] in BACKFILL else a for a in LEDGER]

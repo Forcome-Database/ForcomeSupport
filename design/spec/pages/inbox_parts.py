@@ -376,9 +376,9 @@ def sarah_body(hint=EDIT_HINT, legend=False):
 
 def sarah_approval():
     return approval_needed([
-        ('动作', '良仓创建售后出库单：良仓 US · V2 黑色 ×1 · UPS Next Day Air'),
+        ('动作', '易仓创建售后出库单：易仓 US · V2 黑色 ×1 · UPS Next Day Air'),
         [('报备', '快递费用 <span style="font-weight: 700;">%s</span>' % money(ORDERS['113-4567890-1234567']['resend_freight'])), ('责任', '物流问题（规则：轨迹停滞满 5 天且超预计送达）')],
-    ], '提交后会同时创建售后单。批准后经积加创建良仓出库单，成功即自动发出这封回复。')
+    ], '提交后会同时创建售后单。批准后经积加创建易仓出库单，成功即自动发出这封回复。')
 
 
 def sarah_msg(toggle_on='原文'):

@@ -148,10 +148,10 @@ def i8():
     def line(k, v):
         return '<div style="display: flex; gap: 12px; align-items: flex-start; padding: 8px 0px; border-bottom: 1px solid %s;"><div style="width: 64px; flex-shrink: 0; font-size: 12px; color: %s; padding-top: 1px;">%s</div><div style="flex: 1; min-width: 0px; font-size: 13px; color: %s; line-height: 1.55;">%s</div></div>' % (
             T['line2'], T['ink3'], k, T['ink'], v)
-    body = col(line('动作', '良仓创建售后出库单：良仓 US · V2 黑色 ×1 · UPS Next Day Air') +
+    body = col(line('动作', '易仓创建售后出库单：易仓 US · V2 黑色 ×1 · UPS Next Day Air') +
                line('报备', '快递费用 <b>%s</b>' % money(ORDERS['113-4567890-1234567']['resend_freight'])) +
                line('绑定回复', 'English · A 先补发，出库单创建成功后自动发出') +
-               line('售后单', '同时创建：寄配件 · 良仓有货 · 物流问题（FSH 100%，向 UPS 索赔）') +
+               line('售后单', '同时创建：寄配件 · 易仓有货 · 物流问题（FSH 100%，向 UPS 索赔）') +
                line('审批人', '客服主管 周敏 · 时限 4 小时（14:20 前）'), 0) + \
         muted('SLA 剩 5h 40m，长于审批时限，不需要先发进展回复。', 12)
     dlg = dialog('提交审批？', body, btn('取消', 'secondary') + btn('提交审批', 'primary', icon_right='arrow_r'), 520, None, '提交后工单转「待审批」（转人工工单保持「转人工」）。审批通过前，这封回复不会发出。')

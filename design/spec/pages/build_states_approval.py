@@ -93,12 +93,12 @@ def a5():
     a = P.AP['AP-20260911-002']
     head = between(row(nowrap(a['no'], 14, T['ink'], 700) + cat('报备 · 快递费用') + cat('动作 · 积加'), 8),
                    row(state('执行失败') + nowrap('周敏 10:51 批准', 12, T['ink3']), 8))
-    bn = banner('danger', '良仓出库单创建失败，已自动重试 3 次', '10:52 首次失败，按 1、5、15 分钟重试仍失败（最后一次 11:13）。积加返回：良仓出库单服务超时。绑定回复未发出。')
+    bn = banner('danger', '易仓出库单创建失败，已自动重试 3 次', '10:52 首次失败，按 1、5、15 分钟重试仍失败（最后一次 11:13）。积加返回：易仓出库单服务超时。绑定回复未发出。')
     steps = col(exec_step('ok', '报备快递费用 $8.40 已登记', '写入登记台账 · S-20260911-0021') +
-                exec_step('fail', '良仓创建售后出库单：良仓 US · 整机黑色 ×1', '4 次尝试均失败 · 11:13') +
+                exec_step('fail', '易仓创建售后出库单：易仓 US · 整机黑色 ×1', '4 次尝试均失败 · 11:13') +
                 exec_step('todo', '发出英语绑定回复', '等出库单创建成功'), 10)
     foot = P.draft_like_foot(btn('重试', 'primary', 'md', 'refresh') + btn('转人工操作清单', 'secondary', 'md', 'handoff'),
-                             nowrap('转人工后由你在积加手工创建良仓出库单，回填单号即视为成功', 12, T['ink3']))
+                             nowrap('转人工后由你在积加手工创建易仓出库单，回填单号即视为成功', 12, T['ink3']))
     c = card(head + P.ap_meta(a) + bn + steps + foot, pad='14px 18px', gap=11, tone='danger')
     t = [x for x in TICKETS if x['no'] == 'T-20260910-0195'][0]
     inbox = card(row(icon('inbox', 15, T['ink3']) + nowrap('收件箱同步标记', 12, T['ink3'], 600) + divider(True, 12) + nowrap(t['no'], 13, T['ink'], 600) +
@@ -160,7 +160,7 @@ def a8():
     head = '<div style="background: #ffffff; padding: 14px 20px 0px 20px; border-bottom: 1px solid %s; display: flex; flex-direction: column; gap: 6px;">%s%s</div>' % (
         T['line'], between(text('审批', 18, T['ink'], 700), row(avatar('婷', 'green', 20) + nowrap('李婷 · 坐席', 12, T['ink3']), 6)), '<div style="margin-bottom: -1px;">%s</div>' % tabs_html.replace('border-bottom: 1px solid %s;">' % T['line'], 'border-bottom: 0px;">', 1))
     rows = []
-    for no, what, withdrawn in (('AP-20260911-002', '报备快递费用 $8.40 + 良仓创建售后出库单', True), ('AP-20260911-004', 'Shopify #1057 改收货地址 · Shopify Admin API', False)):
+    for no, what, withdrawn in (('AP-20260911-002', '报备快递费用 $8.40 + 易仓创建售后出库单', True), ('AP-20260911-004', 'Shopify #1057 改收货地址 · Shopify Admin API', False)):
         a = P.AP[no]
         rows.append([nowrap(no, 13, T['accent'], 600), col(text(a['customer'], 13, T['ink'], 600) + ellipsis(what, 12, T['ink3']), 1),
                      state('已撤回' if withdrawn else '待审批'),

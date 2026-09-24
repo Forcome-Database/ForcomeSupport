@@ -38,7 +38,7 @@ def p01_right():
     o = SARAH['orders'][0]
     order = rsec('订单', col(
         col(nowrap(o[0], 13, T['ink'], 700) + row(state('已发货') + chip('超预计送达', 'warning'), 4), 4) +
-        col(kv('商品', 'V2 黑色 ×1 · $49.99') + kv('配送', 'FBM · 良仓 US · 09-03 下单') +
+        col(kv('商品', 'V2 黑色 ×1 · $49.99') + kv('配送', 'FBM · 易仓 US · 09-03 下单') +
             kv('承运商', '%s %s' % (ORDERS[o[0]]['carrier'], ORDERS[o[0]]['tracking'])) + kv('最后扫描', '09-05 Louisville, KY') +
             kv('预计送达', '09-09（已超 2 天）', 'warning'), 4), 8),
         extra=link('卖家后台', 12, 'external'))

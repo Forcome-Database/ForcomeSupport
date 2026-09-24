@@ -80,7 +80,7 @@ def shopify_card():
 
 
 def jijia_card():
-    return ch_card('link', '积加 ERP', state('已连接'), ['订单与物流轨迹（聚合亚马逊、Shopify）', '库存、售后出库单、单号与运费（积加对接良仓）'], '', 'ok', sync=CHANNEL_SYNC['积加'])
+    return ch_card('link', '积加 ERP', state('已连接'), ['订单与物流轨迹（聚合亚马逊、Shopify）', '库存、售后出库单、单号与运费（积加对接易仓）'], '', 'ok', sync=CHANNEL_SYNC['积加'])
 
 
 def gmail_card(err=False):
@@ -93,9 +93,9 @@ def gmail_card(err=False):
 
 def p18_channels():
     im = ch_card('users', '钉钉', state('已连接'), ['通讯录：成员与部门每小时同步', '工作通知推送；扫码登录与钉钉内免登'], '', 'ok', sync=CHANNEL_SYNC['钉钉'])
-    lc_head = between(row(tile('box', 'muted') + col(nowrap('良仓海外仓', 14, T['ink2'], 600) + nowrap('最近同步 %s · 经积加' % CHANNEL_SYNC['良仓'], 11, T['ink4']), 0), 10),
+    lc_head = between(row(tile('box', 'muted') + col(nowrap('易仓海外仓', 14, T['ink2'], 600) + nowrap('最近同步 %s · 经积加' % CHANNEL_SYNC['易仓'], 11, T['ink4']), 0), 10),
                       row(chip('经积加对接', 'neutral', 11) + test_btn(), 6))
-    lc = dashed_card(lc_head + muted('库存、售后出库单、单号与实际运费都经积加读写，本系统不直连良仓接口；测试连接走积加。', 12), '12px 14px', 8)
+    lc = dashed_card(lc_head + muted('库存、售后出库单、单号与实际运费都经积加读写，本系统不直连易仓接口；测试连接走积加。', 12), '12px 14px', 8)
     return '<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: stretch;">%s%s%s%s%s%s</div>' % (
         amazon_card(), shopify_card(), gmail_card(), jijia_card(), im, lc)
 
@@ -128,7 +128,7 @@ def p18_stores():
 
 def p18(h=900):
     inner = col(label('渠道连接') + p18_channels(), 10) + p18_stores()
-    return spage('liuyang', '渠道与店铺', '渠道与店铺', '订单、物流、库存与良仓出库单经积加；退款、改地址、取消走平台官方接口；客户来信统一经 Gmail 收发。店铺在右侧抽屉里新增与编辑。', '',
+    return spage('liuyang', '渠道与店铺', '渠道与店铺', '订单、物流、库存与易仓出库单经积加；退款、改地址、取消走平台官方接口；客户来信统一经 Gmail 收发。店铺在右侧抽屉里新增与编辑。', '',
                  inner, h=h)
 
 
@@ -154,7 +154,7 @@ def p22_explain():
     item = lambda ic, t, d: row(tile(ic, 'muted', 28) + col(nowrap(t, 13, T['ink'], 600) + d, 3), 10, 'flex-start')
     lv = row(nowrap('只读', 12, T['ink3']) + chip('低风险', 'muted', 11) + chip('高风险', 'warning', 11) + nowrap('按发送方式', 12, T['ink3']), 8)
     cells = (item('link', '%d 个统一动作 × 两类店铺' % len(ACTION_MAP), muted('亚马逊店铺 / Shopify 店铺。AI 与坐席只调用统一动作，按工单所属店铺的平台落到对应接口。', 12)) +
-             item('box', '良仓经积加对接', muted('库存与售后出库单都经积加读写，本系统不直连良仓接口。', 12)) +
+             item('box', '易仓经积加对接', muted('库存与售后出库单都经积加读写，本系统不直连易仓接口。', 12)) +
              item('shield', '分级标签', col(lv + muted('高风险动作一律提交审批，批准后执行。', 12), 4)) +
              item('x_c', '平台不支持', col(row(unsupported('平台不支持', ACTION_UNSUPPORTED['改地址']) + nowrap('灰色删除线，悬停看原因', 12, T['ink3']), 8) +
                                        muted('该动作由坐席在平台后台人工处理。', 12), 4)))
@@ -168,7 +168,7 @@ def p22_table():
         rows.append([nowrap(n, 13, T['ink'], 600), risk_tag(lv), amz, chip(b[0], b[1], 11), nowrap(EXEC_BY_LEVEL[lv], 13, T['ink2'])])
     t = table([('统一动作', 'left'), ('分级', 'left'), ('亚马逊店铺', 'left'), ('Shopify 店铺', 'left'), ('执行方式', 'left')], rows,
               '200px 140px minmax(0, 1fr) minmax(0, 1fr) 280px', py=10)
-    head = between(row(label('接口映射') + nowrap('%d 个统一动作 · 2 类店铺' % len(ACTION_MAP), 12, T['ink3']), 8), nowrap('良仓经积加对接', 12, T['ink4']))
+    head = between(row(label('接口映射') + nowrap('%d 个统一动作 · 2 类店铺' % len(ACTION_MAP), 12, T['ink3']), 8), nowrap('易仓经积加对接', 12, T['ink4']))
     return col(head + t, 10)
 
 

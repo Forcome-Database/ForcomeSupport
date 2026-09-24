@@ -140,7 +140,7 @@ HISTORY_TICKETS = {
 # ---------------------------------------------------------------- 售后单
 # status：待确认 进行中 已完成 已取消
 # method（处理方式）：调整安装方式 / 寄配件 / 退款或部分补偿
-# branch：良仓有货 / 良仓无货 / —
+# branch：易仓有货 / 易仓无货 / —
 # resp（责任类型）：客户使用问题 / 产品质量问题 / 物流问题 / 其他
 # filing（报备）：(类型, 状态) 类型为 快递费用 / 额外赔偿；状态为 待审批 已批准 已驳回 已作废；不需要报备写 None
 # factory：只在有生产厂参与（询价、寄件或比例协商）时填写；initiator：只有路径 B（坐席提交审批时创建）才有
@@ -175,37 +175,37 @@ AFTERSALES = [
      'product': 0.0, 'freight': 0.0, 'comp': 12.00, 'other': 0.0, 'filing': ('额外赔偿', '已批准'), 'ratios': R_FSH, 'ratio_state': '不适用',
      'nego': '不适用', 'settle': '不适用', 'status': '已完成', 'claim': '向 USPS 索赔', 'claim_state': '索赔中', 'step': '已完成 · 向 USPS 索赔中', 'waiting': '—', 'owner': '王磊', 'initiator': '陈晨', 'reg': '自动'},
     {'no': 'S-20260903-0012', 'factory': 'FQD', 'customer': 'Mateo Rivas', 'store': 'Forcome Direct', 'site': 'MX', 'ticket': 'T-20260902-0071',
-     'method': '寄配件', 'branch': '良仓无货', 'resp': '产品质量问题', 'part': 'FC-V2-BT01', 'qty': 1, 'tracking': 'YT2625100012340921',
+     'method': '寄配件', 'branch': '易仓无货', 'resp': '产品质量问题', 'part': 'FC-V2-BT01', 'qty': 1, 'tracking': 'YT2625100012340921',
      'product': 9.80, 'freight': 13.60, 'comp': 0.0, 'other': 0.0, 'filing': ('快递费用', '已批准'), 'ratios': R_FAC, 'ratio_state': '建议',
      'counter': R_HALF, 'nego': '待升级', 'settle': '未定', 'status': '已完成', 'step': '比例协商 · 待升级', 'waiting': '双方负责人',
      'waited': '2 天', 'owner': '王磊', 'reg': '王磊手工'},
     {'no': 'S-20260904-0013', 'factory': 'FQD', 'customer': 'Emily Chen', 'store': 'forcome.com', 'site': 'US', 'ticket': 'T-20260903-0087',
-     'method': '寄配件', 'branch': '良仓有货', 'resp': '产品质量问题', 'part': 'FC-V2-HF01', 'qty': 2, 'tracking': '1Z4R28830358229041',
+     'method': '寄配件', 'branch': '易仓有货', 'resp': '产品质量问题', 'part': 'FC-V2-HF01', 'qty': 2, 'tracking': '1Z4R28830358229041',
      'product': 6.40, 'freight': 6.80, 'comp': 0.0, 'other': 0.0, 'filing': ('快递费用', '已批准'), 'ratios': R_FAC, 'ratio_state': '已确认',
      'nego': '已确认', 'settle': '已结算', 'batch': '2026-09-FQD-A', 'status': '已完成', 'step': '已完成 · 已结算', 'waiting': '—', 'owner': '王磊', 'reg': '自动'},
     {'no': 'S-20260905-0014', 'factory': 'FZJ', 'customer': 'Oliver Grant', 'store': 'Forcome Direct', 'site': 'CA', 'ticket': 'T-20260904-0098',
-     'method': '寄配件', 'branch': '良仓有货', 'resp': '产品质量问题', 'part': 'FC-V2-CB01', 'qty': 1, 'tracking': '1Z4R28830358229052',
+     'method': '寄配件', 'branch': '易仓有货', 'resp': '产品质量问题', 'part': 'FC-V2-CB01', 'qty': 1, 'tracking': '1Z4R28830358229052',
      'product': 1.40, 'freight': 5.90, 'comp': 0.0, 'other': 0.0, 'filing': ('快递费用', '已批准'), 'ratios': R_FAC, 'ratio_state': '已确认',
      'nego': '已确认', 'settle': '已结算', 'batch': '2026-09-FZJ-A', 'status': '已完成', 'step': '已完成 · 已结算', 'waiting': '—', 'owner': '王磊', 'reg': '自动'},
     {'no': 'S-20260908-0015', 'factory': 'FQD', 'customer': 'Hannah Ross', 'store': 'Forcome Direct', 'site': 'US', 'ticket': 'T-20260907-0122',
-     'method': '寄配件', 'branch': '良仓无货', 'resp': '其他', 'part': 'FC-V2-BT01', 'qty': 1, 'tracking': 'YT2625100012345678',
+     'method': '寄配件', 'branch': '易仓无货', 'resp': '其他', 'part': 'FC-V2-BT01', 'qty': 1, 'tracking': 'YT2625100012345678',
      'product': 9.80, 'freight': 12.30, 'comp': 0.0, 'other': 0.0, 'filing': ('快递费用', '已批准'), 'ratios': R_HALF, 'ratio_state': '已确认',
      'nego': '已确认', 'settle': '待结算', 'status': '已完成', 'step': '待内部结算', 'waiting': '月度结算', 'owner': '王磊', 'reg': '王磊手工'},
     {'no': 'S-20260909-0016', 'factory': None, 'customer': 'David Park', 'store': 'forcome.com', 'site': 'US', 'ticket': 'T-20260908-0140',
-     'method': '寄配件', 'branch': '良仓有货', 'resp': '客户使用问题', 'part': 'FC-V2-HS02', 'qty': 1, 'tracking': '1Z4R28830358229088',
+     'method': '寄配件', 'branch': '易仓有货', 'resp': '客户使用问题', 'part': 'FC-V2-HS02', 'qty': 1, 'tracking': '1Z4R28830358229088',
      'product': 2.60, 'freight': 6.80, 'comp': 0.0, 'other': 0.0, 'filing': ('快递费用', '已批准'), 'ratios': R_FSH, 'ratio_state': '不适用',
      'nego': '不适用', 'settle': '不适用', 'status': '已完成', 'step': '已完成', 'waiting': '—', 'owner': '王磊', 'reg': '自动'},
     {'no': 'S-20260910-0017', 'factory': 'FQD', 'customer': 'Marcus Lee', 'store': 'Forcome Direct', 'site': 'US', 'ticket': 'T-20260909-0163',
-     'method': '寄配件', 'branch': '良仓有货', 'resp': '产品质量问题', 'part': 'FC-V2-DC01', 'qty': 1, 'tracking': '1Z4R28830358229101',
+     'method': '寄配件', 'branch': '易仓有货', 'resp': '产品质量问题', 'part': 'FC-V2-DC01', 'qty': 1, 'tracking': '1Z4R28830358229101',
      'product': 4.10, 'freight': 6.80, 'comp': 0.0, 'other': 0.0, 'filing': ('快递费用', '已批准'), 'ratios': R_FAC, 'ratio_state': '已确认',
      'nego': '已确认', 'settle': '待结算', 'status': '已完成', 'step': '待内部结算', 'waiting': '月度结算', 'owner': '王磊', 'reg': '自动'},
     {'no': 'S-20260911-0018', 'factory': 'FQD', 'customer': 'Laura Bennett', 'store': 'Forcome Auto', 'site': 'US', 'ticket': 'T-20260910-0201',
-     'method': '寄配件', 'branch': '良仓无货', 'resp': '产品质量问题', 'part': 'FC-V2-HF01', 'qty': 1, 'tracking': None,
+     'method': '寄配件', 'branch': '易仓无货', 'resp': '产品质量问题', 'part': 'FC-V2-HF01', 'qty': 1, 'tracking': None,
      'product': 3.20, 'freight': 11.50, 'comp': 0.0, 'other': 0.0, 'filing': ('快递费用', '待审批'), 'ratios': R_FAC, 'ratio_state': '建议',
      'nego': '未发起', 'settle': '未定', 'status': '进行中', 'step': '报备审批 · 快递费用', 'waiting': '客服主管 周敏', 'waited': '39m',
      'owner': '王磊', 'reg': '自动', 'approval': 'AP-20260911-003'},
     {'no': 'S-20260911-0019', 'factory': 'FQD', 'customer': 'Diego Salazar', 'store': 'Forcome Direct', 'site': 'MX', 'ticket': 'T-20260910-0188',
-     'method': '寄配件', 'branch': '良仓无货', 'resp': '产品质量问题', 'part': 'FC-V2-HS02', 'qty': 2, 'tracking': None,
+     'method': '寄配件', 'branch': '易仓无货', 'resp': '产品质量问题', 'part': 'FC-V2-HS02', 'qty': 2, 'tracking': None,
      'product': None, 'freight': None, 'comp': 0.0, 'other': 0.0, 'filing': None, 'ratios': R_FAC, 'ratio_state': '建议',
      'nego': '未发起', 'settle': '未定', 'status': '进行中', 'step': '生产厂报价', 'waiting': '生产厂 FQD', 'waited': '1h 30m · 09-15 周二 09:00 截止',
      'owner': '王磊', 'reg': '自动'},
@@ -215,12 +215,12 @@ AFTERSALES = [
      'nego': '未发起', 'settle': '未定', 'status': '进行中', 'step': '报备审批 · 额外赔偿', 'waiting': '客服主管 周敏', 'waited': '50m',
      'owner': '王磊', 'initiator': '陈晨', 'reg': '自动', 'approval': 'AP-20260911-001'},
     {'no': 'S-20260911-0021', 'factory': None, 'customer': 'Marcus Lee', 'store': 'Forcome Auto', 'site': 'US', 'ticket': 'T-20260910-0195',
-     'method': '寄配件', 'branch': '良仓有货', 'resp': '物流问题', 'part': 'FC-V2-BLK', 'qty': 1, 'tracking': None,
+     'method': '寄配件', 'branch': '易仓有货', 'resp': '物流问题', 'part': 'FC-V2-BLK', 'qty': 1, 'tracking': None,
      'product': 18.00, 'freight': 8.40, 'comp': 0.0, 'other': 0.0, 'filing': ('快递费用', '待审批'), 'ratios': R_FSH, 'ratio_state': '不适用',
-     'nego': '不适用', 'settle': '不适用', 'claim': '向良仓索赔（错发）', 'claim_state': '待发起', 'status': '进行中', 'step': '报备审批 · 快递费用', 'waiting': '客服主管 周敏',
+     'nego': '不适用', 'settle': '不适用', 'claim': '向易仓索赔（错发）', 'claim_state': '待发起', 'status': '进行中', 'step': '报备审批 · 快递费用', 'waiting': '客服主管 周敏',
      'waited': '45m', 'owner': '王磊', 'initiator': '李婷', 'reg': '自动', 'approval': 'AP-20260911-002'},
     {'no': 'S-20260911-0022', 'factory': 'FZJ', 'customer': 'Ethan Brooks', 'store': 'Forcome Direct', 'site': 'US', 'ticket': 'T-20260911-0035',
-     'method': '寄配件', 'branch': '良仓有货', 'resp': '产品质量问题', 'part': 'FC-V2-CB01', 'qty': 1, 'tracking': None,
+     'method': '寄配件', 'branch': '易仓有货', 'resp': '产品质量问题', 'part': 'FC-V2-CB01', 'qty': 1, 'tracking': None,
      'product': 1.40, 'freight': 5.90, 'comp': 0.0, 'other': 0.0, 'filing': None, 'ratios': R_FAC, 'ratio_state': '建议',
      'nego': '未发起', 'settle': '未定', 'status': '待确认', 'step': '确认责任与处理方式', 'waiting': '售后负责人 王磊', 'waited': '15m',
      'owner': '王磊', 'reg': '自动'},
@@ -237,7 +237,7 @@ APPROVALS = [
     {'no': 'AP-20260911-002', 'at': '09:35', 'by': '李婷', 'ticket': 'T-20260910-0195', 'aftersales': 'S-20260911-0021', 'customer': 'Marcus Lee',
      'store': 'Forcome Auto', 'site': 'US',
      'filings': [('快递费用', '$8.40', '错发换发，UPS Ground')],
-     'actions': [('良仓创建售后出库单：良仓 US · 整机黑色 ×1', '积加（良仓）', None)],
+     'actions': [('易仓创建售后出库单：易仓 US · 整机黑色 ×1', '积加（易仓）', None)],
      'reply': '英语回复，出库单创建成功后自动发出', 'approver': '客服主管', 'deadline': '13:35', 'left': '3h 15m', 'status': '待审批'},
     {'no': 'AP-20260911-003', 'at': '09:41', 'by': '系统', 'ticket': 'T-20260910-0201', 'aftersales': 'S-20260911-0018', 'customer': 'Laura Bennett',
      'store': 'Forcome Auto', 'site': 'US',
@@ -251,7 +251,7 @@ APPROVALS = [
      'reply': '英语回复，地址修改成功后自动发出', 'approver': '客服主管或售后负责人', 'deadline': '13:48', 'left': '3h 28m', 'status': '待审批'},
 ]
 APPROVAL_LOG_TODAY = [
-    ('10:12', '查询良仓 US 库存', '积加 · 自动', '失败：积加接口超时，第 2 次重试成功', 'warning'),
+    ('10:12', '查询易仓 US 库存', '积加 · 自动', '失败：积加接口超时，第 2 次重试成功', 'warning'),
     ('09:41', '发起报备 AP-20260911-003 · 快递费用 $11.50', '系统 · 自动', 'S-20260911-0018', 'success'),
     ('09:40', '生产厂提交报价，写入登记台账', '工厂工作台 · 陈工', 'S-20260911-0018', 'success'),
     ('08:50', '向生产厂 FQD 派发询价单', '系统 · 自动', 'S-20260911-0019', 'success'),
@@ -299,7 +299,7 @@ BATCH = {b['no']: b for b in SETTLE_BATCHES}
 # ---------------------------------------------------------------- 订单、库存、历史审批单（页面上引用的补充事实）
 ORDERS = {
     '113-4567890-1234567': {'customer': 'Sarah Mitchell', 'item': 'V2 黑色 ×1', 'amount': '$49.99', 'date': '09-03',
-                            'resend_freight': 12.40,  # A 版补发：良仓运费试算 UPS Next Day Air
+                            'resend_freight': 12.40,  # A 版补发：易仓运费试算 UPS Next Day Air
                             'carrier': 'UPS', 'tracking': '1Z4R28830358229017'},
     '#1063': {'customer': 'Olivia Turner', 'item': 'V2 车载吸尘器 ×1', 'amount': '$54.99', 'date': '08-05', 'age': '37 天'},
     '302-8811234-9901122': {'customer': 'Mateo Rivas', 'item': '车载吸尘器 V2 ×1', 'amount': 'MX$889.00', 'usd': 49.39, 'delivered': '08-27'},
@@ -318,7 +318,7 @@ QUOTES = {
 }
 # 报价参考（P21 ✦ 参考行，仅参考，仍由对接人填写）：该配件近 3 次报价（每根，USD）与寄往各国的运费区间
 QUOTE_REF = {'FC-V2-HS02': {'unit': (2.40, 2.70), 'freight': {'MX': (11.90, 13.60)}}}
-INVENTORY = {  # 良仓 US 库存（经积加查询时刻）
+INVENTORY = {  # 易仓 US 库存（经积加查询时刻）
     ('FC-V2-CB01', '09-11 10:05'): 12,
     ('FC-V2-DC01', '09-10 09:20'): 8,
 }
@@ -328,7 +328,7 @@ AI_MADE = {
     'P08_preselect': '10:06 生成 · 依据来信、积加订单与「充电线不充电排查」',    # S-20260911-0022 10:05 创建后
     'P12_basis': '09-11 09:02 生成 · 依据本单沟通与 S-20260908-0015',  # S-20260903-0012 升级后商定依据
     'P21_quote_ref': '08:50 生成 · 依据近 3 次报价与运费记录',                  # 询价单 08:50 派发时
-    'P13_backfill': '10:16 生成 · 依据积加良仓出库单',                           # 积加最近同步 10:16（CHANNEL_SYNC）
+    'P13_backfill': '10:16 生成 · 依据积加易仓出库单',                           # 积加最近同步 10:16（CHANNEL_SYNC）
     'K13_draft': '10:08 生成 · 依据 2 条缺口来信与「FBM 补发标准」',              # K13 第一簇点「✦ AI 起草条目」后
 }
 HISTORY_APPROVALS = {'S-20260905-0014': 'AP-20260905-002', 'S-20260910-0017': 'AP-20260910-003', 'S-20260902-0011': 'AP-20260902-004'}
@@ -336,7 +336,7 @@ HISTORY_APPROVALS = {'S-20260905-0014': 'AP-20260905-002', 'S-20260910-0017': 'A
 AS_WAIT_LEVEL = {'S-20260903-0012': 'warning'}
 # P12 商定依据的 AI 草稿（依据本单沟通 + 相近单据的协商结论）
 NEGO_AI_BASIS = {'S-20260903-0012': '保修期内失效，但电池出厂到签收已 9 个月，有库存老化因素；参照 S-20260908-0015（同为电池寄配件，责任「其他」，按三组均 FSH 50 / 工厂 50 结案），建议三组均 FSH 50 / 工厂 50。'}
-# P13「待回填」预填：这些单的快递单号没有自动回写（良仓回传延迟），积加出库单里已有单号（即 AFTERSALES 的 tracking），台账给出核对补登建议
+# P13「待回填」预填：这些单的快递单号没有自动回写（易仓回传延迟），积加出库单里已有单号（即 AFTERSALES 的 tracking），台账给出核对补登建议
 LEDGER_BACKFILL = ['S-20260909-0016']
 
 
@@ -613,7 +613,7 @@ def intent_counts(total_n, intents):
 # ---------------------------------------------------------------- 设置示例（P18–P20 与 StatesAdmin）
 # 渠道卡「最近同步」时刻（P18）；「异常」为 K7 连接异常画面里的最后一次成功同步
 CHANNEL_SYNC = {'SP-API': '10:12', 'SP-API 异常': '10:02', 'Shopify': '10:15', '积加': '10:16', 'Gmail': '10:18', 'Gmail 异常': '10:04',
-                '钉钉': '10:00', '良仓': '10:16'}
+                '钉钉': '10:00', '易仓': '10:16'}
 # 关闭风险信号的影响（P19 二次确认提示）：近 30 天约少转人工的封数
 RISK_OFF_IMPACT = {'重复联系': 23, '高价值': 14}
 # 发送方式与阈值（P19、StatesAdmin K6/K9）
@@ -639,13 +639,13 @@ SEND_RULE_EDITS = {'产品咨询': ('80%', '85%')}  # P19 示例：1 项未保�
 STORE_OVERRIDES = {'amz-direct': ['模板 1'], 'amz-auto': ['签名'], 'shop-com': ['政策口径 1'], 'shop-mx': ['签名']}
 
 # 动作映射（P22）：统一动作, 分级, 亚马逊店铺 (接口, 色调) 或 None（平台不支持）, Shopify 店铺 (接口, 色调)
-# 分级：只读 / 低风险 / 高风险 / 按发送方式；良仓出库单与库存经积加对接
+# 分级：只读 / 低风险 / 高风险 / 按发送方式；易仓出库单与库存经积加对接
 ACTION_MAP = [
     ('查订单', '只读', ('积加', 'accent'), ('积加', 'accent')),
     ('查物流', '只读', ('积加', 'accent'), ('积加', 'accent')),
-    ('查库存', '只读', ('积加（良仓）', 'accent'), ('积加（良仓）', 'accent')),
+    ('查库存', '只读', ('积加（易仓）', 'accent'), ('积加（易仓）', 'accent')),
     ('回复客户', '按发送方式', ('Gmail 中转', 'accent'), ('Gmail', 'accent')),
-    ('创建售后出库单', '高风险', ('积加（良仓）', 'accent'), ('积加（良仓）', 'accent')),
+    ('创建售后出库单', '高风险', ('积加（易仓）', 'accent'), ('积加（易仓）', 'accent')),
     ('订单备注', '低风险', ('系统内备注', 'neutral'), ('Admin API', 'accent')),
     ('退款', '高风险', ('SP-API', 'accent'), ('Admin API', 'accent')),
     ('改地址', '高风险', None, ('Admin API', 'accent')),
@@ -668,7 +668,7 @@ LINK_WHITELIST = ['forcome.com', 'forcome.mx', 'youtube.com', 'ups.com', 'yuntra
 
 # 售后规则（P23）：责任类型说明（是否协商、含义）与报备规则
 RESP_NOTES = {'客户使用问题': ('不协商', '含顾客购买、使用不当'), '产品质量问题': ('需协商', '抱怨索赔'),
-              '物流问题': ('不协商', '向承运商或良仓索赔'), '其他': ('需协商', '需填写理由；默认值')}
+              '物流问题': ('不协商', '向承运商或易仓索赔'), '其他': ('需协商', '需填写理由；默认值')}
 FILING_RULES = [('报备类型', '快递费用 · 额外赔偿'), ('审批人', '客服主管'), ('时限', '4 小时，剩 1 小时提醒'), ('金额门槛', '无'),
                 ('超额补充报备', '实际金额超出报备 10% 以上')]
 

@@ -22,8 +22,8 @@ GAP_X, GAP_Y = 120, 160
 ROWS_HIFI = [
     ('收件箱与工单', [('Main', 'P01 收件箱 · 亚马逊工单'), ('TicketEmail', 'P02 收件箱 · 邮件工单'), ('TicketEscalated', 'P03 收件箱 · 转人工工单'),
                    ('Tickets', 'P04 工单列表'), ('TicketDetail', 'P05 工单详情 · 全程记录'), ('Customer', 'P06 客户档案')]),
-    ('售后', [('AfterSalesList', 'P07 售后单列表'), ('AfterSalesConfirm', 'P08 确认责任与处理方式'), ('AfterSalesTicket', 'P09 售后单详情 · 良仓无货'),
-            ('AfterSalesInStock', 'P10 售后单详情 · 良仓有货'), ('AfterSalesRefund', 'P11 售后单详情 · 部分补偿'), ('AfterSalesNegotiation', 'P12 承担比例协商'),
+    ('售后', [('AfterSalesList', 'P07 售后单列表'), ('AfterSalesConfirm', 'P08 确认责任与处理方式'), ('AfterSalesTicket', 'P09 售后单详情 · 易仓无货'),
+            ('AfterSalesInStock', 'P10 售后单详情 · 易仓有货'), ('AfterSalesRefund', 'P11 售后单详情 · 部分补偿'), ('AfterSalesNegotiation', 'P12 承担比例协商'),
             ('AfterSalesLog', 'P13 登记台账'), ('AfterSalesSettlement', 'P14 内部结算')]),
     ('审批、知识库、报表、设置、工厂工作台', [('Actions', 'P15 审批'), ('KnowledgeBase', 'P16 知识库'), ('Reports', 'P17 报表'), ('Settings', 'P18 设置 · 渠道与店铺'),
                                 ('SettingsActions', 'P22 设置 · 动作映射'), ('SettingsRules', 'P19 设置 · 处理规则'), ('SettingsAfterSales', 'P23 设置 · 售后规则'),
@@ -97,7 +97,7 @@ def main(seed=False):
     for n, t in FLOWS:
         w, h = add(n, 0, y, t, 'page-1')
         y += h + GAP_Y
-    notes.append({'id': 'note-flows', 'x': 1560, 'y': 0, 'w': 340, 'page': 'page-1', 'text': '流程与架构\n\n这些是给业务与技术评审看的全景图，规则的唯一定义在 PRD 第 5 至 7 节：\n\n· 系统架构：官方接入（买家消息经亚马逊邮件中转与 Gmail；订单、物流、库存与良仓出库单经积加；退款、改地址、取消经 SP-API 与 Shopify Admin API）、五步处理、统一动作接口、数据、工作台。\n· 产品全生命周期：七个阶段的客户触点、系统动作、人工介入、数据沉淀，下方是工单状态机。\n· 售后流程：两条创建路径、三种处理方式、报备、并行的比例协商。\n· AI Agent 决策逻辑：五步处理、风险信号、12 条处理规则、发送方式与动作分级。'})
+    notes.append({'id': 'note-flows', 'x': 1560, 'y': 0, 'w': 340, 'page': 'page-1', 'text': '流程与架构\n\n这些是给业务与技术评审看的全景图，规则的唯一定义在 PRD 第 5 至 7 节：\n\n· 系统架构：官方接入（买家消息经亚马逊邮件中转与 Gmail；订单、物流、库存与易仓出库单经积加；退款、改地址、取消经 SP-API 与 Shopify Admin API）、五步处理、统一动作接口、数据、工作台。\n· 产品全生命周期：七个阶段的客户触点、系统动作、人工介入、数据沉淀，下方是工单状态机。\n· 售后流程：两条创建路径、三种处理方式、报备、并行的比例协商。\n· AI Agent 决策逻辑：五步处理、风险信号、12 条处理规则、发送方式与动作分级。'})
 
     # 邮件流转
     w, h = add('EmailFlow', 0, 0, '一封来信的完整流转', 'page-4')

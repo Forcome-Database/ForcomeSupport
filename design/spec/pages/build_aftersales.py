@@ -118,7 +118,7 @@ def p08_sections(err_resp=False, override=False, stock_fail=False):
         T['subtle'], T['line'],
         inl('配件', select_box('FC-V2-CB01 充电线'), True),
         inl('数量', input_box('1', suffix='件 · 1–10', mono=True), True),
-        inl('发货方', input_box('手工选择分支后确定' if stock_fail else '良仓 US（有货 %d）' % stock_n, st='readonly', suffix=None if stock_fail else '按库存自动')))
+        inl('发货方', input_box('手工选择分支后确定' if stock_fail else '易仓 US（有货 %d）' % stock_n, st='readonly', suffix=None if stock_fail else '按库存自动')))
     s1 = card(sec_head(1, '处理方式', True) + m_cards + m_more, pad='12px 16px', gap=10)
 
     # 2 责任类型：AI 建议保持预选并标「✦ AI 预选」，改选才要求理由
@@ -142,12 +142,12 @@ def p08_sections(err_resp=False, override=False, stock_fail=False):
     if stock_fail:
         stock = '<div style="display: flex; align-items: center; gap: 12px; background: %s; border: 1px solid %s; border-radius: 8px; padding: 10px 12px;">%s<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 13px; font-weight: 700; color: %s;">库存查询失败</div><div style="font-size: 12px; color: %s;">积加接口超时（10:05，已自动重试 3 次）。可以重试，或手工选择分支后继续。</div></div>%s</div>' % (
             T['bad_bg'], T['bad_line'], icon('wifi_off', 18, T['bad'], 2), T['bad'], T['ink2'], btn('重试', 'secondary', 'sm', 'refresh'))
-        stock += row(nowrap('手工选择分支', 12, T['ink2'], 600) + radio('良仓有货') + radio('良仓无货（向生产厂询价）') + nowrap('手工选择会记入审计日志', 12, T['ink4']), 16)
+        stock += row(nowrap('手工选择分支', 12, T['ink2'], 600) + radio('易仓有货') + radio('易仓无货（向生产厂询价）') + nowrap('手工选择会记入审计日志', 12, T['ink4']), 16)
     else:
-        stock = row(icon('store', 15, T['ink3']) + nowrap('良仓 US 库存 %d 件' % stock_n, 13, T['ink'], 600) + cat('良仓有货') + nowrap('积加 · 10:05 查询', 12, T['ink4']) + link('重新查询', 12, 'refresh'), 8)
+        stock = row(icon('store', 15, T['ink3']) + nowrap('易仓 US 库存 %d 件' % stock_n, 13, T['ink'], 600) + cat('易仓有货') + nowrap('积加 · 10:05 查询', 12, T['ink4']) + link('重新查询', 12, 'refresh'), 8)
     costs = grid(
         field('产品成本', input_box('1.40', prefix='$', suffix='SKU 成本表', st='readonly', mono=True)) +
-        field('运费', input_box('5.90', prefix='$', suffix='良仓运费试算', st='readonly', mono=True)) +
+        field('运费', input_box('5.90', prefix='$', suffix='易仓运费试算', st='readonly', mono=True)) +
         field('额外赔偿', input_box('0.00', prefix='$', mono=True)) +
         field('其他', input_box('0.00', prefix='$', mono=True)), 4, 12)
     ref = AS['S-20260905-0014']
@@ -163,7 +163,7 @@ def p08_sections(err_resp=False, override=False, stock_fail=False):
 
 def p08_footer():
     """确认后将发生 + 提交按钮；「退回继续排查」「取消售后单」并排在右侧，都要求填原因。"""
-    nxt = row(nowrap('确认后将发生', 12, T['ink3'], 700) + flow_steps(['生成出库单参数', '报备快递费用 $5.90，交客服主管审批', '批准即经积加创建良仓出库单', '批准后向生产厂 FZJ 发起比例提案']), 12)
+    nxt = row(nowrap('确认后将发生', 12, T['ink3'], 700) + flow_steps(['生成出库单参数', '报备快递费用 $5.90，交客服主管审批', '批准即经积加创建易仓出库单', '批准后向生产厂 FZJ 发起比例提案']), 12)
     bt = between(row(btn('确认并提交报备', 'primary', 'md', icon_right='arrow_r') + btn('暂存') + nowrap('上次暂存：无', 12, T['ink4']), 8),
                  row(nowrap('以下两项都需填写原因', 12, T['ink4']) + btn('退回继续排查', 'secondary', 'md', 'chev_l') + btn('取消售后单', 'danger_outline'), 8))
     return '<div style="display: flex; flex-direction: column; gap: 10px; background: #ffffff; border: 1px solid %s; border-radius: 12px; padding: 10px 16px; box-shadow: %s;">%s%s</div>' % (
@@ -196,7 +196,7 @@ def p08(err_resp=False, override=False, stock_fail=False):
     return app('wanglei', '售后', ['售后', '售后单', 'S-20260911-0022'], body)
 
 
-# ================================================================ P09 售后单详情 · 良仓无货
+# ================================================================ P09 售后单详情 · 易仓无货
 P09_STEPS = [('确认', '08:20', 'done'), ('派发询价', '08:21', 'done'), ('生产厂报价', '09:40', 'done'),
              ('报备审批', '等周敏审批', 'current'), ('生产厂寄件', '', 'todo'), ('单号回复客户', '', 'todo'), ('完成', '', 'todo')]
 
@@ -225,7 +225,7 @@ def p09_filing():
 def p09_log():
     return log_card([
         ('08:02', '系统', '由工单 T-20260910-0201 创建售后单：滤芯发黄、吸力下降，排查两轮未解决（路径 A），待确认。'),
-        ('08:20', '王磊', '确认：寄配件 · 产品质量问题（AI 预选）。良仓 US 库存 0 件 → 良仓无货。'),
+        ('08:20', '王磊', '确认：寄配件 · 产品质量问题（AI 预选）。易仓 US 库存 0 件 → 易仓无货。'),
         ('08:21', '系统', '在工厂工作台向生产厂 FQD 派发询价单：HEPA 滤芯组件 FC-V2-HF01 ×1 · 寄往美国，时限 2 个工作日。'),
         ('09:40', '陈工', '提交报价：产品成本 $3.20、运费 $11.50（云途专线），可寄出日期 09-14。已写入登记台账。'),
         ('09:41', '系统', '发起报备 AP-20260911-003 · 快递费用 $11.50，已通知周敏（站内 + 钉钉工作通知）。'),
@@ -236,14 +236,14 @@ def reg_groups_for(kind):
     """登记信息分组（处理 / 物流 / 费用 / 结算）。st：1 已填、0 应填未填、None 未到环节（不计入进度）。"""
     later = lambda t='未到环节': na(t)
     if kind == 'P09':
-        return [('处理', [('处理方式', '寄配件', 1), ('分支', '良仓无货', 1), ('责任类型', '产品质量问题', 1), ('配件 × 数量', 'FC-V2-HF01 × 1', 1), ('发货方', '生产厂 FQD', 1)]),
+        return [('处理', [('处理方式', '寄配件', 1), ('分支', '易仓无货', 1), ('责任类型', '产品质量问题', 1), ('配件 × 数量', 'FC-V2-HF01 × 1', 1), ('发货方', '生产厂 FQD', 1)]),
                 ('物流', [('承运方式', '云途专线', 1), ('寄出日期', later(), None), ('快递单号', later(), None)]),
                 ('费用', [('产品成本', '$3.20', 1), ('运费', '$11.50', 1), ('额外赔偿', '$0.00', 1), ('其他', '$0.00', 1)]),
                 ('结算', [('报备', state('待审批'), 1), ('承担比例', later('报备通过后协商'), None), ('工厂承担', later('比例确认后'), None),
                           ('结算批次', later('比例确认后'), None)])]
     if kind == 'P10':
         a = AS['S-20260910-0017']
-        return [('处理', [('处理方式', '寄配件', 1), ('分支', '良仓有货', 1), ('责任类型', '产品质量问题', 1), ('配件 × 数量', 'FC-V2-DC01 × 1', 1), ('发货方', '良仓 US', 1)]),
+        return [('处理', [('处理方式', '寄配件', 1), ('分支', '易仓有货', 1), ('责任类型', '产品质量问题', 1), ('配件 × 数量', 'FC-V2-DC01 × 1', 1), ('发货方', '易仓 US', 1)]),
                 ('物流', [('承运方式', 'UPS Ground', 1), ('寄出日期', '09-10', 1), ('快递单号', '1Z4R28830358229101', 1)]),
                 ('费用', [('产品成本', '$4.10', 1), ('运费', '$6.80', 1), ('额外赔偿', '$0.00', 1), ('其他', '$0.00', 1)]),
                 ('结算', [('报备', '快递费用 · 已批准', 1), ('承担比例', ratio_words(a['ratios']), 1), ('工厂承担', money(factory_share(a)), 1), ('结算批次', '2026-09-FQD-B', 1)])]
@@ -259,7 +259,7 @@ def fac_card(body):
 
 def p09(banner_html=None, steps=None):
     a = AS['S-20260911-0018']
-    meta = meta_line(['售后单 S-20260911-0018', '寄配件 · 良仓无货', '产品质量问题', ch(a), '原工单 T-20260910-0201', '订单 111-2233445-5566778', '负责人 王磊'])
+    meta = meta_line(['售后单 S-20260911-0018', '寄配件 · 易仓无货', '产品质量问题', ch(a), '原工单 T-20260910-0201', '订单 111-2233445-5566778', '负责人 王磊'])
     actions = btn('查看原工单', 'secondary', 'md', 'external') + btn('改处理方式') + btn('终止流程', 'danger_outline')
     par = [('比例协商', state('未发起'), '报备通过后自动发起'), ('内部结算', state('未定'), '比例确认后进入月度批次')]
     left = p09_filing() + reg_groups(reg_groups_for('P09')) + p09_log()
@@ -268,14 +268,14 @@ def p09(banner_html=None, steps=None):
                      steps or P09_STEPS, par, left, right, par_right=link('工厂协同 · 陈工 1 条留言', 12, 'chev_r'), banner_html=banner_html, blocker_html=p09_blocker())
 
 
-# ================================================================ P10 售后单详情 · 良仓有货
-P10_STEPS = [('确认', '09-10 09:20', 'done'), ('估算运费', '09-10 09:20', 'done'), ('报备审批', '09-10 09:40 周敏', 'done'), ('良仓创建出库单', '09-10 09:41', 'done'),
-             ('良仓发出', '09-10 14:30', 'done'), ('单号回复客户', '09-10 14:35', 'done'), ('完成', '09-10 14:35', 'done')]
+# ================================================================ P10 售后单详情 · 易仓有货
+P10_STEPS = [('确认', '09-10 09:20', 'done'), ('估算运费', '09-10 09:20', 'done'), ('报备审批', '09-10 09:40 周敏', 'done'), ('易仓创建出库单', '09-10 09:41', 'done'),
+             ('易仓发出', '09-10 14:30', 'done'), ('单号回复客户', '09-10 14:35', 'done'), ('完成', '09-10 14:35', 'done')]
 
 
 def p10(banner_html=None, steps=None, status='已完成', par=None, left_extra=''):
     a = AS['S-20260910-0017']
-    meta = meta_line(['售后单 S-20260910-0017', '寄配件 · 良仓有货', '产品质量问题', ch(a), '原工单 T-20260909-0163', '订单 113-2244668-8800997', '负责人 王磊'])
+    meta = meta_line(['售后单 S-20260910-0017', '寄配件 · 易仓有货', '产品质量问题', ch(a), '原工单 T-20260909-0163', '订单 113-2244668-8800997', '负责人 王磊'])
     actions = btn('查看原工单', 'secondary', 'md', 'external') + btn('在积加查看出库单', 'secondary', 'md', 'external')
     reopen = row(btn('重开协商', 'secondary', 'sm', 'refresh') + nowrap('批次 10-05 生成前可用 · 原因必填', 11, T['ink4']), 6)
     par = par or [('比例协商', state('已确认'), row(nowrap('陈工 09-10 17:10 接受 ' + share_words(a, 'FQD'), 12, T['ink2']) + reopen, 10)),
@@ -287,10 +287,10 @@ def p10(banner_html=None, steps=None, status='已完成', par=None, left_extra='
                   pad='10px 16px', gap=8)
     log = log_card([
         ('09-10 09:05', '系统', '由工单 T-20260909-0163 创建售后单：集尘杯卡扣断裂，客户照片与已知缺陷一致（路径 A）。'),
-        ('09-10 09:20', '王磊', '确认：寄配件 · 产品质量问题（AI 预选）。良仓 US 库存 %d 件 → 良仓有货；良仓运费试算 $6.80，发起报备。' % INVENTORY[('FC-V2-DC01', '09-10 09:20')]),
+        ('09-10 09:20', '王磊', '确认：寄配件 · 产品质量问题（AI 预选）。易仓 US 库存 %d 件 → 易仓有货；易仓运费试算 $6.80，发起报备。' % INVENTORY[('FC-V2-DC01', '09-10 09:20')]),
         ('09-10 09:40', '周敏', '批准报备 AP-20260910-003，视为出库动作已批准。'),
-        ('09-10 09:41', '系统', '经积加创建良仓售后出库单：良仓 US · 集尘杯 FC-V2-DC01 ×1；向生产厂 FQD 发起比例提案。'),
-        ('09-10 14:30', '良仓', '发出 UPS 1Z4R28830358229101；回传实际运费 $6.80，未超报备。'),
+        ('09-10 09:41', '系统', '经积加创建易仓售后出库单：易仓 US · 集尘杯 FC-V2-DC01 ×1；向生产厂 FQD 发起比例提案。'),
+        ('09-10 14:30', '易仓', '发出 UPS 1Z4R28830358229101；回传实际运费 $6.80，未超报备。'),
         ('09-10 14:35', '李婷', '采用单号回复草稿 A 版发出，售后单完成。'),
         ('09-10 17:10', '陈工', '接受承担比例 %s，比例锁定，转为待结算。' % share_words(a, 'FQD')),
     ], extra=link('查看全部与审计日志', 12, 'chev_r'))
@@ -433,7 +433,7 @@ def p12(err=False):
                   can_do=can('') + btn('给刘厂长留言', 'secondary', 'sm', 'message'))
     head = detail_head('承担比例协商 · Mateo Rivas 电池', state('待升级'),
                        btn('查看售后单', 'secondary', 'md', 'external') + btn('查看原工单', 'secondary', 'md', 'external'),
-                       meta_line(['售后单 S-20260903-0012', '寄配件 · 良仓无货', '产品质量问题', ch(a), '生产厂 FQD', '第 1 / 3 轮', '负责人 王磊']), blk)
+                       meta_line(['售后单 S-20260903-0012', '寄配件 · 易仓无货', '产品质量问题', ch(a), '生产厂 FQD', '第 1 / 3 轮', '负责人 王磊']), blk)
     ev = card(bullet('保修 12 个月内，%s 签收后不到一周失效' % ORDERS['302-8811234-9901122']['delivered']) + bullet('客户视频 1 段 · 09-02；电池批次照片 · 陈工 09-05') +
               bullet('云途 YT2625100012340921 · 09-04 寄出，运输中'), '证据', pad='12px 14px', gap=5)
     tip = banner('warning', '同一工单另有退款售后单', 'S-20260911-0020（额外赔偿 %s）报备审批中，将单独协商，不并入本单。' % money_cur(889.00, 'MXN', 49.39))

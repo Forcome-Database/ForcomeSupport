@@ -606,7 +606,7 @@ def stepper(steps):
 
 
 def who(t):
-    tone = {'自动': 'accent', 'AI': 'accent', '系统': 'neutral', '人工': 'warning', '工厂': 'flow', '良仓': 'neutral', '客户': 'outline', '外部': 'neutral'}.get(t, 'neutral')
+    tone = {'自动': 'accent', 'AI': 'accent', '系统': 'neutral', '人工': 'warning', '工厂': 'flow', '易仓': 'neutral', '客户': 'outline', '外部': 'neutral'}.get(t, 'neutral')
     return chip(t, tone, 10)
 
 
