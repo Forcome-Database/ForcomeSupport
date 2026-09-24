@@ -40,6 +40,7 @@ Label: wayfinder:map
 - [讨论：集成层设计与「MCP 形式」的含义](issues/10-integration-layer.md)：进程内适配器、形状对齐 MCP，不拆独立服务；9 个动作结果含 pending 异步回执；映射存库；缺口转人工操作清单；每个适配器配 Fake
 - [讨论：身份与权限](issues/11-identity-access.md)：服务端会话；6 个固定角色，能力矩阵前后端共用；店铺范围与生产厂隔离在应用层强制（不用 RLS）；钉钉版本待确认
 - [调研：订单数据的准实时来源（SP-API 非受限订单接口、Shopify Admin API、第三方聚合平台）](issues/19-order-source.md)：推荐亚马逊订单走 SP-API v2026-01-01 非受限角色（ORDER_CHANGE 经 SQS + 增量兜底），Shopify 走 Admin API，买家姓名与地址仍取积加；不接聚合平台；MFN 单号能否读到待实测
+- [调研：领星能否替代积加](issues/20-lingxing.md)：不建议替代，也不建议作补充数据源（读不到亚马逊收件人、时效未公布）；优势是运费约 30 分钟、可接口取消补发；是否换 ERP 由客户决定
 
 ## Not yet specified
 

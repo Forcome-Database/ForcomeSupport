@@ -1,6 +1,6 @@
 Title: 讨论：第一期报表的数据来源与同步
 Type: grilling
-Status: open
+Status: claimed
 Blocked by: 01, 19, 20
 Map: ../map.md
 
