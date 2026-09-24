@@ -19,7 +19,7 @@ Label: wayfinder:map
   - 账号：Shopify、钉钉、Gmail（Google Workspace）管理权限已有；积加开放接口、亚马逊 SP-API 尚未开通。
   - 模型：Claude 经 NewAPI 网关接入（2026-09-24 用户决定）；调用合规与网络问题不在考虑范围内。模型层必须同时适配 Claude、OpenAI GPT 与任意 OpenAI 兼容接口，不绑定单一厂商；接入层用 Vercel AI SDK（ADR [0001](../../docs/adr/0001-模型接入层用VercelAISDK.md)）。
 - **PRD 已锁定、不再讨论**：前端 shadcn/ui + Tailwind CSS v4（D-10）；读走积加、写走 SP-API 与 Shopify Admin API、来信走 Gmail、组织与通知走钉钉（D-14、D-16、D-17）；适配器为 MCP 形式（F-AP-02）；审计保留 ≥ 2 年；三期交付顺序 报表与台账 → 售后流程 → AI 回信。
-- **已定 ADR**：[0001 模型接入层用 Vercel AI SDK](../../docs/adr/0001-模型接入层用VercelAISDK.md)；[0002 按记账方选择外部数据来源](../../docs/adr/0002-按记账方选择外部数据来源.md)；[0003 内网零入站与工厂工作台单一公网入口](../../docs/adr/0003-内网零入站与工厂工作台单一公网入口.md)；[0004 不设个人信息脱敏与留存限制](../../docs/adr/0004-不设个人信息脱敏与留存限制.md)；[0005 模块化单体与强制模块边界](../../docs/adr/0005-模块化单体与强制模块边界.md)；[0006 后端用 Hono 与 Drizzle 加 PostgreSQL](../../docs/adr/0006-后端用Hono与Drizzle加PostgreSQL.md)；[0007 前端用 Vite 单页应用与工厂工作台独立入口](../../docs/adr/0007-前端用Vite单页应用与工厂工作台独立入口.md)。
+- **已定 ADR**：[0001 模型接入层用 Vercel AI SDK](../../docs/adr/0001-模型接入层用VercelAISDK.md)；[0002 按记账方选择外部数据来源](../../docs/adr/0002-按记账方选择外部数据来源.md)；[0003 内网零入站与工厂工作台单一公网入口](../../docs/adr/0003-内网零入站与工厂工作台单一公网入口.md)；[0004 不设个人信息脱敏与留存限制](../../docs/adr/0004-不设个人信息脱敏与留存限制.md)；[0005 模块化单体与强制模块边界](../../docs/adr/0005-模块化单体与强制模块边界.md)；[0006 后端用 Hono 与 Drizzle 加 PostgreSQL](../../docs/adr/0006-后端用Hono与Drizzle加PostgreSQL.md)；[0007 前端用 Vite 单页应用与工厂工作台独立入口](../../docs/adr/0007-前端用Vite单页应用与工厂工作台独立入口.md)；[0008 后台任务用 pg-boss 与扫描式时限](../../docs/adr/0008-后台任务用pg-boss与扫描式时限.md)。
 - **合规**：整个方案不考虑合规问题，按最佳体验设计（2026-09-24 用户决定，ADR [0004](../../docs/adr/0004-不设个人信息脱敏与留存限制.md)）。
 - **已知风险**：SP-API 没有直接的自发货退款、取消接口，已由调研确认改走 Feeds 异步。
 
@@ -36,6 +36,7 @@ Label: wayfinder:map
 - [讨论：架构形态与代码仓库结构](issues/06-architecture-shape.md)：模块化单体，9 个业务模块加 integration、core；lint 强制边界，跨模块走发件箱事件；pnpm workspace；api 与 worker 两个容器
 - [讨论：后端与数据库选型](issues/07-backend-db.md)：Node 24 + Hono（zod-openapi）+ Drizzle + PostgreSQL 18，一个模块一个 schema；锁用数据库租约，实时推送用 SSE + LISTEN/NOTIFY，暂无 Redis
 - [讨论：前端框架与工程](issues/08-frontend.md)：Vite + React 19 单页应用，TanStack Router/Query/Table + react-hook-form + shadcn Charts；工厂工作台是同一项目的独立构建入口，以手机为主
+- [讨论：后台任务与流程引擎](issues/09-jobs-workflow.md)：pg-boss（任务表即发件箱，无 Redis）；状态机手写迁移表；时限每分钟扫描；工作日历为前后端共用的纯函数包
 
 ## Not yet specified
 
