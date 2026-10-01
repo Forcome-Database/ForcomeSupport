@@ -59,10 +59,10 @@ FONT = '"Inter", "PingFang SC", "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft 
 # 状态 → 色调（全站唯一映射；页面里显示状态一律用 state()）
 STATE_TONE = {
     # 工单
-    '分诊中': 'neutral', '待审草稿': 'accent', '待审批': 'warning', '转人工': 'danger',
+    '分诊中': 'neutral', '待审草稿': 'accent', '待审批': 'warning', '转人工': 'danger', '待回复': 'accent',  # 待回复仅第一阶段
     '等客户': 'outline', '等内部': 'outline', '等外部': 'outline', '已解决': 'success', '已关闭': 'muted', '已合并': 'muted',
     # 售后单
-    '待确认': 'warning', '进行中': 'accent', '已完成': 'success', '已取消': 'muted',
+    '待确认': 'warning', '进行中': 'accent', '已完成': 'success', '已取消': 'muted', '待分配': 'warning',
     # 审批单 / 报备
     '已批准': 'success', '已驳回': 'danger', '已超时': 'danger', '执行中': 'accent', '已执行': 'success', '执行失败': 'danger', '已撤回': 'muted',
     # 人工操作清单
@@ -388,6 +388,8 @@ def icon_btn(name, tone='ghost', size=32, title=None, badge=None, active=False):
     if active:
         bd, bg, c = T['accent_line'], T['accent_bg'], T['accent_ink']
     b = '<div style="position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 999px; background: %s; border: 1.5px solid #ffffff;"></div>' % T['bad_solid'] if badge else ''
+    if badge and not isinstance(badge, bool):  # 数字角标（未读数）
+        b = '<div style="position: absolute; top: -4px; right: -5px; min-width: 16px; height: 16px; box-sizing: border-box; padding: 0px 4px; border-radius: 999px; background: %s; border: 1.5px solid #ffffff; font-size: 10px; font-weight: 700; color: #ffffff; line-height: 13px; text-align: center;">%s</div>' % (T['bad_solid'], badge)
     return '<div style="position: relative; width: %dpx; height: %dpx; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s%s</div>' % (size, size, bd, bg, icon(name, 16, c), b)
 
 
@@ -873,27 +875,31 @@ def _segnav(items, active, badges=None):
     return '<div style="display: flex; align-items: center; gap: 2px; background: %s; padding: 3px; border-radius: 8px; flex-shrink: 0;">%s</div>' % (T['track'], out)
 
 
-def _topbar(items, active, user, badges=None, scope='全部店铺', show_scope=True, right_extra='', search_ph='搜索工单、订单号、客户邮箱', brand_sub='Support', scope_label='店铺', scope_fixed=False):
-    """56px 白色顶栏：品牌 · 分段导航 · 店铺范围 · 搜索（Ctrl K 命令面板）· 密度（舒适 / 紧凑）· 通知 · 当前用户。第一期只有浅色，不放主题切换。"""
+def _topbar(items, active, user, badges=None, scope='全部店铺', show_scope=True, right_extra='', search_ph='搜索工单、订单号、客户邮箱', brand_sub='Support', scope_label='店铺', scope_fixed=False, show_search=True, bell_n=None):
+    """56px 白色顶栏：品牌 · 分段导航 · 店铺范围 · 搜索（Ctrl K 命令面板）· 密度（舒适 / 紧凑）· 通知 · 当前用户。第一期只有浅色，不放主题切换。
+    第一阶段（prd_b 4.1）不显示店铺范围与搜索：show_scope=False、show_search=False。bell_n 为铃铛未读数（None 只显示红点）。"""
     scope_html = '<div style="height: 32px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; border: 1px solid %s; border-radius: 8px; padding: 0px 10px; background: #ffffff; white-space: nowrap;">%s<div style="font-size: 12px; color: %s;">%s：<span style="font-weight: 600; color: %s;">%s</span></div>%s</div>' % (
         T['line'], icon('lock' if scope_fixed else 'store', 14, T['ink4']), T['ink3'], scope_label, T['ink'], scope, '' if scope_fixed else icon('chev_d', 12, T['ink4'])) if show_scope else ''
-    role = {'知识库负责人': '知识库', '售后负责人': '售后负责人', '生产厂对接人': '生产厂对接人', '生产厂负责人': '生产厂负责人'}.get(user['role'], user['role'])
+    role = user['role']
     me = '<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">%s<div style="display: flex; flex-direction: column; line-height: 1.25;"><div style="font-size: 13px; font-weight: 600; color: %s; white-space: nowrap;">%s</div><div style="font-size: 11px; color: %s; white-space: nowrap;">%s</div></div></div>' % (
         avatar(user['avatar'], 'grad', 30), T['ink'], user['name'], T['ink4'], role)
-    right = right_extra + scope_html + search_box(search_ph, '240px') + icon_btn('rows', size=32) + icon_btn('bell', size=32, badge=True) + me
+    bell = icon_btn('bell', size=32, badge=True if bell_n is None else bell_n)
+    right = right_extra + scope_html + (search_box(search_ph, '240px') if show_search else '') + icon_btn('rows', size=32) + bell + me
     return '<div style="height: 56px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border-bottom: 1px solid %s; display: flex; align-items: center; gap: 16px; padding: 0px 16px;">%s%s<div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">%s</div></div>' % (
         T['line'], _brand(brand_sub), _segnav(items, active, badges), right)
 
 
-def app(user_key, active, crumbs, body, badges=None, scope='全部店铺', banner_html=None, right_extra='', show_scope=True, w=1440, h=900):
-    """客服系统页面外壳：顶栏 + 内容区（浅灰底）。body 自带内边距与布局；crumbs 记录页面层级（在页面标题区体现）。"""
+def app(user_key, active, crumbs, body, badges=None, scope='全部店铺', banner_html=None, right_extra='', show_scope=True, w=1440, h=900, phase1=False, bell_n=None):
+    """客服系统页面外壳：顶栏 + 内容区（浅灰底）。body 自带内边距与布局；crumbs 记录页面层级（在页面标题区体现）。
+    phase1=True 时按第一阶段外壳：导航取 NAV_BY_ROLE_P1，不显示店铺范围、搜索与导航角标（prd_b 4.1）。"""
     user = STAFF[user_key]
-    items = NAV_BY_ROLE[user['role']]
-    b = BADGES.get(user_key, {}) if badges is None else badges
+    items = (NAV_BY_ROLE_P1 if phase1 else NAV_BY_ROLE)[user['role']]
+    b = {} if phase1 else (BADGES.get(user_key, {}) if badges is None else badges)
     b = {k: v for k, v in b.items() if k in items}
     bn = '<div style="padding: 12px 16px 0px 16px; flex-shrink: 0;">%s</div>' % banner_html if banner_html else ''
+    top = _topbar(items, active, user, b, scope, show_scope and not phase1, right_extra, show_search=not phase1, bell_n=bell_n)
     return '<div style="width: %dpx; height: %dpx; box-sizing: border-box; background: %s; display: flex; flex-direction: column; overflow: hidden; position: relative; font-variant-numeric: tabular-nums;">%s%s<div style="flex: 1; display: flex; flex-direction: column; min-height: 0px; min-width: 0px;">%s</div></div>' % (
-        w, h, T['canvas'], _topbar(items, active, user, b, scope, show_scope, right_extra), bn, body)
+        w, h, T['canvas'], top, bn, body)
 
 
 def factory_app(active, crumbs, body, badges=None, w=1440, h=900, user_key='chengong'):

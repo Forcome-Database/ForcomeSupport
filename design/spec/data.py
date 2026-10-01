@@ -48,6 +48,14 @@ NAV_BY_ROLE = {
     '管理员':     ['报表', '设置'],
 }
 FACTORY_NAV = ['待办', '已完成', '结算']
+# 第一阶段导航（prd_b 4.1「第一阶段」表）：没有收件箱、审批、知识库；售后只有 P13；设置只有 P18、P20；生产厂对接人第一阶段不分配
+NAV_BY_ROLE_P1 = {
+    '坐席':       ['工单', '售后'],
+    '客服主管':   ['工单', '售后', '报表'],
+    '售后负责人': ['工单', '售后', '报表'],
+    '知识库负责人': ['工单', '报表'],
+    '管理员':     ['报表', '设置'],
+}
 
 # ---------------------------------------------------------------- 店铺
 STORES = [
@@ -310,6 +318,10 @@ ORDERS = {
     '113-2244668-8800997': {'customer': 'Marcus Lee', 'aftersales': 'S-20260910-0017'},
     '#1049': {'customer': 'Priya Raman', 'aftersales': 'S-20260902-0011', 'refund_no': 'RF-1049-01'},
     '305-1122334-4455667': {'customer': 'Diego Salazar', 'country': '墨西哥', 'zip': '06600'},  # 询价阶段生产厂只见目的国与邮编
+    # P05 订单卡（平台镜像，SP-API 非受限角色：不含买家姓名与地址明细，只有城市、州、国家）
+    '204-5566778-9900112': {'customer': 'Oliver Grant', 'item': '车载吸尘器 V2 黑色 ×1', 'amount': 'CA$67.99', 'usd': 49.99, 'date': '08-20',
+                            'status': '已签收', 'fulfil': 'MFN（自发货）', 'promise': '08-27', 'ship_to': 'Toronto, ON, CA',
+                            'carrier': 'Canada Post', 'tracking': '7316204855219087', 'delivered': '08-26'},
 }
 # 生产厂报价（StatesFactory F3、F7、F9 用的「提交后」画面；S-20260911-0019 在演示时刻 NOW 仍为待报价）
 QUOTES = {
@@ -356,8 +368,8 @@ def factory_share(a):
 
 
 def fsh_share(a):
-    p, r = _parts(a), a['ratios']
-    return round(sum(p[k] * r[k][0] / 100.0 for k in p), 2)
+    """R-AS-08：工厂承担逐行四舍五入到分，FSH 承担 = 该行费用合计 − 工厂承担。"""
+    return round(total(a) - factory_share(a), 2)
 
 
 def ratio_uniform(r):
@@ -545,9 +557,11 @@ MATEO = {'email': 'mateo.r.8k3p@marketplace.amazon.com.mx',
 # ---------------------------------------------------------------- 未归属店铺队列（StatesInbox I14）：收件地址或卖家 ID 未登记的来信与 AI 推荐店铺
 UNASSIGNED_MAIL = [
     {'customer': 'Tom Harris', 'subject': 'Where is my order? Tracking says delivered.', 'source': '买家消息 · amz-ca2@forcome.com 未登记',
-     'store': 'Forcome Direct CA', 'basis': '收件地址前缀 amz-、买家历史订单', 'at': '10:02', 'sla': '23h 42m'},
+     'store': 'Forcome Direct CA', 'basis': '收件地址前缀 amz-、买家历史订单', 'at': '10:02', 'sla': '23h 42m',
+     'to': 'amz-ca2@forcome.com', 'to_hdr': 'Delivered-To', 'from_domain': 'marketplace.amazon.ca', 'sla_kind': '亚马逊 24 小时'},
     {'customer': 'Lucía Herrera', 'subject': 'El filtro no encaja en mi aspiradora.', 'source': '邮件 · info@forcome.mx 未登记',
-     'store': 'forcome.mx', 'basis': '收件地址域名、买家历史订单', 'at': '09:47', 'sla': '23h 27m · 内部'},
+     'store': 'forcome.mx', 'basis': '收件地址域名、买家历史订单', 'at': '09:47', 'sla': '23h 27m · 内部',
+     'to': 'info@forcome.mx', 'to_hdr': 'To', 'from_domain': 'gmail.com', 'sla_kind': '内部目标 24 小时'},
 ]
 
 # ---------------------------------------------------------------- 知识库示例
@@ -657,6 +671,7 @@ ACTION_UNSUPPORTED = {'改地址': '亚马逊不允许卖家改地址：草稿�
 RISK_SIGNALS = [
     ('安全事故', '起火、冒烟、过热、烫伤、电池鼓包', '紧急', 'lock'),
     ('平台风险', 'A-to-Z、拒付、差评威胁、投诉到平台、律师', '紧急', 'lock'),
+    ('疑似提示注入', '来信含试图改变系统行为的指令（忽略规则、直接退款、透露内部信息），附原文片段', '高', 'lock'),
     ('重复联系', '重复联系 2 次（1 次只升优先级）', '高', 'on'),
     ('高价值', '订单或累计消费超过 $300', '高', 'on'),
     ('要求真人', '客户明确要求与人沟通', '高', 'on'),
@@ -683,6 +698,258 @@ def cost_by_resp():
             continue
         out[a['resp']] = round(out.get(a['resp'], 0) + total(a), 2)
     return out
+
+
+# ================================================================ 第一阶段（D-22、D-24）与补充页面
+# ---------------------------------------------------------------- 第一阶段工单（P04 第一阶段版 I16、P05 第一阶段版 I18）
+# 第一阶段状态只有 待回复 / 等客户 / 已解决 / 已关闭（prd_b 6.1 第一阶段迁移表）；其余字段沿用 TICKETS
+P1_STATUS = {
+    'T-20260902-0071': '待回复', 'T-20260910-0192': '待回复', 'T-20260910-0195': '待回复', 'T-20260910-0176': '待回复',
+    'T-20260911-0031': '待回复', 'T-20260910-0170': '等客户', 'T-20260911-0035': '等客户', 'T-20260910-0201': '等客户',
+    'T-20260910-0188': '等客户', 'T-20260909-0142': '等客户', 'T-20260904-0098': '已解决', 'T-20260909-0131': '已解决',
+    'T-20260909-0128': '等客户',
+}
+# 第一阶段才出现的工单：已超时的待回复、来源为生产厂的待回复（不计 SLA 与工单量）、30 天内已关闭
+P1_EXTRA_TICKETS = [
+    {'no': 'T-20260910-0158', 'customer': 'James Walker', 'store': 'Forcome Auto', 'channel': '亚马逊', 'site': 'US', 'source': '客户',
+     'subject': 'Box arrived crushed, the vacuum is cracked', 'status': '待回复', 'sla_left': '已超时 2h 05m', 'sla_level': 'danger',
+     'last_in': '09-10 08:15', 'order': '113-5566112-7788990'},
+    {'no': 'T-20260911-0036', 'customer': 'FQD 品质部', 'store': 'forcome.com', 'channel': '邮件', 'site': 'US', 'source': '生产厂',
+     'subject': '9 月电池批次抽检报告', 'status': '待回复', 'sla_left': '—', 'sla_level': 'none',
+     'last_in': '09-11 09:58', 'order': None, 'from': 'qc@fqd-forcome.com'},
+    {'no': 'T-20260901-0059', 'customer': 'Priya Raman', 'store': 'forcome.com', 'channel': 'Shopify', 'site': 'US', 'source': '客户',
+     'subject': 'My package is 9 days late', 'status': '已关闭', 'close_reason': '客户未回复', 'sla_left': '—', 'sla_level': 'none',
+     'last_in': '09-02 10:30', 'order': '#1049'},
+]
+
+
+def p1_tickets():
+    """第一阶段工单列表行（按 P04 第一阶段默认排序）：已超时在前，其后按 SLA 剩余升序，再按 待回复 → 等客户 → 已解决 → 已关闭，组内最近来信倒序。"""
+    rows = []
+    for t in TICKETS:
+        st = P1_STATUS[t['no']]
+        r = dict(t, status=st, source='客户')
+        if st == '等客户':
+            r.update(sla_left='已回复', sla_level='none')
+        elif st != '待回复':
+            r.update(sla_left='—', sla_level='none')
+        rows.append(r)
+    rows += [dict(t) for t in P1_EXTRA_TICKETS]
+    group = {'待回复': 0, '等客户': 1, '已解决': 2, '已关闭': 3}
+
+    def key(r):
+        m = _sla_minutes(r)
+        last = r['last_in'] if len(r['last_in']) > 5 else NOW[5:10] + ' ' + r['last_in']
+        desc = tuple(-ord(c) for c in last)  # 组内按最近来信倒序
+        if r['sla_left'].startswith('已超时'):
+            return (0, 0, desc)
+        if m is not None:
+            return (1, m, desc)
+        return (2 + group[r['status']], 0, desc)
+    return sorted(rows, key=key)
+
+
+# P17 下钻到 P04 的示例：「每日工单量」09-10 的柱（prd_c P17、AC-P1-14）
+P1_DRILL = {'label': '09-10 新建或重开 · 客户来信', 'count': REPORT['daily'][5][1] + REPORT['daily'][5][2]}
+
+# P05 第一阶段（I18）：Oliver Grant 工单，我方回复来自 Gmail「已发送」（对应不到成员），致谢来信由李婷标记无需回复
+P1_OLIVER = {
+    'ticket': 'T-20260904-0098', 'mailbox': 'amz-direct@forcome.com', 'marked_by': '李婷', 'marked_at': '09-10 09:05',
+    'close_at': '09-17 09:00', 'close_reason': '已解决后无来信',
+    # (日期分隔, 时刻, 类型 in / out / marked, 内容)
+    'timeline': [
+        ('09-04 周五', '10:12', 'in', "Hi, the charger cable doesn't work. I plug it in and nothing happens, no light on the vacuum at all."),
+        ('09-04 周五', '10:40', 'out', "Hi Oliver, sorry about the trouble. Could you try a different 12V socket and check the car's cigarette lighter fuse? If it still won't charge, just reply here and we'll sort it out."),
+        ('09-05 周六', '08:58', 'in', 'Tried another socket, still nothing. But it charges fine with my own USB-C cable.'),
+        ('09-05 周六', '15:30', 'out', 'Hi Oliver, a replacement charging cable is on its way via UPS, tracking 1Z4R28830358229052. Please keep the old cable, no return needed.'),
+        ('09-10 周四', '09:00', 'marked', 'Thanks, the new cable works!'),
+    ],
+    # 状态流转：(状态, 时间, 触发方 · 事件)
+    'flow': [('待回复', '09-04 10:12', '系统 · 新建'), ('等客户', '09-04 10:40', '系统 · 识别到我方回复'), ('待回复', '09-05 08:58', '系统 · 新来信'),
+             ('等客户', '09-05 15:30', '系统 · 识别到我方回复'), ('待回复', '09-10 09:00', '系统 · 新来信'), ('已解决', '09-10 09:05', '李婷 · 标记无需回复')],
+    # SLA 结果：(来信, 结果, 色调, 说明)
+    'sla': [('09-04 10:12', '首次回复 28m', 'success', '达标'), ('09-05 08:58', '首次回复 6h 32m', 'success', '达标'),
+            ('09-10 09:00', '无需回复 · 李婷', 'muted', '不计')],
+}
+# I18 另一张小图：SLA 结果的几种写法，以及生产厂来信、自动回复的显示
+P1_SLA_KINDS = [('09-10 16:00', '剩 5h 40m', 'warning', '未到期'), ('09-10 08:15', '已超时 2h 05m', 'danger', '未达标'),
+                ('09-08 11:02', '首次回复 3h 10m', 'success', '达标'), ('09-08 14:20', '无需回复 · 陈晨', 'muted', '不计'),
+                ('09-11 09:58', '生产厂来信', 'muted', '不计（生产厂）')]
+P1_AUTO_REPLY = {'from': 'support@forcome.com', 'at': '09-11 09:59', 'header': 'Auto-Submitted: auto-replied',
+                 'body': 'Thanks for contacting Forcome. We have received your email and will reply within 24 hours.'}
+
+# ---------------------------------------------------------------- 第一阶段台账（P13 第一阶段版 S13–S15，R-AS-08）
+# 手工登记需要、AFTERSALES 里没有的字段：订单号、费用发生日、完成时间、发货方、承运方式、寄出日期、责任理由
+# S-20260911-0022（待确认）第一阶段不存在：第一阶段没有待确认状态，示例夹具转换时丢弃
+LEDGER_EXTRA = {
+    'S-20260901-0010': {'order': '113-3344556-6677889', 'fee_date': '09-01', 'done': '09-03 15:10'},
+    'S-20260902-0011': {'order': '#1049', 'fee_date': '09-02', 'done': '09-02 16:40'},
+    'S-20260903-0012': {'order': '302-8811234-9901122', 'fee_date': '09-04', 'done': '09-05 11:20', 'shipper': '生产厂', 'carrier': '云途专线', 'ship_date': '09-04'},
+    'S-20260904-0013': {'order': '#0991', 'fee_date': '09-04', 'done': '09-07 10:05', 'shipper': '易仓', 'carrier': 'UPS Ground', 'ship_date': '09-04'},
+    'S-20260905-0014': {'order': '204-5566778-9900112', 'fee_date': '09-05', 'done': '09-06 09:30', 'shipper': '易仓', 'carrier': 'UPS Standard', 'ship_date': '09-05'},
+    'S-20260908-0015': {'order': '113-6677001-2233445', 'fee_date': '09-08', 'done': '09-10 11:00', 'shipper': '生产厂', 'carrier': '云途专线', 'ship_date': '09-09',
+                        'reason': '包裹途中受潮，承运商与产品责任都无法确认，双方分摊'},
+    'S-20260909-0016': {'order': '#1052', 'fee_date': '09-09', 'done': '09-10 17:20', 'shipper': '易仓', 'carrier': 'UPS Ground', 'ship_date': '09-09'},
+    'S-20260910-0017': {'order': '113-2244668-8800997', 'fee_date': '09-10', 'done': '09-11 09:30', 'shipper': '易仓', 'carrier': 'UPS Ground', 'ship_date': '09-10'},
+    'S-20260911-0018': {'order': '111-2233445-5566778', 'fee_date': '09-11', 'shipper': '生产厂', 'carrier': '云途专线'},
+    'S-20260911-0019': {'order': '305-1122334-4455667', 'fee_date': '09-11', 'shipper': '生产厂'},
+    'S-20260911-0020': {'order': '302-8811234-9901122', 'fee_date': '09-10', 'rate_date': '09-10'},
+    'S-20260911-0021': {'order': '113-9988776-5544332', 'fee_date': '09-11', 'shipper': '易仓', 'carrier': 'UPS Ground'},
+}
+# 第一阶段台账里 S-20260909-0016 的快递单号没有登记（第二阶段画面里是积加预填的待回填，LEDGER_BACKFILL）
+P1_LEDGER_MISSING_TRACKING = ['S-20260909-0016']
+
+
+def p1_ledger_rows():
+    """第一阶段台账行：AFTERSALES 去掉待确认的单，补上 LEDGER_EXTRA；未发生的金额（None）按 0 计入售后成本，页面显示「—」。"""
+    out = []
+    for a in AFTERSALES:
+        if a['status'] == '待确认':
+            continue
+        r = dict(a, **LEDGER_EXTRA.get(a['no'], {}))
+        if a['no'] in P1_LEDGER_MISSING_TRACKING:
+            r['tracking'] = None
+        out.append(r)
+    return out
+
+
+def ledger_missing(r):
+    """R-AS-08 必填矩阵：返回缺失的适用字段名（费用项为 0 视为已填，None 为未填）。"""
+    miss = []
+    for k, lab in (('store', '店铺'), ('site', '站点'), ('order', '订单号'), ('customer', '客户'), ('method', '处理方式'), ('resp', '责任类型'),
+                   ('owner', '负责人'), ('fee_date', '费用发生日')):
+        if not r.get(k):
+            miss.append(lab)
+    if r['resp'] == '其他' and not r.get('reason'):
+        miss.append('责任理由')
+    if r['method'] == '寄配件':
+        for k, lab in (('part', '配件 × 数量'), ('shipper', '发货方'), ('carrier', '承运方式'), ('ship_date', '寄出日期'), ('tracking', '快递单号')):
+            if not r.get(k):
+                miss.append(lab)
+    for k, lab in (('product', '产品成本'), ('freight', '运费'), ('comp', '额外赔偿'), ('other', '其他')):
+        if r.get(k) is None:
+            miss.append(lab)
+    if r['method'] == '退款或部分补偿' and not (r.get('comp') or 0) > 0 and '额外赔偿' not in miss:
+        miss.append('额外赔偿')
+    if any(v[1] > 0 for v in r['ratios'].values()) and not r.get('factory'):
+        miss.append('生产厂')
+    if r['resp'] == '物流问题' and not (r.get('claim') and r.get('claim_state')):
+        miss.append('索赔对象与状态')
+    return miss
+
+
+def ledger_completion(month='09'):
+    """登记完整率（R-AS-08）：当月（按完成时间）已完成单中适用字段齐全的单数 ÷ 已完成单数；历史导入不计。"""
+    done = [r for r in p1_ledger_rows() if r['status'] == '已完成' and r.get('done', '').startswith(month) and r.get('reg') != '历史导入']
+    ok = [r for r in done if not ledger_missing(r)]
+    pct = ('%.1f%%' % (100.0 * len(ok) / len(done))).replace('.0%', '%') if done else '—'
+    return {'ok': len(ok), 'total': len(done), 'pct': pct}
+
+
+# S14 新建登记示例（寄配件 · Olivia Turner）；S15 设为已完成与取消的示例单
+LEDGER_NEW_DEMO = {'store': 'forcome.com', 'site': 'US', 'order': '#1063', 'customer': 'Olivia Turner', 'ticket': 'T-20260911-0031',
+                   'owner': '王磊', 'fee_date': '09-11', 'method': '寄配件', 'resp': '产品质量问题', 'factory': 'FQD',
+                   'part': 'FC-V2-HF01', 'qty': 1, 'shipper': '易仓', 'carrier': 'UPS Ground', 'product': 3.20, 'freight': 6.80}
+LEDGER_DONE_DEMO = 'S-20260911-0018'   # 设为已完成：缺寄出日期、快递单号 2 项
+LEDGER_CANCEL_DEMO = 'S-20260911-0021'
+
+# ---------------------------------------------------------------- 报表「更新于」（prd_c P17、AC-P1-11）
+REPORT_SOURCES = ('Gmail', 'SP-API', 'Shopify')  # 工单来自 Gmail；站点与订单关联用平台订单；台账为手工登记，不参与
+
+
+def report_updated():
+    """取所用数据源中最旧的一次同步成功时间。"""
+    return min(CHANNEL_SYNC[k] for k in REPORT_SOURCES)
+
+
+SHOPIFY_BACKFILL_DAYS = 60  # 第一阶段示例：未开通 read_all_orders，Shopify 订单只回补 60 天（K19、K20）
+
+# ---------------------------------------------------------------- 审计日志（P27、K18）：(时刻, 操作人, 角色, 对象类型, 对象, 动作, 变更摘要, 来源 IP, 越权)
+AUDIT_LOG = [
+    ('10:19', '周敏', '客服主管', '审批单', 'AP-20260911-004', '批准', '状态：待审批 → 执行中', '10.20.3.41', False),
+    ('10:16', '系统', '系统', '售后单', 'S-20260909-0016', '✦ 生成补登建议', '快递单号：— → 1Z4R28830358229088（未写入，等核对）', '—', False),
+    ('10:05', '系统', '系统', '渠道', 'Gmail · support@forcome.mx', '连接异常', '状态：已连接 → 连接异常（连续 3 次失败）', '—', False),
+    ('09:52', '刘洋', '管理员', '成员', '陈晨', '修改店铺范围', '店铺范围：全部店铺 → Forcome Direct、forcome.mx', '10.20.1.12', False),
+    ('09:48', '李婷', '坐席', '审批单', 'AP-20260911-004', '提交审批', '动作：Shopify #1057 改收货地址', '10.20.3.27', False),
+    ('09:41', '系统', '系统', '审批单', 'AP-20260911-003', '发起报备', '快递费用 $11.50 · S-20260911-0018', '—', False),
+    ('09:30', '陈晨', '坐席', '审批单', 'AP-20260911-001', '提交审批', '额外赔偿 MX$889.00（≈ $49.39）· S-20260911-0020', '10.20.3.33', False),
+    ('09:12', '王磊', '售后负责人', '导出', '登记台账', '导出 Excel', '筛选：9 月 · 全部店铺 · 12 行', '10.20.2.18', False),
+    ('08:31', '张工', '生产厂对接人', '售后单', 'S-20260911-0018', '越权访问被拒', '该单属于生产厂 FQD（R-FT-01）', '58.211.20.6', True),
+    ('08:02', '李婷', '坐席', '登录', '钉钉扫码', '登录', '会话有效期 7 天（无操作）', '10.20.3.27', False),
+]
+# K18 管理员视角展开的一条：售后单设为已完成（财务字段对管理员显示「已隐藏」）：(字段, 前, 后, 是否财务字段)
+AUDIT_EXPAND_DEMO = {'at': '09-10 17:20', 'who': '王磊', 'obj': 'S-20260909-0016', 'action': '设为已完成',
+                     'fields': [('状态', '进行中', '已完成', False), ('完成时间', '—', '09-10 17:20', False),
+                                ('产品成本', '$2.60', '$2.60', True), ('运费', '$6.80', '$6.80', True), ('承担比例', '三组均 FSH 100 / 工厂 0', '同左', True)]}
+
+# ---------------------------------------------------------------- 站内通知（G10）：周敏，(时刻, 色调, 图标, 标题, 说明, 对象, 已读)
+NOTIFICATIONS = [
+    ('10:14', 'success', 'check_c', 'Gmail 已恢复', 'support@forcome.mx 已重新连接，补拉 3 封来信', 'P18 · Gmail', False),
+    ('10:05', 'danger', 'alert', 'Gmail 连接异常', 'support@forcome.mx 连续 3 次失败，来信暂存', 'P18 · Gmail', False),
+    ('10:02', 'warning', 'store', '未归属店铺来信', 'Tom Harris · amz-ca2@forcome.com 未登记', 'P04 · 未归属店铺', False),
+    ('09:48', 'accent', 'approve', '新审批单', 'AP-20260911-004 · 李婷 · Shopify 改地址', 'AP-20260911-004', True),
+    ('09:47', 'warning', 'store', '未归属店铺来信', 'Lucía Herrera · info@forcome.mx 未登记', 'P04 · 未归属店铺', True),
+    ('09:35', 'accent', 'approve', '新审批单', 'AP-20260911-002 · 李婷 · 错发换发', 'AP-20260911-002', True),
+]
+
+# ---------------------------------------------------------------- P25 模型（技术方案 9.1）：用途, 名称, 阶段, 主模型, 备用模型, 推理强度, 时限, 提示词版本, 状态, 近 24h 调用, 失败率, 成本
+MODEL_USES = [
+    ('translate', '译文', '二', 'Claude Haiku 4.5', 'GPT-6-Astra', '低', '20s', 'v3', '正常', '1,284', '0.2%', '$1.86'),
+    ('summarize', '摘要', '二', 'Claude Sonnet 5.5', 'Claude Haiku 4.5', '中', '30s', 'v2', '已切到备用 · 10:05', '412', '3.4%', '$2.10'),
+    ('extract', '抽取', '二', 'Claude Haiku 4.5', 'GPT-6-Astra', '低', '15s', 'v4', '正常', '655', '0.0%', '$0.42'),
+    ('assess', '售后评估', '二', 'Claude Opus 5.5', 'Claude Sonnet 5.5', '高', '60s', 'v2', '正常', '38', '0.0%', '$3.05'),
+    ('triage', '分诊', '三', 'Claude Sonnet 5.5', 'GPT-6-Astra', '中', '20s', 'v6', '第三阶段启用', '—', '—', '—'),
+    ('draft', '草稿', '三', 'Claude Fable 5.1', 'Claude Opus 5.5', '高', '40s', 'v9', '第三阶段启用', '—', '—', '—'),
+    ('check', '回复检查', '三', 'Claude Sonnet 5.5', 'GPT-6-Astra', '中', '20s', 'v3', '第三阶段启用', '—', '—', '—'),
+    ('knowledge', '知识', '三', 'Claude Sonnet 5.5', 'Claude Haiku 4.5', '中', '60s', 'v2', '第三阶段启用', '—', '—', '—'),
+    ('judge', '评测', '三', 'Claude Opus 5.5', 'GPT-6-Astra', '高', '120s', 'v1', '第三阶段启用', '—', '—', '—'),
+    ('embed', '嵌入', '三', '嵌入模型（经 NewAPI）', '—', '—', '10s', '—', '第三阶段启用', '—', '—', '—'),
+]
+MODEL_BREAKER_DEMO = {'use': 'summarize', 'at': '10:05', 'why': '5 分钟内失败 6 次', 'probe': '10:35'}
+
+# ---------------------------------------------------------------- P26 系统状态（技术方案第 10 节）
+HEALTH = {
+    'checked': '10:20', 'heartbeat': '10:20:05', 'backup': '03:10', 'wal': '10:19', 'drill': '07-15',
+    # 数据源：(名称, 最近同步, 阈值, 状态)
+    'sources': [('Gmail · 4 个邮箱', CHANNEL_SYNC['Gmail'], '10 分钟', '已连接'), ('亚马逊订单 · SQS', CHANNEL_SYNC['SP-API'], '10 分钟', '已连接'),
+                ('Shopify 订单', CHANNEL_SYNC['Shopify'], '10 分钟', '已连接'), ('积加', CHANNEL_SYNC['积加'], '10 分钟', '已连接'),
+                ('17TRACK', '10:10', '30 分钟', '已连接'), ('钉钉通讯录', CHANNEL_SYNC['钉钉'], '2 小时', '已连接'), ('汇率', '09-11 06:00', '1 天', '已连接')],
+    # 队列：(任务, 等待, 进行中, 近 24h 失败, 最久等待)
+    'queues': [('来信归并', 0, 1, 0, '—'), ('回复识别', 0, 0, 0, '—'), ('订单同步', 2, 1, 1, '40s'), ('动作执行', 1, 1, 3, '6m'),
+               ('通知发送', 0, 0, 0, '—'), ('时限扫描', 0, 1, 0, '—')],
+    # 外部调用（近 1 小时）：(系统 · 接口, 调用, 错误率, P95, 配额)
+    'calls': [('SP-API · searchOrders', '64', '0.0%', '420ms', '令牌桶剩余 18 / 20'), ('Shopify · orders', '58', '0.0%', '310ms', '调用额度 92%'),
+              ('积加 · 出库单', '22', '4.5%', '1.8s', '—'), ('Gmail · history.list', '24', '0.0%', '260ms', '—'),
+              ('钉钉 · 工作通知', '17', '0.0%', '180ms', '本月 1,240 / 5,000'), ('17TRACK · 查询', '30', '0.0%', '650ms', '本月 3,100 / 10,000')],
+}
+
+# ---------------------------------------------------------------- P19「处理说明」页签（K21）：「未收到与异常」
+INTENT_GUIDE = {
+    'intent': '未收到与异常', 'published': 'v4 · 09-08 周敏', 'draft': 'v5（未发布）', 'regress': (18, 20),
+    # (段落, 正文, 店铺覆盖说明或 None)
+    'sections': [
+        ('处理步骤', '先按订单号查平台订单与物流轨迹；轨迹停滞满 5 天或超过预计送达视为异常；签收但客户说没收到时先要投递证明。', None),
+        ('何时给哪种方案', '客户写明截止日期且查件来不及时先补发（报备快递费用）；否则先查件并承诺 2 个工作日内答复；高价值订单可提部分补偿。', 'Forcome Direct 覆盖：MX 站补发电池前先确认清关限制'),
+        ('3 版草稿如何区分', 'A 先补发 · B 先查件再定 · C 部分补偿或部分退款；只有一种合理方案时只给 1 版并说明原因。', None),
+        ('语气与禁忌', '先致歉再给方案；不写具体送达时刻；亚马逊渠道不留站外联系方式。', None),
+    ],
+    'structured': [('需要的信息', '订单号；签收未收到需投递证明'), ('预取', '平台订单、物流轨迹（17TRACK）、易仓库存（积加）'),
+                   ('允许的动作', '查件 · 补发（报备快递费用）· 部分补偿（额外赔偿）· 部分退款'), ('默认发送方式', '待审草稿'), ('置信度阈值', '80%')],
+    # 未通过的回归样例：(样例来源工单, 情形, 期望, 实际)
+    'failed': [('T-20260905-0110', '客户写明 09-08 前要用，轨迹停滞 6 天', '先补发', '先查件'),
+               ('T-20260902-0063', '签收但客户说没收到，未附投递证明', '先要投递证明', '直接补发')],
+}
+INTENT_GUIDE_LIST = [(i, 'v4' if i == '未收到与异常' else 'v%d' % (2 + n % 3), i == '未收到与异常') for n, i in enumerate(
+    ['产品咨询', '购买咨询', '批发与合作', '订单查询', '未收到与异常', '修改订单', '到货问题', '产品故障与使用问题', '退货与退款', '保修与配件购买', '发票与收据', '评价与反馈'])]
+
+# ---------------------------------------------------------------- 设置「SLA」「标签库」「模板」（K22–K24）
+SLA_OVERRIDES = {'amz-direct': None, 'amz-auto': None, 'shop-com': None, 'shop-mx': 12}  # None 为继承全局 24 小时
+TAG_LIBRARY = [('路途急', '客户写明了出行或使用期限', 38, '已启用'), ('物流停滞', '轨迹停滞满 5 天或超预计送达', 52, '已启用'),
+               ('差评风险', '来信提到差评、feedback 或投诉', 17, '已启用'), ('批发', '批量采购与合作询价', 6, '已启用')]
+# (模板, 用途, 语言, 渠道, 适用店铺, 更新)
+TEMPLATES = [('进展回复 · 英语', '进展回复', '英语', '全部', '全部店铺', '09-02'), ('进展回复 · 西班牙语', '进展回复', '西班牙语', '全部', 'Forcome Direct、forcome.mx', '09-02'),
+             ('签名 · Forcome Support', '签名', '英语', '邮件', 'forcome.com', '08-20'), ('签名 · Forcome México', '签名', '西班牙语', '邮件', 'forcome.mx', '08-20'),
+             ('补发已寄出通知', '通知', '英语', '全部', '全部店铺', '09-05')]
 
 
 if __name__ == '__main__':
