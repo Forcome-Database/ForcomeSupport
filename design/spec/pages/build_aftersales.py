@@ -277,10 +277,12 @@ def p10(banner_html=None, steps=None, status='已完成', par=None, left_extra='
     a = AS['S-20260910-0017']
     meta = meta_line(['售后单 S-20260910-0017', '寄配件 · 易仓有货', '产品质量问题', ch(a), '原工单 T-20260909-0163', '订单 113-2244668-8800997', '负责人 王磊'])
     actions = btn('查看原工单', 'secondary', 'md', 'external') + btn('在积加查看出库单', 'secondary', 'md', 'external')
-    reopen = row(btn('重开协商', 'secondary', 'sm', 'refresh') + nowrap('批次 10-05 生成前可用 · 原因必填', 11, T['ink4']), 6)
+    # 批次月末自动生成（prd_b 6.7）；生成日取 as_common.BATCH_PLAN
+    at = BATCH_PLAN['2026-09-FQD-B']
+    reopen = row(btn('重开协商', 'secondary', 'sm', 'refresh') + nowrap('批次 %s 生成前可用 · 原因必填' % at, 11, T['ink4']), 6)
     par = par or [('比例协商', state('已确认'), row(nowrap('陈工 09-10 17:10 接受 ' + share_words(a, 'FQD'), 12, T['ink2']) + reopen, 10)),
-                  ('内部结算', state('待结算'), '批次 2026-09-FQD-B · 10-05 生成')]
-    blk = blocker('月度结算 · 批次 2026-09-FQD-B 于 10-05 自动生成', since='17h（比例 09-10 17:10 锁定）',
+                  ('内部结算', state('待结算'), '批次 2026-09-FQD-B · %s生成' % BATCH_PLAN_WORDS)]
+    blk = blocker('月度结算 · 批次 2026-09-FQD-B 于 %s自动生成' % BATCH_PLAN_WORDS, since='17h（比例 09-10 17:10 锁定）',
                   can_do=link('查看内部结算', 12, 'chev_r'))
     filing = card(between(row(label('报备审批') + nowrap(HISTORY_APPROVALS['S-20260910-0017'], 12, T['ink2'], 600) + state('已批准'), 8),
                           row(nowrap('快递费用 $6.80 · 周敏 09-10 09:40 批准 · 实际运费 $6.80', 12, T['ink2']) + nowrap('未超报备 10%', 12, T['ok'], 600), 8)),
@@ -421,7 +423,7 @@ def p12_confirm_dialog():
     t = table([('费用项', 'left'), ('金额', 'right'), ('FSH', 'right'), ('工厂', 'right')], rows, 'minmax(0, 1fr) 72px 110px 110px', dense=True,
               footer=['合计', '$23.40', 'FSH $11.70', '工厂 $11.70'])
     body = t + grid(kv('商定人', '王磊 · 刘厂长（生产厂 FQD）') + kv('录入人', '王磊'), 2, 16) + \
-        col(bullet('录入后比例锁定，售后单协商状态转为「已确认」、结算状态转为「待结算」，进入 10-05 生成的批次 2026-09-FQD-B。') +
+        col(bullet('录入后比例锁定，售后单协商状态转为「已确认」、结算状态转为「待结算」，进入 %s生成的批次 2026-09-FQD-B。' % BATCH_PLAN_WORDS) +
             bullet('锁定后只能在批次生成前「重开协商」（原因必填）；批次生成后需在下一批次冲销。'), 4)
     return dialog('录入最终比例并锁定？', body, btn('取消', 'secondary', st='focus') + btn('确认录入并锁定', 'primary', 'md', 'lock'), 500, 'warning',
                   'S-20260903-0012 · 三组均 FSH 50 / 工厂 50 · 默认焦点在「取消」')

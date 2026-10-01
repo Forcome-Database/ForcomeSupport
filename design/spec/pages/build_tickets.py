@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ui import *
 from data import *
 from common import *
-from inbox_parts import merge_btn
+from inbox_parts import merge_btn, customer_msg
 
 TK = {t['no']: t for t in TICKETS}
 TC = ticket_counts()
@@ -150,8 +150,8 @@ def day_sep(label_):
         T['ink3'], T['track'], label_, T['line'])
 
 
-def vflow(steps):
-    """纵向状态流转（带时间）：steps: [(状态 html, 时间, 'done'|'current'|'todo')]。"""
+def vflow(steps, step_gap=5):
+    """纵向状态流转（带时间）：steps: [(状态 html, 时间, 'done'|'current'|'todo')]；step_gap 为步与步的间距。"""
     out = ''
     n = len(steps)
     for i, (s_, tm, st) in enumerate(steps):
@@ -160,8 +160,33 @@ def vflow(steps):
             '#ffffff' if st == 'todo' else c, c)
         ln = '<div style="position: absolute; left: 4px; top: 17px; bottom: -3px; width: 2px; background: %s;"></div>' % T['line'] if i < n - 1 else ''
         out += '<div style="position: relative; display: flex; gap: 10px; align-items: flex-start; padding-bottom: %dpx;">%s%s<div style="flex: 1; display: flex; justify-content: space-between; align-items: center; gap: 8px; min-width: 0px;">%s<div style="font-size: 12px; color: %s; white-space: nowrap; font-variant-numeric: tabular-nums;">%s</div></div></div>' % (
-            0 if i == n - 1 else 5, ln, dot, s_, T['ink4'], tm)
+            0 if i == n - 1 else step_gap, ln, dot, s_, T['ink4'], tm)
     return '<div style="display: flex; flex-direction: column;">%s</div>' % out
+
+
+RCARD_PAD = '10px 14px'  # P05 右栏卡片内边距（右栏 5 张卡要在 900 高度内放下）
+
+
+def sla_line(arr, res, tone, note):
+    """SLA 结果一行：来信到达时刻 · 结果 · 达标 / 未达标 / 不计 徽标。P05 与第一阶段 I18 共用。"""
+    return '<div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><div style="color: %s; width: 108px; white-space: nowrap; font-variant-numeric: tabular-nums;">%s 来信</div><div style="flex: 1; color: %s; font-weight: 600; white-space: nowrap;">%s</div>%s</div>' % (
+        T['ink3'], arr, T['ink'], res, chip(note, tone, 10) if note else '')
+
+
+def order_card(no, pad=RCARD_PAD):
+    """订单卡（平台镜像，SP-API 非受限角色：不含买家姓名与地址明细，只有城市、州、国家），数据取 data.ORDERS；
+    标题右侧「平台镜像 · 最近同步」取 data.CHANNEL_SYNC['SP-API']。P05 与第一阶段 I18 共用。"""
+    o = ORDERS[no]
+    head = between(nowrap(no, 13, T['ink'], 700), row(state(o['status']) + nowrap(o['delivered'], 12, T['ink3']), 6))
+    body = col(head + col(kv('商品', o['item']) + kv('金额', '%s（≈ %s）' % (o['amount'], money(o['usd']))) +
+                          grid(kv('履约方式', o['fulfil']) + kv('承诺送达', o['promise']), 2, 20) + kv('收件城市', o['ship_to']) +
+                          kv('承运商', '%s %s' % (o['carrier'], o['tracking'])), 3), 6)
+    return card(body, title='订单', extra=nowrap('平台镜像 · 最近同步 %s' % CHANNEL_SYNC['SP-API'], 11, T['ink3']), pad=pad, gap=8)
+
+
+def inline_kv(k, v):
+    """行内键值：灰色小字标签 + 值（同一行放几项时用）。"""
+    return row(nowrap(k, 12, T['ink3']) + v, 6, extra='flex-shrink: 0;')
 
 
 def p05():
@@ -199,24 +224,144 @@ def p05():
     ]), 7, 'flex: 1; min-height: 0px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: %s transparent; padding-right: 6px;' % T['line_strong'])
     left = card(tl, title=text('全程记录', 13, T['ink'], 700), extra=row(seg(['全部', '仅消息', '仅事件'], '全部', 'sm'), 8), pad='14px 18px', gap=12, style='flex: 1; min-height: 0px;')
 
-    info = card(col(kv('意图', cat('产品故障与使用问题')) + kv('情绪', sentiment('正面')) + kv('重复联系', '0 次'), 6), title='工单信息', pad='12px 16px')
-
-    def sla_line(arr, res, tone, note):
-        return '<div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><div style="color: %s; width: 108px; white-space: nowrap; font-variant-numeric: tabular-nums;">%s 来信</div><div style="flex: 1; color: %s; font-weight: 600; white-space: nowrap;">%s</div>%s</div>' % (
-            T['ink3'], arr, T['ink'], res, chip(note, tone, 10) if note else '')
+    # 右栏：工单信息与关联合为一张卡（意图 · 情绪 · 重复联系一行；关联售后单、审批单各一行），给订单卡腾出高度
+    info = card(col(row(inline_kv('意图', cat('产品故障与使用问题')) + inline_kv('情绪', sentiment('正面')) + inline_kv('重复联系', nowrap('0 次', 12, T['ink'], 600)), 16) +
+                    divider() +
+                    kv('关联售后单', row(nowrap(AS14['no'], 12, T['accent'], 600) + state(AS14['status']), 6)) +
+                    kv('关联审批单', row(nowrap(ap, 12, T['accent'], 600) + state('已执行'), 6)), 6), title='工单信息', pad=RCARD_PAD, gap=8)
+    order = order_card(t['order'])
     slab = card(col(sla_line('09-04 10:12', '首次回复 28m', 'success', '达标') + sla_line('09-05 08:58', '首次回复 6h 32m', 'success', '达标') +
-                    sla_line('09-10 09:00', '致谢，无需回复', 'muted', None), 8), title='SLA 结果', extra=nowrap('亚马逊 24 小时', 11, T['ink3']), pad='12px 16px')
+                    sla_line('09-10 09:00', '致谢，无需回复', 'muted', None), 6), title='SLA 结果', extra=nowrap('亚马逊 24 小时', 11, T['ink3']), pad=RCARD_PAD, gap=8)
     fl = vflow([(chip('新建', 'neutral', 11), '09-04 10:12', 'done'), (state('待审草稿'), '09-04 10:13', 'done'), (state('等客户'), '09-04 10:40', 'done'),
                 (state('等内部'), '09-05 08:59', 'done'), (state('等客户'), '09-05 15:30', 'done'), (state('已解决'), '09-10 09:00', 'current'),
-                (chip('已关闭', 'muted', 11), '预计 09-17 自动', 'todo')])
-    flow = card(fl, title='状态流转', extra=nowrap('7 天无来信自动关闭', 11, T['ink3']), pad='12px 16px', gap=8)
-    rel = card(col(kv('售后单', row(nowrap('S-20260905-0014', 12, T['accent'], 600) + state('已完成'), 6)) +
-                   kv('审批单', row(nowrap(HISTORY_APPROVALS['S-20260905-0014'], 12, T['accent'], 600) + state('已执行'), 6)), 6), title='关联', pad='12px 16px')
-    ai = card(col(kv('回复', '2 次，均采纳 A 版未修改') + kv('采纳率', '已计入采纳率（意图：产品故障与使用问题）') + kv('知识', '充电线不充电排查（命中 2 次）'), 6),
-              title='AI 记录', extra=chip('FAQ 候选 · 李婷 09-10 提交 · 待审核', 'accent', 11, 'star'), pad='12px 16px')
-    right = info + slab + flow + rel + ai
-    body = head + '<div style="flex: 1; min-height: 0px; display: flex; gap: 16px; padding: 16px 24px;"><div style="flex: 1; min-width: 0px; display: flex; flex-direction: column;">%s</div><div style="width: 380px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px;">%s</div></div>' % (left, right)
+                (chip('已关闭', 'muted', 11), '预计 09-17 自动', 'todo')], 2)
+    flow = card(fl, title='状态流转', extra=nowrap('7 天无来信自动关闭', 11, T['ink3']), pad=RCARD_PAD, gap=8)
+    ai = card(col(kv('回复', '2 次，均采纳 A 版未修改 · 已计入采纳率') + kv('知识', '充电线不充电排查（命中 2 次）'), 5),
+              title='AI 记录', extra=chip('FAQ 候选 · 李婷 09-10 提交 · 待审核', 'accent', 11, 'star'), pad=RCARD_PAD, gap=8)
+    right = info + order + slab + flow + ai
+    body = head + '<div style="flex: 1; min-height: 0px; display: flex; gap: 16px; padding: 14px 24px 16px 24px;"><div style="flex: 1; min-width: 0px; display: flex; flex-direction: column;">%s</div><div style="width: 380px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px;">%s</div></div>' % (left, right)
     return app('liting', '工单', ['工单', 'T-20260904-0098'], body)
+
+
+# ================================================================ 第一阶段 P04 工单列表（StatesInbox I16，周敏；prd_c P04「第一阶段」）
+# 只读：没有指标行、快捷视图、批量条、选择框、优先级、意图、情绪、负责人、导出、新建工单
+P1_COLS = [('工单号', 'left'), ('主题', 'left'), ('来源', 'left'), ('渠道与店铺', 'left'), ('客户', 'left'), ('订单号', 'left'), ('状态', 'left'),
+           (sort_head('SLA 剩余', True), 'left'), ('最近来信', 'left')]
+P1_TPL = '124px minmax(0, 1fr) 72px 196px 112px 148px 70px 132px 76px'
+
+
+def source_badge(src, size=11):
+    """来源徽标（prd_a 1.4「来源」）：客户不显示徽标；生产厂、其他供应商用紫色徽标（与时间线「工厂」执行者同色）。"""
+    return chip(src, 'flow', size, 'factory' if src == '生产厂' else 'truck')
+
+
+def short_time(v):
+    """最近来信：当天只写时分。"""
+    return v[6:] if v.startswith(NOW[5:10]) else v
+
+
+def p1_row(t):
+    """第一阶段工单行。SLA：待回复写剩余或「已超时」，Shopify 与邮件加「· 内部」；等客户「已回复」；其余「—」（数据由 data.p1_tickets 给出）。"""
+    internal = t['channel'] in ('Shopify', '邮件') and t['sla_level'] != 'none'
+    src = nowrap('客户', 12, T['ink4']) if t['source'] == '客户' else source_badge(t['source'])
+    return [nowrap(t['no'], 13, T['accent'], 500), ellipsis(t['subject'], 13, T['ink'], 500), src, channel(t['channel'], t['site'], t['store']),
+            ellipsis(t['customer'], 13), nowrap(t['order'] or '—', 12, T['ink2'] if t['order'] else T['ink4']), state(t['status']),
+            sla(t['sla_left'] + (' · 内部' if internal else ''), t['sla_level']), nowrap(short_time(t['last_in']), 12, T['ink3'])]
+
+
+def drill_chip(lbl):
+    """「来自报表」筛选芯片（可移除）：从 P17 下钻进入时带上与指标同口径的条件（prd_c P04 第一阶段、P17）。"""
+    return ('<div style="height: 28px; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: %s; background: %s; border: 1px solid %s; border-radius: 8px; padding: 0px 6px 0px 8px; white-space: nowrap;">'
+            '%s来自报表：<span style="font-weight: 600; color: %s;">%s</span><div title="移除这条筛选" style="display: flex; padding: 2px; border-radius: 4px; cursor: pointer;">%s</div></div>') % (
+        T['ink3'], T['accent_bg'], T['accent_line'], icon('chart', 13, T['accent_ink']), T['accent_ink'], lbl, icon('x', 12, T['accent_ink'], 2))
+
+
+def p1_filters(drill=False):
+    """第一阶段筛选行：状态 · 渠道 · 店铺 · 站点 · 来源 · 最近来信（近 30 天）；右侧客服主管专用「未归属店铺 N」入口（I17）。"""
+    names = [('状态', None), ('渠道', None), ('店铺', None), ('站点', None), ('来源', None), ('最近来信', '近 30 天')]
+    chips = ''.join(filter_chip(n, v, v is not None) for n, v in names)
+    if drill:
+        chips = drill_chip(P1_DRILL['label']) + divider(True, 20) + chips
+    entry = row(nowrap('仅客服主管可见', 11, T['ink4']) + btn('未归属店铺 ' + chip(str(len(UNASSIGNED_MAIL)), 'warning', 11), 'secondary', 'sm', 'inbox'), 8)
+    return between(row(chips, 6, wrap=True), entry)
+
+
+def p04_p1(drill=False, h=900):
+    """drill=True：从 P17「每日工单量」09-10 的柱下钻进入（局部画面，只列示例数据里 09-10 新建的客户来信工单；总数取 P1_DRILL）。"""
+    rows = p1_tickets()
+    if drill:
+        rows = [t for t in rows if t['no'].startswith('T-' + NOW[:4] + '0910') and t['source'] == '客户']
+    note = row(icon('refresh', 14, T['ink4']) + nowrap('只读 · 数据变化时自动刷新', 12, T['ink3']), 6)
+    head = page_head('工单', '全部渠道 · 全部店铺', note)
+    tbl = tk_table(P1_COLS, [p1_row(t) for t in rows], P1_TPL)
+    if drill:
+        count = between(row(text('共 %d 条' % P1_DRILL['count'], 13, T['ink'], 600) + muted('条件与报表「每日工单量」09-10 的柱同口径：新建或重开日期 09-10 · 来源 客户', 12), 10),
+                        btn('清除筛选', 'link', 'sm'))
+        inner = p1_filters(True) + col(count + tbl, 8)
+    else:
+        foot = between(muted('共 %d 条 · 每页 20 条 · 已超时在前，其后按 SLA 剩余升序，再按 待回复 → 等客户 → 已解决 → 已关闭，组内按最近来信倒序' % len(rows)),
+                       row(btn('上一页', 'secondary', 'sm', disabled=True, reason='已是第一页') + nowrap('1 / 1', 12, T['ink2']) +
+                           btn('下一页', 'secondary', 'sm', disabled=True, reason='已是最后一页（共 %d 条，每页 20 条）' % len(rows)), 8))
+        inner = p1_filters() + tbl + foot
+    return app('zhoumin', '工单', ['工单'], head + content(inner, '14px 24px 12px 24px', 12), phase1=True, h=h)
+
+
+# ================================================================ 第一阶段 P05 工单详情（StatesInbox I18，李婷 · Oliver Grant；prd_c P05「第一阶段」）
+def our_reply(mailbox, via, time_, body):
+    """第一阶段我方回复卡：回信来自 Gmail「已发送」，对应不到成员，只写「我方 · 发件邮箱 · 经…」。"""
+    return message('我方', '%s · %s · %s' % (mailbox, via, time_), body, 'out', avatar(icon('send', 13, T['ink2'], 2), 'grey', 28))
+
+
+def p1_event(state_, at, trig):
+    """状态迁移事件行（触发方 · 事件 → 目标状态），数据取 P1_OLIVER['flow']。"""
+    actor, what = trig.split(' · ')
+    t = {'新建': '新建工单，状态「%s」', '新来信': '新来信，回到「%s」'}.get(what, what + '，转「%s」') % state_
+    return ev(at[6:], '系统', t) if actor == '系统' else ev(at[6:], '人工', actor + t)
+
+
+def p1_flow(steps, close_at, close_reason):
+    """第一阶段状态流转：每步写状态、触发方与时间，最后一步写预计关闭时刻与关闭原因。"""
+    n = len(steps)
+    vs = [(row(state(s) + nowrap(trig, 11, T['ink3']), 6), at, 'current' if i == n - 1 else 'done') for i, (s, at, trig) in enumerate(steps)]
+    vs.append((row(chip('已关闭', 'muted', 11) + nowrap(close_reason, 11, T['ink3']), 6), '预计 ' + close_at, 'todo'))
+    return vflow(vs, 3)
+
+
+def p05_p1():
+    o = P1_OLIVER
+    t = TK[o['ticket']]
+    store = [s for s in STORES if s['name'] == t['store']][0]
+    via = '经亚马逊买家消息'
+    meta = ''.join([nowrap(t['no'], 12, T['ink3']), nowrap('·', 12, T['ink4']), nowrap('客户 ' + t['customer'], 12, T['ink3']), nowrap('·', 12, T['ink4']),
+                    nowrap('订单 ' + t['order'], 12, T['ink3']), nowrap('·', 12, T['ink4']),
+                    nowrap('已解决 · 7 天无来信将于 %s 自动关闭（%s）' % (o['close_at'], o['close_reason']), 12, T['ink3'])])
+    head = detail_head(t['subject'], state(t['status']) + channel(t['channel'], t['site'], t['store']), '', meta=meta)
+    # 全程记录：消息（P1_OLIVER['timeline']）与状态迁移事件（P1_OLIVER['flow']）按时刻合并，按日期分组
+    day_label = {d[:5]: d for d, _, _, _ in o['timeline']}
+    items = [('%s %s' % (d[:5], tm), 0, k, b) for d, tm, k, b in o['timeline']] + [(at, 1, s, trig) for s, at, trig in o['flow']]
+    tl, last_day = '', None
+    for at, kind, a, b in sorted(items, key=lambda x: (x[0], x[1])):
+        if at[:5] != last_day:
+            tl += day_sep(day_label[at[:5]])
+            last_day = at[:5]
+        if kind == 1:
+            tl += p1_event(a, at, b)
+        elif a == 'out':
+            tl += our_reply(o['mailbox'], via, at[6:], b)
+        else:
+            mark = chip('无需回复 · %s · %s' % (o['marked_by'], o['marked_at'][6:]), 'muted', 11, 'check') if a == 'marked' else None
+            tl += customer_msg(t['customer'], '亚马逊买家消息 · ' + at[6:], b, '', mark)
+    tl = col(tl, 7, 'flex: 1; min-height: 0px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: %s transparent; padding-right: 6px;' % T['line_strong'])
+    left = card(tl, title=text('全程记录', 13, T['ink'], 700), extra=row(seg(['全部', '仅消息', '仅事件'], '全部', 'sm'), 8), pad='14px 18px', gap=12, style='flex: 1; min-height: 0px;')
+
+    info = card(col(grid(kv('店铺', t['store']) + kv('站点', t['site']) + kv('渠道', t['channel']) + kv('来源', '客户'), 2, 20, extra='row-gap: 6px;') +
+                    kv('进线邮箱', store['mailbox']) + kv('订单号', t['order']), 6), title='工单信息', pad='12px 16px', gap=8)
+    slab = card(col(''.join(sla_line(*x) for x in o['sla']), 8), title='SLA 结果', extra=nowrap('亚马逊 24 小时', 11, T['ink3']), pad='12px 16px', gap=8)
+    flow = card(p1_flow(o['flow'], o['close_at'], o['close_reason']), title='状态流转', extra=nowrap('已解决 7 天无来信自动关闭', 11, T['ink3']), pad='12px 16px', gap=8)
+    right = info + order_card(t['order'], '12px 16px') + slab + flow
+    ts = '<div style="position: absolute; right: 436px; bottom: 30px;">%s</div>' % toast('success', '已标记无需回复 · 工单转已解决', undo=5, remain=4)
+    body = head + '<div style="flex: 1; min-height: 0px; display: flex; gap: 16px; padding: 14px 24px 16px 24px;"><div style="flex: 1; min-width: 0px; display: flex; flex-direction: column;">%s</div><div style="width: 380px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px;">%s</div></div>%s' % (left, right, ts)
+    return app('liting', '工单', ['工单', t['no']], body, phase1=True)
 
 
 # ================================================================ P06 客户档案（李婷 · Sarah Mitchell）

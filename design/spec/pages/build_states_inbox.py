@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""StatesInbox.dc.html —— 收件箱与工单状态 I1–I15。"""
+"""StatesInbox.dc.html —— 收件箱与工单状态 I1–I18（I16–I18 为第一阶段）。"""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ui import *
-from data import *
+from data import *  # 含 P1_FACTORY_MAIL（I18 生产厂来信正文）
 from inbox_parts import *
-from common import mtable, cbox, table_empty
+from common import mtable, cbox, table_empty, scaled
 import build_inbox
 import build_tickets
 
@@ -150,12 +150,12 @@ def i8():
             T['line2'], T['ink3'], k, T['ink'], v)
     body = col(line('动作', '易仓创建售后出库单：易仓 US · V2 黑色 ×1 · UPS Next Day Air') +
                line('报备', '快递费用 <b>%s</b>' % money(ORDERS['113-4567890-1234567']['resend_freight'])) +
-               line('绑定回复', 'English · A 先补发，出库单创建成功后自动发出') +
+               line('绑定回复', 'English · A 先补发，积加回传已推送易仓且未缺货后自动发出') +
                line('售后单', '同时创建：寄配件 · 易仓有货 · 物流问题（FSH 100%，向 UPS 索赔）') +
                line('审批人', '客服主管 周敏 · 时限 4 小时（14:20 前）'), 0) + \
-        muted('SLA 剩 5h 40m，长于审批时限，不需要先发进展回复。', 12)
+        row(icon('clock', 14, T['warn'], 2) + text('SLA 剩 %s，短于「审批时限 + 积加补发执行时长」，建议先发进展回复<span style="white-space: nowrap;">（R-SL-05）</span>' % SARAH_T['sla_left'], 12, T['warn'], 600), 6, 'flex-start')
     dlg = dialog('提交审批？', body, btn('取消', 'secondary') + btn('提交审批', 'primary', icon_right='arrow_r'), 520, None, '提交后工单转「待审批」（转人工工单保持「转人工」）。审批通过前，这封回复不会发出。')
-    return variant('I8 提交审批确认', '弹窗逐项列出动作、报备、绑定回复、同时创建的售后单、审批人与时限。确认后浮层「已提交审批，周敏会在 4 小时内处理」。',
+    return variant('I8 提交审批确认', '弹窗逐项列出动作、报备、绑定回复（积加回传已推送易仓且未缺货后自动发出）、同时创建的售后单、审批人与时限；SLA 剩余短于「审批时限 + 积加补发执行时长」时提示先发进展回复（R-SL-05）。确认后浮层「已提交审批，周敏会在 4 小时内处理」。',
                    scrim_frame(build_inbox_scaled(build_inbox.p01()), dlg), VW, trigger='草稿含审批项且回复检查通过，点「提交审批」。')
 
 
@@ -251,12 +251,20 @@ def i14():
         for m in UNASSIGNED_MAIL
     ]
     tbl = mtable(cols, rows, 'minmax(0, 1fr) minmax(0, 1.8fr) 100px 250px', py=10)
-    head = between(row(text('未归属店铺', 16, T['ink'], 700) + chip('2', 'warning', 11), 8), row(nowrap('仅客服主管可见', 12, T['ink3']) + btn('去登记店铺', 'secondary', 'sm', 'store'), 8))
-    note = banner('warning', '2 封来信识别不出店铺，未生成草稿', 'SLA 按原到达时间照常计时。AI 推荐只做预选，主管点「确认」后才归入该店铺队列并开始五步处理；新店铺请管理员在「设置 · 渠道与店铺」登记（E-13）。')
+    head = unassigned_head(len(UNASSIGNED_MAIL))
+    note = banner('warning', '%d 封来信识别不出店铺，未生成草稿' % len(UNASSIGNED_MAIL), 'SLA 按原到达时间照常计时。AI 推荐只做预选，主管点「确认」后才归入该店铺队列并开始五步处理（E-13）。')
     tail = row(icon('check_c', 14, T['ok_solid'], 2) + nowrap('确认后浮层「已归入 forcome.mx，正在生成草稿」（5 秒内可撤销），本行移出列表；改选其他店铺同样生效，并记入推荐采纳统计。', 12, T['ink3']), 6)
     frame = mini(col(head + note + tbl + tail, 12), VW, 420, pad='20px')
-    return variant('I14 未归属店铺队列', '客服主管周敏的视角（P04 筛选「未归属店铺」或收件箱提醒进入）。每行显示识别依据（收件地址、卖家 ID）与 ✦ AI 推荐店铺（写依据与生成时间），下拉已预选推荐值，主管确认后生效；确认前不生成草稿、不能回复。',
+    return variant('I14 未归属店铺队列', '客服主管周敏的视角（仅客服主管可见，不受店铺数据范围限制；P04 筛选「未归属店铺 2」或收件箱提醒进入）。提示「2 封来信识别不出店铺，未生成草稿 · SLA 按原到达时间照常计时」；每行显示识别依据（收件地址、卖家 ID）与 ✦ AI 推荐店铺（写依据与生成时间），下拉已预选推荐值，主管确认后生效；确认前不生成草稿、不能回复。不设登记入口：管理员登记新店铺后，收件地址匹配的来信会自动归位。',
                    frame, VW, trigger='收件地址或卖家 ID 未登记（E-13、AC-TK-09、AC-TK-11）。')
+
+
+def unassigned_head(n, hint=True):
+    """未归属店铺队列标题行（I14、I17 共用）：标题 + 计数 · 仅客服主管可见、不受店铺数据范围限制 | 自动归位提示（D-24，不设「去登记店铺」入口）。
+    hint=False：提示已写在下方横幅里时不重复（I17）。"""
+    left = row(text('未归属店铺', 16, T['ink'], 700) + chip(str(n), 'warning', 11) + nowrap('仅客服主管可见 · 不受店铺数据范围限制', 12, T['ink3']), 8)
+    right = row(icon('info', 13, T['ink4']) + nowrap('管理员登记新店铺后，收件地址匹配的来信会自动归位', 12, T['ink3']), 5)
+    return between(left, right if hint else '')
 
 
 # ---------------------------------------------------------------- I15 已达 5 版上限
@@ -272,15 +280,109 @@ def i15():
                    frame, VW, trigger='同一封来信已有 A–E 共 5 版草稿（AC-AI-05）。')
 
 
+# ---------------------------------------------------------------- 第一阶段（I16–I18）共用：一个变体里上下放两张画面，各带一行小标题
+def cap(t):
+    return '<div style="padding: 8px 14px; background: %s; border-bottom: 1px solid %s; font-size: 12px; font-weight: 600; color: %s;">%s</div>' % (
+        T['subtle'], T['line'], T['ink2'], t)
+
+
+def stack(*parts):
+    """parts: [(小标题, 画面 html)]，自上而下排列。"""
+    out = ''.join('<div style="display: flex; flex-direction: column;%s">%s%s</div>' % (' border-top: 1px solid %s;' % T['line'] if i else '', cap(c), h)
+                  for i, (c, h) in enumerate(parts))
+    return '<div style="width: %dpx; display: flex; flex-direction: column; background: %s;">%s</div>' % (VW, T['canvas'], out)
+
+
+# ---------------------------------------------------------------- I16 第一阶段工单列表
+def i16():
+    main = build_inbox_scaled(build_tickets.p04_p1())
+    drill = scaled(build_tickets.p04_p1(True, 520), 1440, 520, 0.6111)
+    frame = stack(('① 第一阶段 P04 · 周敏（客服主管）· 共 16 条', main), ('② 从 P17「每日工单量」09-10 的柱下钻进入（局部画面：示例数据只含其中 7 张）', drill))
+    return variant('I16 第一阶段工单列表',
+                   '按 P04「第一阶段」小节：只读，没有指标行、快捷视图、批量条、选择框、优先级、意图、情绪、负责人、导出、新建工单。筛选 状态 · 渠道 · 店铺 · 站点 · 来源 · 最近来信（近 30 天），条件写在地址栏；右侧「未归属店铺 2」只对客服主管显示，打开 I17。'
+                   '列 工单号 · 主题 · 来源（非客户显示徽标）· 渠道与店铺（含站点）· 客户 · 订单号 · 状态 · SLA 剩余 · 最近来信（当天只写时分）。SLA：待回复写最早一封未回复的应回复来信的剩余或「已超时」，Shopify 与邮件加「· 内部」，来源为生产厂的工单写「—」；等客户「已回复」；已解决、已关闭「—」。'
+                   '默认排序：已超时在前，其后按剩余升序，再按 待回复 → 等客户 → 已解决 → 已关闭，组内按最近来信倒序。点击行进 I18。② 下钻进入时筛选行多一枚可移除的「来自报表：%s ×」芯片，写「共 %d 条」。' % (P1_DRILL['label'], P1_DRILL['count']),
+                   frame, VW, trigger='第一阶段客服主管打开 P04（默认首页）；或从 P17 下钻进入。')
+
+
+# ---------------------------------------------------------------- I17 第一阶段未归属店铺来信队列
+def i17_table(mails, picked=None):
+    """没有 ✦ 推荐列；识别依据 = 收件头字段名 + 收件地址 +「未登记」（发件域作补充）；指定店铺下拉未预选，只列当前客服主管的授权店铺。"""
+    cols = [('来信', 'left'), ('识别依据', 'left'), ('到达', 'left'), ('SLA', 'left'), ('指定店铺（只列你的授权店铺）', 'left')]
+    rows = [[col(text(m['customer'], 13, T['ink'], 600) + ellipsis(m['subject'], 12, T['ink3']), 1),
+             col(nowrap(m['to_hdr'], 11, T['ink4']) + row(nowrap(m['to'], 12, T['ink'], 600) + chip('未登记', 'warning', 10), 6) + nowrap('发件域 ' + m['from_domain'], 11, T['ink4']), 2),
+             nowrap(m['at'], 12, T['ink2']),
+             col(sla(m['sla'], 'normal') + nowrap(m['sla_kind'], 11, T['ink4']), 3),
+             row(select_box(None, '选择店铺', width='164px', h=28) + btn('指定', 'primary', 'sm'), 6)] for m in mails]
+    return mtable(cols, rows, 'minmax(0, 1fr) minmax(0, 1.3fr) 44px 132px 222px', py=10)
+
+
+def i17():
+    def note(n):
+        return banner('warning', '%d 封来信识别不出店铺' % n, 'SLA 按原到达时间照常计时 · 管理员登记新店铺后，收件地址匹配的来信会自动归位')
+    mails = UNASSIGNED_MAIL
+    tail = row(icon('info', 13, T['ink4']) + nowrap('点「指定」后本行移出；5 秒撤销窗口结束才归并成工单，撤销则来信回到队列、不产生工单。', 12, T['ink3']), 6)
+    a = mini(col(unassigned_head(len(mails), False) + note(len(mails)) + i17_table(mails) + tail, 12), VW, 380, pad='20px')
+    rest = [m for m in mails if m['store'] != 'forcome.mx']  # Lucía Herrera 已指定到 forcome.mx，移出队列
+    ts = '<div style="position: absolute; right: 20px; bottom: 16px;">%s</div>' % toast('success', '已归入 forcome.mx', '5 秒后归并成工单', undo=5, remain=5)
+    b = mini(col(unassigned_head(len(rest), False) + note(len(rest)) + i17_table(rest), 12) + ts, VW, 344, pad='20px')
+    frame = stack(('① 周敏打开 P04「未归属店铺 2」', a), ('② Lucía Herrera 选 forcome.mx 后点「指定」：本行移出，撤销浮层倒计时', b))
+    return variant('I17 第一阶段未归属店铺来信队列',
+                   '与 I14 同一入口与位置（仅客服主管可见，不受店铺数据范围限制），但没有 ✦ 推荐列：列为 来信（客户 + 主题）· 识别依据（收件地址 To / Delivered-To +「未登记」）· 到达 · SLA · 指定店铺（下拉未预选，只列周敏的授权店铺）+「指定」。'
+                   '② 点「指定」后该行移出，浮层「已归入 forcome.mx · 5 秒后归并成工单 · 撤销」带倒计时；窗口结束才提交归并，撤销后来信回到队列、不产生工单。',
+                   frame, VW, trigger='第一阶段店铺识别失败（E-13）：收件地址未登记。')
+
+
+# ---------------------------------------------------------------- I18 第一阶段工单详情
+def mail_hdr(t):
+    """来信卡正文顶部的邮件头小字（发件人、Auto-Submitted 等识别依据）。"""
+    return '<div style="font-size: 11px; color: %s; line-height: 1.5; margin-bottom: 2px; font-variant-numeric: tabular-nums;">%s</div>' % (T['ink4'], t)
+
+
+def auto_reply_card(a):
+    """带 Auto-Submitted 的我方邮件：灰色虚线卡，写「自动回复 · 不算回复」，不结束 SLA 计时（R-SL-08）。数据取 data.P1_AUTO_REPLY。"""
+    av = avatar(icon('send', 13, T['ink4'], 2), 'grey', 28)
+    head = row(nowrap('我方', 13, T['ink3'], 600) + nowrap('%s · %s' % (a['from'], a['at'][6:]), 12, T['ink4']) + chip('自动回复 · 不算回复', 'muted', 10), 8)
+    bubble = '<div style="background: %s; border: 1px dashed %s; border-radius: 4px 12px 12px 12px; padding: 7px 13px 9px 13px; font-size: 13px; line-height: 1.6; color: %s;">%s%s</div>' % (
+        T['subtle'], T['line_strong'], T['ink3'], mail_hdr(a['header']), a['body'])
+    return '<div style="display: flex; gap: 10px; align-items: flex-start;">%s<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 6px;">%s%s</div></div>' % (av, head, bubble)
+
+
+def i18_kinds():
+    """第二张小图：SLA 结果的写法（P1_SLA_KINDS，取自不同工单）· 生产厂来信卡 · 自动回复 · 未回复来信的「标记无需回复」。"""
+    slab = card(col(''.join(build_tickets.sla_line(*x) for x in P1_SLA_KINDS), 9), title='SLA 结果 · 写法示例', extra=nowrap('取自不同工单', 11, T['ink3']), pad='12px 16px', gap=10)
+    fx = [t for t in P1_EXTRA_TICKETS if t['source'] == '生产厂'][0]
+    fav = avatar(icon('factory', 14, T['flow'], 2), 'violet', 28)
+    store = [s for s in STORES if s['name'] == fx['store']][0]
+    fmail = message(fx['customer'], '邮件 · %s' % fx['last_in'][6:],
+                    mail_hdr('发件人 %s → %s' % (fx['from'], store['mailbox'])) + '<b>%s</b><br>%s' % (fx['subject'], P1_FACTORY_MAIL), 'in', fav,
+                    build_tickets.source_badge('生产厂', 10) + chip('不计（生产厂）', 'muted', 10) + spacer() + btn('标记无需回复', 'secondary', 'sm', 'check'))
+    tl = col(row(nowrap(fx['no'], 12, T['ink3'], 600) + state(fx['status']) + nowrap('· %s' % fx['store'], 12, T['ink3']), 6) +
+             fmail + build_tickets.ev(fx['last_in'][6:], '系统', '新建工单，状态「待回复」；来源生产厂，不计工单量与 SLA') +
+             auto_reply_card(P1_AUTO_REPLY) + build_tickets.ev(P1_AUTO_REPLY['at'][6:], '系统', '自动回复不算回复，工单保持「待回复」'), 9)
+    return mini(grid(slab + tl, template='316px minmax(0, 1fr)', gap=20, extra='align-items: start;'), VW, 380, pad='20px')
+
+
+def i18():
+    frame = stack(('① 第一阶段 P05 · 李婷 · 09-10 09:05 标记致谢来信无需回复之后', build_inbox_scaled(build_tickets.p05_p1())),
+                  ('② SLA 结果的写法、来源为生产厂的来信、自动回复，以及未回复来信的「标记无需回复」', i18_kinds()))
+    return variant('I18 第一阶段工单详情',
+                   '按 P05「第一阶段」小节：只读，标题区没有重新打开、合并、内部备注、导出记录、添加标签与负责人，元信息写自动关闭预计「已解决 · 7 天无来信将于 09-17 09:00 自动关闭（已解决后无来信）」；客户名不是链接。'
+                   '全程记录：我方回复卡写「我方 · amz-direct@forcome.com · 经亚马逊买家消息」（回信来自 Gmail「已发送」，对应不到成员）；每次状态迁移一条事件行（系统 / 李婷）；致谢来信卡写「无需回复 · 李婷 · 09:05」，底部浮层「已标记无需回复 · 工单转已解决 · 撤销 4s」。'
+                   '右栏：工单信息（店铺、站点、渠道、进线邮箱、来源、订单号）· 订单（平台镜像 · 最近同步 %s）· SLA 结果（每封应回复来信一行）· 状态流转（每步写状态、时间与触发方，最后一步写关闭原因）。'
+                   '② 未关闭工单里未回复的来信卡右上有「标记无需回复」；生产厂来信带来源徽标并写「不计（生产厂）」；带 Auto-Submitted 的我方邮件为灰色「自动回复 · 不算回复」。' % CHANNEL_SYNC['SP-API'],
+                   frame, VW, trigger='第一阶段打开 P05；画面为 09-10 09:05 李婷标记致谢来信之后。')
+
+
 def build():
-    vs = [i1(), i2(), i3(), i4(), i5(), i6(), i7(), i8(), i9(), i10(), i11(), i12(), i13(), i14(), i15()]
+    vs = [i1(), i2(), i3(), i4(), i5(), i6(), i7(), i8(), i9(), i10(), i11(), i12(), i13(), i14(), i15(), i16(), i17(), i18()]
     rows_ = ''
     for k in range(0, len(vs), 2):
         pair = vs[k:k + 2]
         rows_ += grid(''.join(pair), template='%dpx %dpx' % (VW, VW), gap=32, extra='align-items: start;')
     body = col(rows_, 36)
-    leg = row(state('待审草稿') + state('待审批') + state('转人工') + state('已失效') + sla('5h 40m', 'warning') + sla('已超时 2h 00m', 'danger'), 6)
-    return board('收件箱与工单状态', 'P01–P06 的加载、空、生成、失败、并发、确认、超时、筛选、合并、渠道内容能力、未归属店铺与草稿版本上限状态。画面数据取自 data.py，演示时刻 %s（I9 为 13:15 的画面）。' % NOW_LABEL,
+    leg = row(state('待审草稿') + state('待审批') + state('转人工') + state('待回复') + state('已失效') + sla('5h 40m', 'warning') + sla('已超时 2h 00m', 'danger'), 6)
+    return board('收件箱与工单状态', 'I1–I18：P01–P06 的加载、空、生成、失败、并发、确认、超时、筛选、合并、渠道内容能力、未归属店铺与草稿版本上限状态，以及第一阶段的工单列表、未归属店铺来信队列与工单详情（I16–I18，D-22、D-24）。画面数据取自 data.py，演示时刻 %s（I9 为 13:15 的画面）。' % NOW_LABEL,
                  body, 1920, 800, leg)
 
 

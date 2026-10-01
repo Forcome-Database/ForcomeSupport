@@ -15,7 +15,7 @@ Forcome Support 组件库（高保真原型唯一样式来源）
     save('Main.dc.html', html)
 """
 import io, os
-from data import STAFF, NAV_BY_ROLE, FACTORY_NAV, BADGES, USD_MXN, USD_CAD, RATIO_LABELS, money, total, fsh_share, factory_share, _parts
+from data import STAFF, NAV_BY_ROLE, NAV_BY_ROLE_P1, FACTORY_NAV, BADGES, USD_MXN, USD_CAD, RATIO_LABELS, money, total, fsh_share, factory_share, _parts
 
 DESIGN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -64,7 +64,7 @@ STATE_TONE = {
     # 售后单
     '待确认': 'warning', '进行中': 'accent', '已完成': 'success', '已取消': 'muted', '待分配': 'warning',
     # 审批单 / 报备
-    '已批准': 'success', '已驳回': 'danger', '已超时': 'danger', '执行中': 'accent', '已执行': 'success', '执行失败': 'danger', '已撤回': 'muted',
+    '已批准': 'success', '已驳回': 'danger', '已超时': 'danger', '执行中': 'accent', '已执行': 'success', '执行失败': 'danger', '已撤回': 'muted', '暂停待确认': 'warning',
     # 人工操作清单
     '待执行': 'warning', '已回填': 'success',
     # 协商

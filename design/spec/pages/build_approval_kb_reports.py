@@ -107,6 +107,28 @@ AP_SUMMARY = {
                         'Shopify 订单 #1057 改收货地址，批准后经 Shopify Admin API 执行，成功即发出英语绑定回复。'),
 }
 
+# D-23：提交审批后客户又来信时，审批卡显示非阻断提示「提交后客户又来信 N 封」，可展开查看原文（prd_c P15、6.3）。
+# 示例来信 data.AP_NEW_MAIL 在演示时刻 10:20 之后（10:22），所以 P15 不显示，只在 StatesApproval A11 演示
+
+
+def new_mail_hint(no, expanded=False, note=True):
+    """审批卡上的非阻断提示（信息色，不影响批准）：折叠时为一行胶囊，展开后列出每封来信原文与 ✦ 中文译文。"""
+    mails = AP_NEW_MAIL.get(no) or []
+    if not mails:
+        return ''
+    pill_ = '<div style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: %s; background: %s; border: 1px solid %s; border-radius: 6px; padding: 0px 8px; line-height: 22px; white-space: nowrap; flex-shrink: 0;">%s提交后客户又来信 %d 封<span style="font-weight: 400; color: %s;">· %s</span><span style="display: inline-flex; align-items: center; gap: 2px; font-weight: 500; color: %s;">%s%s</span></div>' % (
+        T['info'], T['info_bg'], T['info_line'], icon('message', 13, T['info'], 2), len(mails), T['ink3'], mails[-1]['at'],
+        T['accent'], '收起' if expanded else '展开原文', '' if expanded else icon('chev_d', 12, T['accent'], 2))
+    if not expanded:
+        return pill_
+    items = ''.join(
+        '<div style="display: flex; flex-direction: column; gap: 3px; border-left: 2px solid %s; padding-left: 10px;"><div style="font-size: 12px; color: %s;"><b style="color: %s;">%s</b> · %s · 提交审批之后</div><div style="font-size: 13px; color: %s; line-height: 1.55;">%s</div><div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: %s;">%s%s</div></div>' % (
+            T['info_line'], T['ink4'], T['ink2'], m['from'], m['at'], T['ink'], m['en'], T['ink3'], ai_badge('译文', 11), m['zh']) for m in mails)
+    nt = muted('不影响批准。绑定回复发送前会再校验，有新来信时暂停，由发起人确认后再发（R-AP-06）。', 12) if note else ''
+    return '<div style="display: flex; flex-direction: column; gap: 8px; background: %s; border: 1px solid %s; border-radius: 6px; padding: 8px 12px;">%s%s%s</div>' % (
+        '#ffffff', T['info_line'], row(pill_, 8), items, nt)
+
+
 # AP-004 改地址：原地址 → 新地址，逐字段对比（data.PRIYA_ADDRESS_DIFF）
 PRIYA_ADDR = PRIYA_ADDRESS_DIFF
 
@@ -329,20 +351,26 @@ def chart_card(title, sub, body, extra=None, tag=''):
     return card(body, title=t, extra=extra or link('查看明细', 12, 'chev_r'), pad='14px 18px', gap=12, style='min-width: 0px;')
 
 
+def report_desc():
+    """P17 标题下的数据来源说明：「更新于」取 Gmail、亚马逊订单、Shopify 订单中最旧的一次同步（data.report_updated，D-24）。"""
+    return '数据来源：工单系统、登记台账、平台订单 · 更新于 %s' % report_updated()
+
+
 def p17():
-    head = page_head('报表', '数据来源：工单系统、登记台账、平台订单 ·更新于 10:15', btn('导出', 'secondary', 'md', 'download'))
+    head = page_head('报表', report_desc(), btn('导出', 'secondary', 'md', 'download'))
     filt = between(row(seg(['近 7 天', '本月', '自定义'], '近 7 天') + nowrap('09-05 至 09-11', 12, T['ink3']) + divider(True, 16) +
                        filter_chip('店铺', '全部') + filter_chip('站点', '全部') + filter_chip('标签'), 8),
                    chip('指标为示例数据', 'warning', 11, 'info'))
     R = REPORT
-    kpis = grid(kpi('工单量', str(R['tickets_week']), R['tickets_delta'], 'muted', '近 7 天 · 全部渠道') +
-                kpi('首响中位数', R['frt_median'], R['frt_delta'], 'success', '从来信到第一封回复') +
+    kpis = grid(kpi('工单量', str(R['tickets_week']), R['tickets_delta'], 'muted', '近 7 天 · 客户来信新建或重开') +
+                kpi('首响中位数', R['frt_median'], R['frt_delta'], 'success', '来信到首次回复 · 按来信到达归期') +
                 kpi('SLA 达标率（亚马逊）', R['sla_rate'], None, 'muted', '未达标 %d 封' % R['sla_miss']) +
                 kpi('草稿采纳率', R['adopt_rate'], None, 'muted', R['adopt_split']) +
                 kpi('自动发送占比', R['auto_rate'], None, 'muted', R['auto_note']), 5, 12)
 
     d10 = [x for x in R['daily'] if x[0] == '09-10'][0]
-    tip_d = drill_tip('09-10 · %d 单' % (d10[1] + d10[2]), ['亚马逊 %d · Shopify 与邮件 %d' % (d10[1], d10[2])], 'P04 工单（09-10）')
+    # 下钻到 P04 带与指标同口径的条件：新建或重开日期 + 来源客户（P04 以「来自报表」芯片显示，I16）
+    tip_d = drill_tip('09-10 · %d 单' % (d10[1] + d10[2]), ['亚马逊 %d · Shopify 与邮件 %d' % (d10[1], d10[2])], 'P04 工单（%s）' % P1_DRILL['label'])
     daily = chart_card('每日工单量', '按渠道堆叠 · 近 7 天 · 点柱下钻', legend([('亚马逊', T['amazon']), ('Shopify 与邮件', T['shopify'])]) +
                        stacked_columns(R['daily'], 184, 80, 20, hover=R['daily'].index(d10), tip=tip_d))
     ic = intent_counts(R['tickets_week'], R['intents'])
@@ -356,8 +384,9 @@ def p17():
     lt = ledger_totals()
     tot = round(sum(cbr.values()), 2)
     tip_c = drill_tip('%s · %s' % (order[0][0], money(order[0][1])), ['本月登记台账，不含待确认'], 'P13 登记台账（已按责任筛选）')
-    cost = chart_card('售后成本按责任类型', '来自登记台账（不含待确认）· 点条下钻',
-                      between(row(text(money(tot), 20, T['ink'], 700) + muted('%d 单 · 产品成本 + 运费 + 额外赔偿' % lt['count'], 12), 8, 'baseline'), '') +
+    # 卡头总额即售后成本（R-AS-08、D-24），不单设指标卡
+    cost = chart_card('售后成本按责任类型', '产品成本 + 运费 + 额外赔偿 + 其他',
+                      between(row(text(money(tot), 20, T['ink'], 700) + muted('售后成本 · %d 单 · 来自登记台账，不含待确认 · 点条下钻' % lt['count'], 12), 8, 'baseline'), '') +
                       hbars(order, money, 130, T['accent'], 96, hover=0, tip=tip_c), tag=lock_tag())
 
     seg_bar = ''
@@ -367,7 +396,7 @@ def p17():
             v * 100.0 / lt['factory'], c, ' margin-right: 2px;' if i < 2 else '', ' border-radius: 4px 0px 0px 4px;' if i == 0 else (' border-radius: 0px 4px 4px 0px;' if i == 2 else ''))
     bar = '<div style="display: flex; height: 14px;">%s</div>' % seg_bar
     rows_ = col(''.join('<div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><div style="width: 10px; height: 10px; border-radius: 2px; background: %s;"></div><div style="flex: 1; color: %s;">%s</div><div style="color: %s; width: 56px; text-align: right;">%s</div><div style="font-weight: 600; color: %s; width: 64px; text-align: right; font-variant-numeric: tabular-nums;">%s</div></div>' % (
-        c, T['ink2'], n + note, T['ink3'], '%.0f%%' % (v * 100.0 / lt['factory']), T['ink'], money(v)) for (n, v, c), note in zip(parts, [' · 批次 FQD-A、FZJ-A', ' · 进入 10-05 生成的 FQD-B', ' · 按建议比例估算，不进批次'])), 8)
+        c, T['ink2'], n + note, T['ink3'], '%.0f%%' % (v * 100.0 / lt['factory']), T['ink'], money(v)) for (n, v, c), note in zip(parts, [' · 批次 FQD-A、FZJ-A', ' · 进入 09-30 月末生成的 FQD-B', ' · 按建议比例估算，不进批次'])), 8)
     fac = chart_card('工厂承担与结算进度', '生产厂 FQD、FZJ · 点分段下钻 → P13', tag=lock_tag(), body=
                      row(text(money(lt['factory']), 20, T['ink'], 700) + muted('工厂承担（含估算）· 其中已确认 %s' % money(round(lt['settled'] + lt['pending'], 2)), 12), 8, 'baseline') + bar + rows_ +
                      '<div style="display: flex; gap: 16px; border-top: 1px solid %s; padding-top: 8px; font-size: 12px; color: %s;">%s</div>' % (T['line2'], T['ink3'], ''.join(

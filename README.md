@@ -34,13 +34,13 @@ design/
 
 | 分组 | 画板 |
 |---|---|
-| 高保真页面 P01–P24 | Main、TicketEmail、TicketEscalated、Tickets、TicketDetail、Customer、AfterSalesList、AfterSalesConfirm、AfterSalesTicket、AfterSalesInStock、AfterSalesRefund、AfterSalesNegotiation、AfterSalesLog、AfterSalesSettlement、Actions、KnowledgeBase、Reports、Settings、SettingsRules、SettingsTeam、FactoryPortal、SettingsActions、SettingsAfterSales、SettingsFactory |
-| 状态板 | StatesInbox、StatesApproval、StatesAfterSales、StatesFactory、StatesAdmin |
+| 高保真页面 P01–P27 | Main、TicketEmail、TicketEscalated、Tickets、TicketDetail、Customer、AfterSalesList、AfterSalesConfirm、AfterSalesTicket、AfterSalesInStock、AfterSalesRefund、AfterSalesNegotiation、AfterSalesLog、AfterSalesSettlement、Actions、KnowledgeBase、Reports、Settings、SettingsRules、SettingsTeam、FactoryPortal、SettingsActions、SettingsAfterSales、SettingsFactory、SettingsModels、SettingsHealth、AuditLog |
+| 状态板 | StatesInbox、StatesApproval、StatesAfterSales、StatesFactory、StatesAdmin（第一阶段过渡界面在 I16–I18、S13–S15、K19、K20） |
 | 规范 | DesignSystem、GlobalStates、PageMap |
 | 流程图（手工维护） | Architecture、LifeCycle、AfterSales、DecisionTree、EmailFlow |
 | 早期视觉方向（存档） | DirectionA、DirectionB、DirectionC |
 
-页面编号、状态编号（G/I/A/S/F/K）、规则编号（R-xx）、验收编号（AC-xx）在 PRD、画板与画布中一致。
+页面编号、状态编号（G/I/A/S/F/K）、规则编号（R-xx）、验收编号（AC-xx）在 PRD、画板与画布中一致。原型按完整产品画一套；各阶段的裁剪写在 PRD 各页「第一阶段」小节，过渡界面用状态板表达（决策 31、PRD D-24）。
 
 ## 修改与重建
 

@@ -25,9 +25,10 @@ ROWS_HIFI = [
     ('售后', [('AfterSalesList', 'P07 售后单列表'), ('AfterSalesConfirm', 'P08 确认责任与处理方式'), ('AfterSalesTicket', 'P09 售后单详情 · 易仓无货'),
             ('AfterSalesInStock', 'P10 售后单详情 · 易仓有货'), ('AfterSalesRefund', 'P11 售后单详情 · 部分补偿'), ('AfterSalesNegotiation', 'P12 承担比例协商'),
             ('AfterSalesLog', 'P13 登记台账'), ('AfterSalesSettlement', 'P14 内部结算')]),
-    ('审批、知识库、报表、设置、工厂工作台', [('Actions', 'P15 审批'), ('KnowledgeBase', 'P16 知识库'), ('Reports', 'P17 报表'), ('Settings', 'P18 设置 · 渠道与店铺'),
-                                ('SettingsActions', 'P22 设置 · 动作映射'), ('SettingsRules', 'P19 设置 · 处理规则'), ('SettingsAfterSales', 'P23 设置 · 售后规则'),
-                                ('SettingsTeam', 'P20 设置 · 团队与权限'), ('SettingsFactory', 'P24 设置 · 工厂账号'), ('FactoryPortal', 'P21 工厂工作台')]),
+    ('审批、知识库、报表、审计日志', [('Actions', 'P15 审批'), ('KnowledgeBase', 'P16 知识库'), ('Reports', 'P17 报表'), ('AuditLog', 'P27 审计日志')]),
+    ('设置、工厂工作台', [('Settings', 'P18 设置 · 渠道与店铺'), ('SettingsActions', 'P22 设置 · 动作映射'), ('SettingsRules', 'P19 设置 · 处理规则'),
+                   ('SettingsAfterSales', 'P23 设置 · 售后规则'), ('SettingsTeam', 'P20 设置 · 团队与权限'), ('SettingsFactory', 'P24 设置 · 工厂账号'),
+                   ('SettingsModels', 'P25 设置 · 模型'), ('SettingsHealth', 'P26 设置 · 系统状态'), ('FactoryPortal', 'P21 工厂工作台')]),
 ]
 STATES = [('StatesInbox', '状态板 · 收件箱与工单'), ('StatesApproval', '状态板 · 审批'), ('StatesAfterSales', '状态板 · 售后'),
           ('StatesFactory', '状态板 · 工厂工作台'), ('StatesAdmin', '状态板 · 知识库、报表、设置')]
@@ -72,7 +73,7 @@ def main(seed=False):
     for n, t in SPEC:
         w, _ = add(n, x, 0, t, 'page-0')
         x += w + GAP_X
-    notes.append({'id': 'note-ds', 'x': x, 'y': 0, 'w': 360, 'page': 'page-0', 'text': '怎么用这一页\n\n设计规范：色彩、字体、间距、组件、状态标识、文案规则。全部高保真页面只用这里的组件，研发实现以组件库 spec/ui.py 为准；与 shadcn/ui + Tailwind CSS v4 的令牌和组件对照见第 12 节。\n\n全局状态：加载、无权限、找不到、断网、集成中断、浮层提示、二次确认、并发、未保存离开、密度切换（G1–G9）。每个页面都适用。\n\n页面地图：24 个页面的跳转关系与 7 条关键用户路径，编号与 PRD 第 4、8 节一致。'})
+    notes.append({'id': 'note-ds', 'x': x, 'y': 0, 'w': 360, 'page': 'page-0', 'text': '怎么用这一页\n\n设计规范：色彩、字体、间距、组件、状态标识、文案规则。全部高保真页面只用这里的组件，研发实现以组件库 spec/ui.py 为准；与 shadcn/ui + Tailwind CSS v4 的令牌和组件对照见第 12 节。\n\n全局状态：加载、无权限、找不到、断网、集成中断、浮层提示、二次确认、并发、未保存离开、密度切换、站内通知、登录、登录被拒（G1–G12）。每个页面都适用。\n\n页面地图：27 个页面的跳转关系与关键用户路径，编号与 PRD 第 4、8 节一致。'})
 
     # 高保真页面
     y = 0
@@ -85,19 +86,21 @@ def main(seed=False):
             hmax = max(hmax, h)
         y += hmax + GAP_Y
 
+    notes.append({'id': 'note-phase1', 'x': -420, 'y': y, 'w': 340, 'page': 'page-2', 'text': '本页是完整产品的界面\n\n第一阶段（报表与台账）只上线登录、P04、P05、P13、P17、P18、P20、P27，按 PRD 各页「第一阶段」小节裁剪；其中 P04、P05、P13、P17、P18 的第一阶段版画在状态板 I16–I18、S13–S15、K19、K20，登录与站内通知见全局状态 G10–G12。'})
+
     # 状态板
     x = 0
     for n, t in STATES:
         w, _ = add(n, x, 0, t, 'page-6')
         x += w + GAP_X
-    notes.append({'id': 'note-states', 'x': 0, 'y': -260, 'w': 720, 'page': 'page-6', 'text': '状态与异常\n\n每个变体都有编号（I、A、S、F、K），与 PRD 第 8A 节表格一一对应，并写明触发条件与规格。全局状态（G1–G9）在「设计规范」页。测试用例按编号覆盖。'})
+    notes.append({'id': 'note-states', 'x': 0, 'y': -260, 'w': 720, 'page': 'page-6', 'text': '状态与异常\n\n每个变体都有编号（I、A、S、F、K），与 PRD 第 8A 节表格一一对应，并写明触发条件与规格。全局状态（G1–G12）在「设计规范」页。测试用例按编号覆盖。\n\n第一阶段（报表与台账）的过渡界面也在这里：I16–I18（工单列表、未归属来信队列、工单详情）、S13–S15（登记台账、新建与编辑登记、完成取消与补登）、K19（报表）、K20（渠道卡）。'})
 
     # 流程与架构（纵向）
     y = 0
     for n, t in FLOWS:
         w, h = add(n, 0, y, t, 'page-1')
         y += h + GAP_Y
-    notes.append({'id': 'note-flows', 'x': 1560, 'y': 0, 'w': 340, 'page': 'page-1', 'text': '流程与架构\n\n这些是给业务与技术评审看的全景图，规则的唯一定义在 PRD 第 5 至 7 节：\n\n· 系统架构：官方接入（买家消息经亚马逊邮件中转与 Gmail；订单、物流、库存与易仓出库单经积加；退款、改地址、取消经 SP-API 与 Shopify Admin API）、五步处理、统一动作接口、数据、工作台。\n· 产品全生命周期：七个阶段的客户触点、系统动作、人工介入、数据沉淀，下方是工单状态机。\n· 售后流程：两条创建路径、三种处理方式、报备、并行的比例协商。\n· AI Agent 决策逻辑：五步处理、风险信号、12 条处理规则、发送方式与动作分级。'})
+    notes.append({'id': 'note-flows', 'x': 1560, 'y': 0, 'w': 340, 'page': 'page-1', 'text': '流程与架构\n\n这些是给业务与技术评审看的全景图，规则的唯一定义在 PRD 第 5 至 7 节：\n\n· 系统架构：官方接入（买家消息经亚马逊邮件中转与 Gmail；订单经 SP-API 与 Shopify Admin API 平台直读；库存、易仓出库单、运费与亚马逊收件人经积加；物流轨迹经 17TRACK；退款、改地址、取消经 SP-API 与 Shopify Admin API）、五步处理、统一动作接口、数据、工作台。\n· 产品全生命周期：七个阶段的客户触点、系统动作、人工介入、数据沉淀，下方是工单状态机。\n· 售后流程：两条创建路径、三种处理方式、报备、并行的比例协商。\n· AI Agent 决策逻辑：五步处理、风险信号、12 条处理规则、发送方式与动作分级。'})
 
     # 邮件流转
     w, h = add('EmailFlow', 0, 0, '一封来信的完整流转', 'page-4')

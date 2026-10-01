@@ -60,11 +60,13 @@ NAV_BY_ROLE_P1 = {
 # ---------------------------------------------------------------- 店铺
 STORES = [
     # 亚马逊：买家消息走亚马逊官方邮件中转，收发都在该店铺绑定的邮箱（Gmail API）；订单、物流、库存走积加，退款与取消走 SP-API。Shopify：客服邮箱（Gmail API）+ Admin API 写动作。
-    {'id': 'amz-direct', 'name': 'Forcome Direct', 'platform': '亚马逊', 'sites': ['US', 'CA', 'MX'], 'mailbox': 'amz-direct@forcome.com', 'api': 'SP-API', 'sid': '卖家 ID A1FD7Q2M9XK3LC', 'signature': 'Forcome Support'},
-    {'id': 'amz-auto',   'name': 'Forcome Auto',   'platform': '亚马逊', 'sites': ['US'],             'mailbox': 'amz-auto@forcome.com',   'api': 'SP-API', 'sid': '卖家 ID A3KA8V1T6RW2NB', 'signature': 'Forcome Auto Care'},
-    {'id': 'shop-com',   'name': 'forcome.com',    'platform': 'Shopify', 'sites': ['US', 'CA'],      'mailbox': 'support@forcome.com',    'api': 'Admin API', 'sid': 'forcome-com.myshopify.com', 'signature': 'Forcome Support'},
-    {'id': 'shop-mx',    'name': 'forcome.mx',     'platform': 'Shopify', 'sites': ['MX'],            'mailbox': 'support@forcome.mx',     'api': 'Admin API', 'sid': 'forcome-mx.myshopify.com', 'signature': 'Forcome México'},
+    {'id': 'amz-direct', 'name': 'Forcome Direct', 'platform': '亚马逊', 'sites': ['US', 'CA', 'MX'], 'mailbox': 'amz-direct@forcome.com', 'api': 'SP-API', 'sid': '卖家 ID A1FD7Q2M9XK3LC', 'signature': 'Forcome Support', 'default_site': 'US'},
+    {'id': 'amz-auto',   'name': 'Forcome Auto',   'platform': '亚马逊', 'sites': ['US'],             'mailbox': 'amz-auto@forcome.com',   'api': 'SP-API', 'sid': '卖家 ID A3KA8V1T6RW2NB', 'signature': 'Forcome Auto Care', 'default_site': 'US'},
+    {'id': 'shop-com',   'name': 'forcome.com',    'platform': 'Shopify', 'sites': ['US', 'CA'],      'mailbox': 'support@forcome.com',    'api': 'Admin API', 'sid': 'forcome-com.myshopify.com', 'signature': 'Forcome Support', 'default_site': 'US'},
+    {'id': 'shop-mx',    'name': 'forcome.mx',     'platform': 'Shopify', 'sites': ['MX'],            'mailbox': 'support@forcome.mx',     'api': 'Admin API', 'sid': 'forcome-mx.myshopify.com', 'signature': 'Forcome México', 'default_site': 'MX'},
 ]
+# 店铺默认站点（来信无订单时用，D-23；P18 站点列加粗、K8）
+STORE_DEFAULT_SITE = {s['id']: s['default_site'] for s in STORES}
 
 # ---------------------------------------------------------------- 配件与商品
 PARTS = {
@@ -299,7 +301,7 @@ FACTORY_TASKS = [
 SETTLE_BATCHES = [
     {'no': '2026-09-FQD-A', 'factory': 'FQD', 'at': '09-08', 'items': ['S-20260904-0013'], 'state': '已结算', 'note': '提前生成；陈工 09-10 15:30 确认、王磊 09-10 确认'},
     {'no': '2026-09-FZJ-A', 'factory': 'FZJ', 'at': '09-08', 'items': ['S-20260905-0014'], 'state': '已结算', 'note': '提前生成；张工 09-10 16:05 确认、王磊 09-10 确认'},
-    {'no': '2026-09-FQD-B', 'factory': 'FQD', 'at': '10-05', 'items': ['S-20260908-0015', 'S-20260910-0017'], 'state': '待生成', 'note': '每月 5 日按生产厂自动生成上月批次，可提前生成'},
+    {'no': '2026-09-FQD-B', 'factory': 'FQD', 'at': '09-30', 'items': ['S-20260908-0015', 'S-20260910-0017'], 'state': '待生成', 'note': '每月末按生产厂自动生成当月批次，可提前生成'},
 ]
 BATCH = {b['no']: b for b in SETTLE_BATCHES}
 
@@ -627,7 +629,14 @@ def intent_counts(total_n, intents):
 # ---------------------------------------------------------------- 设置示例（P18–P20 与 StatesAdmin）
 # 渠道卡「最近同步」时刻（P18）；「异常」为 K7 连接异常画面里的最后一次成功同步
 CHANNEL_SYNC = {'SP-API': '10:12', 'SP-API 异常': '10:02', 'Shopify': '10:15', '积加': '10:16', 'Gmail': '10:18', 'Gmail 异常': '10:04',
-                '钉钉': '10:00', '易仓': '10:16'}
+                '钉钉': '10:00', '易仓': '10:16', '钉钉 延迟': '08:00'}  # 「钉钉 延迟」为 K20 同步延迟示例的最近同步
+DINGTALK_LATE_SYNC = CHANNEL_SYNC['钉钉 延迟']
+SQS_STATE = ('正常', 0)       # 亚马逊订单通知队列（SQS）：状态, 积压条数（P18、K20）
+AMZ_BACKFILL_DAYS = 90        # 第一阶段亚马逊订单回补天数（K20）
+SLA_HOURS = {'亚马逊': 24, '内部目标': 24}  # K22：亚马逊首次回复时限（平台考核）与 Shopify 与邮件内部目标的全局值
+# K24 模板编辑示例：正文含具体时刻「by Friday」，保存时按 R-SL-05 报错
+TEMPLATE_DEMO = {'name': '进展回复 · 英语', 'body': 'Hi {客户名}, thanks for your patience. We are checking order {订单号} with the carrier and will update you by Friday.',
+                 'bad': 'by Friday'}
 # 关闭风险信号的影响（P19 二次确认提示）：近 30 天约少转人工的封数
 RISK_OFF_IMPACT = {'重复联系': 23, '高价值': 14}
 # 发送方式与阈值（P19、StatesAdmin K6/K9）
@@ -866,7 +875,7 @@ SHOPIFY_BACKFILL_DAYS = 60  # 第一阶段示例：未开通 read_all_orders，S
 
 # ---------------------------------------------------------------- 审计日志（P27、K18）：(时刻, 操作人, 角色, 对象类型, 对象, 动作, 变更摘要, 来源 IP, 越权)
 AUDIT_LOG = [
-    ('10:19', '周敏', '客服主管', '审批单', 'AP-20260911-004', '批准', '状态：待审批 → 执行中', '10.20.3.41', False),
+    ('10:14', '系统', '系统', '渠道', 'Gmail · support@forcome.mx', '恢复连接', '状态：连接异常 → 已连接（补拉 3 封来信）', '—', False),
     ('10:16', '系统', '系统', '售后单', 'S-20260909-0016', '✦ 生成补登建议', '快递单号：— → 1Z4R28830358229088（未写入，等核对）', '—', False),
     ('10:05', '系统', '系统', '渠道', 'Gmail · support@forcome.mx', '连接异常', '状态：已连接 → 连接异常（连续 3 次失败）', '—', False),
     ('09:52', '刘洋', '管理员', '成员', '陈晨', '修改店铺范围', '店铺范围：全部店铺 → Forcome Direct、forcome.mx', '10.20.1.12', False),
@@ -877,6 +886,9 @@ AUDIT_LOG = [
     ('08:31', '张工', '生产厂对接人', '售后单', 'S-20260911-0018', '越权访问被拒', '该单属于生产厂 FQD（R-FT-01）', '58.211.20.6', True),
     ('08:02', '李婷', '坐席', '登录', '钉钉扫码', '登录', '会话有效期 7 天（无操作）', '10.20.3.27', False),
 ]
+# P27 第一行（10:14 Gmail 恢复连接）展开后的完整前后值：(字段, 前, 后)
+AUDIT_P27_EXPAND = [('状态', '连接异常', '已连接'), ('最近同步成功', '10:04', '10:14'), ('补拉', '—', '3 封来信（10:05–10:13 到达，SLA 按原到达时间）'),
+                    ('触发', '连续 3 次失败', '第 4 次重试成功')]
 # K18 管理员视角展开的一条：售后单设为已完成（财务字段对管理员显示「已隐藏」）：(字段, 前, 后, 是否财务字段)
 AUDIT_EXPAND_DEMO = {'at': '09-10 17:20', 'who': '王磊', 'obj': 'S-20260909-0016', 'action': '设为已完成',
                      'fields': [('状态', '进行中', '已完成', False), ('完成时间', '—', '09-10 17:20', False),
@@ -950,6 +962,24 @@ TAG_LIBRARY = [('路途急', '客户写明了出行或使用期限', 38, '已启
 TEMPLATES = [('进展回复 · 英语', '进展回复', '英语', '全部', '全部店铺', '09-02'), ('进展回复 · 西班牙语', '进展回复', '西班牙语', '全部', 'Forcome Direct、forcome.mx', '09-02'),
              ('签名 · Forcome Support', '签名', '英语', '邮件', 'forcome.com', '08-20'), ('签名 · Forcome México', '签名', '西班牙语', '邮件', 'forcome.mx', '08-20'),
              ('补发已寄出通知', '通知', '英语', '全部', '全部店铺', '09-05')]
+
+
+# ---------------------------------------------------------------- P15 / A11 / G7 演示
+# A11（D-23，6.3、R-AP-06）：AP-20260911-002（09:35 李婷提交）提交后客户又来信。时刻在演示时刻 10:20 之后，
+# 所以 P15（10:20）不出现提示，TICKETS 也不变；审批卡上的非阻断提示「提交后客户又来信 N 封」只在 StatesApproval A11 演示
+AP_NEW_MAIL = {
+    'AP-20260911-002': [{'at': '10:22', 'from': 'Marcus Lee',
+                         'en': "Do I need to send the grey one back? There's no return label in the box.",
+                         'zh': '灰色那台需要寄回吗？箱子里没有退货标签。'}],
+}
+# A11 时间线：① 周敏看到提示 → ② 批准、出库单创建成功并暂停（审批单已执行，子状态暂停待确认）、李婷视角 → ③ 李婷选择
+A11_DEMO = {'view1': '10:23', 'approve': '10:24', 'outbound': '10:25', 'paused': '10:25', 'view': '10:26', 'choice': '照常发送', 'chosen': '10:27'}
+# GlobalStates G7 乐观锁冲突：赵倩（知识库负责人）编辑王磊负责的排查树条目时，王磊 10:18 先保存了一版
+G7_OCC = {'record': next(k for k in KB if k[0] == '吸力下降排查'), 'by': '王磊', 'at': '10:18', 'field': '第 2 步',
+          'mine': '取下 HEPA 滤芯，轻拍除尘后用冷水冲洗，晾干 24 小时再装回；滤芯发黄或破损直接更换。',
+          'theirs_fields': '第 2 步、适用型号'}
+# StatesInbox I18 第二张小图：生产厂来信正文（工单 T-20260911-0036，主题取 P1_EXTRA_TICKETS）
+P1_FACTORY_MAIL = '附件为 9 月电池批次抽检报告，请查收。若有客诉涉及该批次，请回复本邮件告知订单号，我们安排追溯。'
 
 
 if __name__ == '__main__':

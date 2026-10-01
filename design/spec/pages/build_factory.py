@@ -89,7 +89,7 @@ def f_list(sel='S-20260911-0019', empty=False, override=None):
     foot = '<div style="padding: 12px 16px; border-top: 1px solid %s; background: %s; display: flex; flex-direction: column; gap: 4px;">%s%s%s</div>' % (
         T['line'], T['subtle'], between(nowrap('本月本厂应承担（已确认）', 12, T['ink3']), nowrap(money(round(LT['settled'] + LT['pending'], 2)), 14, T['ink'], 700)),
         nowrap('已结算 %s · 待结算 %s' % (money(LT['settled']), money(LT['pending'])), 11, T['ink3']),
-        between(nowrap('批次 2026-09-FQD-B 于 10-05 生成', 11, T['ink3']), link('查看结算', 12, 'chev_r')))
+        between(nowrap('批次 2026-09-FQD-B 于 09-30 月末生成', 11, T['ink3']), link('查看结算', 12, 'chev_r')))
     return '<div style="width: 320px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 16px; box-shadow: 0 1px 2px rgba(16,20,35,0.04); overflow: hidden; margin: 10px 0px 12px 14px; display: flex; flex-direction: column; min-height: 0px;">%s%s%s</div>' % (
         T['line'], head, body, foot)
 

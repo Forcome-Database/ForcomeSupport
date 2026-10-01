@@ -60,7 +60,7 @@ buttons = col(
                                                                               tooltip('Laura Bennett 在 Forcome Auto 没有其他未关闭的工单，无可合并对象（合并仅限同店铺、同客户）'), 10, 'flex-start') +
              muted('禁用按钮必须给出原因：外层带 title 悬停说明（研发用 Tooltip 包裹禁用按钮）；原因影响下一步时同时写在按钮旁。不给原因的禁用按钮不允许出现。', 12), 8) +
          col(label('快捷键 Kbd（shadcn Kbd）') + row(kbd('Ctrl') + kbd('K') + nowrap('全局搜索与命令面板', 13, T['ink2']), 6) +
-             muted('全站只有顶部搜索设快捷键（Mac 为 ⌘K）。其他按钮、队列、页签不设快捷键，也不显示按键小标。', 12), 8), 2, 24) +
+             muted('全站只有顶部搜索设快捷键（Mac 为 ⌘K）。其他按钮、队列、页签不设快捷键，也不显示按键小标。第一阶段不显示全局搜索（prd_b 4.1）。', 12), 8), 2, 24) +
     muted('文案用动词短语，说清结果：「批准并通知生产厂寄出」而不是「确定」。禁用按钮必须写原因（见上）。点击后进入「处理中」并防止重复提交；成功后按钮恢复并弹出成功提示。', 12), 14)
 
 forms = grid(''.join([
@@ -101,7 +101,7 @@ states = grid(''.join(col(label(n) + row(''.join(state(s) for s in ss), 6, wrap=
 ]), 2, 18) + muted('规则：状态一律带圆点并用语义浅底；分类值一律中性灰；AI 产出一律用渐变 ✦ 徽标（' + ai_badge('AI 摘要') + '）。同一个状态在所有页面颜色相同，映射表在组件库 STATE_TONE。', 12)
 
 feedback = grid(''.join([
-    col(label('页内横幅') + banner('info', '工单已合并到 T-20260902-0071', '原工单只读，新来信会进入主工单。') + banner('success', '已批准，出库单创建成功', '回复已自动发出，SLA 计时停止。') + banner('warning', 'SLA 剩 55 分钟，审批时限 4 小时', '承诺类回复要等审批后才能发出。建议先发一条不含承诺的进展回复。', btn('插入进展回复', 'secondary', 'sm')) + banner('danger', 'Gmail 连接中断，来信暂存队列', '09-11 10:05 起未收取。恢复后按到达顺序处理，SLA 从原到达时间计算。', btn('查看状态', 'secondary', 'sm')), 10),
+    col(label('页内横幅') + banner('info', '工单已合并到 T-20260902-0071', '原工单只读，新来信会进入主工单。') + banner('success', '已批准，出库单创建成功', '回复已自动发出，SLA 计时停止。') + banner('warning', 'SLA 剩 55 分钟，审批时限 4 小时', '承诺类回复要等审批后才能发出。建议先发一条不含承诺的进展回复。', btn('插入进展回复', 'secondary', 'sm')) + banner('danger', 'Gmail 连接中断，来信暂存队列', '09-11 10:05 起未收取。恢复后按到达顺序处理，SLA 从原到达时间计算。管理员、客服主管已收到通知。', btn('查看渠道状态', 'secondary', 'sm')), 10),
     col(label('浮层提示（右上角，成功 3 秒消失，失败需手动关闭）') + toast('success', '已提交审批', '周敏会在 4 小时内处理，结果会通知你。') + toast('error', '发送失败：Gmail 接口超时', '草稿已保留，系统将在 1 分钟后自动重试。', row(link('立即重试') + link('复制草稿'), 12)) + toast('info', '陈晨正在处理这张工单', '你可以查看，但不能同时编辑回复。') + toast('warning', '草稿已失效', '客户在你编辑期间又来了一封信，请先阅读新消息。') +
         toast('neutral', '查询易仓库存：第 2 次重试成功', '积加接口首次超时，结果已更新。') +
         label('可撤销浮层 · toast(..., undo=5)（可逆操作不弹确认）', 'margin-top: 4px;') + toast('success', '已关闭工单 T-20260910-0192', undo=5, remain=3) + toast('success', '已驳回报备 AP-20260911-003', '已通知发起人王磊。', undo=5), 10),
@@ -133,7 +133,7 @@ data_disp = grid(''.join([
 
 loading = grid(''.join([
     col(label('空状态') + card(empty('inbox', '收件箱已清空', '没有待你处理的工单。新来信会自动出现在这里。', btn('查看全部工单', 'secondary')), pad='0px'), 8),
-    col(label('无权限') + card(no_permission('没有访问权限', '「设置」只对客服主管和管理员开放。如需开通，请联系管理员刘洋。'), pad='0px'), 8),
+    col(label('无权限') + card(no_permission('没有访问权限', '「渠道与店铺」只对管理员开放。你当前的角色是坐席，如需开通请联系管理员刘洋。', btn('返回首页', 'secondary', 'md', 'chev_l')), pad='0px'), 8),
     col(label('加载失败') + card(load_error('报表加载失败', '积加接口超时。已显示的数据截止 09-11 09:30。'), pad='0px'), 8),
     col(label('骨架屏（首屏加载 > 300ms 时显示）') + card(skel_rows(4, True), pad='0px') + row(spinner() + muted('局部加载用行内转圈，不遮挡整页'), 8) + progress(62) , 8),
 ]), 4, 20)
@@ -159,14 +159,14 @@ color_rules = table([('颜色', 'left'), ('含义', 'left'), ('示例', 'left'),
 ], '130px 300px 360px minmax(0, 1fr)', dense=True)
 
 shell_note = grid(''.join([
-    card(label('页面外壳') + text('顶部 56px 白色顶栏：品牌标（渐变 F）· 分段导航（浅灰轨道，当前项白底描边，待办数用浅靛蓝计数）· 店铺范围（按授权店铺过滤全站数据）· 搜索（Ctrl K 命令面板）· 密度（舒适 / 紧凑）· 通知 · 当前用户与角色。第一期只有浅色，不放主题切换。导航项按角色显示，无权入口不出现。', 13) + text('内容区为浅灰底（#f5f6fa）：列表页「标题区 + 筛选行 + 表格卡片」；详情页「标题区 + 左主右辅两栏（右栏 360–400px）」；收件箱、知识库、设置、工厂工作台用 16px 圆角的浮动面板，面板间距 12px。', 13) + text('收件箱三栏：队列 308 / 处理台（自适应，内容区浅底）/ 上下文 332；上下文分区可折叠。', 13), pad='16px 18px'),
+    card(label('页面外壳') + text('顶部 56px 白色顶栏：品牌标（渐变 F）· 分段导航（浅灰轨道，当前项白底描边，待办数用浅靛蓝计数）· 店铺范围（按授权店铺过滤全站数据）· 搜索（Ctrl K 命令面板）· 密度（舒适 / 紧凑）· 通知（铃铛面板，带未读数，G10）· 当前用户与角色（头像菜单：审计日志、密度、退出登录）。第一期只有浅色，不放主题切换。导航项按角色显示，无权入口不出现。第一阶段不显示店铺范围与全局搜索（prd_b 4.1）。', 13) + text('内容区为浅灰底（#f5f6fa）：列表页「标题区 + 筛选行 + 表格卡片」；详情页「标题区 + 左主右辅两栏（右栏 360–400px）」；收件箱、知识库、设置、工厂工作台用 16px 圆角的浮动面板，面板间距 12px。', 13) + text('收件箱三栏：队列 308 / 处理台（自适应，内容区浅底）/ 上下文 332；上下文分区可折叠。', 13), pad='16px 18px'),
     card(label('交互通则') + text('1. 所有写操作点击后立即进入「处理中」，防重复提交；成功给浮层提示，失败给可重试的提示并保留输入。', 13) +
          text('2. 二次确认只用于不可逆操作：执行退款、终止流程、停用成员、录入最终比例（锁定）、生成结算批次——用确认弹窗（AlertDialog），危险确认默认焦点在「取消」。', 13) +
          text('3. 可逆操作直接执行，不弹确认：关闭工单、驳回、撤回、改派、合并等。执行后弹 5 秒「撤销」浮层（toast(..., undo=5)），5 秒内可一键恢复；需要原因的（驳回、终止）仍用弹窗收集原因，但不再追问「确定吗」。', 13) +
          text('4. 同一工单同一时间只允许一人编辑回复，其他人只读并看到「谁在处理」；审批单同理，审批人打开即加处理锁（R-AP-03）。', 13) + text('5. 列表默认排序写在列表上方；筛选条件在地址栏保留，刷新后不丢。', 13) +
          text('6. 禁用的按钮必须写原因（btn(..., reason=…) 悬停说明，影响下一步时写在按钮旁）。', 13) +
          text('7. 行首色条两种用法，不混用：收件箱队列卡片左侧色条只表示风险（转人工红），选中用浅底 + 描边，不用色条；列表表格行（如 P07 售后单列表）左侧 3px 黄条表示「需我处理」（待确认、协商待升级），属于「需要关注」的黄，不表示风险。', 13), pad='16px 18px'),
-    card(label('快捷键与键盘') + text('快捷键只保留顶部搜索：Ctrl K（Mac 为 ⌘K）打开全局搜索与命令面板。其他页面不设快捷键，也不显示按键小标。', 13) +
+    card(label('快捷键与键盘') + text('快捷键只保留顶部搜索：Ctrl K（Mac 为 ⌘K）打开全局搜索与命令面板。其他页面不设快捷键，也不显示按键小标。第一阶段不显示全局搜索（prd_b 4.1）。', 13) +
          text('弹窗沿用浏览器与 shadcn 的默认键盘行为：Esc 关闭即取消；单行输入框里回车提交，多行文本里是换行；危险确认框打开时焦点在「取消」。', 13) +
          text('提交、批准或驳回后自动打开队列里的下一张，并在浮层提示里给「撤销」或「返回上一张」。', 13), pad='16px 18px'),
 ]), 3, 16)
@@ -242,6 +242,9 @@ CMP = [
     ('search_box（Ctrl K）', 'Command（CommandDialog）', '全局搜索与命令面板'),
     ('toast（undo=5 撤销浮层）', 'Sonner（toast 的 action）', '成功 3 秒消失，失败常驻；可逆操作带 5 秒「撤销」'),
     ('kbd', 'Kbd', '只用于顶部搜索的 Ctrl K'),
+    ('通知面板（G10）', 'Popover + Tabs + ScrollArea', '宽 360；全部 · 未读；未读圆点 + 浅底；全部已读'),
+    ('头像菜单（G10）', 'DropdownMenu', '姓名、角色与部门；审计日志 · 密度 · 退出登录'),
+    ('登录卡片（G11、G12）', 'Card', '钉钉扫码二维码（2 分钟过期蒙层 + 刷新）；被拒时换成说明'),
     ('blocker（当前卡点）', 'Alert（自定义布局）', '详情页步骤条上方：在等谁 · 还剩多久 · 你可以做什么'),
     ('fee_card · fee_amt · money_cur', 'Card + Table', '费用与承担；金额三态：估算 ≈ / 已确认 / 已结算 ✓'),
     ('save_bar', '自定义组件（sticky 底栏）+ Button', '设置页未保存修改：放弃 · 保存'),
@@ -280,14 +283,20 @@ body = col(''.join([
 save('DesignSystem.dc.html', board('设计规范', '视觉 v3：顶栏分段导航 + 浅灰底浮动面板 + 靛蓝主色，AI 用靛蓝→青色渐变标识（参考 forcome-support-console.html）。本板定义色彩、字体、间距、组件、状态与研发映射；所有高保真页面只使用这里的组件，开发用 shadcn/ui + Tailwind CSS v4。', body, 1920, 2400))
 
 # ---------------------------------------------------------------- 全局状态
-from data import NOW_LABEL, TICKETS
+from data import NOW_LABEL, TICKETS, G7_OCC
 _g7_t = next(t for t in TICKETS if t['no'] == 'T-20260902-0071')  # G7 并发示例：陈晨负责的工单
 page_skel = app('liting', '收件箱', ['收件箱', '待处理'], '<div style="flex: 1; display: flex; gap: 12px; padding: 10px 14px 12px 14px; min-height: 0px;"><div style="width: 308px; background: #ffffff; border: 1px solid %s; border-radius: 16px; overflow: hidden;">%s</div><div style="flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; background: #ffffff; border-radius: 16px;">%s%s%s%s</div><div style="width: 332px; background: #ffffff; border: 1px solid %s; border-radius: 16px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">%s%s%s%s</div></div>' % (
     T['line'], skel_rows(8), skel('50%', 16), skel('100%', 90, 8), skel('100%', 200, 8), skel('40%', 32, 6), T['line'], skel('40%', 10), skel('80%', 10), skel('100%', 120, 8), skel('100%', 80, 8)), w=1440, h=900)
-page_403 = app('liting', '', ['设置'], '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(no_permission('没有访问权限', '「设置」只对客服主管和管理员开放。你当前的角色是坐席。如需开通，请联系管理员刘洋。', row(btn('返回收件箱', 'primary', 'md', 'chev_l') + btn('申请权限', 'secondary'), 8)), pad='8px 24px'))
-page_404 = app('liting', '工单', ['工单', 'T-20260801-9999'], '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(empty('search', '找不到这张工单', '工单 T-20260801-9999 不存在，或已按数据保留策略清除。', row(btn('返回工单列表', 'primary') + btn('按订单号搜索', 'secondary', 'md', 'search'), 8)), pad='8px 24px'))
+# G2 无权限：写明哪个角色能看；按钮只有「返回首页」（回到该角色的默认首页，坐席为收件箱），没有「申请权限」（prd_c GlobalStates）
+G2_DESC = '「渠道与店铺」只对管理员开放。你当前的角色是坐席，如需开通请联系管理员刘洋。'
+# G3 找不到：不写保留策略（D-21 个人信息长期保留）
+G3_DESC = '工单 T-20260801-9999 不存在，请检查编号或链接是否完整。'
+# G4 集成中断横幅：不可关闭、恢复后自动消失；本图为坐席李婷视角，「查看渠道状态」只对管理员显示，这里不出现
+G4_BANNER = ('Gmail 连接中断，来信暂存队列', '09-11 10:05 起未收取。恢复后自动补收，按到达顺序处理，SLA 从原到达时间计算。管理员、客服主管已收到通知。')
+page_403 = app('liting', '', ['设置', '渠道与店铺'], '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(no_permission('没有访问权限', G2_DESC, btn('返回首页', 'primary', 'md', 'chev_l')), pad='8px 24px'))
+page_404 = app('liting', '工单', ['工单', 'T-20260801-9999'], '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(empty('search', '找不到这张工单', G3_DESC, row(btn('返回工单列表', 'primary') + btn('按订单号搜索', 'secondary', 'md', 'search'), 8)), pad='8px 24px'))
 page_offline = app('liting', '收件箱', ['收件箱', '待处理'], '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(load_error('网络连接已断开', '你刚才编辑的回复已保存在本机。恢复连接后会自动同步，不需要重新输入。', row(btn('重新连接', 'primary', 'md', 'refresh'), 8)), pad='8px 24px'),
-                   banner_html=banner('danger', 'Gmail 连接中断，来信暂存队列', '09-11 10:05 起未收取。恢复后按到达顺序处理，SLA 从原到达时间计算。管理员已收到通知。', btn('查看渠道状态', 'secondary', 'sm')))
+                   banner_html=banner('danger', *G4_BANNER))
 
 
 def scaled(inner, w=1440, h=900, s=0.5):
@@ -300,15 +309,36 @@ def focus(page, key, w=720, h=450, note='整页缩略图（淡化）+ 关键区�
         w, h, T['canvas'], scaled(page, s=w / 1440.0), key, nowrap(note, 11, T['ink4']))
 
 
-key_403 = card(no_permission('没有访问权限', '「设置」只对客服主管和管理员开放。你当前的角色是坐席。如需开通，请联系管理员刘洋。', row(btn('返回收件箱', 'primary', 'md', 'chev_l') + btn('申请权限', 'secondary'), 8)), pad='0px 16px', style='width: 460px; box-shadow: %s;' % SHADOW_LG)
-key_404 = card(empty('search', '找不到这张工单', '工单 T-20260801-9999 不存在，或已按数据保留策略清除。', row(btn('返回工单列表', 'primary') + btn('按订单号搜索', 'secondary', 'md', 'search'), 8)), pad='0px 16px', style='width: 460px; box-shadow: %s;' % SHADOW_LG)
-key_offline = col(banner('danger', 'Gmail 连接中断，来信暂存队列', '09-11 10:05 起未收取。恢复后自动补收，按到达顺序处理，SLA 从原到达时间计算。', btn('查看渠道状态', 'secondary', 'sm')) +
+key_403 = card(no_permission('没有访问权限', G2_DESC, btn('返回首页', 'primary', 'md', 'chev_l')), pad='0px 16px', style='width: 460px; box-shadow: %s;' % SHADOW_LG)
+key_404 = card(empty('search', '找不到这张工单', G3_DESC, row(btn('返回工单列表', 'primary') + btn('按订单号搜索', 'secondary', 'md', 'search'), 8)), pad='0px 16px', style='width: 460px; box-shadow: %s;' % SHADOW_LG)
+key_offline = col(banner('danger', *G4_BANNER) +
                   card(load_error('网络连接已断开', '回复草稿已保存在本机。恢复连接后自动重试未完成的提交，并用浮层提示结果。', btn('立即重试', 'secondary', 'md', 'refresh')), pad='0px 16px', style='box-shadow: %s;' % SHADOW_LG) +
                   toast('neutral', '网络已恢复 · 已自动重新提交 1 项', '回复 T-20260910-0192 已发出。'), 10, 'width: 560px;')
 
 toasts_frame = mini(col(toast('success', '已提交审批', '周敏会在 4 小时内处理，结果会通知你。') + toast('error', '保存失败：网络不可用', '修改已保存在本机，网络恢复后自动重试并提示结果。', link('立即重试')) + toast('success', '已关闭工单 T-20260910-0192', undo=5, remain=3), 10, 'align-items: flex-end;'), 700, 330, pad='20px')
 confirm_frame = mini('<div style="flex: 1; display: flex; align-items: center; justify-content: center; background: rgba(16,24,40,0.45);">%s</div>' % dialog('执行退款 MX$889.00？', muted('退款经 SP-API 立即发给买家 Mateo Rivas，执行后不能撤销。', 13) + kv('订单', '302-8811234-9901122') + kv('金额', money_cur(889.00, 'MXN')), btn('取消', 'secondary', st='focus') + btn('执行退款', 'danger'), 440, 'danger'), 700, 330)
-conflict_frame = mini(col(banner('info', '陈晨正在处理这张工单', '09-11 10:12 开始编辑回复。你可以查看会话和上下文，回复框只读。', row(btn('申请接手', 'secondary', 'sm') + btn('刷新', 'ghost', 'sm', 'refresh'), 6)) + banner('warning', '这张工单在你编辑期间收到新来信', '09-11 10:18 %s 又发来 1 封。你的草稿已保留，请阅读新消息后再发送。' % _g7_t['customer'], btn('查看新消息', 'secondary', 'sm')) + banner('info', '这张工单不在你的店铺范围内', '工单属于店铺 forcome.mx。你的数据范围不含该店铺，需要查看请联系客服主管开通。', btn('联系主管', 'secondary', 'sm')), 10), 700, 330, pad='20px')
+# G7 乐观锁冲突示例：data.G7_OCC（赵倩编辑王磊负责的排查树条目时，王磊 10:18 先保存了一版）
+
+
+def g7_occ():
+    o = G7_OCC
+    rec = o['record']
+    head = between(row(text('编辑条目 · %s' % rec[0], 13, T['ink'], 700) + cat(rec[1]), 8), nowrap('你：赵倩 · 知识库负责人 · 点「保存」时', 12, T['ink4']))
+    bn = banner('warning', '这条记录刚被%s修改（%s）' % (o['by'], o['at']),
+                '%s改了：%s。你的修改还没保存，已保留在下方；可先查看最新内容再改，或用你的内容覆盖。' % (o['by'], o['theirs_fields']),
+                row(btn('查看最新', 'secondary', 'sm', 'refresh') + btn('覆盖保存', 'danger_outline', 'sm'), 6))
+    fld = field(o['field'], textarea_box(o['mine'], st='focus', h=40), hint='你的输入 · 未保存（已保留）')
+    top = card(head + bn + fld, pad='12px 14px', gap=10)
+    dlg = dialog('覆盖%s的修改？' % o['by'], muted('%s %s 保存的「%s」等 2 项会被你的内容替换，覆盖后记入审计日志。' % (o['by'], o['at'], o['field']), 12),
+                 btn('取消', 'secondary', 'sm', st='focus') + btn('覆盖保存', 'danger', 'sm'), 420, 'warning')
+    bottom = '<div style="display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(16,24,40,0.45); border-radius: 12px;">%s</div>' % dlg
+    return col(top + bottom, 10)
+
+
+conflict_frame = mini(col(
+    nowrap('编辑锁 · 草稿失效 · 数据范围', 12, T['ink2'], 600) +
+    banner('info', '陈晨正在处理这张工单', '09-11 10:12 开始编辑回复。你可以查看会话和上下文，回复框只读。', row(btn('申请接手', 'secondary', 'sm') + btn('刷新', 'ghost', 'sm', 'refresh'), 6)) + banner('warning', '这张工单在你编辑期间收到新来信', '09-11 10:18 %s 又发来 1 封。你的草稿已保留，请阅读新消息后再发送。' % _g7_t['customer'], btn('查看新消息', 'secondary', 'sm')) + banner('info', '这张工单不在你的店铺范围内', '工单属于店铺 forcome.mx。你的数据范围不含该店铺，需要查看请联系客服主管开通。', btn('联系主管', 'secondary', 'sm')) +
+    nowrap('乐观锁冲突 · 保存时发现记录已被他人修改 → 点「覆盖保存」二次确认', 12, T['ink2'], 600, ) + g7_occ(), 10), 700, 800, pad='20px')
 unsaved_frame = mini(col(
     nowrap('草稿类（回复框、内部备注）· 自动保存，离开不弹窗', 12, T['ink2'], 600) +
     row(toast('neutral', '草稿已保存', '离开后保留 7 天，下次打开这张工单时恢复。'), 0, justify='flex-end') +
@@ -335,17 +365,140 @@ def dens_col(dense):
 from data import AFTERSALES, total, money
 dens_frame = '<div style="width: 1500px; box-sizing: border-box; padding: 20px; background: %s; display: flex; gap: 24px; align-items: flex-start;">%s%s</div>' % (T['canvas'], dens_col(False), dens_col(True))
 
+# ---------------------------------------------------------------- G10 站内通知 + 头像菜单（周敏视角）
+import ui as UI
+from data import NOTIFICATIONS, STAFF, NAV_BY_ROLE, BADGES
+ZM = STAFF['zhoumin']
+ZM_NAV = NAV_BY_ROLE[ZM['role']]
+ZM_BADGES = {k: v for k, v in BADGES.get('zhoumin', {}).items() if k in ZM_NAV}
+UNREAD = sum(1 for n in NOTIFICATIONS if not n[6])
+
+
+def topbar_crop(w, bell_n=UNREAD):
+    """顶栏 1:1 右侧裁切（店铺范围 · 搜索 · 密度 · 铃铛 · 头像）。"""
+    return '<div style="width: %dpx; height: 56px; overflow: hidden; position: relative; flex-shrink: 0;"><div style="position: absolute; right: 0px; top: 0px; width: 1440px;">%s</div></div>' % (
+        w, UI._topbar(ZM_NAV, '审批', ZM, ZM_BADGES, bell_n=bell_n))
+
+
+def notif_item(n):
+    tm, tone, ic, title, desc, obj, read = n
+    fg, bg, _ = TONES[tone]
+    ico = '<div style="width: 28px; height: 28px; border-radius: 8px; background: %s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (bg, icon(ic, 15, fg, 2))
+    dot = '<div style="width: 7px; height: 7px; border-radius: 999px; background: %s; flex-shrink: 0; margin-top: 6px;"></div>' % (T['accent'] if not read else 'transparent')
+    body = col(between(ellipsis(title, 13, T['ink'] if not read else T['ink2'], 600 if not read else 500), nowrap(tm, 11, T['ink4'])) +
+               ellipsis(desc, 12, T['ink3']) + nowrap(obj, 12, T['accent'], 500), 1, 'flex: 1; min-width: 0px;')
+    return '<div style="display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border-radius: 8px; background: %s;">%s%s%s</div>' % (
+        T['subtle'] if not read else '#ffffff', ico, body, dot)
+
+
+def notif_panel(items, unread, tab='全部', empty_html=''):
+    """站内通知面板（shadcn Popover + Tabs + ScrollArea），宽 360。"""
+    head = between(text('通知', 14, T['ink'], 700), link('全部已读', 12, 'check') if unread else nowrap('全部已读', 12, T['ink5']))
+    tb = tabs([('全部', None), ('未读', unread)], tab)
+    lst = ''.join(notif_item(n) for n in items) if items else empty_html
+    foot = '<div style="padding: 8px 14px; border-top: 1px solid %s; font-size: 11px; color: %s;">点一条即跳到对应对象并标为已读</div>' % (T['line2'], T['ink4']) if items else ''
+    return '<div style="width: 360px; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; box-shadow: %s; display: flex; flex-direction: column; overflow: hidden;"><div style="padding: 12px 14px 0px 14px; display: flex; flex-direction: column; gap: 4px;">%s%s</div><div style="padding: 6px; display: flex; flex-direction: column; gap: 2px;">%s</div>%s</div>' % (
+        T['line'], SHADOW_MD, head, tb, lst, foot)
+
+
+def avatar_menu(u):
+    """头像菜单（shadcn DropdownMenu）：姓名、角色与部门 · 审计日志 · 密度 · 退出登录。"""
+    head = '<div style="display: flex; align-items: center; gap: 10px; padding: 8px 10px 10px 10px;">%s%s</div>' % (
+        avatar(u['avatar'], 'grad', 32), col(nowrap(u['name'], 13, T['ink'], 600) + nowrap('%s · %s' % (u['role'], u['dept']), 11, T['ink4']), 1))
+    it = lambda t, ic, hint, c=T['ink2']: '<div style="display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 6px; font-size: 13px; color: %s;">%s<div style="flex: 1;">%s</div>%s</div>' % (
+        c, icon(ic, 15, c), t, nowrap(hint, 11, T['ink4']) if hint else '')
+    sep = '<div style="height: 1px; background: %s; margin: 4px 0px;"></div>' % T['line2']
+    return '<div style="width: 248px; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; box-shadow: %s; padding: 5px;">%s%s%s%s%s%s</div>' % (
+        T['line'], SHADOW_MD, head, sep, it('审计日志', 'history', '所有角色可见'), it('密度', 'rows', '舒适 ›'), sep, it('退出登录', 'arrow_r', ''))
+
+
+def cap(t):
+    return nowrap(t, 12, T['ink2'], 600)
+
+
+g10_a = col(cap('① 点铃铛 · 全部（周敏，未读 %d）' % UNREAD) +
+            '<div style="width: 640px; height: 640px; position: relative; background: %s; border: 1px solid %s; border-radius: 12px; overflow: hidden;">%s<div style="position: absolute; right: 98px; top: 62px;">%s</div></div>' % (
+                T['canvas'], T['line'], topbar_crop(640), notif_panel(NOTIFICATIONS, UNREAD)), 8)
+g10_b = col(cap('② 没有通知时') + notif_panel([], 0, '全部', empty('bell', '暂无通知', '审批、渠道异常、未归属店铺来信等需要你知道的事会出现在这里。', compact=True)), 8)
+g10_c = col(cap('③ 点头像 · 头像菜单') +
+            '<div style="width: 420px; height: 300px; position: relative; background: %s; border: 1px solid %s; border-radius: 12px; overflow: hidden;">%s<div style="position: absolute; right: 12px; top: 62px;">%s</div></div>' % (
+                T['canvas'], T['line'], topbar_crop(420), avatar_menu(ZM)) +
+            muted('「审计日志」所有角色可见（P27）：客服主管、管理员看全部，其他角色只看自己的操作记录；管理员另可从 P18 页头进入。「密度」与顶栏密度按钮是同一个设置（G9）。', 12, 'width: 420px;'), 8)
+g10_frame = '<div style="width: 1510px; box-sizing: border-box; padding: 20px; background: %s; display: flex; gap: 24px; align-items: flex-start;">%s%s%s</div>' % (T['canvas'], g10_a, g10_b, g10_c)
+
+
+# ---------------------------------------------------------------- G11 登录 · G12 登录被拒
+def qr_svg(size=168, n=25, seed=11):
+    """示意二维码：三个定位角 + 伪随机模块（固定种子，生成结果稳定）。"""
+    import random
+    rnd = random.Random(seed)
+    fin = [(0, 0), (n - 7, 0), (0, n - 7)]
+    rects = []
+    for x0, y0 in fin:
+        rects += ['<rect x="%d" y="%d" width="7" height="7"></rect>' % (x0, y0), '<rect x="%d" y="%d" width="5" height="5" fill="#ffffff"></rect>' % (x0 + 1, y0 + 1),
+                  '<rect x="%d" y="%d" width="3" height="3"></rect>' % (x0 + 2, y0 + 2)]
+    for y in range(n):
+        for x in range(n):
+            if any(x0 - 1 <= x <= x0 + 7 and y0 - 1 <= y <= y0 + 7 for x0, y0 in fin):
+                continue
+            if rnd.random() < 0.46:
+                rects.append('<rect x="%d" y="%d" width="1" height="1"></rect>' % (x, y))
+    return '<svg width="%d" height="%d" viewBox="-1 -1 %d %d" fill="%s" shape-rendering="crispEdges" style="display: block;">%s</svg>' % (size, size, n + 2, n + 2, T['ink'], ''.join(rects))
+
+
+def qr_box(expired=False):
+    ov = ''
+    if expired:
+        ov = '<div style="position: absolute; inset: 0px; background: rgba(255,255,255,0.93); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">%s%s</div>' % (
+            nowrap('二维码已过期', 13, T['ink'], 600), btn('刷新', 'primary', 'sm', 'refresh'))
+    return '<div style="position: relative; padding: 10px; border: 1px solid %s; border-radius: 12px; background: #ffffff;">%s%s</div>' % (T['line'], qr_svg(), ov)
+
+
+def auth_card(inner, w=360):
+    """登录卡片：品牌 + 内容（G11 二维码；G12 换成被拒说明）。"""
+    return '<div style="width: %dpx; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 16px; box-shadow: %s; padding: 24px 24px 20px 24px; display: flex; flex-direction: column; align-items: center; gap: 14px;">%s%s</div>' % (
+        w, T['line'], SHADOW_CARD, UI._brand('Support'), inner)
+
+
+login_note = '<div style="font-size: 12px; color: %s; line-height: 1.55; text-align: center; border-top: 1px solid %s; padding-top: 12px; align-self: stretch;">成员与部门来自钉钉通讯录，由管理员在本系统分配角色后才能进入</div>' % (T['ink3'], T['line2'])
+login_card = auth_card(col(text('用钉钉扫码登录', 16, T['ink'], 700, 'text-align: center;') + muted('打开钉钉，扫一扫下方二维码', 12, 'text-align: center;'), 2) +
+                       qr_box() + nowrap('二维码 2 分钟内有效', 12, T['ink4']) + login_note)
+g11_frame = mini(row(
+    '<div style="flex: 1; align-self: stretch; display: flex; align-items: center; justify-content: center; background: %s; border-radius: 12px;">%s</div>' % (T['canvas'], login_card) +
+    col(cap('2 分钟后过期 · 蒙层 +「刷新」') + qr_box(True) + muted('刷新后生成新二维码，重新计时 2 分钟。', 12, 'width: 190px;'), 10, 'width: 210px; flex-shrink: 0;'),
+    20, 'center', extra='flex: 1;'), 880, 680, '#ffffff', '20px')
+
+
+def deny(tag, ic, title, desc, action=None, who=''):
+    return col(cap(tag) + auth_card(who + empty(ic, title, desc, action, compact=True), 410), 8)
+
+
+chengong = STAFF['chengong']
+who_cg = row(avatar(chengong['avatar'], 'amber', 24) + nowrap('%s · %s · %s' % (chengong['name'], chengong['dept'], chengong['role']), 12, T['ink3']), 8)
+g12_frame = mini(grid(
+    deny('未分配角色', 'user', '还没有分配角色', '你的钉钉账号还没有在本系统分配角色，请联系管理员刘洋。', btn('返回登录页', 'secondary', 'md', 'chev_l')) +
+    deny('账号已停用', 'lock', '账号已停用', '你的账号已停用（钉钉离职或管理员停用）。', btn('返回登录页', 'secondary', 'md', 'chev_l')) +
+    deny('会话过期', 'clock', '已退出登录', '7 天未操作，已退出登录。', btn('重新扫码登录', 'primary', 'md', 'refresh')) +
+    deny('第一阶段 · 生产厂对接人', 'factory', '暂时无法进入', '工厂工作台第二阶段上线，目前无法进入。', None, who_cg),
+    2, 20), 880, 680, '#ffffff', '20px')
+
 gs_body = col(
     grid(variant('G1 整页加载', '首屏数据超过 300ms 未返回时显示骨架屏，保留外壳与导航；超过 10 秒转为加载失败（第 9 节）。', scaled(page_skel)) +
-         variant('G2 无权限（403）', '导航里不显示无权限入口；从链接直接进入时显示本页。按钮回到该角色的默认首页。', focus(page_403, key_403)), 2, 32) +
-    grid(variant('G3 找不到（404）', '单号不存在或已按保留策略清除。提供按订单号搜索的出口。', focus(page_404, key_404)) +
-         variant('G4 网络断开 + 集成中断', '浏览器断网：整页提示，未发送的草稿保存在本机；恢复连接后自动重试未完成的提交与同步，并用 G5 浮层提示结果（成功为中性「已自动重新提交 N 项」，仍失败给「立即重试」），与 F7、K6 一致。Gmail、积加、SP-API 或 Shopify 中断：全站顶部红色横幅，仅管理员可关闭；恢复后自动补收。', focus(page_offline, key_offline, h=500)), 2, 32) +
+         variant('G2 无权限（403）', '导航里不显示无权限入口；从链接直接进入无权页面时显示本页，写明哪个角色能看（例「「渠道与店铺」只对管理员开放。你当前的角色是坐席，如需开通请联系管理员刘洋」）。按钮只有「返回首页」，回到该角色的默认首页（4.1，本例坐席为收件箱）；没有「申请权限」。', focus(page_403, key_403)), 2, 32) +
+    grid(variant('G3 找不到（404）', '单号不存在或链接不完整时显示（例「工单 T-20260801-9999 不存在，请检查编号或链接是否完整」），提供按订单号搜索的出口；不写保留策略（个人信息长期保留，D-21）。', focus(page_404, key_404)) +
+         variant('G4 网络断开 + 集成中断', '浏览器断网：整页提示，未发送的草稿保存在本机；恢复连接后自动重试未完成的提交与同步，并用 G5 浮层提示结果（成功为中性「已自动重新提交 N 项」，仍失败给「立即重试」），与 F7、K6 一致。Gmail、积加、SP-API 或 Shopify 中断：全站顶部红色横幅，写「管理员、客服主管已收到通知」；横幅不可关闭，连接恢复后自动消失并自动补收。「查看渠道状态」按钮只对管理员显示（本图为坐席李婷视角，不显示）。钉钉同步异常不出全站横幅，只在 P18 钉钉卡显示、只给管理员站内提醒（6.9）。', focus(page_offline, key_offline, h=500)), 2, 32) +
     grid(variant('G5 浮层提示', '右上角堆叠，最多 3 条。成功与信息 3 秒消失；失败与警示不自动消失，必须给出重试或下一步；断网导致的失败在恢复后自动重试并再次提示结果（同 G4）。可逆操作（关闭工单、驳回、撤回）直接执行，弹 5 秒「撤销」浮层，倒计时结束前不消失。', toasts_frame, 700) +
          variant('G6 二次确认（只用于不可逆操作）', '执行退款、终止流程、停用成员、录入最终比例（锁定）、生成结算批次前确认；默认焦点在「取消」，Esc 取消。关闭工单、驳回、撤回等可逆操作不确认，改为 G5 的撤销浮层；驳回、终止的原因仍必填。', confirm_frame, 700), 2, 32) +
-    grid(variant('G7 并发与数据范围', '同一工单只允许一人编辑回复；编辑期间来新信则草稿失效提醒；访问无权店铺的数据用信息色横幅说明范围（不是错误）。', conflict_frame, 700) +
+    grid(variant('G7 并发与数据范围', '同一工单只允许一人编辑回复；编辑期间来新信则草稿失效提醒；访问无权店铺的数据用信息色横幅说明范围（不是错误）。乐观锁冲突（保存时发现记录已被他人修改）：提示「这条记录刚被王磊修改（10:18）」并写明对方改了哪些项，你的输入保留不丢；给出「查看最新」与「覆盖保存」，覆盖需二次确认（默认焦点在「取消」），覆盖记入审计日志。', conflict_frame, 700) +
          variant('G8 未保存离开', '草稿类（回复框、内部备注）自动保存，离开时只弹「草稿已保存」浮层，不拦截。表单类（设置页）有未保存修改时弹窗：继续编辑 · 放弃修改 · 保存并离开，默认焦点在「继续编辑」。', unsaved_frame, 700), 2, 32) +
     variant('G9 密度切换', '第一期提供舒适（默认）与紧凑两档（Q-24）。顶栏「密度」按钮切换，按用户保存；只改字号、行距与内边距，不改布局和信息量。紧凑：正文 12、次要 11（中文最小 11）、队列行内边距 6、行距 2、表格行高 32。两档一致：队列卡片左侧色条只表示风险（转人工红），选中用浅底 + 描边。', dens_frame, 1500,
-            trigger='点顶栏「密度」按钮（图标：三条横线）。'),
+            trigger='点顶栏「密度」按钮（图标：三条横线）。') +
+    variant('G10 站内通知', '顶栏铃铛带未读数（本例 %d）；点开 360px 面板，页签「全部 · 未读」，每条写类型图标、标题、说明、对象编号与时间，未读带圆点并用浅底；点一条即跳到对象并标为已读；右上「全部已读」；没有通知时显示空状态。头像菜单：姓名、角色与部门（来自钉钉），「审计日志」所有角色可见（P27，按 10.2 过滤），「密度」同 G9，「退出登录」。' % UNREAD,
+            g10_frame, 1510, trigger='点顶栏铃铛；点顶栏头像。示例为周敏 · 客服主管（data.NOTIFICATIONS）。') +
+    grid(variant('G11 登录', '居中卡片：产品名、「用钉钉扫码登录」二维码（2 分钟过期，过期后二维码上加蒙层与「刷新」），下方说明「成员与部门来自钉钉通讯录，由管理员在本系统分配角色后才能进入」。在钉钉内打开时免登（第二阶段）。会话 7 天无操作过期（G12）。', g11_frame, 880,
+                 trigger='未登录或会话过期后访问任意页面。') +
+         variant('G12 登录被拒', '同一张登录卡片换成被拒说明，三种：未分配角色、账号已停用、会话过期（「重新扫码登录」）。第一阶段不分配「生产厂对接人」角色，已分配者扫码后看到「工厂工作台第二阶段上线，目前无法进入」（4.1）。', g12_frame, 880,
+                 trigger='扫码成功但不能进入系统；或 7 天未操作。'), 2, 32),
     32)
-save('GlobalStates.dc.html', board('全局状态与反馈', '所有页面共用的加载、无权限、找不到、断网、集成中断、提示、确认、并发、未保存与密度切换状态。各模块自己的状态见对应状态板。演示时刻 %s。' % NOW_LABEL, gs_body, 1920, 2400))
+save('GlobalStates.dc.html', board('全局状态与反馈', '所有页面共用的加载、无权限、找不到、断网、集成中断、提示、确认、并发、未保存、密度切换、站内通知与登录状态（G1–G12）。各模块自己的状态见对应状态板。演示时刻 %s。' % NOW_LABEL, gs_body, 1920, 2400))
 print('ok')

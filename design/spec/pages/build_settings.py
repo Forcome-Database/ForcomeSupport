@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """设置：左侧菜单每项一个独立页面，页内多块内容用页签，编辑表单用右侧抽屉。
-P18 渠道与店铺 · P22 动作映射 · P19 处理规则 · P23 售后规则 · P24 工厂账号 · P20 团队与权限（共用 as_common.settings_menu）。
-P19、P20 的非默认页签画面放在 StatesAdmin：K15 风险信号、K16 渠道内容能力、K17 角色权限；P18 新增店铺抽屉为 K8。
+P18 渠道与店铺 · P22 动作映射 · P19 处理规则 · P23 售后规则 · P24 工厂账号 · P20 团队与权限（共用 as_common.settings_menu）；
+P25 模型、P26 系统状态在 build_settings_more.py，沿用本文件的 spage 外壳。
+P19、P20 的非默认页签画面放在 StatesAdmin：K15 风险信号、K16 渠道内容能力、K21 处理说明、K17 角色权限；P18 新增店铺抽屉为 K8，第一阶段 P18 为 K20。
 保存口径：修改 → 吸底保存栏（ui.save_bar）→ 保存；离开页面时有未保存提示。"""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -9,22 +10,40 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ui import *
 from data import *
 from as_common import *
+import as_common as _AC
+
+P1_MENU = ('渠道与店铺', '团队与权限')  # 第一阶段设置只有 P18、P20（prd_b 4.1）
 
 
 def tile(ic, tone='accent', size=32):
-    fg, bg = {'accent': (T['accent'], T['accent_bg']), 'ok': (T['ok'], T['ok_bg']), 'muted': (T['ink3'], T['line2']), 'bad': (T['bad'], T['bad_bg'])}[tone]
+    fg, bg = {'accent': (T['accent'], T['accent_bg']), 'ok': (T['ok'], T['ok_bg']), 'muted': (T['ink3'], T['line2']), 'bad': (T['bad'], T['bad_bg']),
+              'warn': (T['warn'], T['warn_bg'])}[tone]
     return '<div style="width: %dpx; height: %dpx; border-radius: 8px; background: %s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (size, size, bg, icon(ic, 18, fg))
 
 
-def spage(user, active, title, desc, actions, inner, bar='', tabs_html='', h=900):
-    """设置页外壳：左侧设置菜单 + 右侧内容区；tabs_html 为页内页签；bar 为吸底保存栏（ui.save_bar），固定在内容区底部。"""
+def menu(active, role, phase1=False):
+    """设置菜单：第二阶段起 11 项；第一阶段只列 P18、P20（临时收窄 as_common.SETTINGS_MENU 后复用同一部件）。"""
+    if not phase1:
+        return settings_menu(active, role)
+    full = _AC.SETTINGS_MENU
+    _AC.SETTINGS_MENU = [m for m in full if m[0] in P1_MENU]
+    try:
+        html = settings_menu(active, role)
+    finally:
+        _AC.SETTINGS_MENU = full
+    return html.replace('带锁的项由客服主管维护', '第一阶段只开放这两项设置')
+
+
+def spage(user, active, title, desc, actions, inner, bar='', tabs_html='', h=900, phase1=False):
+    """设置页外壳：左侧设置菜单 + 右侧内容区；tabs_html 为页内页签；bar 为吸底保存栏（ui.save_bar），固定在内容区底部。
+    phase1=True 为第一阶段外壳（导航 NAV_BY_ROLE_P1、不显示店铺范围与搜索，菜单只有 P18、P20）。"""
     role = STAFF[user]['role']
-    head = between(col('<div style="font-size: 20px; font-weight: 700; color: %s; letter-spacing: -0.01em;">%s</div><div style="font-size: 13px; color: %s;">%s</div>' % (T['ink'], title, T['ink3'], desc), 4),
+    head = between(col('<div style="font-size: 20px; font-weight: 700; color: %s; letter-spacing: -0.01em;">%s</div><div style="font-size: 13px; color: %s; line-height: 1.5;">%s</div>' % (T['ink'], title, T['ink3'], desc), 4),
                    row(actions, 8), 'flex-end')
     scroll = '<div style="flex: 1; min-height: 0px; padding: 16px 24px 16px 24px; display: flex; flex-direction: column; gap: 16px; overflow: hidden;">%s%s%s</div>' % (head, tabs_html, inner)
     main = '<div style="flex: 1; min-width: 0px; min-height: 0px; display: flex; flex-direction: column;">%s%s</div>' % (scroll, bar)
-    body = '<div style="flex: 1; min-height: 0px; display: flex; flex-direction: row;">%s%s</div>' % (settings_menu(active, role), main)
-    return app(user, '设置', ['设置', active], body, h=h)
+    body = '<div style="flex: 1; min-height: 0px; display: flex; flex-direction: row;">%s%s</div>' % (menu(active, role, phase1), main)
+    return app(user, '设置', ['设置', active], body, h=h, phase1=phase1)
 
 
 def edited_tag():
@@ -53,18 +72,32 @@ def drawer_over(inner, drw, w, h):
 
 
 # ================================================================ P18 渠道与店铺
+
+P18_DESC = '订单由平台直读；库存、易仓出库单与运费经积加；物流轨迹经 17TRACK；退款、改地址、取消走平台官方接口；客户来信统一经 Gmail 收发。店铺决定订单匹配、回复身份、签名与数据权限。'
+P18_DESC_P1 = '订单由平台直读；客户来信统一经 Gmail 收取。店铺决定订单匹配与数据权限。'
+RULE_CARD_STATE = ('卡片显示该渠道下最差的状态，并列出异常的邮箱或店铺；店铺表「状态」列显示该店铺各连接的状态。'
+                   '同步延迟按数据源阈值：Gmail、订单 10 分钟，钉钉 2 小时；连续 3 次失败为连接异常。'
+                   '钉钉例外：异常只在钉钉卡显示、只提醒管理员，不出全站横幅（6.9）。')
+
+
 def test_btn():
     return btn('测试连接', 'link', 'sm')
 
 
-def ch_card(ic, name, st, lines, foot='', tone='accent', card_tone=None, sync=None, test=True):
-    """渠道卡：标题下统一写「最近同步 hh:mm」，右上角为连接状态与「测试连接」文字按钮。"""
-    sub_ = nowrap('最近同步 ' + sync, 11, T['ink4']) if sync else ''
+def ch_card(ic, name, st, lines, foot='', tone='accent', card_tone=None, sync=None, test=True, sub_text=None):
+    """渠道卡：标题下统一写「最近同步 hh:mm」（sub_text 可替换为其他说明），右上角为连接状态与「测试连接」文字按钮。"""
+    sub_ = nowrap(sub_text if sub_text else ('最近同步 ' + sync), 11, T['ink4']) if (sync or sub_text) else ''
     head = between(row(tile(ic, tone) + col('<div style="font-size: 14px; font-weight: 600; color: %s; white-space: nowrap;">%s</div>' % (T['ink'], name) + sub_, 0), 10),
                    row(st + (test_btn() if test else ''), 6))
-    body = col(''.join(text(l, 12, T['ink3']) for l in lines), 2)
+    body = col(''.join(text(l, 12, T['ink3']) for l in lines), 2) if lines else ''
     f = '<div style="margin-top: auto;">%s</div>' % foot if foot else ''
     return card(head + body + f, pad='12px 14px', gap=8, tone=card_tone, style='height: 100%; box-sizing: border-box;')
+
+
+def sqs_line(st=SQS_STATE):
+    """亚马逊卡的订单通知队列状态：正常 / 积压 N 条 / 拉取失败（D-21）。"""
+    s, n = st
+    return row(nowrap('订单通知队列（SQS）', 12, T['ink3']) + chip('%s · 积压 %d' % (s, n), 'success' if (s == '正常' and not n) else 'warning', 11, dot=True), 6)
 
 
 def amazon_card(err=False):
@@ -72,7 +105,7 @@ def amazon_card(err=False):
         return ch_card('store', '亚马逊 SP-API', state('连接异常'),
                        ['10:05 起连续 3 次调用失败：授权令牌已过期', '退款、取消与订单同步暂停，恢复后自动补执行与补拉；买家消息走 Gmail，不受影响'],
                        row(btn('重新授权', 'primary', 'sm', 'refresh') + btn('查看错误日志', 'ghost', 'sm'), 6), 'bad', 'danger', sync=CHANNEL_SYNC['SP-API 异常'])
-    return ch_card('store', '亚马逊 SP-API', state('已连接'), ['2 个店铺 · 退款、取消（审批后执行）', '订单经 SP-API 准实时同步（订单通知队列 SQS）'], '', 'ok', sync=CHANNEL_SYNC['SP-API'])
+    return ch_card('store', '亚马逊 SP-API', state('已连接'), ['2 个店铺 · 退款、取消（审批后执行）', '订单经 SP-API 准实时同步', sqs_line()], '', 'ok', sync=CHANNEL_SYNC['SP-API'])
 
 
 def shopify_card():
@@ -91,13 +124,44 @@ def gmail_card(err=False):
     return ch_card('message', 'Gmail', state('已连接'), ['4 个邮箱：2 个亚马逊买家消息、2 个 Shopify 客服', '新邮件推送，实时收取'], '', 'ok', sync=CHANNEL_SYNC['Gmail'])
 
 
+def dingtalk_card(late=False):
+    """钉钉卡。late=True 为同步延迟（超过 2 小时）：只在本卡显示、只提醒管理员，不出全站横幅（6.9、E-32）。"""
+    if late:
+        return ch_card('users', '钉钉', state('同步延迟'),
+                       ['通讯录 %s 后未同步成功，超过 2 小时' % DINGTALK_LATE_SYNC, '只提醒管理员，不出全站横幅；成员与部门保持上次结果，登录与权限不受影响', '工作通知推送；扫码登录'],
+                       '', 'warn', 'warning', sync=DINGTALK_LATE_SYNC)
+    return ch_card('users', '钉钉', state('已连接'), ['通讯录：成员与部门每小时同步', '工作通知推送；扫码登录与钉钉内免登'], '', 'ok', sync=CHANNEL_SYNC['钉钉'])
+
+
+def grid3(cells):
+    return '<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: stretch;">%s</div>' % ''.join(cells)
+
+
 def p18_channels():
-    im = ch_card('users', '钉钉', state('已连接'), ['通讯录：成员与部门每小时同步', '工作通知推送；扫码登录与钉钉内免登'], '', 'ok', sync=CHANNEL_SYNC['钉钉'])
     lc_head = between(row(tile('box', 'muted') + col(nowrap('易仓海外仓', 14, T['ink2'], 600) + nowrap('最近同步 %s · 经积加' % CHANNEL_SYNC['易仓'], 11, T['ink4']), 0), 10),
                       row(chip('经积加对接', 'neutral', 11) + test_btn(), 6))
     lc = dashed_card(lc_head + muted('库存、售后出库单、单号与实际运费都经积加读写，本系统不直连易仓接口；测试连接走积加。', 12), '12px 14px', 8)
-    return '<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: stretch;">%s%s%s%s%s%s</div>' % (
-        amazon_card(), shopify_card(), gmail_card(), jijia_card(), im, lc)
+    return grid3([amazon_card(), shopify_card(), gmail_card(), jijia_card(), dingtalk_card(), lc])
+
+
+def phase2_card(ic, name, desc):
+    """第一阶段尚未接入的渠道：灰色虚线卡「第二阶段接入」，没有同步时间与测试连接。"""
+    head = between(row(tile(ic, 'muted') + col(nowrap(name, 14, T['ink2'], 600) + nowrap('暂不连接', 11, T['ink4']), 0), 10), chip('第二阶段接入', 'muted', 11))
+    return dashed_card(head + muted(desc, 12), '12px 14px', 8)
+
+
+def p18_channels_p1():
+    """第一阶段渠道卡（K20）：订单同步、回补与来信收取；积加、易仓第二阶段接入，不显示 17TRACK。"""
+    amz = ch_card('store', '亚马逊 SP-API', state('已连接'),
+                  ['2 个店铺 · 订单经 SP-API 准实时同步', sqs_line(), row(nowrap('订单回补 %d 天' % AMZ_BACKFILL_DAYS, 12, T['ink3']) + chip('已完成', 'success', 11, 'check'), 6)],
+                  '', 'ok', sync=CHANNEL_SYNC['SP-API'])
+    shp = ch_card('store', 'Shopify Admin API', state('已连接'),
+                  ['2 个店铺 · 订单经 Admin API 准实时同步', row(nowrap('订单回补 %d 天' % SHOPIFY_BACKFILL_DAYS, 12, T['ink3']) + chip('未开通 read_all_orders', 'warning', 11), 6)],
+                  '', 'ok', sync=CHANNEL_SYNC['Shopify'])
+    gm = ch_card('message', 'Gmail', state('已连接'), ['4 个邮箱：2 个亚马逊买家消息、2 个 Shopify 客服', '收件与「已发送」：识别到我方回复即转等客户'], '', 'ok', sync=CHANNEL_SYNC['Gmail'])
+    return grid3([amz, shp, gm, dingtalk_card(late=True),
+                  phase2_card('link', '积加 ERP', '亚马逊订单收件人、库存、售后出库单、单号与运费。'),
+                  phase2_card('box', '易仓海外仓', '库存与售后出库单经积加读写，本系统不直连易仓接口。')])
 
 
 def copy_val(v):
@@ -109,27 +173,58 @@ RULE_ROUTE = '亚马逊按买家消息的收件邮箱（每店一个）与发件
 RULE_LAYER = '配置按「全局 → 平台 → 店铺」取值。店铺可覆盖签名、政策口径、模板、素材与链接白名单、SLA 内部目标；意图、风险信号、动作分级只能全局配置。'
 
 
-def p18_stores():
-    cols = [('店铺', 'left'), ('站点', 'left'), ('进线邮箱', 'left'), ('平台标识', 'left'), ('覆盖项', 'left'), ('状态', 'left'), ('', 'right')]
+def default_site(s_):
+    return s_.get('default_site') or STORE_DEFAULT_SITE[s_['id']]
+
+
+def site_cell(s_):
+    """站点列：默认站点加粗（无订单的来信按默认站点归站点，D-23）。"""
+    d = default_site(s_)
+    parts = ['<span style="font-weight: %d; color: %s;">%s</span>' % (700 if x == d else 400, T['ink'] if x == d else T['ink3'], x) for x in s_['sites']]
+    return '<div title="默认站点 %s" style="font-size: 13px; color: %s; white-space: nowrap;">%s</div>' % (d, T['ink4'], ' · '.join(parts))
+
+
+def store_conns(s_):
+    return ['Gmail', 'SP-API' if s_['platform'] == '亚马逊' else 'Admin API']
+
+
+def store_status(s_, issue=None):
+    """店铺表「状态」列：该店铺各连接的状态。都正常写「已连接」并列出连接；有异常写「Gmail 同步延迟」（色调同 STATE_TONE）。"""
+    if issue:
+        conn, st = issue
+        return '<div style="display: flex;">%s</div>' % chip('%s %s' % (conn, st), STATE_TONE[st], 11, dot=True)
+    return col('<div style="display: flex;">%s</div>' % state('已连接') + nowrap(' · '.join(store_conns(s_)), 11, T['ink4']), 3)
+
+
+def p18_stores(phase1=False, issues=None):
+    """店铺表。phase1=True 不显示覆盖项列（第一阶段没有店铺签名与覆盖项）；issues: {店铺 id: (连接, 状态)}。"""
+    issues = issues or {}
+    cols = [('店铺', 'left'), ('站点（加粗为默认）', 'left'), ('进线邮箱', 'left'), ('平台标识', 'left')] + ([] if phase1 else [('覆盖项', 'left')]) + [('状态', 'left'), ('', 'right')]
     rows = []
     for s_ in STORES:
         amz = s_['platform'] == '亚马逊'
         e = col(nowrap(s_['mailbox'], 13, T['ink'], 600) + nowrap('亚马逊买家消息' if amz else 'Shopify 客服邮箱', 11, T['ink4']), 2)
         k, v = s_['sid'].rsplit(' ', 1) if amz else ('店铺域名', s_['sid'])
         sid = col(nowrap(k, 11, T['ink4']) + copy_val(v), 2)
-        over = row(''.join(chip(o, 'outline', 11) for o in STORE_OVERRIDES[s_['id']]), 4)
+        over = [row(''.join(chip(o, 'outline', 11) for o in STORE_OVERRIDES[s_['id']]), 4)] if not phase1 else []
         rows.append([col(nowrap(s_['name'], 13, T['ink'], 600) + '<div style="display: flex;">%s</div>' % channel(s_['platform'], None, None, 11), 4),
-                     nowrap(' · '.join(s_['sites']), 13, T['ink2']), e, sid, over, state('已连接'), link('编辑', 12)])
-    t = table(cols, rows, '190px 120px 240px 260px minmax(0, 1fr) 80px 40px', py=12)
-    head = between(row(label('店铺') + nowrap('4 个', 12, T['ink3']) + divider(True, 12) + info_tip('进线识别', RULE_ROUTE) + info_tip('配置取值层级', RULE_LAYER), 10),
+                     site_cell(s_), e, sid] + over + [store_status(s_, issues.get(s_['id'])), link('编辑', 12)])
+    tpl = '190px 130px 230px 250px %s140px 40px' % ('' if phase1 else 'minmax(0, 1fr) ')
+    if phase1:
+        tpl = '200px 150px 260px minmax(0, 1fr) 160px 40px'
+    t = table(cols, rows, tpl, py=12)
+    head = between(row(label('店铺') + nowrap('%d 个' % len(STORES), 12, T['ink3']) + divider(True, 12) + info_tip('进线识别', RULE_ROUTE) +
+                       ('' if phase1 else info_tip('配置取值层级', RULE_LAYER)), 10),
                    btn('新增店铺', 'secondary', 'sm', 'plus'))
     return col(head + t, 10)
 
 
-def p18(h=900):
-    inner = col(label('渠道连接') + p18_channels(), 10) + p18_stores()
-    return spage('liuyang', '渠道与店铺', '渠道与店铺', '订单由平台直读；库存、易仓出库单与运费经积加；物流轨迹经 17TRACK；退款、改地址、取消走平台官方接口；客户来信统一经 Gmail 收发。店铺在右侧抽屉里新增与编辑。', '',
-                 inner, h=h)
+def p18(h=900, phase1=False):
+    """P18；phase1=True 为第一阶段版（K20）：页头说明、渠道卡、店铺表按 prd_c P18「第一阶段」，没有吸底保存栏。"""
+    ch_head = row(label('渠道连接') + info_tip('卡片状态按店铺计算', RULE_CARD_STATE), 10)
+    inner = col(ch_head + (p18_channels_p1() if phase1 else p18_channels()), 10) + p18_stores(phase1)
+    return spage('liuyang', '渠道与店铺', '渠道与店铺', P18_DESC_P1 if phase1 else P18_DESC, btn('查看审计日志', 'secondary', 'md', 'history'),
+                 inner, h=h, phase1=phase1)
 
 
 # ================================================================ P22 动作映射
@@ -181,11 +276,18 @@ def p22():
 # 意图发送规则与放开进度取 data.SEND_RULES；未保存修改取 data.SEND_RULE_EDITS
 INTENTS = SEND_RULES
 EDITED = SEND_RULE_EDITS
-RULE_TABS = ['发送方式与阈值', '风险信号', '渠道内容能力']
+RULE_TABS = [('发送方式与阈值', None), ('风险信号', len(RISK_SIGNALS)), ('渠道内容能力', None), ('处理说明', None)]
+P19_DESC = '所有修改在底部统一保存；修改阈值与关闭风险信号需二次确认，并记入审计日志。'
 
 
-def rule_tabs(active):
-    return tabs([(t, None) for t in RULE_TABS], active)
+def dirty_dot():
+    return '<span title="有未保存修改" style="display: inline-block; width: 6px; height: 6px; border-radius: 999px; background: %s; margin-left: 2px;"></span>' % T['warn_solid']
+
+
+def rule_tabs(active, dirty=('发送方式与阈值',)):
+    """P19 四个页签；dirty 中的页签名旁加黄色圆点，表示该页签有未保存修改（切换页签不丢修改）。"""
+    deco = lambda n: n + dirty_dot() if n in dirty else n
+    return tabs([(deco(n), c) for n, c in RULE_TABS], deco(active))
 
 
 def mini_bar(pct, w=28):
@@ -229,18 +331,18 @@ def p19_send_table():
 
 def p19():
     en, (e_old, e_new) = list(EDITED.items())[0]
-    return spage('zhoumin', '处理规则', '处理规则', '每个意图的发送方式与阈值、风险信号、各渠道能放的内容。修改阈值与关闭风险信号需二次确认，并记入审计日志。', '',
+    return spage('zhoumin', '处理规则', '处理规则', P19_DESC, '',
                  p19_send_table(), save_bar(len(EDITED), '%s · 置信度阈值 %s → %s；保存时二次确认，离开页面前会提示' % (en, e_old, e_new)), rule_tabs('发送方式与阈值'))
 
 
 def p19_risk():
-    """「风险信号」页签（StatesAdmin K15）：命中即转人工；两条硬规则锁定，两条关闭需二次确认并写明影响。"""
+    """「风险信号」页签（StatesAdmin K15）：命中即转人工；安全事故、平台风险、疑似提示注入为硬规则锁定，重复联系、高价值关闭需二次确认并写明影响。"""
     out = ''
     for i, (n, d, p, sw) in enumerate(RISK_SIGNALS):
         less = RISK_OFF_IMPACT.get(n)
         tg = toggle_on_locked() if sw == 'lock' else toggle(True)
         right = row((nowrap('硬规则，不可关闭', 12, T['ink4']) if sw == 'lock' else '') + tg, 8)
-        warn_ = row(icon('alert', 13, T['warn'], 2) + nowrap('关闭需二次确认 · 影响：近 30 天约少转人工 %d 封，这些来信将按意图生成草稿' % less, 12, T['warn']), 5) if less else ''
+        warn_ = row(icon('alert', 13, T['warn'], 2) + nowrap('关闭需二次确认：近 30 天约少转人工 %d 封；关闭后命中的来信不再转人工，可能自动发送' % less, 12, T['warn']), 5) if less else ''
         out += '<div style="display: flex; align-items: center; gap: 16px; padding: 12px 16px;%s"><div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 3px;"><div style="display: flex; align-items: center; gap: 8px;"><div style="font-size: 13px; font-weight: 600; color: %s;">%s</div>%s</div><div style="font-size: 12px; color: %s;">%s</div>%s</div>%s</div>' % (
             ' border-top: 1px solid %s;' % T['line2'] if i else '', T['ink'], n, priority(p), T['ink3'], d, warn_, right)
     head = between(row(label('风险信号') + nowrap('%d 条 · 命中即转人工，优先级取最高一条' % len(RISK_SIGNALS), 12, T['ink3']), 8),
@@ -259,6 +361,74 @@ def p19_content_cap():
                                     for d in LINK_WHITELIST), 8, wrap=True), pad='14px 16px', gap=12)
     head = row(label('渠道内容能力') + nowrap('按渠道限制草稿里能放的图片与链接', 12, T['ink3']), 8)
     return col(head + t, 10) + wl
+
+
+def kvl(k, v, kw=84):
+    """键在左、值左对齐（长值换行不掉到右侧）。"""
+    return '<div style="display: flex; gap: 10px; align-items: baseline; font-size: 12px; line-height: 1.55;"><div style="width: %dpx; flex-shrink: 0; color: %s;">%s</div><div style="flex: 1; min-width: 0px; color: %s;">%s</div></div>' % (
+        kw, T['ink3'], k, T['ink'], v)
+
+
+def guide_intents():
+    """处理说明左侧：12 个意图，每项写当前发布版本与是否有未发布草稿（data.INTENT_GUIDE_LIST）。"""
+    dv = INTENT_GUIDE['draft'].split('（')[0]
+    out = ''
+    for name, ver, draft in INTENT_GUIDE_LIST:
+        on = name == INTENT_GUIDE['intent']
+        sub_ = row(nowrap('发布 ' + ver, 11, T['accent_ink'] if on else T['ink4']) + (chip('草稿 %s 未发布' % dv, 'warning', 11) if draft else ''), 6)
+        out += '<div style="padding: 7px 10px; border-radius: 6px; background: %s; display: flex; flex-direction: column; gap: 1px;%s">%s%s</div>' % (
+            T['accent_bg'] if on else 'transparent', ' box-shadow: inset 3px 0 0 %s;' % T['accent'] if on else '',
+            nowrap(name, 13, T['accent_ink'] if on else T['ink2'], 700 if on else 500), sub_)
+    return card(col(out, 1), title=row(label('意图') + nowrap('%d 个' % len(INTENT_GUIDE_LIST), 12, T['ink4']), 6), pad='12px 8px', gap=8, style='width: 236px; flex-shrink: 0; box-sizing: border-box;')
+
+
+GUIDE_PUBLISH_WHY = '还有 %d 条回归样例未通过，全部通过后才能发布'
+
+
+def guide_body():
+    """处理说明右侧：版本行 + 四段自然语言说明（可按店铺覆盖）+ 右栏结构化部分（只读）与回归结果（K21，D-21）。"""
+    G = INTENT_GUIDE
+    dv = G['draft'].split('（')[0]
+    passed, total_ = G['regress']
+    why = GUIDE_PUBLISH_WHY % (total_ - passed)
+    # 悬停提示画在按钮左侧（箭头指向按钮），不遮挡下方右栏
+    tip = '<div style="position: relative; display: flex; align-items: center; flex-shrink: 0;">%s<div style="position: absolute; right: -4px; top: 50%%; margin-top: -4px; width: 8px; height: 8px; background: %s; transform: rotate(45deg);"></div></div>' % (
+        tooltip(why), T['ink'])
+    pub = row(tip + btn('发布 %s' % dv, 'primary', 'md', 'upload', disabled=True, reason=why), 10)
+    head = between(col(row(text(G['intent'], 16, T['ink'], 700) + chip('发布版本 ' + G['published'], 'neutral', 11) + chip('草稿 ' + G['draft'], 'warning', 11, dot=True), 8) +
+                       muted('正在编辑草稿 %s · 每段可按店铺覆盖，覆盖的段落标「店铺覆盖」' % dv, 12), 4),
+                   row(row(nowrap('店铺', 12, T['ink3']) + select_box('Forcome Direct', width='168px'), 6) + link('历史版本与对比', 12, 'history') + pub, 12))
+    secs = ''
+    for title, body, ov in G['sections']:
+        ov_html, tag = '', ''
+        if ov:
+            who_, txt = ov.split('：', 1)
+            tag = chip(who_, 'accent', 11, 'store')
+            ov_html = '<div style="display: flex; gap: 8px; align-items: flex-start; background: %s; border: 1px solid %s; border-radius: 8px; padding: 7px 10px;">%s%s</div>' % (
+                T['accent_bg'], T['accent_line'], icon('store', 14, T['accent_ink']), text(txt, 12, T['accent_ink'], 600))
+        secs += card(between(row(text(title, 13, T['ink'], 700) + tag, 8), icon('edit', 14, T['ink4'])) + text(body, 13, T['ink2']) + ov_html,
+                     pad='12px 14px', gap=6, tone='accent' if ov else None)
+    struct = card(col(''.join(kvl(k, v) for k, v in G['structured']), 6), title='结构化部分', extra=chip('只读 · 代码执行', 'muted', 11, 'lock'), pad='12px 14px', gap=10)
+    fails = ''
+    for i, (no, case, want, got) in enumerate(G['failed']):
+        head_ = between(row(icon('chev_d' if i == 0 else 'chev_r', 13, T['ink4'], 2) + icon('x_c', 14, T['bad'], 2) + nowrap(no, 12, T['accent'], 600), 6),
+                        nowrap('期望「%s」· 实际「%s」' % (want, got), 12, T['ink3']) if i else '')
+        detail = ''
+        if i == 0:
+            detail = col(kvl('情形', case, 40) + kvl('期望', '<b>%s</b>' % want, 40) + kvl('实际', '<span style="color: %s; font-weight: 600;">%s</span>' % (T['bad'], got), 40), 3, 'padding: 4px 0px 0px 25px;')
+        fails += '<div style="border-top: 1px solid %s; padding: 8px 0px; display: flex; flex-direction: column; gap: 2px;">%s%s</div>' % (T['line2'], head_, detail)
+    pct = int(round(passed * 100.0 / total_))
+    reg = card(row(text('上次回归 %s 草稿：%d / %d 通过' % (dv, passed, total_), 13, T['ink'], 700) + nowrap('%d 条未通过' % (total_ - passed), 12, T['bad'], 600), 8) +
+               progress(pct, 'warning', 6) + '<div style="display: flex; flex-direction: column;">%s</div>' % fails,
+               title='回归样例', extra=btn('重新运行回归', 'secondary', 'sm', 'refresh'), pad='12px 14px', gap=8)
+    note = row(icon('info', 14, T['ink4']) + muted('发布前自动跑该意图的回归样例，未全部通过时「发布」置灰；每次发布记入审计，可查看历史版本与对比。', 12), 6, 'flex-start')
+    right = col(struct + reg + note, 12, 'width: 400px; flex-shrink: 0;')
+    return col(head + '<div style="display: flex; gap: 16px; align-items: flex-start;">%s%s</div>' % (col(secs, 10, 'flex: 1; min-width: 0px;'), right), 14, 'flex: 1; min-width: 0px;')
+
+
+def p19_guide():
+    """「处理说明」页签（StatesAdmin K21）：左侧意图列表，右侧所选意图的处理说明、结构化部分与回归结果。"""
+    return '<div style="display: flex; gap: 16px; align-items: flex-start;">%s%s</div>' % (guide_intents(), guide_body())
 
 
 # ================================================================ P23 售后规则
@@ -340,51 +510,63 @@ def team_tabs(active):
     return tabs([('成员', len(MEMBERS)), ('角色权限', None)], active)
 
 
+def role_cell(s):
+    """角色列：成员可有多个角色（导航取并集），逐个显示为中性标签；示例数据为单角色（STAFF['roles'] 缺省时取 role）。"""
+    return row(''.join(cat(r) for r in (s.get('roles') or [s['role']])), 4, wrap=True, extra='row-gap: 4px;')
+
+
 def member_table(sel=None):
     cols = [('成员', 'left'), ('钉钉部门', 'left'), ('角色', 'left'), ('数据范围', 'left'), ('语言', 'left'), ('状态', 'left'), ('最近登录', 'left'), ('', 'right')]
     rows = []
     for k, mail, last in MEMBERS:
         s = STAFF[k]
         who_ = row(avatar(s['avatar'], AV_TONE.get(s['role'], 'green'), 28) + col(nowrap(s['name'] + ('（我）' if k == 'liuyang' else ''), 13, T['ink'], 700) + nowrap(mail, 12, T['ink4']), 1), 10)
-        rows.append([who_, nowrap(s['dept'], 13, T['ink2']), cat(s['role']), nowrap(s['stores'], 13, T['ink2']), nowrap(s.get('lang', '—'), 13, T['ink2'] if s.get('lang') else T['ink4']),
+        rows.append([who_, nowrap(s['dept'], 13, T['ink2']), role_cell(s), nowrap(s['stores'], 13, T['ink2']), nowrap(s.get('lang', '—'), 13, T['ink2'] if s.get('lang') else T['ink4']),
                      state('已启用'), nowrap(last, 13, T['ink2']), icon_btn('more', size=24)])
-    return table(cols, rows, 'minmax(0, 1fr) 150px 130px 110px 90px 90px 110px 28px', sel=sel, py=11)
+    return table(cols, rows, 'minmax(0, 1fr) 150px 190px 110px 90px 90px 110px 28px', sel=sel, py=11)
 
 
 def p20_body(sel=None):
-    head = between(row(label('成员') + nowrap('%d 人 · 来自钉钉通讯录，%s 同步；钉钉离职的成员自动停用' % (len(MEMBERS), CHANNEL_SYNC['钉钉']), 12, T['ink3']), 8), btn('从钉钉添加', 'primary', 'sm', 'plus'))
+    head = between(row(label('成员') + nowrap('%d 人 · 来自钉钉通讯录，%s 同步' % (len(MEMBERS), CHANNEL_SYNC['钉钉']), 12, T['ink3']), 8), btn('从钉钉添加', 'primary', 'sm', 'plus'))
     return col(head + member_table(sel), 10)
 
 
-def p20():
+def p20(h=900):
     backup = row(col(nowrap('备用审批人', 12, T['ink2'], 600) + nowrap('唯一有权审批的人是发起人时转给此人（R-AP-02）', 11, T['ink4']), 1) + select_box('王磊 · 售后负责人', width='168px', h=32), 10)
-    return spage('liuyang', '团队与权限', '团队与权限', '成员与部门来自钉钉通讯录；在这里分配角色、店铺数据范围与备用审批人。', backup, p20_body(),
-                 save_bar(0, '角色、数据范围与备用审批人的修改在这里统一保存'), team_tabs('成员'))
+    return spage('liuyang', '团队与权限', '团队与权限', '成员与部门来自钉钉通讯录；在这里分配角色、店铺数据范围与备用审批人。钉钉离职的成员自动停用。', backup, p20_body(),
+                 save_bar(0, '角色、数据范围与备用审批人的修改在这里统一保存'), team_tabs('成员'), h=h)
 
 
 ROLE_HEAD = ['坐席', '客服主管', '售后负责人', '知识库负责人', '管理员', '生产厂对接人']
-MATRIX = [  # prd_d 10.1 功能权限（能力文字与圆点照原文）
+MATRIX = [  # prd_d 10.1 功能权限（能力文字与圆点照原文；空白画为「—」）
     ('查看工单、回复、标签、合并、转人工、手工新建工单', ['●', '●', '●', '只读', '', '']),
     ('合并与拆分客户身份', ['●', '●', '●', '', '', '']),
     ('改派他人工单、强制接手', ['', '●', '', '', '', '']),
+    ('标记来信「无需回复」（第一阶段）', ['●', '●', '', '', '', '']),
+    ('为未归属店铺的来信指定店铺', ['', '●', '', '', '', '']),
     ('提交审批单；提交时同时创建售后单（路径 B）', ['●', '●', '●', '', '', '']),
     ('审批含报备的审批单', ['', '●', '', '', '', '']),
     ('审批只含动作的审批单', ['', '●', '●', '', '', '']),
     ('撤回审批单', ['○', '○', '○', '', '', '']),
     ('执行人工操作清单（兜底）', ['○', '○', '○', '', '', '']),
     ('查看售后单、登记台账', ['只读', '●', '●', '', '', '']),
-    ('登记台账补登', ['', '', '●', '', '', '']),
+    ('新建登记；编辑进行中的登记（第一阶段）', ['', '○（自己登记的）', '●', '', '', '']),
+    ('售后单设为已完成（第一阶段）', ['', '○（自己登记的）', '●', '', '', '']),
+    ('登记台账补登（已完成的单）、修改汇率', ['', '', '●', '', '', '']),
+    ('改派售后单负责人', ['', '●', '●', '', '', '']),
     ('手工新建售后单、确认责任与处理方式、退回继续排查、终止售后单', ['', '●', '●', '', '', '']),
     ('发起与录入比例协商、重开协商、退回生产厂报价、生成结算批次', ['', '', '●', '', '', '']),
     ('维护知识条目、素材库、审核沉淀', ['提交候选', '审核政策规则', '维护排查树', '●', '', '']),
     ('查看报表', ['', '●', '●', '●', '●', '']),
-    ('处理规则、发送方式、风险信号、售后规则、标签库、模板、SLA', ['', '●', '', '', '', '']),
-    ('渠道、店铺、动作映射、成员、角色、备用审批人、生产厂账号', ['', '', '', '', '●', '']),
+    ('查看成本、承担比例与结算金额（含报表、导出、下钻与审计前后值）', ['', '●', '●', '', '', '本厂部分']),
+    ('查看审计日志（P27）', ['○', '●', '○', '○', '●', '']),
+    ('处理规则（P19：发送方式、风险信号、渠道内容能力）、售后规则（P23）、标签库、模板、SLA', ['', '●', '', '', '', '']),
+    ('渠道与店铺（P18）、动作映射（P22）、成员、角色、备用审批人（P20）、工厂账号（P24）', ['', '', '', '', '●', '']),
     ('工厂工作台：本厂任务的报价、回填、答复、结算确认、留言', ['', '', '', '', '', '●']),
 ]
-# 分组：(组名, MATRIX 下标)；全部展开
-MATRIX_GROUPS = [('工单', (0, 1, 2)), ('审批', (3, 4, 5, 6, 7)), ('售后', (8, 9, 10, 11)),
-                 ('知识', (12,)), ('报表', (13,)), ('设置', (14, 15)), ('工厂', (16,))]
+# 分组：(组名, MATRIX 下标)；全部展开。成本可见与审计日志都是「看数据」的能力，归入「报表」组
+MATRIX_GROUPS = [('工单', (0, 1, 2, 3, 4)), ('审批', (5, 6, 7, 8, 9)), ('售后', (10, 11, 12, 13, 14, 15, 16)),
+                 ('知识', (17,)), ('报表', (18, 19, 20)), ('设置', (21, 22)), ('工厂', (23,))]
 
 
 def mark(v):
@@ -392,6 +574,9 @@ def mark(v):
         return '<div style="width: 9px; height: 9px; border-radius: 999px; background: %s; margin: 0px auto;"></div>' % T['accent']
     if v == '○':
         return '<div style="width: 9px; height: 9px; box-sizing: border-box; border-radius: 999px; border: 1.5px solid %s; margin: 0px auto;"></div>' % T['accent']
+    if v.startswith('○'):  # 「○（自己登记的）」：空心圆 + 范围说明
+        return '<div style="display: flex; align-items: center; justify-content: center; gap: 4px;"><div style="width: 9px; height: 9px; box-sizing: border-box; border-radius: 999px; border: 1.5px solid %s; flex-shrink: 0;"></div><div style="font-size: 11px; color: %s; white-space: nowrap;">%s</div></div>' % (
+            T['accent'], T['ink3'], v[1:].strip('（）'))
     if v:
         return '<div style="font-size: 12px; color: %s; text-align: center; white-space: nowrap;">%s</div>' % (T['ink3'], v)
     return '<div style="font-size: 12px; color: %s; text-align: center;">—</div>' % T['ink4']

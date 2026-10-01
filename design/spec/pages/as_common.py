@@ -12,6 +12,10 @@ AS = {a['no']: a for a in AFTERSALES}
 STORE = {s['name']: s for s in STORES}
 FT = {(t['type'], t['aftersales']): t for t in FACTORY_TASKS}
 
+# 结算批次计划生成日（prd_b 6.7、5.5：每个生产厂每月至少一个批次，月末自动生成，也可提前；提前批次只收当时比例已确认的单，月末批次收其余），取自 data.SETTLE_BATCHES。
+BATCH_PLAN = {b['no']: b['at'] for b in SETTLE_BATCHES if b['state'] == '待生成'}
+BATCH_PLAN_WORDS = BATCH_PLAN['2026-09-FQD-B'] + ' 月末'  # 页面写法：「于 09-30 月末自动生成」「进入 09-30 月末生成的批次」
+
 
 def plat(store):
     return STORE[store]['platform']
@@ -237,21 +241,24 @@ def group_table(cols, groups, template, footer=None):
     return '<div style="background: #ffffff; border: 1px solid %s; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; box-shadow: %s;">%s</div>' % (T['line'], SHADOW_XS, out)
 
 
-def table_span(cols, rows, template, footer, dense=True, row_tones=None, gap=12):
-    """与 ui.table 同样式，合计行的格子可跨列。footer: [(html, 'left'|'right', 跨列数)]"""
+def table_span(cols, rows, template, footer=None, dense=True, row_tones=None, gap=12, px=16):
+    """与 ui.table 同样式，合计行的格子可跨列。footer: [(html, 'left'|'right', 跨列数)]；None 时不出合计行（如坐席只读视角）。
+    px：左右内边距（列多的台账收窄到 12）。row_tones 另可取 'select'（选中行：主色浅底 + 左侧主色条）。"""
     py = 8 if dense else 10
     head = ''.join('<div style="text-align: %s; min-width: 0px;">%s</div>' % (a, c) for c, a in cols)
-    out = '<div style="display: grid; grid-template-columns: %s; gap: %dpx; padding: 9px 16px; background: %s; border-bottom: 1px solid %s; font-size: 11px; font-weight: 700; color: %s; letter-spacing: 0.02em; white-space: nowrap;">%s</div>' % (
-        template, gap, T['subtle'], T['line'], T['ink3'], head)
+    out = '<div style="display: grid; grid-template-columns: %s; gap: %dpx; padding: 9px %dpx; background: %s; border-bottom: 1px solid %s; font-size: 11px; font-weight: 700; color: %s; letter-spacing: 0.02em; white-space: nowrap;">%s</div>' % (
+        template, gap, px, T['subtle'], T['line'], T['ink3'], head)
     for i, r in enumerate(rows):
         tone = (row_tones or {}).get(i)
-        bar = 'box-shadow: inset 3px 0 0 %s;' % {'warning': T['warn_solid'], 'danger': T['bad_solid'], 'accent': T['accent']}[tone] if tone else ''
+        bg = T['accent_bg'] if tone == 'select' else '#ffffff'
+        bar = 'box-shadow: inset 3px 0 0 %s;' % {'warning': T['warn_solid'], 'danger': T['bad_solid'], 'accent': T['accent'], 'select': T['accent']}[tone] if tone else ''
         cells = ''.join('<div style="text-align: %s; min-width: 0px;">%s</div>' % (cols[j][1], c) for j, c in enumerate(r))
-        out += '<div style="display: grid; grid-template-columns: %s; gap: %dpx; padding: %dpx 16px; background: #ffffff; border-bottom: 1px solid %s; font-size: 13px; color: %s; align-items: center; font-variant-numeric: tabular-nums; %s">%s</div>' % (
-            template, gap, py, T['line2'], T['ink'], bar, cells)
-    cells = ''.join('<div style="text-align: %s; min-width: 0px; grid-column: span %d;">%s</div>' % (a, n, c) for c, a, n in footer)
-    out += '<div style="display: grid; grid-template-columns: %s; gap: %dpx; padding: 10px 16px; background: %s; font-size: 13px; font-weight: 700; color: %s; align-items: center; font-variant-numeric: tabular-nums;">%s</div>' % (
-        template, gap, T['subtle'], T['ink'], cells)
+        out += '<div style="display: grid; grid-template-columns: %s; gap: %dpx; padding: %dpx %dpx; background: %s; border-bottom: 1px solid %s; font-size: 13px; color: %s; align-items: center; font-variant-numeric: tabular-nums; %s">%s</div>' % (
+            template, gap, py, px, bg, T['line2'], T['ink'], bar, cells)
+    if footer is not None:
+        cells = ''.join('<div style="text-align: %s; min-width: 0px; grid-column: span %d;">%s</div>' % (a, n, c) for c, a, n in footer)
+        out += '<div style="display: grid; grid-template-columns: %s; gap: %dpx; padding: 10px %dpx; background: %s; font-size: 13px; font-weight: 700; color: %s; align-items: center; font-variant-numeric: tabular-nums;">%s</div>' % (
+            template, gap, px, T['subtle'], T['ink'], cells)
     return '<div style="background: #ffffff; border: 1px solid %s; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; box-shadow: %s;">%s</div>' % (T['line'], SHADOW_XS, out)
 
 
@@ -330,6 +337,8 @@ SETTINGS_MENU = [
     ('标签库', 'tag', '客服主管'),
     ('工厂账号', 'factory', '管理员'),
     ('团队与权限', 'users', '管理员'),
+    ('模型', 'spark', '管理员'),
+    ('系统状态', 'refresh', '管理员'),
     ('模板', 'file', '客服主管'),
     ('SLA', 'clock', '客服主管'),
 ]
@@ -345,8 +354,8 @@ def settings_menu(active, role):
         items += '<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 34px; box-sizing: border-box; padding: 0px 10px; border-radius: 6px; background: %s;"><div style="display: flex; align-items: center; gap: 9px;">%s<div style="font-size: 13px; font-weight: %d; color: %s; white-space: nowrap;">%s</div></div>%s</div>' % (
             T['accent_bg'] if on else 'transparent', icon(ic, 16, T['accent'] if on else (T['ink3'] if allowed else T['ink4'])), 700 if on else 500, c, name,
             '' if allowed else icon('lock', 13, T['ink4']))
-    foot = '<div style="margin-top: auto; padding: 10px; border-top: 1px solid %s; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 11px; color: %s; line-height: 1.5;">带锁的项由%s维护</div><div style="display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: %s;">%s查看审计日志</div></div>' % (
-        T['line'], T['ink4'], '客服主管' if role == '管理员' else '管理员', T['accent'], icon('history', 14, T['accent']))
+    foot = '<div style="margin-top: auto; padding: 10px; border-top: 1px solid %s; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 11px; color: %s; line-height: 1.5;">带锁的项由%s维护</div></div>' % (
+        T['line'], T['ink4'], '客服主管' if role == '管理员' else '管理员')
     return '<div style="width: 208px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 16px; box-shadow: 0 1px 2px rgba(16,20,35,0.04); overflow: hidden; margin: 10px 0px 12px 14px; padding: 14px 10px; display: flex; flex-direction: column; gap: 2px;"><div style="font-size: 16px; font-weight: 700; color: %s; padding: 0px 10px 10px 10px;">设置</div>%s%s</div>' % (
         T['line'], T['ink'], items, foot)
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""StatesApproval.dc.html —— 审批状态 A1–A10。"""
+"""StatesApproval.dc.html —— 审批状态 A1–A11。"""
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -96,7 +96,7 @@ def a5():
     bn = banner('danger', '易仓出库单创建失败，已自动重试 3 次', '10:52 首次失败，按 1、5、15 分钟重试仍失败（最后一次 11:13）。积加返回：易仓出库单服务超时。绑定回复未发出。')
     steps = col(exec_step('ok', '报备快递费用 $8.40 已登记', '写入登记台账 · S-20260911-0021') +
                 exec_step('fail', '易仓创建售后出库单：易仓 US · 整机黑色 ×1', '4 次尝试均失败 · 11:13') +
-                exec_step('todo', '发出英语绑定回复', '等出库单创建成功'), 10)
+                exec_step('todo', '发出英语绑定回复', '等积加回传已推送易仓且未缺货'), 10)
     foot = P.draft_like_foot(btn('重试', 'primary', 'md', 'refresh') + btn('转人工操作清单', 'secondary', 'md', 'handoff'),
                              nowrap('转人工后由你在积加手工创建易仓出库单，回填单号即视为成功', 12, T['ink3']))
     c = card(head + P.ap_meta(a) + bn + steps + foot, pad='14px 18px', gap=11, tone='danger')
@@ -206,13 +206,65 @@ def a10():
                    frame, VW, trigger='待审批剩 1 小时（%s）；随后周敏 %s 打开这张单，王磊 %s 从提醒进入。' % (tl['remind'], tl['lock'], tl['backup']))
 
 
+# ---------------------------------------------------------------- A11 绑定回复暂停待确认（D-23，6.3、R-AP-06）
+# 「暂停待确认」是审批单「已执行」之后、绑定回复发出之前的子状态（主状态为已执行）。
+# 新来信 data.AP_NEW_MAIL 与时间线 data.A11_DEMO 都在演示时刻 10:20 之后，P15 不显示这条提示
+
+
+def _left_at(a, hhmm):
+    """某一时刻距审批截止的剩余时间（「剩 3h 12m」）。"""
+    m = lambda t: int(t[:2]) * 60 + int(t[3:5])
+    d = m(a['deadline']) - m(hhmm)
+    return '剩 %dh %02dm' % (d // 60, d % 60) if d >= 60 else '剩 %dm' % d
+
+
+def a11():
+    no = 'AP-20260911-002'
+    a, d = P.AP[no], A11_DEMO
+    ch, sm = P.AP_SUMMARY[no]
+    mails = AP_NEW_MAIL[no]
+    mail = mails[-1]
+    paused = chip('暂停待确认', 'warning', 11, dot=True)
+    capf = lambda av, tone, t: row(avatar(av, tone, 20) + nowrap(t, 12, T['ink3'], 600), 6)
+    # ① 审批人视角：卡头非阻断提示展开（不影响批准）
+    c1 = P.ap_card_collapsed(a, ch, sm, left_text=_left_at(a, d['view1']), extra_body=P.new_mail_hint(no, expanded=True))
+    # ② 发起人视角：审批单已执行，绑定回复暂停（子状态暂停待确认），二选一
+    head = between(row(nowrap(no, 14, T['ink'], 700) + ch + state('已执行') + paused, 8), nowrap('周敏 %s 批准' % d['approve'], 12, T['ink3']))
+    bn = banner('warning', '绑定回复已暂停，等你确认',
+                '提交审批后客户又来信 %d 封（%s），发送前校验未通过（R-AP-06）。审批单已执行，出库单已创建，外部动作不撤回。' % (len(mails), mail['at']))
+    steps = col(exec_step('ok', '报备快递费用 $8.40 已登记', '%s 写入登记台账 · %s' % (d['approve'], a['aftersales'])) +
+                exec_step('ok', '易仓创建售后出库单：易仓 US · 整机黑色 ×1', '%s 积加回传：已推送易仓且未缺货' % d['outbound']) +
+                exec_step('todo', '发出英语绑定回复', '%s 已暂停 · 等你选择' % d['paused']), 8)
+    qbox = lambda t, body: '<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0px; background: %s; border: 1px solid %s; border-radius: 6px; padding: 8px 12px;">%s%s</div>' % (
+        T['subtle'], T['line'], nowrap(t, 12, T['ink3'], 600), body)
+    cmp_ = grid(qbox('提交后的新来信 · %s %s' % (mail['from'], mail['at']), text(mail['en'], 13) + row(ai_badge('译文', 11) + nowrap(mail['zh'], 12, T['ink3']), 6)) +
+                qbox('待发的绑定回复 · English', text(DRAFTS['marcus_bound'], 13)), 2, 10)
+    opt = lambda k, v: '<div style="font-size: 12px; color: %s; line-height: 1.5;"><b style="color: %s;">%s</b>　%s</div>' % (T['ink3'], T['ink2'], k, v)
+    opts = col(opt('照常发送', '回复立即发出，工单按原规则转等客户或等内部。') +
+               opt('放弃并改写', '回复作废，工单回到待审草稿（转人工工单保持转人工）；改写后不再审批，发送前照常过回复检查；原来信与新来信的 SLA 在改写后的回复发出时结束。'), 2)
+    foot = P.draft_like_foot(btn('照常发送', 'primary', 'md', 'send') + btn('放弃并改写', 'secondary', 'md', 'edit'),
+                             nowrap('选择后离开「暂停待确认」，结果写入执行日志', 12, T['ink3']))
+    c2 = card(head + P.ap_meta(a) + bn + steps + cmp_ + opts + foot, pad='12px 18px', gap=10, tone='warning')
+    # ③ 审批人视角：卡片写明暂停与发起人的选择
+    chosen = '<div style="display: flex; align-items: center; gap: 8px; background: %s; border: 1px solid %s; border-radius: 6px; padding: 7px 12px; font-size: 12px; color: %s;">%s<span><b style="color: %s;">%s 暂停待确认</b>（提交后客户又来信 %d 封）→ 李婷 %s 选择<b style="color: %s;">「%s」</b>，绑定回复已发出，工单按原规则转等客户或等内部。</span></div>' % (
+        T['subtle'], T['line'], T['ink2'], icon('history', 14, T['ink3'], 2), T['ink'], d['paused'], len(mails), d['chosen'], T['ink'], d['choice'])
+    c3 = card(between(row(icon('chev_r', 14, T['ink4'], 2) + nowrap(no, 14, T['ink'], 700) + ch, 8), row(state('已执行') + nowrap('周敏 %s 批准' % d['approve'], 12, T['ink3']), 8)) + chosen,
+              pad='10px 18px', gap=8)
+    frame = mini(col(capf('敏', 'accent', '① 周敏 · 客服主管 · %s · 待我审批' % d['view1']) + c1 +
+                     capf('婷', 'green', '② 李婷 · 坐席（发起人）· %s · 我发起的' % d['view']) + c2 +
+                     capf('敏', 'accent', '③ 周敏 · 已处理 · %s 之后' % d['chosen']) + c3, 10), VW, 1040, pad='20px')
+    return variant('A11 绑定回复暂停待确认（新增）', '① 提交后客户又来信时，审批卡头显示非阻断提示「提交后客户又来信 N 封」（信息色），可展开查看原文与 ✦ 中文译文，不影响批准。② 「暂停待确认」是审批单「已执行」之后、绑定回复发出之前的子状态：绑定回复发送前校验不通过（提交后客户又来信，或出现新风险信号）时进入，已执行的外部动作不撤回；发起人在「我发起的」看到卡片标「已执行 · 暂停待确认」，对照新来信与待发回复二选一——「照常发送」：回复发出，工单按原规则转等客户或等内部；「放弃并改写」：绑定回复作废，工单回到待审草稿（转人工工单保持转人工），改写后的回复不再审批、发送前照常过回复检查，原来信与新来信的 SLA 在改写后的回复发出时结束。③ 审批人的卡片写明暂停与发起人的选择（6.3、R-AP-06、D-23）。',
+                   frame, VW, trigger='AP-20260911-002 提交（09:35）后，Marcus Lee %s 又来信（演示时刻之后，P15 的 10:20 画面里没有）；周敏 %s 打开看到提示，%s 批准，%s 易仓出库单创建成功（积加回传已推送易仓且未缺货），发送绑定回复前校验暂停；李婷 %s 选择「%s」。' % (
+                       mail['at'], d['view1'], d['approve'], d['outbound'], d['chosen'], d['choice']))
+
+
 def build():
-    vs = [a1(), a2(), a3(), a4(), a5(), a6(), a7(), a8(), a9(), a10()]
+    vs = [a1(), a2(), a3(), a4(), a5(), a6(), a7(), a8(), a9(), a10(), a11()]
     rows_ = ''
     for k in range(0, len(vs), 2):
         rows_ += grid(''.join(vs[k:k + 2]), template='%dpx %dpx' % (VW, VW), gap=32, extra='align-items: start;')
-    leg = row(state('待审批') + state('执行中') + state('已执行') + state('执行失败') + state('已驳回') + state('已撤回') + state('待执行') + state('已回填') + sla('剩 3h 10m', 'normal') + sla('剩 48m', 'warning') + sla('已超时 20m', 'danger'), 6)
-    return board('审批状态', 'P15 审批页的空、批准确认、驳回、超时、执行失败、人工操作清单回填、坐席撤回、备用审批人、剩 1 小时提醒与处理锁（A1–A10）。审批单把动作、报备、绑定回复合成一张。演示时刻 %s（A4、A5、A10 为当天稍后的画面）。' % NOW_LABEL,
+    leg = row(state('待审批') + state('执行中') + chip('暂停待确认', 'warning', 11, dot=True) + state('已执行') + state('执行失败') + state('已驳回') + state('已撤回') + state('待执行') + state('已回填') + sla('剩 3h 10m', 'normal') + sla('剩 48m', 'warning') + sla('已超时 20m', 'danger'), 6)
+    return board('审批状态', 'P15 审批页的空、批准确认、驳回、超时、执行失败、人工操作清单回填、坐席撤回、备用审批人、剩 1 小时提醒与处理锁、绑定回复暂停待确认（A1–A11）。审批单把动作、报备、绑定回复合成一张。演示时刻 %s（A4、A5、A10、A11 为当天稍后的画面）。' % NOW_LABEL,
                  col(rows_, 36), 1920, 800, leg)
 
 

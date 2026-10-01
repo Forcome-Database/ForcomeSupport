@@ -19,9 +19,10 @@ def p01_middle():
     toolbar = draft_toolbar('English', False, media=False, hint='亚马逊站内信不支持图片和链接')
     ev = evidence([('政策 · 物流停滞或超预计送达处理流程', 'book'), ('政策 · FBM 补发标准', 'book'), ('历史工单 · T-20260614-0117', 'history')])
     foot = act_foot(btn('提交审批', 'primary', 'md', icon_right='arrow_r'))
-    dc = draft_card('09-10 16:01 生成 · %s · 3 条依据' % conf(SARAH_AI['conf'], SARAH_CONF_WHY), tabs_html + reason, toolbar, sarah_body(legend=True), ev, check_row(),
-                    sarah_approval(), foot, gap=6)
-    return middle(head, summary + msg + dc, pad='10px 20px', gap=6)
+    # R-SL-05：A 版含积加补发，审批 4 小时 + 执行 4 个工作小时超过 SLA 剩余，草稿卡顶部提示先发进展回复（prd_c P01「校验」）
+    dc = draft_card('09-10 16:01 生成 · %s · 3 条依据' % conf(SARAH_AI['conf'], SARAH_CONF_WHY), tabs_html + reason, toolbar, sarah_body(legend=True, compact=True), ev, check_row(),
+                    sarah_approval(), foot, top=rsl05_strip(t['sla_left']), gap=4)
+    return middle(head, summary + msg + dc, pad='8px 20px', gap=4)
 
 
 def cust_sec(name, av, email, summary, basis):

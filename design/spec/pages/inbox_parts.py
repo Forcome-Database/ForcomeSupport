@@ -369,16 +369,26 @@ SARAH_REASON_BASIS = SARAH_AI['basis']
 SARAH_CONF_WHY = SARAH_AI['conf_why']
 
 
-def sarah_body(hint=EDIT_HINT, legend=False):
-    """legend=True：右下角放承诺图例（与依据行同一视线；依据徽标占满一行，图例放正文角上不另起一行）。"""
-    return body_box(paras(DRAFTS['sarah_A'], [(SARAH_PROMISE, promise(SARAH_PROMISE))]), gap=5, hint=hint, corner=promise_legend() if legend else '')
+def sarah_body(hint=EDIT_HINT, legend=False, compact=False):
+    """legend=True：右下角放承诺图例（与依据行同一视线；依据徽标占满一行，图例放正文角上不另起一行）。
+    compact=True：段距与上下内边距收紧（P01 草稿卡顶部多了 R-SL-05 提示条，要在 900 高度内放下）。"""
+    return body_box(paras(DRAFTS['sarah_A'], [(SARAH_PROMISE, promise(SARAH_PROMISE))]), gap=3 if compact else 5, pad='8px 14px' if compact else '10px 14px',
+                    hint=hint, corner=promise_legend() if legend else '')
 
 
 def sarah_approval():
     return approval_needed([
         ('动作', '易仓创建售后出库单：易仓 US · V2 黑色 ×1 · UPS Next Day Air'),
         [('报备', '快递费用 <span style="font-weight: 700;">%s</span>' % money(ORDERS['113-4567890-1234567']['resend_freight'])), ('责任', '物流问题（规则：轨迹停滞满 5 天或超预计送达）')],
-    ], '提交后会同时创建售后单。批准后经积加创建易仓出库单，成功即自动发出这封回复。')
+    ], '提交后会同时创建售后单。批准后经积加创建易仓出库单，积加回传已推送易仓且未缺货后自动发出这封回复。')
+
+
+def rsl05_strip(sla_left, action='积加补发'):
+    """R-SL-05 提示条（草稿卡顶部）：SLA 剩余少于「审批剩余时限 + 动作预计执行时长」且草稿含审批项时显示，建议先发不含承诺的进展回复。"""
+    why = 'R-SL-05：审批剩余时限加上动作预计执行时长（%s按 4 个工作小时）后晚于 SLA 截止，承诺类回复来不及在 SLA 内发出' % action
+    return ('<div title="%s" style="display: flex; align-items: center; gap: 8px; background: %s; border: 1px solid %s; border-radius: 8px; padding: 3px 10px;">%s'
+            '<div style="flex: 1; min-width: 0px; font-size: 12px; color: %s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><b style="color: %s;">SLA 剩 %s</b>，短于「审批时限 + %s执行时长」，建议先发不含承诺的进展回复</div>%s</div>') % (
+        why, T['warn_bg'], T['warn_line'], icon('clock', 14, T['warn'], 2), T['ink2'], T['warn'], sla_left, action, link('插入进展回复模板', 12))
 
 
 def sarah_msg(toggle_on='原文'):
