@@ -889,11 +889,11 @@ def _topbar(items, active, user, badges=None, scope='全部店铺', show_scope=T
         T['line'], _brand(brand_sub), _segnav(items, active, badges), right)
 
 
-def app(user_key, active, crumbs, body, badges=None, scope='全部店铺', banner_html=None, right_extra='', show_scope=True, w=1440, h=900, phase1=False, bell_n=None):
+def app(user_key, active, crumbs, body, badges=None, scope='全部店铺', banner_html=None, right_extra='', show_scope=True, w=1440, h=900, phase1=False, bell_n=None, nav=None):
     """客服系统页面外壳：顶栏 + 内容区（浅灰底）。body 自带内边距与布局；crumbs 记录页面层级（在页面标题区体现）。
     phase1=True 时按第一阶段外壳：导航取 NAV_BY_ROLE_P1，不显示店铺范围、搜索与导航角标（prd_b 4.1）。"""
     user = STAFF[user_key]
-    items = (NAV_BY_ROLE_P1 if phase1 else NAV_BY_ROLE)[user['role']]
+    items = nav or (NAV_BY_ROLE_P1 if phase1 else NAV_BY_ROLE)[user['role']]  # nav：按阶段自定义导航（例如第二阶段不含知识库）
     b = {} if phase1 else (BADGES.get(user_key, {}) if badges is None else badges)
     b = {k: v for k, v in b.items() if k in items}
     bn = '<div style="padding: 12px 16px 0px 16px; flex-shrink: 0;">%s</div>' % banner_html if banner_html else ''

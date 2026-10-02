@@ -982,6 +982,86 @@ G7_OCC = {'record': next(k for k in KB if k[0] == '吸力下降排查'), 'by': '
 P1_FACTORY_MAIL = '附件为 9 月电池批次抽检报告，请查收。若有客诉涉及该批次，请回复本邮件告知订单号，我们安排追溯。'
 
 
+# ---- 第二阶段（D-25）演示
+# ---------------------------------------------------------------- 第二阶段收件箱（StatesInbox I19）
+# 第二阶段没有 AI 分诊与草稿，「分诊中」「待审草稿」「待审批」不出现（prd_b 6.1「第二阶段」）。演示时刻的工单映射为：
+# 原待审草稿、待审批、转人工的都记为转人工（原因「人工处理」），其余沿用 TICKETS
+P2_STATUS = {t['no']: ('转人工' if t['status'] in ('待审草稿', '待审批', '转人工') else t['status']) for t in TICKETS}
+P2_REASON = '人工处理'
+# 没有 AI 判定的紧急度：优先级默认「普通」，只按重复联系升级（R-TK-03，次数为 1 升一级）；Mateo Rivas 重复联系 1 次
+P2_PRIORITY = {'T-20260902-0071': '高'}
+# 挂在工单上的未结束审批单（工单号 → 审批单号）；系统发起的报备（AP-20260911-003）挂在售后单上，不算（prd_b 6.1 补充说明 2）
+P2_OPEN_APPROVAL = {a['ticket']: a['no'] for a in APPROVALS if a['status'] == '待审批' and a['by'] != '系统'}
+
+
+def p2_ticket(no):
+    """第二阶段的工单视图：状态、优先级按上方映射，其余字段沿用 TICKETS。"""
+    t = next(x for x in TICKETS if x['no'] == no)
+    return dict(t, status=P2_STATUS[no], priority=P2_PRIORITY.get(no, '普通'))
+
+
+def p2_segments():
+    """I19 左栏四个分段的行（顺序同 INBOX_QUEUE_ORDER，按 SLA 剩余升序）：
+    需处理 = 有未回复来信（SLA 计时中）的转人工；审批中 = 挂着未结束审批单；等待中 = 等客户 / 等内部 / 等外部；全部 = 未关闭。
+    需处理与审批中可以重叠：已提交审批、来信还没回复的工单（Mateo Rivas、Marcus Lee）两个分段都列出。"""
+    tk = {t['no']: t for t in TICKETS}
+    allq = list(INBOX_QUEUE_ORDER)
+    return {'需处理': [n for n in allq if P2_STATUS[n] == '转人工' and _sla_minutes(tk[n]) is not None],
+            '审批中': [n for n in allq if n in P2_OPEN_APPROVAL],
+            '等待中': [n for n in allq if P2_STATUS[n] in ('等客户', '等内部', '等外部')],
+            '全部': allq}
+
+
+def p2_queue_counts():
+    """I19 分段计数；收件箱导航角标 = 需处理（prd_b 4.1「第二阶段」）。"""
+    return {k: len(v) for k, v in p2_segments().items()}
+
+
+# I19 中栏：✦ 对话摘要（第二阶段的 AI 只有摘要与翻译，没有意图、情绪与风险判断）；回复框里李婷正在写的中文、英语译文与回译（R-LG-03）
+P2_SARAH = {
+    'summary': '9 月 3 日下单 V2 黑色，UPS 自 9 月 5 日无扫描，已超预计送达（9 月 9 日）。客户 9 月 15 日（周二）前要用，问包裹是否丢失。首次来信。',
+    'reply_zh': 'Sarah 您好，很抱歉包裹一直没有更新。',
+    'reply_en': "Hi Sarah, I'm sorry the tracking still hasn't updated.",
+    'reply_back': 'Sarah 您好，很抱歉物流信息一直没有更新。',
+}
+# I19 右栏订单卡：亚马逊订单的平台镜像（SP-API 非受限角色，只有城市、州、国家）+ 积加补充的收件人（prd_c「收件箱第二阶段」）
+P2_SHIP_TO = {'113-4567890-1234567': {'city': 'Evanston, IL, US', 'name': 'Sarah Mitchell', 'address': '1847 Maple Ave, Evanston, IL 60201',
+                                      'phone': '+1 847-555-0193'}}
+
+# ---------------------------------------------------------------- 人工提交审批（StatesInbox I20）：李婷在 Sarah Mitchell 工单上组织补发
+INVENTORY[('FC-V2-BLK', '09-11 10:05')] = 12  # 易仓 US · V2 黑色整机（经积加查询）
+P2_SUBMIT = {
+    'ticket': 'T-20260910-0192', 'order': '113-4567890-1234567', 'warehouse': '易仓 US', 'sku': 'FC-V2-BLK', 'qty': 1,
+    'carrier': 'UPS Next Day Air', 'stock_at': '09-11 10:05', 'approver': '周敏', 'limit_h': 4,
+    'deadline': '%02d:%s' % (int(NOW[11:13]) + 4, NOW[14:16]),  # 演示时刻 + 4 小时（R-AP-03）
+    # 绑定回复：从回复框带入（P2_SARAH 的首句）后写完，回复类型「结论性回复」
+    'bound_zh': 'Sarah 您好，很抱歉包裹一直没有更新。我们会免费为您补发一台 V2，走 UPS 次日达，预计 9 月 14 日（周一）送到，赶得上您周二出行；原包裹我们也已向 UPS 发起查件。',
+    'bound_en': ("Hi Sarah, I'm sorry the tracking still hasn't updated. We're sending you a free replacement V2 via UPS Next Day Air, "
+                 "arriving Monday, Sep 14, in time for your Tuesday trip. We've also opened a trace with UPS on the original package."),
+    'err_refund': 59.99,  # 校验态：另加的「亚马逊部分退款」误填 $59.99，超过订单金额 $49.99（E-25）
+}
+
+# ---------------------------------------------------------------- 转售后确认（StatesInbox I21）
+# 演示时刻之后：Olivia Turner 15:46 回信说滤芯早已清洗晾干、吸力仍弱，附照片与视频；李婷 15:52 转售后确认。
+# 时刻在 NOW 之后，不改 TICKETS（P02 的 10:20 画面不变）；售后单号接在当天最后一张之后
+P2_OLIVIA_FOLLOWUP = {
+    'at': '15:46',
+    'en': ("I'd already washed the filter on Wednesday and let it dry for a full day before I wrote to you. "
+           "Suction is still weak, see the video. The photo is the filter after drying."),
+    'zh': '我周三就把滤芯洗过并晾了一整天，然后才给你们写信的。吸力还是很弱，见视频。照片是晾干后的滤芯。',
+    # (文件名, 类型, 说明)
+    'attachments': [('IMG_4127.jpg', '照片', '晾干后的 HEPA 滤芯'), ('suction_test.mov', '视频 · 0:18', '吸口吸力测试')],
+}
+P2_ESCALATE = {
+    'ticket': 'T-20260911-0031', 'at': '15:52', 'by': '李婷',
+    'no': 'S-20260911-%04d' % (max(int(a['no'][-4:]) for a in AFTERSALES if a['no'][2:10] == '20260911') + 1),
+    'desc': '使用约 5 周后吸力明显下降。客户每次用后都清空集尘杯；滤芯清洗并晾干 24 小时后吸力仍弱，视频可见吸口吸力不足。',
+    'checked': '已按排查树清洁滤芯并晾干 24 小时，吸力仍弱',
+    'part': 'FC-V2-HF01',
+    'sla_left': '23h 54m',  # 15:46 来信的内部目标 24 小时，15:52 时剩余
+}
+
+
 if __name__ == '__main__':
     t = ledger_totals()
     for k, v in t.items():

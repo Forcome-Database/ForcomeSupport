@@ -18,11 +18,13 @@ SEG_COUNTS = INBOX_SEG_COUNTS
 
 
 # ---------------------------------------------------------------- 左栏 · 工单队列
-def queue_seg(active='需处理', counts=None):
-    """队列分段：数字在上、名称在下的六等分胶囊分段（浅灰轨道，选中白底）。第一个「需处理」= 待审草稿 + 转人工，为默认分段。"""
+def queue_seg(active='需处理', counts=None, segments=None):
+    """队列分段：数字在上、名称在下的等分胶囊分段（浅灰轨道，选中白底）。第一个「需处理」= 待审草稿 + 转人工，为默认分段。
+    segments 不给时为完整版六段；第二阶段（I19）传 P2_SEGMENTS 四段。"""
     counts = SEG_COUNTS if counts is None else counts
+    segments = segments or SEGMENTS
     cells = ''
-    for name in SEGMENTS:
+    for name in segments:
         on = name == active
         n = counts.get(name, 0)
         nc = T['bad'] if (name == '转人工' and n) else (T['accent_ink'] if on else T['ink'])
@@ -31,7 +33,15 @@ def queue_seg(active='需处理', counts=None):
                   '<div style="font-size: 11px; font-weight: %d; color: %s; line-height: 15px; white-space: nowrap;">%s</div></div>') % (
             '#ffffff' if on else 'transparent', T['line'] if on else 'transparent', ' box-shadow: %s;' % SHADOW_XS if on else '', nc, n, 600 if on else 500,
             T['accent_ink'] if on else T['ink3'], name)
-    return '<div style="display: grid; grid-template-columns: repeat(%d, minmax(0, 1fr)); gap: 1px; background: %s; border-radius: 8px; padding: 3px;">%s</div>' % (len(SEGMENTS), T['track'], cells)
+    return '<div style="display: grid; grid-template-columns: repeat(%d, minmax(0, 1fr)); gap: 1px; background: %s; border-radius: 8px; padding: 3px;">%s</div>' % (len(segments), T['track'], cells)
+
+
+P2_SEGMENTS = ['需处理', '审批中', '等待中', '全部']  # 第二阶段收件箱分段（prd_c「收件箱第二阶段」）
+
+
+def manual_tag(size=11):
+    """第二阶段转人工行的「人工处理」小标（原因写人工处理，不是 E-03 的「AI 未处理」，中性灰）。"""
+    return chip(P2_REASON, 'muted', size)
 
 
 def esc_state(size=11):
@@ -52,10 +62,11 @@ def sla_chip(t, size=11, left=None, level=None, suffix=True):
     return sla(v, level or t['sla_level'], size)
 
 
-def queue_row(t, selected=False, sla_html=None, highlight=None, dense=False, status_html=None):
+def queue_row(t, selected=False, sla_html=None, highlight=None, dense=False, status_html=None, phase2=False):
     """队列卡片：渠道徽标 + 客户名 + SLA / 主题 / 意图 · 状态（· 负面）。
-    左侧色条只表示风险（转人工或 highlight='danger' 为红条）；选中改用浅靛蓝底 + 描边，不加色条。情绪只在负面时写「负面」。"""
-    bar_c = T['bad_solid'] if (t['status'] == '转人工' or highlight == 'danger') else None
+    左侧色条只表示风险（转人工或 highlight='danger' 为红条）；选中改用浅靛蓝底 + 描边，不加色条。情绪只在负面时写「负面」。
+    phase2=True（I19）：没有 AI 分诊，不写意图与情绪；全部转人工都是「人工处理」，不表示风险，不加红条。"""
+    bar_c = T['bad_solid'] if ((t['status'] == '转人工' and not phase2) or highlight == 'danger') else None
     bar = '<div style="position: absolute; left: 0px; top: 10px; bottom: 10px; width: 3px; border-radius: 0px 3px 3px 0px; background: %s;"></div>' % bar_c if bar_c else ''
     bg = T['accent_bg'] if selected else '#ffffff'
     bd = T['accent_line'] if selected else 'transparent'
@@ -64,16 +75,16 @@ def queue_row(t, selected=False, sla_html=None, highlight=None, dense=False, sta
     line1 = between('<div style="display: flex; align-items: center; gap: 7px; min-width: 0px;">%s%s</div>' % (
         channel(t['channel'], t['site'], None, 11 - k), ellipsis(t['customer'], 13 - k, T['ink'], 600)), s_)
     line2 = ellipsis(t['subject'], 13 - k, T['ink'] if selected else T['ink2'], 500 if selected else 400)
-    neg = nowrap('负面', 11, T['bad']) if t['sentiment'] == '负面' else ''
+    neg = nowrap('负面', 11, T['bad']) if (t['sentiment'] == '负面' and not phase2) else ''
     st = status_html if status_html is not None else status_chip(t['status'], 11 - k)
     inner = nowrap('内部目标', 11, T['ink4']) if (t.get('sla_kind') and t['sla_level'] != 'none' and sla_html is None) else ''
-    line3 = between(row(nowrap(t['intent'], 12 - k, T['ink3']) + st + neg, 6), inner)
+    line3 = between(row(('' if phase2 else nowrap(t['intent'], 12 - k, T['ink3'])) + st + neg, 6), inner)
     return '<div style="position: relative; padding: %s; border-radius: %dpx; border: 1px solid %s; background: %s; display: flex; flex-direction: column; gap: %dpx;">%s%s%s%s</div>' % (
         '6px 10px 6px 11px' if dense else '9px 11px 9px 12px', 12, bd, bg, 2 if dense else 4, bar, line1, line2, line3)
 
 
-def queue_head(active_seg='需处理', counts=None, mine=False):
-    return col(between(text('待处理', 14, T['ink'], 600), toggle(mine, '只看我的')) + queue_seg(active_seg, counts), 10)
+def queue_head(active_seg='需处理', counts=None, mine=False, segments=None):
+    return col(between(text('待处理', 14, T['ink'], 600), toggle(mine, '只看我的')) + queue_seg(active_seg, counts, segments), 10)
 
 
 def queue_list_note(n, extra=''):
@@ -82,7 +93,7 @@ def queue_list_note(n, extra=''):
         row(icon('sort', 13, T['ink4']) + nowrap('%d 张 · 按 SLA 剩余升序' % n, 11, T['ink4']), 4), extra)
 
 
-def queue_column(selected_no=None, active_seg='需处理', rows_html=None, counts=None, w=308, mine=False):
+def queue_column(selected_no=None, active_seg='需处理', rows_html=None, counts=None, w=308, mine=False, segments=None):
     if rows_html is None:
         nos = NEED_ORDER if active_seg == '需处理' else QUEUE_ORDER
         rows_html = queue_list_note(len(nos)) + ''.join(queue_row(TK[n], n == selected_no) for n in nos)
@@ -92,7 +103,7 @@ def queue_column(selected_no=None, active_seg='需处理', rows_html=None, count
     return ('<div style="width: %dpx; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 16px; box-shadow: %s; display: flex; flex-direction: column; min-height: 0px; overflow: hidden;">'
             '<div style="padding: 13px 14px 11px 14px; border-bottom: 1px solid %s; flex-shrink: 0;">%s</div>'
             '<div style="flex: 1; min-height: 0px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: %s transparent; padding: 6px 8px 10px 8px; display: flex; flex-direction: column; gap: 3px;">%s</div></div>') % (
-        w, T['line'], SHADOW_XS, T['line2'], queue_head(active_seg, counts, mine), T['line_strong'], rows_html)
+        w, T['line'], SHADOW_XS, T['line2'], queue_head(active_seg, counts, mine, segments), T['line_strong'], rows_html)
 
 
 # ---------------------------------------------------------------- 中栏
@@ -109,8 +120,9 @@ def merge_btn(t, size='sm'):
     return btn('合并', 'secondary', size, 'merge', disabled=True, reason=why)
 
 
-def conv_head(t, owner_av, tags=None, actions=None, sla_label=None):
-    """会话标题区（三行，P01–P03 共用）：主题 + 操作 / 编号 · 渠道与店铺 · 负责人 · 状态 · 优先级 | SLA 胶囊 / 意图 · 标签。"""
+def conv_head(t, owner_av, tags=None, actions=None, sla_label=None, intent=True, status_html=None):
+    """会话标题区（三行，P01–P03 共用）：主题 + 操作 / 编号 · 渠道与店铺 · 负责人 · 状态 · 优先级 | SLA 胶囊 / 意图 · 标签。
+    intent=False（第二阶段 I19）：没有 AI 分诊，第三行只有标签；status_html 覆盖状态胶囊（如「转人工 + 人工处理」）。"""
     acts = actions if actions is not None else (merge_btn(t) + btn('内部备注', 'secondary', 'sm', 'message') + icon_btn('more', 'secondary', 28))
     r1 = between('<div style="flex: 1; min-width: 0px;">%s</div>' % ellipsis(t['subject'], 17, T['ink'], 600), row(acts, 6))
     lbl = sla_label or ('内部目标' if t.get('sla_kind') else '亚马逊 24h SLA' if t['channel'] == '亚马逊' else 'SLA')
@@ -122,9 +134,9 @@ def conv_head(t, owner_av, tags=None, actions=None, sla_label=None):
         s_ = sla_meter(lbl, ('剩 ' + t['sla_left']) if t['sla_left'][0].isdigit() else t['sla_left'], {'danger': 'danger', 'warning': 'warning'}.get(t['sla_level'], 'normal'), _sla_pct(t))
     meta = row(nowrap(t['no'], 12, T['ink4']) + channel(t['channel'], t['site'], t['store']) + divider(True, 12) +
                row(avatar(owner_av, 'grad', 18) + nowrap(t['owner'], 12, T['ink2']), 5) + divider(True, 12) +
-               row(status_chip(t['status']) + priority(t['priority']), 4), 8)
+               row((status_html or status_chip(t['status'])) + priority(t['priority']), 4), 8)
     r2 = between(meta, s_, extra='flex-wrap: wrap; row-gap: 6px;')  # 窄画面（状态板）时 SLA 胶囊换到下一行
-    r3 = row(cat(t['intent']) + (divider(True, 12) if tg_ else '') + tg_ + add, 6)
+    r3 = row((cat(t['intent']) + (divider(True, 12) if tg_ else '') if intent else '') + tg_ + add, 6)
     return '<div style="padding: 11px 18px 10px 18px; border-bottom: 1px solid %s; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; background: #ffffff;">%s%s%s</div>' % (
         T['line2'], r1, r2, r3)
 
@@ -278,6 +290,37 @@ def approval_needed(rows, note, approver='客服主管', limit='4 小时'):
 
 def draft_foot(left, right=''):
     return '<div style="display: flex; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid %s;">%s<div style="flex: 1;"></div>%s</div>' % (T['line2'], left, right)
+
+
+# ---------------------------------------------------------------- 人工回复：回复类型（R-TK-03，D-25）
+REPLY_TYPES = ('排查步骤', '索要信息', '进展回复', '结论性回复')
+# 每种回复类型对重复联系计数的影响（R-TK-03：只有结论性回复之后的再来信才计重复联系）
+REPLY_TYPE_NOTE = {
+    '排查步骤': '客户按步骤反馈结果，不计重复联系',
+    '索要信息': '客户按要求补充信息，不计重复联系',
+    '进展回复': '不含方案与承诺，客户再来信不计重复联系',
+    '结论性回复': '给出方案、承诺或拒绝；客户再来信计重复联系',
+}
+
+
+def reply_type_row(value='结论性回复', note=None, right=''):
+    """回复框下方的「回复类型」下拉（坐席发送时选择，默认结论性回复）+ 一句说明；right 放发送渠道说明。"""
+    n = REPLY_TYPE_NOTE[value] if note is None else note
+    left = row(nowrap('回复类型', 12, T['ink3']) + select_box(value, width='116px', h=28) +
+               (row(icon('info', 13, T['ink4']) + nowrap(n, 11, T['ink3']), 4) if n else ''), 8)
+    return between(left, right)
+
+
+def reply_type_menu(value='结论性回复', width=320):
+    """回复类型下拉展开：四个选项，每项一句对重复联系计数的影响，当前项打勾（样式同 ui.menu）。"""
+    out = ''
+    for t in REPLY_TYPES:
+        on = t == value
+        out += '<div style="display: flex; align-items: flex-start; gap: 8px; padding: 6px 10px; border-radius: 6px; background: %s;">%s%s</div>' % (
+            T['accent_bg'] if on else 'transparent', '<div style="width: 15px; flex-shrink: 0; padding-top: 2px;">%s</div>' % (icon('check', 15, T['accent_ink'], 2) if on else ''),
+            col(nowrap(t, 13, T['accent_ink'] if on else T['ink'], 600) + nowrap(REPLY_TYPE_NOTE[t], 11, T['ink3']), 1))
+    return '<div style="width: %dpx; box-sizing: border-box; background: %s; border: 1px solid %s; border-radius: 12px; box-shadow: %s; padding: 5px;">%s</div>' % (
+        width, T['surface'], T['line'], SHADOW_MD, out)
 
 
 def draft_card(meta, tabs_html, toolbar, body, evid='', check='', approval='', foot='', top='', gap=8, head_right=''):

@@ -118,9 +118,10 @@ def p02_right():
     return right_column(cust + order + rel + info + tree)
 
 
-def p02():
+def p02(h=900):
+    """h：状态板拿它作弹窗底图时可加高（StatesInbox I21），页面本身固定 900。"""
     body = three_col(queue_column('T-20260911-0031'), p02_middle(), p02_right())
-    return app('liting', '收件箱', ['收件箱', '待处理', 'T-20260911-0031'], body)
+    return app('liting', '收件箱', ['收件箱', '待处理', 'T-20260911-0031'], body, h=h)
 
 
 # ================================================================ P03 收件箱 · 转人工工单（陈晨 · Mateo Rivas）
@@ -156,9 +157,11 @@ def progress_reply():
     es = col(between(nowrap('西班牙语译文 · 将发送', 11, T['ink3'], 600), link('查看回译', 11)) +
              '<div style="min-height: 84px; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.5; color: %s;">%s</div>' % (
                  T['line'], T['subtle'], T['ink'], DRAFTS['mateo_progress_es']), 4)
-    foot = draft_foot(btn('发送进展回复', 'primary', 'md', 'send') + btn('让 AI 起草', 'secondary', 'md', 'spark') + btn('转客服主管', 'secondary', 'md', 'handoff'),
-                      nowrap('经亚马逊买家消息以 Forcome Direct 发出', 11, T['ink4']))
-    return card(tb + grid(zh + es, 2, 12) + foot, pad='10px 16px', gap=6)
+    # 回复类型（R-TK-03）：插入进展模板后自动选「进展回复」；发送渠道说明放在这一行右侧，按钮行留给五个操作
+    rtype = reply_type_row('进展回复', '插入进展模板后自动选择 · 客户再来信不计重复联系', nowrap('经亚马逊买家消息以 Forcome Direct 发出', 11, T['ink4']))
+    foot = draft_foot(btn('发送进展回复', 'primary', 'md', 'send') + btn('提交审批', 'secondary', 'md', 'approve') + btn('转售后确认', 'secondary', 'md', 'box') +
+                      btn('让 AI 起草', 'secondary', 'md', 'spark') + btn('转客服主管', 'secondary', 'md', 'handoff'))
+    return card(tb + grid(zh + es, 2, 12) + rtype + foot.replace('padding-top: 10px;', 'padding-top: 8px;', 1), pad='8px 16px', gap=5)
 
 
 def p03_middle():
@@ -170,7 +173,7 @@ def p03_middle():
         icon('history', 15, T['ink3']), T['ink2'], T['accent'], link('展开历史', 12, 'chev_d'))
     warn = banner('warning', 'SLA 剩 55 分钟，审批还剩 3h 10m', '承诺退款的回复要在审批后才发出。建议先发一条不含承诺的进展回复（已插入下方回复框）。',
                   btn('已插入 · 重新插入', 'secondary', 'sm', 'check'))
-    return middle(head, risk + hist + mateo_msg() + mateo_submitted() + warn + progress_reply(), pad='8px 18px', gap=7)
+    return middle(head, risk + hist + mateo_msg() + mateo_submitted() + warn + progress_reply(), pad='8px 18px', gap=5)
 
 
 def p03_right():
