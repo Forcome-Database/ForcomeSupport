@@ -54,13 +54,13 @@ def a2():
         T['subtle'], icon('chev_r', 13, T['ink3'], 2), nowrap('中文译文', 12, T['ink2'], 600), ai_badge('译文', 11), T['ink4'], DRAFTS['mateo_bound_zh'])
     quote = '<div style="font-size: 12px; color: %s; line-height: 1.55; border-left: 2px solid %s; padding-left: 10px; margin-top: 4px;">%s</div>%s' % (T['ink2'], T['accent_line'], DRAFTS['mateo_bound_es'], zh)
     body = col(label('批准后按顺序执行') +
-               step_line(1, '报备通过：额外赔偿 <b>MX$889.00</b>（≈ $49.39）写入登记台账', '售后单 S-20260911-0020 进入「执行付款」') +
+               step_line(1, '报备状态更新为已批准：额外赔偿 <b>MX$889.00</b>（≈ $49.39，金额已在提交时计入台账）', '售后单 S-20260911-0020 进入「执行付款」') +
                step_line(2, '经 SP-API 退款 MX$889.00（Forcome Direct · MX）', '失败按 1、5、15 分钟自动重试 3 次；仍失败时陈晨可转人工操作清单') +
                step_line(3, '退款成功后，自动发出西班牙语绑定回复', quote) +
                step_line(4, '在工厂工作台发起比例提案：建议' + ratio_words([x for x in AFTERSALES if x['no'] == 'S-20260911-0020'][0]['ratios']), '与退款并行，客户不等协商结果'), 12)
     dlg = dialog('批准 AP-20260911-001？', body, btn('取消', 'secondary') + btn('批准并退款', 'primary', 'md', 'check'), 560, None,
                  '审批单转「执行中」，每一步的结果写入执行日志。')
-    return variant('A2 批准确认', '批准执行不可逆，仍弹确认（按 A 同样弹出）：按执行顺序列出批准后发生的动作与绑定回复，西语回复下带可展开的「中文译文」（✦ AI 翻译，默认折叠）；主按钮文案写清结果。确认后浮层「已批准 001，下一张 002」并自动展开下一张。',
+    return variant('A2 批准确认', '批准执行不可逆，仍弹确认：按执行顺序列出批准后发生的动作与绑定回复，西语回复下带可展开的「中文译文」（✦ AI 翻译，默认折叠）；主按钮文案写清结果。确认后浮层「已批准 001，下一张 002」并自动展开下一张。',
                    scrim_frame(scaled(P.p15(), 1440, 900, S), dlg), VW, trigger='在待我审批卡片上点「批准」。')
 
 
@@ -94,7 +94,7 @@ def a5():
     head = between(row(nowrap(a['no'], 14, T['ink'], 700) + cat('报备 · 快递费用') + cat('动作 · 积加'), 8),
                    row(state('执行失败') + nowrap('周敏 10:51 批准', 12, T['ink3']), 8))
     bn = banner('danger', '易仓出库单创建失败，已自动重试 3 次', '10:52 首次失败，按 1、5、15 分钟重试仍失败（最后一次 11:13）。积加返回：易仓出库单服务超时。绑定回复未发出。')
-    steps = col(exec_step('ok', '报备快递费用 $8.40 已登记', '写入登记台账 · S-20260911-0021') +
+    steps = col(exec_step('ok', '报备快递费用 $8.40 已登记', '报备已批准 · 金额已在提交时计入台账 · S-20260911-0021') +
                 exec_step('fail', '易仓创建售后出库单：易仓 US · 整机黑色 ×1', '4 次尝试均失败 · 11:13') +
                 exec_step('todo', '发出英语绑定回复', '等积加回传已推送易仓且未缺货'), 10)
     foot = P.draft_like_foot(btn('重试', 'primary', 'md', 'refresh') + btn('转人工操作清单', 'secondary', 'md', 'handoff'),
@@ -232,7 +232,7 @@ def a11():
     head = between(row(nowrap(no, 14, T['ink'], 700) + ch + state('已执行') + paused, 8), nowrap('周敏 %s 批准' % d['approve'], 12, T['ink3']))
     bn = banner('warning', '绑定回复已暂停，等你确认',
                 '提交审批后客户又来信 %d 封（%s），发送前校验未通过（R-AP-06）。审批单已执行，出库单已创建，外部动作不撤回。' % (len(mails), mail['at']))
-    steps = col(exec_step('ok', '报备快递费用 $8.40 已登记', '%s 写入登记台账 · %s' % (d['approve'], a['aftersales'])) +
+    steps = col(exec_step('ok', '报备快递费用 $8.40 已登记', '%s 报备已批准 · 金额已在提交时计入台账 · %s' % (d['approve'], a['aftersales'])) +
                 exec_step('ok', '易仓创建售后出库单：易仓 US · 整机黑色 ×1', '%s 积加回传：已推送易仓且未缺货' % d['outbound']) +
                 exec_step('todo', '发出英语绑定回复', '%s 已暂停 · 等你选择' % d['paused']), 8)
     qbox = lambda t, body: '<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0px; background: %s; border: 1px solid %s; border-radius: 6px; padding: 8px 12px;">%s%s</div>' % (

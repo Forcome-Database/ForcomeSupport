@@ -9,7 +9,7 @@ from ui import *
 from data import *
 
 NAME_KEY = {v['name']: k for k, v in STAFF.items()}
-OBJ_TYPES = ['工单', '来信', '售后单', '审批单', '店铺', '成员', '设置', '导出', '登录']  # 对象类型筛选项（prd_c P27）
+OBJ_TYPES = ['工单', '来信', '售后单', '审批单', '店铺', '渠道', '成员', '设置', '导出', '登录']  # 对象类型筛选项（prd_c P27）
 LINKABLE = ('工单', '来信', '售后单', '审批单', '店铺', '成员', '渠道')  # 对象编号可点进详情的类型
 
 COLS = [('时间', 'left'), ('操作人', 'left'), ('对象', 'left'), ('动作', 'left'), ('变更摘要', 'left'), ('来源 IP', 'left'), ('', 'right')]
@@ -130,9 +130,11 @@ def p27():
                  row(icon('money', 13, T['ink4']) + nowrap('财务字段：无财务权限的角色看到「已隐藏」', 12, T['ink3']), 6), 12)
     head = '<div style="padding: 16px 24px 2px 24px; flex-shrink: 0;">%s</div>' % audit_page_head()
     tbl_head = between(row(label('09-11 今天') + nowrap('共 %d 条 · 越权访问 %d 条 · 点行展开完整前后值' % (len(AUDIT_LOG), denied), 12, T['ink3']), 8), legend)
-    foot = between(muted('共 %d 条' % len(AUDIT_LOG)), row(btn('上一页', 'secondary', 'sm', disabled=True, reason='已是第一页') + nowrap('1 / 1', 12, T['ink2']) +
-                                                          btn('下一页', 'secondary', 'sm', disabled=True, reason='已是最后一页'), 8))
-    body = head + content(audit_filters() + col(tbl_head + audit_table(AUDIT_LOG, 0, exp, len(AUDIT_P27_EXPAND)), 10) + foot, '14px 24px', 12)
+    per = 10  # 每页 10 条，演示第 1 页
+    pages_n = (len(AUDIT_LOG) + per - 1) // per
+    foot = between(muted('共 %d 条 · 每页 %d 条' % (len(AUDIT_LOG), per)), row(btn('上一页', 'secondary', 'sm', disabled=True, reason='已是第一页') + nowrap('1 / %d' % pages_n, 12, T['ink2']) +
+                                                          btn('下一页', 'secondary', 'sm', disabled=pages_n == 1, reason='已是最后一页'), 8))
+    body = head + content(audit_filters() + col(tbl_head + audit_table(AUDIT_LOG[:per], 0, exp, len(AUDIT_P27_EXPAND)), 10) + foot, '14px 24px', 12)
     return app('zhoumin', '', ['审计日志'], body)
 
 

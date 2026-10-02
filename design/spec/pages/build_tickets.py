@@ -173,7 +173,7 @@ def sla_line(arr, res, tone, note):
         T['ink3'], arr, T['ink'], res, chip(note, tone, 10) if note else '')
 
 
-def order_card(no, pad=RCARD_PAD):
+def order_card(no, pad=RCARD_PAD, synced=None):
     """订单卡（平台镜像，SP-API 非受限角色：不含买家姓名与地址明细，只有城市、州、国家），数据取 data.ORDERS；
     标题右侧「平台镜像 · 最近同步」取 data.CHANNEL_SYNC['SP-API']。P05 与第一阶段 I18 共用。"""
     o = ORDERS[no]
@@ -181,7 +181,7 @@ def order_card(no, pad=RCARD_PAD):
     body = col(head + col(kv('商品', o['item']) + kv('金额', '%s（≈ %s）' % (o['amount'], money(o['usd']))) +
                           grid(kv('履约方式', o['fulfil']) + kv('承诺送达', o['promise']), 2, 20) + kv('收件城市', o['ship_to']) +
                           kv('承运商', '%s %s' % (o['carrier'], o['tracking'])), 3), 6)
-    return card(body, title='订单', extra=nowrap('平台镜像 · 最近同步 %s' % CHANNEL_SYNC['SP-API'], 11, T['ink3']), pad=pad, gap=8)
+    return card(body, title='订单', extra=nowrap('平台镜像 · 最近同步 %s' % (synced or CHANNEL_SYNC['SP-API']), 11, T['ink3']), pad=pad, gap=8)
 
 
 def inline_kv(k, v):
@@ -358,7 +358,7 @@ def p05_p1():
                     kv('进线邮箱', store['mailbox']) + kv('订单号', t['order']), 6), title='工单信息', pad='12px 16px', gap=8)
     slab = card(col(''.join(sla_line(*x) for x in o['sla']), 8), title='SLA 结果', extra=nowrap('亚马逊 24 小时', 11, T['ink3']), pad='12px 16px', gap=8)
     flow = card(p1_flow(o['flow'], o['close_at'], o['close_reason']), title='状态流转', extra=nowrap('已解决 7 天无来信自动关闭', 11, T['ink3']), pad='12px 16px', gap=8)
-    right = info + order_card(t['order'], '12px 16px') + slab + flow
+    right = info + order_card(t['order'], '12px 16px', P1_OLIVER['order_synced']) + slab + flow
     ts = '<div style="position: absolute; right: 436px; bottom: 30px;">%s</div>' % toast('success', '已标记无需回复 · 工单转已解决', undo=5, remain=4)
     body = head + '<div style="flex: 1; min-height: 0px; display: flex; gap: 16px; padding: 14px 24px 16px 24px;"><div style="flex: 1; min-width: 0px; display: flex; flex-direction: column;">%s</div><div style="width: 380px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px;">%s</div></div>%s' % (left, right, ts)
     return app('liting', '工单', ['工单', t['no']], body, phase1=True)

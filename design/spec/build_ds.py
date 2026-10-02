@@ -337,7 +337,7 @@ def g7_occ():
 
 conflict_frame = mini(col(
     nowrap('编辑锁 · 草稿失效 · 数据范围', 12, T['ink2'], 600) +
-    banner('info', '陈晨正在处理这张工单', '09-11 10:12 开始编辑回复。你可以查看会话和上下文，回复框只读。', row(btn('申请接手', 'secondary', 'sm') + btn('刷新', 'ghost', 'sm', 'refresh'), 6)) + banner('warning', '这张工单在你编辑期间收到新来信', '09-11 10:18 %s 又发来 1 封。你的草稿已保留，请阅读新消息后再发送。' % _g7_t['customer'], btn('查看新消息', 'secondary', 'sm')) + banner('info', '这张工单不在你的店铺范围内', '工单属于店铺 forcome.mx。你的数据范围不含该店铺，需要查看请联系客服主管开通。', btn('联系主管', 'secondary', 'sm')) +
+    banner('info', '陈晨正在处理这张工单', '09-11 10:12 开始编辑回复。你可以查看会话和上下文，回复框只读。', row(btn('申请接手', 'secondary', 'sm') + btn('刷新', 'ghost', 'sm', 'refresh'), 6)) + banner('warning', '这张工单在你编辑期间收到新来信', '09-11 10:18 %s 又发来 1 封。你的草稿已保留，请阅读新消息后再发送。' % _g7_t['customer'], btn('查看新消息', 'secondary', 'sm')) + banner('info', '这张工单不在你的店铺范围内', '工单属于店铺 forcome.mx。你的数据范围不含该店铺，需要查看请联系管理员刘洋开通。', btn('联系管理员', 'secondary', 'sm')) +
     nowrap('乐观锁冲突 · 保存时发现记录已被他人修改 → 点「覆盖保存」二次确认', 12, T['ink2'], 600, ) + g7_occ(), 10), 700, 800, pad='20px')
 unsaved_frame = mini(col(
     nowrap('草稿类（回复框、内部备注）· 自动保存，离开不弹窗', 12, T['ink2'], 600) +

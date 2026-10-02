@@ -875,7 +875,7 @@ def _segnav(items, active, badges=None):
     return '<div style="display: flex; align-items: center; gap: 2px; background: %s; padding: 3px; border-radius: 8px; flex-shrink: 0;">%s</div>' % (T['track'], out)
 
 
-def _topbar(items, active, user, badges=None, scope='全部店铺', show_scope=True, right_extra='', search_ph='搜索工单、订单号、客户邮箱', brand_sub='Support', scope_label='店铺', scope_fixed=False, show_search=True, bell_n=None):
+def _topbar(items, active, user, badges=None, scope='全部店铺', show_scope=True, right_extra='', search_ph='搜索工单、订单号、客户邮箱', brand_sub='Support', scope_label='店铺', scope_fixed=False, show_search=True, bell_n=None, show_bell=True):
     """56px 白色顶栏：品牌 · 分段导航 · 店铺范围 · 搜索（Ctrl K 命令面板）· 密度（舒适 / 紧凑）· 通知 · 当前用户。第一期只有浅色，不放主题切换。
     第一阶段（prd_b 4.1）不显示店铺范围与搜索：show_scope=False、show_search=False。bell_n 为铃铛未读数（None 只显示红点）。"""
     scope_html = '<div style="height: 32px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; border: 1px solid %s; border-radius: 8px; padding: 0px 10px; background: #ffffff; white-space: nowrap;">%s<div style="font-size: 12px; color: %s;">%s：<span style="font-weight: 600; color: %s;">%s</span></div>%s</div>' % (
@@ -883,7 +883,7 @@ def _topbar(items, active, user, badges=None, scope='全部店铺', show_scope=T
     role = user['role']
     me = '<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">%s<div style="display: flex; flex-direction: column; line-height: 1.25;"><div style="font-size: 13px; font-weight: 600; color: %s; white-space: nowrap;">%s</div><div style="font-size: 11px; color: %s; white-space: nowrap;">%s</div></div></div>' % (
         avatar(user['avatar'], 'grad', 30), T['ink'], user['name'], T['ink4'], role)
-    bell = icon_btn('bell', size=32, badge=True if bell_n is None else bell_n)
+    bell = icon_btn('bell', size=32, badge=True if bell_n is None else bell_n) if show_bell else ''  # 工厂工作台没有站内通知（通知走钉钉，11.4）
     right = right_extra + scope_html + (search_box(search_ph, '240px') if show_search else '') + icon_btn('rows', size=32) + bell + me
     return '<div style="height: 56px; flex-shrink: 0; box-sizing: border-box; background: #ffffff; border-bottom: 1px solid %s; display: flex; align-items: center; gap: 16px; padding: 0px 16px;">%s%s<div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">%s</div></div>' % (
         T['line'], _brand(brand_sub), _segnav(items, active, badges), right)
@@ -907,7 +907,7 @@ def factory_app(active, crumbs, body, badges=None, w=1440, h=900, user_key='chen
     user = STAFF[user_key]
     b = badges if badges is not None else {'待办': 1}
     return '<div style="width: %dpx; height: %dpx; box-sizing: border-box; background: %s; display: flex; flex-direction: column; overflow: hidden; position: relative; font-variant-numeric: tabular-nums;">%s<div style="flex: 1; display: flex; flex-direction: column; min-height: 0px; min-width: 0px;">%s</div></div>' % (
-        w, h, T['canvas'], _topbar(FACTORY_NAV, active, user, b, '生产厂 ' + user['factory'], True, '', '搜索售后单号、配件号', '工厂工作台', '范围', True), body)
+        w, h, T['canvas'], _topbar(FACTORY_NAV, active, user, b, '生产厂 ' + user['factory'], True, '', '搜索售后单号、配件号', '工厂工作台', '范围', True, show_bell=False), body)
 
 
 def page_head(title, desc=None, actions='', tabs_html='', chips=''):

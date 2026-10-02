@@ -57,7 +57,7 @@ def rep_filters(active=False):
     if active:
         return row(seg(['近 7 天', '本月', '自定义'], '近 7 天') + filter_chip('店铺', 'forcome.mx', True) + filter_chip('站点', '全部') + filter_chip('标签', '批发', True) +
                    link('清除筛选', 12), 8)
-    return row(seg(['近 7 天', '本月', '自定义'], '近 7 天') + filter_chip('店铺', '全部') + filter_chip('站点', '全部') + filter_chip('标签') + row(spinner(14) + nowrap('正在加载 · 数据截至 10:15', 12, T['ink3']), 6), 8)
+    return row(seg(['近 7 天', '本月', '自定义'], '近 7 天') + filter_chip('店铺', '全部') + filter_chip('站点', '全部') + filter_chip('标签') + row(spinner(14) + nowrap('正在加载 · 更新于 %s' % report_updated(), 12, T['ink3']), 6), 8)
 
 
 def k3():
@@ -137,7 +137,8 @@ def k8():
                       muted('生产环境不显示此项；接模拟数据时渠道卡头标「模拟数据」。', 12), '10px 12px', 8)
     body = (grid(field('平台', select_box('Shopify'), True) + field('店铺名', input_box('forcome.com', st='error'), True, error='店铺名已存在，请换一个'), 2, 12, extra='align-items: start;') +
             grid(field('站点（多选）', multi_select(['MX']), True) + field('默认站点', select_box('MX'), True, hint='无订单的来信按它归站点'), 2, 12, extra='align-items: start;') +
-            field('进线邮箱（Shopify 客服邮箱）', input_box('support@forcome', st='error'), True, error='邮箱格式不正确，例如 support@forcome.com') +
+            field('进线邮箱（可填多个，含别名）', col(row(chip('support@forcome.mx', 'outline', 11) + chip('ventas@forcome.mx', 'outline', 11), 6) + input_box('info@forcome', st='error'), 6), True,
+                  error='邮箱格式不正确，例如 info@forcome.mx', hint='每个地址都用来识别店铺；寄到这些地址的未归属来信保存后自动归位') +
             field('平台标识 · Shopify 店铺域名', input_box(None, '例如 forcome-mx.myshopify.com', 'error'), True, error='请填写店铺域名') +
             field('签名', input_box('Forcome México'), hint='回复末尾使用') +
             field('覆盖项', over, hint='可覆盖签名、政策口径、模板、素材与链接白名单、SLA 内部目标') + dev)
@@ -311,7 +312,9 @@ def k16():
 
 
 def k17():
-    return frame(BS.team_tabs('角色权限') + BS.perm_matrix(), w=WW, gap=14)
+    full = frame(BS.team_tabs('角色权限') + BS.perm_matrix(), w=WW, gap=14)
+    p1 = frame(cap('第一阶段 · 只显示阶段为「一起」「仅一」的能力行（prd_d 10.1）') + BS.perm_matrix(phase1=True), w=WW, gap=10)
+    return col(full + p1, 16)
 
 
 def k21():

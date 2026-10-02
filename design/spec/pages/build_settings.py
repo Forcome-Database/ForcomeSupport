@@ -91,7 +91,7 @@ def ch_card(ic, name, st, lines, foot='', tone='accent', card_tone=None, sync=No
                    row(st + (test_btn() if test else ''), 6))
     body = col(''.join(text(l, 12, T['ink3']) for l in lines), 2) if lines else ''
     f = '<div style="margin-top: auto;">%s</div>' % foot if foot else ''
-    return card(head + body + f, pad='12px 14px', gap=8, tone=card_tone, style='height: 100%; box-sizing: border-box;')
+    return card(head + body + f, pad='10px 14px', gap=8, tone=card_tone, style='height: 100%; box-sizing: border-box;')
 
 
 def sqs_line(st=SQS_STATE):
@@ -110,6 +110,11 @@ def amazon_card(err=False):
 
 def shopify_card():
     return ch_card('store', 'Shopify Admin API', state('已连接'), ['2 个店铺 · 退款、改地址、取消、订单备注', '订单经 Admin API 准实时同步'], '', 'ok', sync=CHANNEL_SYNC['Shopify'])
+
+
+def track_card():
+    """17TRACK 物流轨迹（第二阶段起）：注册单号后每 4 小时一轮，工单打开时即时查询。"""
+    return ch_card('truck', '17TRACK 物流轨迹', state('已连接'), ['每 4 小时一轮 · 工单打开时即时查询 · 本月额度 3,100 / 10,000'], '', 'ok', sync=CHANNEL_SYNC['17TRACK'])
 
 
 def jijia_card():
@@ -134,14 +139,14 @@ def dingtalk_card(late=False):
 
 
 def grid3(cells):
-    return '<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: stretch;">%s</div>' % ''.join(cells)
+    return '<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: stretch;">%s</div>' % ''.join(cells)
 
 
 def p18_channels():
     lc_head = between(row(tile('box', 'muted') + col(nowrap('易仓海外仓', 14, T['ink2'], 600) + nowrap('最近同步 %s · 经积加' % CHANNEL_SYNC['易仓'], 11, T['ink4']), 0), 10),
                       row(chip('经积加对接', 'neutral', 11) + test_btn(), 6))
-    lc = dashed_card(lc_head + muted('库存、售后出库单、单号与实际运费都经积加读写，本系统不直连易仓接口；测试连接走积加。', 12), '12px 14px', 8)
-    return grid3([amazon_card(), shopify_card(), gmail_card(), jijia_card(), dingtalk_card(), lc])
+    lc = dashed_card(lc_head + muted('库存、售后出库单、单号与实际运费都经积加读写，本系统不直连易仓接口；测试连接走积加。', 12), '10px 14px', 8)
+    return grid3([amazon_card(), shopify_card(), gmail_card(), jijia_card(), track_card(), dingtalk_card(), lc])
 
 
 def phase2_card(ic, name, desc):
@@ -252,7 +257,7 @@ def p22_explain():
              item('box', '易仓经积加对接', muted('库存与售后出库单都经积加读写，本系统不直连易仓接口。', 12)) +
              item('shield', '分级标签', col(lv + muted('高风险动作一律提交审批，批准后执行。', 12), 4)) +
              item('x_c', '平台不支持', col(row(unsupported('平台不支持', ACTION_UNSUPPORTED['改地址']) + nowrap('灰色删除线，悬停看原因', 12, T['ink3']), 8) +
-                                       muted('该动作由坐席在平台后台人工处理。', 12), 4)))
+                                       muted('亚马逊订单不允许卖家改地址：草稿引导买家取消后重新下单（R-IN 修改订单）。', 12), 4)))
     return card(grid(cells, 4, 20), pad='14px 16px')
 
 
@@ -268,7 +273,7 @@ def p22_table():
 
 
 def p22():
-    return spage('liuyang', '动作映射', '动作映射', '统一动作到各平台接口的映射。分级只能全局配置；改映射后在底部统一保存，并记入审计日志。', '',
+    return spage('liuyang', '动作映射', '动作映射', '统一动作到各平台接口的映射。分级只能全局配置；改映射后在底部统一保存，并记入审计日志。', btn('查看审计日志', 'secondary', 'md', 'history'),
                  p22_explain() + p22_table(), save_bar(0, '修改接口映射后在这里统一保存，并记入审计日志'))
 
 
@@ -538,35 +543,41 @@ def p20(h=900):
 
 
 ROLE_HEAD = ['坐席', '客服主管', '售后负责人', '知识库负责人', '管理员', '生产厂对接人']
-MATRIX = [  # prd_d 10.1 功能权限（能力文字与圆点照原文；空白画为「—」）
-    ('查看工单、回复、标签、合并、转人工、手工新建工单', ['●', '●', '●', '只读', '', '']),
-    ('合并与拆分客户身份', ['●', '●', '●', '', '', '']),
-    ('改派他人工单、强制接手', ['', '●', '', '', '', '']),
-    ('标记来信「无需回复」（第一阶段）', ['●', '●', '', '', '', '']),
-    ('为未归属店铺的来信指定店铺', ['', '●', '', '', '', '']),
-    ('提交审批单；提交时同时创建售后单（路径 B）', ['●', '●', '●', '', '', '']),
-    ('审批含报备的审批单', ['', '●', '', '', '', '']),
-    ('审批只含动作的审批单', ['', '●', '●', '', '', '']),
-    ('撤回审批单', ['○', '○', '○', '', '', '']),
-    ('执行人工操作清单（兜底）', ['○', '○', '○', '', '', '']),
-    ('查看售后单、登记台账', ['只读', '●', '●', '', '', '']),
-    ('新建登记；编辑进行中的登记（第一阶段）', ['', '○（自己登记的）', '●', '', '', '']),
-    ('售后单设为已完成（第一阶段）', ['', '○（自己登记的）', '●', '', '', '']),
-    ('登记台账补登（已完成的单）、修改汇率', ['', '', '●', '', '', '']),
-    ('改派售后单负责人', ['', '●', '●', '', '', '']),
-    ('手工新建售后单、确认责任与处理方式、退回继续排查、终止售后单', ['', '●', '●', '', '', '']),
-    ('发起与录入比例协商、重开协商、退回生产厂报价、生成结算批次', ['', '', '●', '', '', '']),
-    ('维护知识条目、素材库、审核沉淀', ['提交候选', '审核政策规则', '维护排查树', '●', '', '']),
-    ('查看报表', ['', '●', '●', '●', '●', '']),
-    ('查看成本、承担比例与结算金额（含报表、导出、下钻与审计前后值）', ['', '●', '●', '', '', '本厂部分']),
-    ('查看审计日志（P27）', ['○', '●', '○', '○', '●', '']),
-    ('处理规则（P19：发送方式、风险信号、渠道内容能力）、售后规则（P23）、标签库、模板、SLA', ['', '●', '', '', '', '']),
-    ('渠道与店铺（P18）、动作映射（P22）、成员、角色、备用审批人（P20）、工厂账号（P24）', ['', '', '', '', '●', '']),
-    ('工厂工作台：本厂任务的报价、回填、答复、结算确认、留言', ['', '', '', '', '', '●']),
+MATRIX = [  # prd_d 10.1 功能权限：(能力, 上线阶段, 各角色)；空白画为「—」。阶段：一起 = 第一阶段起，仅一 = 只在第一阶段，二起，三
+    ('查看工单（列表与详情）', '一起', ['●', '●', '●', '只读', '', '']),
+    ('标记来信「无需回复」', '一起', ['●', '●', '', '', '', '']),
+    ('为未归属店铺的来信指定店铺', '一起', ['', '●', '', '', '', '']),
+    ('回复、标签、合并、转人工、手工新建、认领、标记解决、重开与关闭', '二起', ['●', '●', '●', '', '', '']),
+    ('合并与拆分客户身份', '二起', ['●', '●', '●', '', '', '']),
+    ('改派他人工单、强制接手、调整工单优先级', '二起', ['', '●', '', '', '', '']),
+    ('提交审批单；提交时同时创建售后单（路径 B）', '二起', ['●', '●', '●', '', '', '']),
+    ('审批含报备的审批单', '二起', ['', '●', '', '', '', '']),
+    ('审批只含动作的审批单', '二起', ['', '●', '●', '', '', '']),
+    ('撤回审批单', '二起', ['○', '○', '○', '', '', '']),
+    ('执行人工操作清单（兜底）', '二起', ['○', '○', '○', '', '', '']),
+    ('查看售后单、登记台账', '一起', ['只读', '●', '●', '', '', '']),
+    ('新建登记（手工登记）', '仅一', ['', '●', '●', '', '', '']),
+    ('编辑进行中的手工登记单、设为已完成', '一起', ['', '○ 自己登记的', '○ 登记或负责的', '', '', '']),
+    ('登记台账补登（已完成的单）、修改汇率', '一起', ['', '', '●', '', '', '']),
+    ('改派售后单负责人', '一起', ['', '●', '●', '', '', '']),
+    ('取消（终止）售后单', '一起', ['', '●', '●', '', '', '']),
+    ('在工单上「转售后确认」', '二起', ['●', '●', '', '', '', '']),
+    ('手工新建售后单、确认责任与处理方式、退回继续排查', '二起', ['', '●', '●', '', '', '']),
+    ('发起与录入比例协商、重开协商、退回生产厂报价、生成结算批次', '二起', ['', '', '●', '', '', '']),
+    ('维护知识条目、素材库、审核沉淀', '三', ['提交候选', '审核政策规则', '维护排查树', '●', '', '']),
+    ('查看报表', '一起', ['', '●', '●', '●', '●', '']),
+    ('查看成本、承担比例与结算金额（含报表、导出、下钻与审计前后值）', '一起', ['', '●', '●', '', '', '本厂部分']),
+    ('查看审计日志（P27）', '一起', ['○', '●', '○', '○', '●', '']),
+    ('售后规则（P23）、标签库、模板、SLA', '二起', ['', '●', '', '', '', '']),
+    ('处理规则（P19：发送方式、风险信号、渠道内容能力、处理说明）', '三', ['', '●', '', '', '', '']),
+    ('渠道与店铺（P18）、成员与角色、店铺数据范围（P20）', '一起', ['', '', '', '', '●', '']),
+    ('动作映射（P22）、备用审批人（P20）、工厂账号（P24）、模型（P25）、系统状态（P26）', '二起', ['', '', '', '', '●', '']),
+    ('工厂工作台：本厂任务的报价、回填、答复、结算确认、留言', '二起', ['', '', '', '', '', '●']),
 ]
+P1_STAGES = ('一起', '仅一')  # 第一阶段 K17 只显示这些行（prd_d 10.1）
 # 分组：(组名, MATRIX 下标)；全部展开。成本可见与审计日志都是「看数据」的能力，归入「报表」组
-MATRIX_GROUPS = [('工单', (0, 1, 2, 3, 4)), ('审批', (5, 6, 7, 8, 9)), ('售后', (10, 11, 12, 13, 14, 15, 16)),
-                 ('知识', (17,)), ('报表', (18, 19, 20)), ('设置', (21, 22)), ('工厂', (23,))]
+MATRIX_GROUPS = [('工单', (0, 1, 2, 3, 4, 5)), ('审批', (6, 7, 8, 9, 10)), ('售后', (11, 12, 13, 14, 15, 16, 17, 18, 19)),
+                 ('知识', (20,)), ('报表', (21, 22, 23)), ('设置', (24, 25, 26, 27)), ('工厂', (28,))]
 
 
 def mark(v):
@@ -582,17 +593,22 @@ def mark(v):
     return '<div style="font-size: 12px; color: %s; text-align: center;">—</div>' % T['ink4']
 
 
-def perm_table(groups=MATRIX_GROUPS):
-    """一张表全部展开：左侧分组小标题，无权限为「—」。"""
+def perm_table(groups=MATRIX_GROUPS, stages=None):
+    """一张表全部展开：左侧分组小标题，无权限为「—」。stages 给定时只显示这些上线阶段的行（第一阶段 K17）。"""
     tpl = '72px minmax(0, 1fr) repeat(6, 120px)'
     g = 'display: grid; grid-template-columns: %s; column-gap: 12px; align-items: center;' % tpl
     head = '<div style="%s padding: 9px 16px; background: %s; border-bottom: 1px solid %s; font-size: 11px; font-weight: 600; color: %s; white-space: nowrap;"><div>分组</div><div>能力</div>%s</div>' % (
         g, T['subtle'], T['line'], T['ink4'], ''.join('<div style="text-align: center;">%s</div>' % h for h in ROLE_HEAD))
     body = ''
-    for gi, (name, idx) in enumerate(groups):
+    gi = 0
+    for name, idx in groups:
+        idx = [i for i in idx if stages is None or MATRIX[i][1] in stages]
+        if not idx:
+            continue
         top = ' border-top: 1px solid %s;' % T['line'] if gi else ''
+        gi += 1
         for k, i in enumerate(idx):
-            cap_, vals = MATRIX[i]
+            cap_, _stage, vals = MATRIX[i]
             sep = top if k == 0 else ' border-top: 1px solid %s;' % T['line2']
             gl = '<div style="font-size: 12px; font-weight: 700; color: %s;">%s</div>' % (T['ink3'], name) if k == 0 else '<div></div>'
             body += '<div style="%s padding: 7px 16px;%s">%s<div style="font-size: 13px; color: %s; white-space: nowrap; min-width: 0px;">%s</div>%s</div>' % (
@@ -605,10 +621,11 @@ def perm_legend():
                row(nowrap('—', 12, T['ink4']) + nowrap('无权限', 12, T['ink3']), 5) + nowrap('文字：部分能力', 12, T['ink3']), 16)
 
 
-def perm_matrix():
-    """「角色权限」页签（StatesAdmin K17）。"""
-    head = between(row(label('角色权限') + nowrap('只读 · 按角色固定；系统发起的审批单由关联售后单的负责人撤回', 12, T['ink3']), 8), perm_legend())
-    return col(head + perm_table(), 10)
+def perm_matrix(phase1=False):
+    """「角色权限」页签（StatesAdmin K17）。phase1=True 时只显示第一阶段已上线的能力行（prd_d 10.1「阶段」列）。"""
+    note = '只读 · 第一阶段只显示已上线的能力' if phase1 else '只读 · 按角色固定；系统发起的审批单由关联售后单的负责人撤回'
+    head = between(row(label('角色权限') + nowrap(note, 12, T['ink3']), 8), perm_legend())
+    return col(head + perm_table(stages=P1_STAGES if phase1 else None), 10)
 
 
 if __name__ == '__main__':

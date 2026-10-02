@@ -56,14 +56,16 @@ def s3():
 
 # ---------------------------------------------------------------- S4 库存用尽自动切换
 def s4():
-    steps = [('确认', '09:35', 'done'), ('易仓创建出库单', '库存不足 10:52', 'error'), ('派发询价', '10:52', 'current'),
+    # R-AS-04 两步（D-23 ⑥）：先在积加取消原补单（人工操作清单），确认取消后才切易仓无货，防止缺货解除后重复寄件
+    steps = [('确认', '09:35', 'done'), ('易仓创建出库单', '积加回传缺货 10:52', 'error'), ('取消原补单', '李婷 10:58 确认', 'done'), ('派发询价', '10:58', 'current'),
              ('生产厂报价', '', 'todo'), ('报备审批', '', 'todo'), ('生产厂寄件', '', 'todo'), ('单号回复客户', '', 'todo')]
-    bn = banner('warning', '出库单创建失败，已切到易仓无货',
-                '积加返回易仓 US「车载吸尘器 V2 黑色（整机）」库存不足。原报备 AP-20260911-002（快递费用 $8.40）已作废；已向生产厂 FQD 派发询价，报价后按新金额重新报备。已通知王磊。',
+    bn = banner('warning', '易仓缺货：已取消原补单，切到易仓无货',
+                '① 10:52 积加回传易仓 US「车载吸尘器 V2 黑色（整机）」缺货，先生成人工操作清单「在积加取消原补单」，当前环节「易仓发货 · 等确认取消原补单」；② 李婷 10:58 确认已取消后，原报备 AP-20260911-002（快递费用 $8.40）作废，已向生产厂 FQD 派发询价，报价后按新金额重新报备。已通知王磊。',
                 btn('查看询价单', 'secondary', 'sm'))
     extra = card(log_row('10:51', '周敏', '批准 AP-20260911-002。') +
-                 log_row('10:52', '系统', '经积加创建易仓出库单失败：易仓 US 整机黑色库存 0 件。') +
-                 log_row('10:52', '系统', '切换为易仓无货，原报备作废；在工厂工作台派发询价：整机黑色 ×1 · 寄往美国。'), '执行记录', pad='12px 16px', gap=8)
+                 log_row('10:52', '系统', '积加回传易仓 US 整机黑色缺货，推单未完成；生成人工操作清单「在积加取消原补单」，指派李婷（4 个工作小时内）。') +
+                 log_row('10:58', '李婷', '回填：已在积加取消原补单。') +
+                 log_row('10:58', '系统', '切换为易仓无货，原报备作废；在工厂工作台派发询价：整机黑色 ×1 · 寄往美国。'), '执行记录', pad='12px 16px', gap=8)
     a = AS['S-20260911-0021']
     blk = blocker('生产厂 FQD 报价（10:52 派发询价）', left='2 个工作日', level='normal',
                   why_not='派发满 1 小时后才能催办', can_do=btn('催办', 'secondary', 'sm', 'bell', disabled=True, reason='派发满 1 小时后才能催办（11:52 起）'))
@@ -95,8 +97,10 @@ def s5():
 
 # ---------------------------------------------------------------- S6 终止流程
 def s6():
-    body = field('终止原因', textarea_box(None, '例如：客户撤回售后申请、改为退款处理', 'error', 64, '0 / 200'), True, error='请填写终止原因') + \
-        col(bullet('售后单变为「已取消」，不可恢复；已产生的费用照常登记到台账。') +
+    keep = col(nowrap('取消后保留的已产生费用（默认全部保留，取消勾选的不计入售后成本，R-AS-08）', 12, T['ink2'], 600) +
+               checkbox('产品成本 $3.20（生产厂 FQD 报价）', True) + checkbox('运费 $11.50（报备待审批，终止后撤回）', True), 6)
+    body = field('终止原因', textarea_box(None, '例如：客户撤回售后申请、改为退款处理', 'error', 64, '0 / 200'), True, error='请填写终止原因') + keep + \
+        col(bullet('售后单变为「已取消」，不可恢复；保留的费用照常计入售后成本。') +
             bullet('待审批的报备 AP-20260911-003 自动撤回，生产厂 FQD 的任务自动取消并通知陈工。') +
             bullet('关联工单 T-20260910-0201 不会自动回复客户，请在工单中说明。'), 4)
     dlg = dialog('终止售后单 S-20260911-0018？', body, btn('取消', 'secondary', st='focus') + btn('终止流程', 'danger'), 460, 'danger', '终止后流程停止，无法恢复 · 默认焦点在「取消」')
@@ -159,8 +163,8 @@ def s12():
 def s11():
     prog = '<div style="width: 360px; box-sizing: border-box; display: flex; gap: 10px; align-items: flex-start; background: #ffffff; border: 1px solid %s; border-radius: 8px; padding: 12px 14px; box-shadow: %s;">%s<div style="flex: 1; min-width: 0px; display: flex; flex-direction: column; gap: 6px;"><div style="font-size: 13px; font-weight: 700; color: %s;">正在导出登记台账</div><div style="font-size: 12px; color: %s;">12 单 · 按当前筛选（2026-09-01 至 09-11）· 62%%</div>%s</div></div>' % (
         T['line'], SHADOW_MD, spinner(18), T['ink'], T['ink3'], progress(62))
-    left = col(cap('导出中') + row(btn('列设置', 'secondary', 'md', 'sort') + btn('导出中', 'secondary', 'md', loading=True), 8) + prog, 12)
-    done = toast('success', '登记台账已导出', '登记台账_20260901-20260911.xlsx · 12 单。文件保留 7 天。', row(link('下载', 12, 'download') + link('查看导出记录', 12), 12))
+    left = col(cap('生成中') + row(btn('列设置', 'secondary', 'md', 'sort') + btn('导出中', 'secondary', 'md', loading=True), 8) + muted('服务端按当前筛选与字段权限同步生成，约 3 秒（同 K5）', 12), 12)
+    done = toast('success', '登记台账已导出', '登记台账_20260901-20260911.xlsx · 12 单，浏览器已开始下载 · 已记入审计日志。')
     right = col(cap('完成') + row(btn('列设置', 'secondary', 'md', 'sort') + btn('导出 Excel', 'secondary', 'md', 'download'), 8) + done, 12)
     return frame(grid(left + right, 2, 24))
 

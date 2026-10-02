@@ -19,7 +19,7 @@ USD_CAD = 1.36
 # ---------------------------------------------------------------- 人员与角色
 STAFF = {
     # 成员与部门来自钉钉通讯录（集团统一组织），角色、店铺范围在 P20 分配
-    'liting':   {'name': '李婷', 'avatar': '婷', 'role': '坐席', 'stores': '全部店铺', 'lang': 'EN · ES', 'dept': 'FSH / 客服部', 'email': 'liting@forcome.com', 'last_login': '10:02'},
+    'liting':   {'name': '李婷', 'avatar': '婷', 'role': '坐席', 'stores': '全部店铺', 'lang': 'EN · ES', 'dept': 'FSH / 客服部', 'email': 'liting@forcome.com', 'last_login': '08:02'},
     'chenchen': {'name': '陈晨', 'avatar': '晨', 'role': '坐席', 'stores': '全部店铺', 'lang': 'ES · EN', 'dept': 'FSH / 客服部', 'email': 'chenchen@forcome.com', 'last_login': '09:15'},
     'zhoumin':  {'name': '周敏', 'avatar': '敏', 'role': '客服主管', 'stores': '全部店铺', 'dept': 'FSH / 客服部', 'email': 'zhoumin@forcome.com', 'last_login': '10:18'},
     'wanglei':  {'name': '王磊', 'avatar': '磊', 'role': '售后负责人', 'stores': '全部店铺', 'dept': 'FSH / 售后部', 'email': 'wanglei@forcome.com', 'last_login': '10:20'},
@@ -35,7 +35,7 @@ STAFF = {
 # 配件与整机全部由集团内这两家生产厂生产；售后单按 SKU 归属派发、协商、结算。SKU 清单在 P24「工厂账号」配置，上线前导入（下列为示例）。
 FACTORIES = {
     'FQD': {'code': 'FQD', 'scope': '整机及结构件：整机、电池、软管、HEPA 滤芯、集尘杯', 'contact': '陈工', 'head': '刘厂长'},
-    'FZJ': {'code': 'FZJ', 'scope': '线材与电源：充电线', 'contact': '张工', 'head': '周厂长'},
+    'FZJ': {'code': 'FZJ', 'scope': '线材：充电线', 'contact': '张工', 'head': '周厂长'},
 }
 PART_FACTORY = {'FC-V2-BLK': 'FQD', 'FC-V2-BT01': 'FQD', 'FC-V2-HS02': 'FQD', 'FC-V2-HF01': 'FQD', 'FC-V2-DC01': 'FQD', 'FC-V2-CB01': 'FZJ'}
 
@@ -629,7 +629,7 @@ def intent_counts(total_n, intents):
 # ---------------------------------------------------------------- 设置示例（P18–P20 与 StatesAdmin）
 # 渠道卡「最近同步」时刻（P18）；「异常」为 K7 连接异常画面里的最后一次成功同步
 CHANNEL_SYNC = {'SP-API': '10:12', 'SP-API 异常': '10:02', 'Shopify': '10:15', '积加': '10:16', 'Gmail': '10:18', 'Gmail 异常': '10:04',
-                '钉钉': '10:00', '易仓': '10:16', '钉钉 延迟': '08:00'}  # 「钉钉 延迟」为 K20 同步延迟示例的最近同步
+                '钉钉': '10:00', '易仓': '10:16', '钉钉 延迟': '08:00', '17TRACK': '10:10'}  # 「钉钉 延迟」为 K20 同步延迟示例的最近同步
 DINGTALK_LATE_SYNC = CHANNEL_SYNC['钉钉 延迟']
 SQS_STATE = ('正常', 0)       # 亚马逊订单通知队列（SQS）：状态, 积压条数（P18、K20）
 AMZ_BACKFILL_DAYS = 90        # 第一阶段亚马逊订单回补天数（K20）
@@ -664,8 +664,8 @@ STORE_OVERRIDES = {'amz-direct': ['模板 1'], 'amz-auto': ['签名'], 'shop-com
 # 动作映射（P22）：统一动作, 分级, 亚马逊店铺 (接口, 色调) 或 None（平台不支持）, Shopify 店铺 (接口, 色调)
 # 分级：只读 / 低风险 / 高风险 / 按发送方式；易仓出库单与库存经积加对接
 ACTION_MAP = [
-    ('查订单', '只读', ('积加', 'accent'), ('积加', 'accent')),
-    ('查物流', '只读', ('积加', 'accent'), ('积加', 'accent')),
+    ('查订单', '只读', ('SP-API（订单镜像）', 'accent'), ('Admin API（订单镜像）', 'accent')),  # 订单平台直读（D-21）
+    ('查物流', '只读', ('17TRACK', 'accent'), ('17TRACK', 'accent')),  # 物流轨迹经 17TRACK（D-21）
     ('查库存', '只读', ('积加（易仓）', 'accent'), ('积加（易仓）', 'accent')),
     ('回复客户', '按发送方式', ('Gmail 中转', 'accent'), ('Gmail', 'accent')),
     ('创建售后出库单', '高风险', ('积加（易仓）', 'accent'), ('积加（易仓）', 'accent')),
@@ -764,7 +764,7 @@ P1_DRILL = {'label': '09-10 新建或重开 · 客户来信', 'count': REPORT['d
 # P05 第一阶段（I18）：Oliver Grant 工单，我方回复来自 Gmail「已发送」（对应不到成员），致谢来信由李婷标记无需回复
 P1_OLIVER = {
     'ticket': 'T-20260904-0098', 'mailbox': 'amz-direct@forcome.com', 'marked_by': '李婷', 'marked_at': '09-10 09:05',
-    'close_at': '09-17 09:00', 'close_reason': '已解决后无来信',
+    'close_at': '09-17 09:00', 'close_reason': '已解决后无来信', 'order_synced': '09:02',  # 画面时刻 09-10 09:05，订单卡最近同步取其之前
     # (日期分隔, 时刻, 类型 in / out / marked, 内容)
     'timeline': [
         ('09-04 周五', '10:12', 'in', "Hi, the charger cable doesn't work. I plug it in and nothing happens, no light on the vacuum at all."),
@@ -878,9 +878,10 @@ AUDIT_LOG = [
     ('10:14', '系统', '系统', '渠道', 'Gmail · support@forcome.mx', '恢复连接', '状态：连接异常 → 已连接（补拉 3 封来信）', '—', False),
     ('10:16', '系统', '系统', '售后单', 'S-20260909-0016', '✦ 生成补登建议', '快递单号：— → 1Z4R28830358229088（未写入，等核对）', '—', False),
     ('10:05', '系统', '系统', '渠道', 'Gmail · support@forcome.mx', '连接异常', '状态：已连接 → 连接异常（连续 3 次失败）', '—', False),
-    ('09:52', '刘洋', '管理员', '成员', '陈晨', '修改店铺范围', '店铺范围：全部店铺 → Forcome Direct、forcome.mx', '10.20.1.12', False),
+    ('09:52', '刘洋', '管理员', '成员', '赵倩', '修改店铺范围', '店铺范围：Forcome Direct → 全部店铺', '10.20.1.12', False),
     ('09:48', '李婷', '坐席', '审批单', 'AP-20260911-004', '提交审批', '动作：Shopify #1057 改收货地址', '10.20.3.27', False),
     ('09:41', '系统', '系统', '审批单', 'AP-20260911-003', '发起报备', '快递费用 $11.50 · S-20260911-0018', '—', False),
+    ('09:35', '李婷', '坐席', '审批单', 'AP-20260911-002', '提交审批', '快递费用 $8.40 · 易仓出库单 · S-20260911-0021', '10.20.3.27', False),
     ('09:30', '陈晨', '坐席', '审批单', 'AP-20260911-001', '提交审批', '额外赔偿 MX$889.00（≈ $49.39）· S-20260911-0020', '10.20.3.33', False),
     ('09:12', '王磊', '售后负责人', '导出', '登记台账', '导出 Excel', '筛选：9 月 · 全部店铺 · 12 行', '10.20.2.18', False),
     ('08:31', '张工', '生产厂对接人', '售后单', 'S-20260911-0018', '越权访问被拒', '该单属于生产厂 FQD（R-FT-01）', '58.211.20.6', True),
@@ -925,7 +926,7 @@ HEALTH = {
     # 数据源：(名称, 最近同步, 阈值, 状态)
     'sources': [('Gmail · 4 个邮箱', CHANNEL_SYNC['Gmail'], '10 分钟', '已连接'), ('亚马逊订单 · SQS', CHANNEL_SYNC['SP-API'], '10 分钟', '已连接'),
                 ('Shopify 订单', CHANNEL_SYNC['Shopify'], '10 分钟', '已连接'), ('积加', CHANNEL_SYNC['积加'], '10 分钟', '已连接'),
-                ('17TRACK', '10:10', '30 分钟', '已连接'), ('钉钉通讯录', CHANNEL_SYNC['钉钉'], '2 小时', '已连接'), ('汇率', '09-11 06:00', '1 天', '已连接')],
+                ('17TRACK', '10:10', '5 小时', '已连接'), ('钉钉通讯录', CHANNEL_SYNC['钉钉'], '2 小时', '已连接'), ('汇率', '09-11 06:00', '1 天', '已连接')],
     # 队列：(任务, 等待, 进行中, 近 24h 失败, 最久等待)
     'queues': [('来信归并', 0, 1, 0, '—'), ('回复识别', 0, 0, 0, '—'), ('订单同步', 2, 1, 1, '40s'), ('动作执行', 1, 1, 3, '6m'),
                ('通知发送', 0, 0, 0, '—'), ('时限扫描', 0, 1, 0, '—')],
@@ -1002,11 +1003,11 @@ def p2_ticket(no):
 
 def p2_segments():
     """I19 左栏四个分段的行（顺序同 INBOX_QUEUE_ORDER，按 SLA 剩余升序）：
-    需处理 = 有未回复来信（SLA 计时中）的转人工；审批中 = 挂着未结束审批单；等待中 = 等客户 / 等内部 / 等外部；全部 = 未关闭。
+    需处理 = 有未回复来信的未关闭工单（D-25；示例数据中未回复来信都在 SLA 计时中）；审批中 = 挂着未结束审批单；等待中 = 等客户 / 等内部 / 等外部；全部 = 未关闭。
     需处理与审批中可以重叠：已提交审批、来信还没回复的工单（Mateo Rivas、Marcus Lee）两个分段都列出。"""
     tk = {t['no']: t for t in TICKETS}
     allq = list(INBOX_QUEUE_ORDER)
-    return {'需处理': [n for n in allq if P2_STATUS[n] == '转人工' and _sla_minutes(tk[n]) is not None],
+    return {'需处理': [n for n in allq if P2_STATUS[n] not in ('已解决', '已关闭', '已合并') and _sla_minutes(tk[n]) is not None],  # 有未回复来信的未关闭工单
             '审批中': [n for n in allq if n in P2_OPEN_APPROVAL],
             '等待中': [n for n in allq if P2_STATUS[n] in ('等客户', '等内部', '等外部')],
             '全部': allq}
