@@ -18,7 +18,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'border-primary bg-primary font-semibold text-primary-foreground shadow-pop hover:border-primary-hover hover:bg-primary-hover active:border-primary-active active:bg-primary-active',
+          'border-primary bg-primary font-semibold text-primary-foreground shadow-pop hover:border-primary-hover hover:bg-primary-hover active:border-primary-active active:bg-primary-active active:shadow-press',
         outline:
           'border-input bg-card font-medium text-ink-2 shadow-xs hover:bg-accent active:bg-border active:shadow-press',
         ghost:
