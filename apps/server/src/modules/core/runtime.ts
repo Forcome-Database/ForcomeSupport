@@ -55,7 +55,7 @@ export interface RuntimeOptions {
   logger: Logger;
   /** 默认系统时钟；测试与回放传手动时钟 */
   clock?: Clock;
-  /** 数据库连接池上限，默认 10 */
+  /** 数据库连接池上限；不填用 createDatabase 的默认值 */
   poolMax?: number;
 }
 
