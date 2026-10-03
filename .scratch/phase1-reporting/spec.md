@@ -368,7 +368,7 @@ P04、P05 第一期版本的列、筛选、排序、取值与隐藏项见 PRD P0
 - 示例数据夹具 `@forcome/fixtures`（`pnpm fixtures:generate` 从 data.py 生成）与加载器（各模块在 `apps/server/src/fixture-steps.ts` 登记加载步骤）；
 - Playwright `apps/web/e2e/dev-login.spec.ts`（开发登录 → 首页顶栏）；
 - 部署（待办 03）：`deploy/`（Compose、镜像、部署脚本 `deploy.mjs`）与 `docs/部署说明.md`；开发测试环境的外部客户端默认 Fake，进程启动时 Fake 从示例数据夹具回放（`FakeClient.replay`）；发信的真实现发出前经 `MailRecipientGuard` 检查发信白名单。
-- 角色、店铺范围与导航（待办 04）：能力矩阵、导航与默认首页、财务字段标记在 `packages/contracts`（`capabilities.ts`、`navigation.ts`、`finance.ts`）；接口挂 `org` 的 `requireSession`、`requireCapability`，处理器用 `c.get('access')` 取店铺范围（交给仓储查询的 `storeScopeCondition`）、越权审计（`access.requireStores`）与财务可见（`stripFinanceFields` / `maskFinanceFields`），写法样板见 `apps/server/test/access-tools.int.test.ts`；测试工具 `t.addMember` 建示例数据里没有的成员。
+- 角色、店铺范围与导航（待办 04）：能力矩阵、导航与默认首页、财务字段标记在 `packages/contracts`（`capabilities.ts`、`navigation.ts`、`finance.ts`）；接口挂 `org` 的 `requireSession`、`requireCapability`，处理器用 `c.get('access')` 取店铺范围（交给仓储查询的 `storeScopeCondition`）、越权审计（列表的店铺筛选用 `access.requireStores`，详情用 `access.findOwned` 取对象并校验归属）与财务可见（`stripFinanceFields` / `maskFinanceFields`），写法样板见 `apps/server/test/access-tools.int.test.ts`；测试工具 `t.addMember` 建示例数据里没有的成员。
 做法与取舍见 ADR 0005–0010、0013 的「待办 02 落地」修订，ADR 0003、0009、0013 的「待办 03 落地」修订，以及 ADR 0005、0007、0010 的「待办 04 落地」修订。
 
 ## Out of Scope

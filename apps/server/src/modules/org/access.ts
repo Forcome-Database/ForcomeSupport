@@ -84,6 +84,7 @@ export interface Access extends MemberAccess {
   /**
    * 详情接口：按编号或 ID 取出对象（load 拿到的是不受限的范围，只为判断归属），对象的店铺不在范围内时
    * 同 requireStores 记审计并 403；对象不存在返回 null。处理器不直接用 SYSTEM_STORE_SCOPE。
+   * 店铺为空的对象（未归属店铺的来信）给出空的店铺列表就会放行，谁能看由调用方另做判断（PRD I17 只给客服主管）。
    */
   findOwned<T>(
     load: (scope: StoreScope) => Promise<T | null>,
