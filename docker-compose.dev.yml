@@ -1,0 +1,23 @@
+# 本机开发与集成测试用：只起一个 PostgreSQL 18（ADR 0013）。外部服务一律用 Fake，不需要任何外部账号。
+# 端口默认 4520（本期本机环境可用 4510–4520，开发测试与生产两套 Compose 用前面的端口），可用 DEV_PG_PORT 覆盖。
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: forcome
+      POSTGRES_PASSWORD: forcome
+      POSTGRES_DB: forcome
+      TZ: UTC
+    ports:
+      - '127.0.0.1:${DEV_PG_PORT:-4520}:5432'
+    # PostgreSQL 18 镜像的数据目录在 /var/lib/postgresql/18/docker，卷挂到上一级
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U forcome -d forcome']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:

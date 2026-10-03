@@ -1,0 +1,92 @@
+# 质量门槛（ADR 0013）：每个 PR 与 main 的推送都在云端运行器上跑类型检查、lint（含模块边界）、
+# 单元测试、集成测试（真实 PostgreSQL 18 服务容器 + Fake）。
+# 分支保护把「CI 通过」设为必需检查：任一作业失败，它就失败，PR 不能合并（设置方法见 README「开发」）。
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: 类型检查、lint 与构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 类型检查
+        run: pnpm typecheck
+      - name: lint（含模块边界）与格式
+        run: pnpm lint
+      - name: 迁移与表结构一致
+        run: pnpm db:verify
+      - name: 构建
+        run: pnpm build
+
+  unit:
+    name: 单元测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:unit
+
+  integration:
+    name: 集成测试（PostgreSQL 18）
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: forcome
+          POSTGRES_PASSWORD: forcome
+          POSTGRES_DB: forcome
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U forcome -d forcome"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgres://forcome:forcome@localhost:5432/forcome
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:integration
+
+  ci-ok:
+    name: CI 通过
+    if: always()
+    needs: [static, unit, integration]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 汇总
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "true" ]; then
+            echo "有作业未通过：${{ toJSON(needs) }}"
+            exit 1
+          fi

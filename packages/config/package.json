@@ -1,0 +1,29 @@
+{
+  "name": "@forcome/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "共享的 TypeScript 与 ESLint 配置（ADR 0005）",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./eslint": "./eslint.js",
+    "./eslint-boundaries": "./eslint-boundaries.js"
+  },
+  "scripts": {
+    "build": "node --check eslint.js && node --check eslint-boundaries.js",
+    "typecheck": "node --check eslint.js && node --check eslint-boundaries.js"
+  },
+  "dependencies": {
+    "@eslint/js": "^10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-boundaries": "^7.2.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.0.0",
+    "typescript-eslint": "^8.71.0"
+  },
+  "peerDependencies": {
+    "eslint": "^10.0.0",
+    "typescript": "~6.0.3"
+  }
+}

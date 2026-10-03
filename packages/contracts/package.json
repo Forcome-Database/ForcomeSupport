@@ -1,0 +1,20 @@
+{
+  "name": "@forcome/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "前后端共享的 zod 模式、类型、状态枚举中英对照与能力矩阵（ADR 0005）",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@forcome/config": "workspace:*"
+  }
+}

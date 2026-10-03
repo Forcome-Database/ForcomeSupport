@@ -1,0 +1,9 @@
+# 只格式化代码与配置；文档、原型与生成物不归 prettier 管
+design/
+docs/
+.scratch/
+*.md
+pnpm-lock.yaml
+apps/server/drizzle/
+**/dist/
+**/coverage/

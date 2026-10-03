@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+
+# pnpm 10 默认不执行依赖的安装脚本，只放行需要原生构建或下载二进制的包
+onlyBuiltDependencies:
+  - esbuild
+# unrs-resolver 的安装脚本只在缺预编译包时才需要（平台包已随可选依赖装好），显式忽略
+ignoredBuiltDependencies:
+  - unrs-resolver

@@ -1,0 +1,16 @@
+# 代码与配置统一 LF（prettier 也按 LF 检查）；文档、原型沿用各自原有换行，不在此规定
+/apps/** text=auto eol=lf
+/packages/** text=auto eol=lf
+/.github/** text=auto eol=lf
+/scripts/** text=auto eol=lf
+/*.json text eol=lf
+/*.js text eol=lf
+/*.ts text eol=lf
+/*.yaml text eol=lf
+/*.yml text eol=lf
+/.prettierrc.json text eol=lf
+/.prettierignore text eol=lf
+/.node-version text eol=lf
+/.gitattributes text eol=lf
+/.dockerignore text eol=lf
+/.env.example text eol=lf

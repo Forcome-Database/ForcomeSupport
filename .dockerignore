@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/coverage
+.git
+.scratch
+design
+docs
+**/*.md
+.env
+.env.*

@@ -11,3 +11,14 @@ design/spec/shots/doc_*.png
 
 # 代理的临时工作树
 .claude/worktrees/
+
+# Node 与构建产物
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# 本机环境变量（.env.example 进仓库）
+.env
+.env.*
+!.env.example

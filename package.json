@@ -1,0 +1,33 @@
+{
+  "name": "forcome-support",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.6",
+  "engines": {
+    "node": "^24.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint --max-warnings 0 . && prettier --check .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "db:up": "docker compose -f docker-compose.dev.yml up -d --wait",
+    "db:down": "docker compose -f docker-compose.dev.yml down",
+    "db:generate": "pnpm --filter @forcome/server db:generate",
+    "db:check": "pnpm --filter @forcome/server db:check",
+    "db:migrate": "pnpm --filter @forcome/server db:migrate",
+    "db:verify": "pnpm --filter @forcome/server db:check && node scripts/check-migrations.mjs",
+    "ci:local": "pnpm typecheck && pnpm lint && pnpm db:verify && pnpm build && pnpm test:unit && pnpm test:integration"
+  },
+  "devDependencies": {
+    "@forcome/config": "workspace:*",
+    "@types/node": "^24.19.1",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.9",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

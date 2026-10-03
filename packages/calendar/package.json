@@ -1,0 +1,17 @@
+{
+  "name": "@forcome/calendar",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "日界与工作日历纯函数（R-CL-01、R-CL-02），前后端共用（ADR 0008）",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@forcome/config": "workspace:*"
+  }
+}
