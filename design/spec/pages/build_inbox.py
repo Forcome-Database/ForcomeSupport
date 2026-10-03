@@ -16,7 +16,8 @@ def p01_middle():
     msg = sarah_msg()
     tabs_html = ver_tabs(SARAH_VERSIONS, 'A', sarah_huan())
     reason = ai_reason(SARAH_REASON)
-    toolbar = draft_toolbar('English', False, media=False, hint='亚马逊站内信不支持图片和链接')
+    # 不再写行内提示：两个置灰按钮悬停即说明原因；工具行右端放「回复类型」（R-TK-03，D-27）
+    toolbar = between(draft_toolbar('English', False, media=False), draft_rtype('结论性回复'))
     ev = evidence([('政策 · 物流停滞或超预计送达处理流程', 'book'), ('政策 · FBM 补发标准', 'book'), ('历史工单 · T-20260614-0117', 'history')])
     foot = act_foot(btn('提交审批', 'primary', 'md', icon_right='arrow_r'))
     # R-SL-05：A 版含积加补发，审批 4 小时 + 执行 4 个工作小时超过 SLA 剩余，草稿卡顶部提示先发进展回复（prd_c P01「校验」）
@@ -97,7 +98,7 @@ def p02_middle():
     head = conv_head(t, '婷')
     msg = customer_msg('Olivia Turner', 'Gmail · support@forcome.com · 09-11 09:12', MSG_IN['olivia_en'], '', seg(['原文', '中文译文'], '原文', 'sm'))
     tabs_html = ver_tabs([('A', 'A 先排查', ai_badge('推荐', 11)), ('B', 'B 直接寄滤芯', ''), ('C', 'C 退款', '')], 'A', btn('换一版', 'ghost', 'sm', 'refresh'))
-    toolbar = draft_toolbar('English', False, media=True, lib=True)
+    toolbar = between(draft_toolbar('English', False, media=True, lib=True), draft_rtype('排查步骤'))
     ev = evidence([('排查树 · 吸力下降 → 清洁滤芯', 'book'), ('产品事实 · V2 保修 12 个月', 'book'), ('素材库 · IMG-V2-014', 'image')])
     foot = act_foot(btn('发送', 'primary', 'md', 'send'), extra=nowrap('以 support@forcome.com 发出', 11, T['ink4']), note='发送后自动打开下一张')
     dc = draft_card('09-11 09:13 生成 · %s · 3 条依据' % conf(OLIVIA_AI['conf'], OLIVIA_AI['conf_why']), tabs_html + ai_reason(OLIVIA_AI['reason']), toolbar, olivia_body(), ev, check_row(), '', foot)

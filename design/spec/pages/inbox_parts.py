@@ -288,6 +288,11 @@ def approval_needed(rows, note, approver='客服主管', limit='4 小时'):
         T['warn_line'], head, col(body, 4), muted(note, 12))
 
 
+def draft_rtype(value='结论性回复'):
+    """草稿卡工具行右端的「回复类型」下拉（R-TK-03：随草稿给出，坐席发送前可改，D-27）。"""
+    return row(nowrap('回复类型', 12, T['ink3']) + select_box(value, width='120px', h=28), 6)
+
+
 def draft_foot(left, right=''):
     return '<div style="display: flex; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid %s;">%s<div style="flex: 1;"></div>%s</div>' % (T['line2'], left, right)
 

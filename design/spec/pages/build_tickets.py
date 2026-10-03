@@ -295,7 +295,7 @@ def p04_p1(drill=False, h=900):
     head = page_head('工单', '全部渠道 · 全部店铺', note)
     tbl = tk_table(P1_COLS, [p1_row(t) for t in rows], P1_TPL)
     if drill:
-        count = between(row(text('共 %d 条' % P1_DRILL['count'], 13, T['ink'], 600) + muted('条件与报表「每日工单量」09-10 的柱同口径：新建或重开日期 09-10 · 来源 客户', 12), 10),
+        count = between(row(text('共 %d 条' % P1_DRILL['count'], 13, T['ink'], 600) + muted('条件与报表「每日工单量」09-10 的柱同口径：客户来信触发的新建或重开 09-10', 12), 10),
                         btn('清除筛选', 'link', 'sm'))
         inner = p1_filters(True) + col(count + tbl, 8)
     else:

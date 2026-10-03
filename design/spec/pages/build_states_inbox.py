@@ -372,7 +372,7 @@ def i18():
                    '按 P05「第一阶段」小节：只读，标题区没有重新打开、合并、内部备注、导出记录、添加标签与负责人，元信息写自动关闭预计「已解决 · 7 天无来信将于 09-17 09:00 自动关闭（已解决后无来信）」；客户名不是链接。'
                    '全程记录：我方回复卡写「我方 · amz-direct@forcome.com · 经亚马逊买家消息」（回信来自 Gmail「已发送」，对应不到成员）；每次状态迁移一条事件行（系统 / 李婷）；致谢来信卡写「无需回复 · 李婷 · 09:05」，底部浮层「已标记无需回复 · 工单转已解决 · 撤销 4s」。'
                    '右栏：工单信息（店铺、站点、渠道、进线邮箱、来源、订单号）· 订单（平台镜像 · 最近同步 %s）· SLA 结果（每封应回复来信一行）· 状态流转（每步写状态、时间与触发方，最后一步写关闭原因）。'
-                   '② 未关闭工单里未回复的来信卡右上有「标记无需回复」；生产厂来信带来源徽标并写「不计（生产厂）」；带 Auto-Submitted 的我方邮件为灰色「自动回复 · 不算回复」。' % CHANNEL_SYNC['SP-API'],
+                   '② 未关闭工单里未回复的来信卡右上有「标记无需回复」；生产厂来信带来源徽标并写「不计（生产厂）」；带 Auto-Submitted 的我方邮件为灰色「自动回复 · 不算回复」。' % P1_OLIVER['order_synced'],
                    frame, VW, trigger='第一阶段打开 P05；画面为 09-10 09:05 李婷标记致谢来信之后。')
 
 
@@ -414,23 +414,24 @@ def p2_msg():
     two = grid('<div>%s</div>' % MSG_IN['sarah_en'] +
                '<div style="color: %s; border-left: 1px solid %s; padding-left: 14px;">%s</div>' % (T['ink2'], T['line'], MSG_IN['sarah_zh']),
                gap=14, template='minmax(0, 1.2fr) minmax(0, 1fr)')
-    return customer_msg('Sarah Mitchell', '亚马逊买家消息 · 09-10 16:00', two, '', seg(['并排', '原文', '译文'], '并排', 'sm'))
+    # 未回复的来信卡上可「标记无需回复」（同第一阶段，prd_b 6.1「第二阶段」）
+    return customer_msg('Sarah Mitchell', '亚马逊买家消息 · 09-10 16:00', two, '', row(btn('标记无需回复', 'secondary', 'sm', 'check') + seg(['并排', '原文', '译文'], '并排', 'sm'), 8))
 
 
-def p2_reply():
+def p2_reply(s=None, via=VIA_AMZ):
     """人工回复框（R-LG-03 第二阶段即上线）：中文写 → 英语译文（将发送）+ 回译；插入模板；回复类型默认「结论性回复」（R-TK-03）。
-    按钮 发送 · 提交审批（I20）· 转售后确认（I21）· 更多（转客服主管、标记解决、关闭）；没有「让 AI 起草」。"""
-    s = P2_SARAH
+    按钮 发送 · 提交审批（I20）· 转售后确认（I21）· 更多（转客服主管、标记解决、关闭）；没有「让 AI 起草」。
+    没有插入图片与插入链接按钮：素材库与链接白名单随第三阶段（R-CC，D-27）。s：回复框内容，默认 Sarah；via：发出方式说明。"""
+    s = s or P2_SARAH
     tb = row(nowrap('回复语言', 12, T['ink3']) + select_box('English', width='104px', h=28) + tg(True, '用中文写，自动译成英语') + divider(True, 16) +
-             btn('插入模板', 'secondary', 'sm', 'book') + btn('插入图片', 'secondary', 'sm', 'image', disabled=True, reason=AMZ_NO_MEDIA) +
-             btn('插入链接', 'secondary', 'sm', 'link', disabled=True, reason=AMZ_NO_MEDIA), 8)
+             btn('插入模板', 'secondary', 'sm', 'book'), 8)
     zh = col(nowrap('中文（可编辑）', 11, T['ink3'], 600) + textarea_box(s['reply_zh'], st='focus', h=92, counter='%d / 1000' % len(s['reply_zh'])), 4)
     back = '<div style="margin-top: auto; border-top: 1px dashed %s; padding-top: 6px; font-size: 12px; line-height: 1.5; color: %s;"><span style="font-weight: 600; color: %s;">回译</span>　%s</div>' % (
         T['line_strong'], T['ink3'], T['ink2'], s['reply_back'])
     en = col(between(nowrap('英语译文 · 将发送', 11, T['ink3'], 600), nowrap('随中文自动更新', 11, T['ink4'])) +
              '<div style="min-height: 92px; box-sizing: border-box; border: 1px solid %s; background: %s; border-radius: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.5; color: %s; display: flex; flex-direction: column; gap: 6px;"><div>%s</div>%s</div>' % (
                  T['line'], T['subtle'], T['ink'], s['reply_en'], back), 4)
-    rtype = reply_type_row('结论性回复', None, nowrap(VIA_AMZ, 11, T['ink4']))
+    rtype = reply_type_row('结论性回复', None, nowrap(via, 11, T['ink4']))
     foot = draft_foot(btn('发送', 'primary', 'md', 'send') + btn('提交审批', 'secondary', 'md', 'approve') + btn('转售后确认', 'secondary', 'md', 'box') +
                       btn('更多', 'secondary', 'md', icon_right='chev_d'), nowrap('发送前确认译文与回译', 11, T['ink4']))
     return card(tb + grid(zh + en, 2, 12) + rtype + foot, pad='10px 16px', gap=8)
@@ -476,7 +477,7 @@ def i19_zoom():
     menus = row(col(cap_('「回复类型」展开 · 默认结论性回复') + reply_type_menu('结论性回复', 330), 6) +
                 col(cap_('「更多」展开') + more, 6) +
                 col(cap_('重复联系怎么计（R-TK-03）') +
-                    muted('只看客户这封来信之前我方最近一封回复的类型：是结论性回复才计 1 次；次数为 1 升一级优先级。第二阶段没有风险拦截，次数为 2 不强制转人工。', 12), 6, 'width: 190px;'),
+                    muted('只看客户这封来信之前我方最近一封回复的类型：是结论性回复才计 1 次；次数为 1 升一级优先级，为 2 升为紧急并提醒客服主管。第二阶段没有风险拦截，不强制转人工；没有回复类型的回复（系统外发出等）不计。', 12), 6, 'width: 190px;'),
                 18, 'flex-start')
     return mini(col('<div style="width: 708px;">%s</div>' % p2_reply() + menus, 16), VW, 560, pad='20px')
 
@@ -485,11 +486,11 @@ def i19():
     frame = stack(('① 第二阶段收件箱 · 李婷 · 需处理 %d · 选中 Sarah Mitchell' % P2_COUNTS['需处理'], build_inbox_scaled(i19_page())),
                   ('② 回复框局部（1:1）与两个下拉的展开内容', i19_zoom()))
     return variant('I19 第二阶段收件箱',
-                   '按 P03「收件箱第二阶段」：没有 AI 分诊与草稿，三页合为一种人工处理界面。左栏分段 需处理 %d（有未回复来信的转人工）· 审批中 %d（挂着未结束审批单）· 等待中 %d · 全部 %d，'
+                   '按 P03「收件箱第二阶段」：没有 AI 分诊与草稿，三页合为一种人工处理界面。左栏分段 需处理 %d（有未回复来信、或关联售后单等待回复客户的未关闭工单）· 审批中 %d（挂着未结束审批单）· 等待中 %d · 全部 %d，'
                    '已提交审批但来信未回复的工单两个分段都列出；行上不写意图与情绪，状态都是「转人工」带「人工处理」小标，不加风险红条；收件箱角标 = 需处理。'
-                   '中栏：✦ 对话摘要、来信原文与中文译文并排、人工回复框（中文写，英语译文将发送，下方显示回译；插入模板；回复类型默认「结论性回复」）、按钮 发送 · 提交审批（I20）· 转售后确认（I21）· 更多（转客服主管、标记解决、关闭工单）。'
+                   '中栏：✦ 对话摘要、来信原文与中文译文并排（来信卡上「标记无需回复」）、人工回复框（中文写，英语译文将发送，下方显示回译；插入模板；回复类型默认「结论性回复」；没有插入图片与链接按钮）、按钮 发送 · 提交审批（I20）· 转售后确认（I21）· 更多（转客服主管、标记解决、关闭工单）。'
                    '没有 AI 草稿卡、换一版、让 AI 起草、风险信号横幅与 AI 分析卡；标题区没有意图，优先级默认普通、只随重复联系升级。右栏：客户（✦ 历史摘要）· 订单（平台镜像 + 积加补充的收件人）· 关联售后 / 审批（暂无）· 工单信息（重复联系 0 次）。'
-                   '导航按第二阶段去掉知识库。' % (P2_COUNTS['需处理'], P2_COUNTS['审批中'], P2_COUNTS['等待中'], P2_COUNTS['全部']),
+                   '导航按第二阶段去掉知识库。负责人为空的工单标题区显示「认领」（本例已由李婷负责）；关联售后单单号回传或待发指导时工单转人工（售后待回复）并进入需处理（6.5）。' % (P2_COUNTS['需处理'], P2_COUNTS['审批中'], P2_COUNTS['等待中'], P2_COUNTS['全部']),
                    frame, VW, trigger='第二阶段坐席打开收件箱（D-25）。')
 
 
@@ -591,7 +592,7 @@ def i20():
                   ('② 校验态：动作参数缺失、报备金额为空、退款金额超过订单金额（E-25）', b))
     return variant('I20 人工提交审批',
                    '右侧面板「提交审批 · %s」，从上到下五节：① 动作（从统一动作中选，可加多项）：创建售后出库单（补发）· %s · V2 黑色 ×%d · %s，旁注库存（经积加查询）；'
-                   '② 报备：快递费用 %s（易仓运费试算）；③ 同时创建售后单（路径 B）：处理方式 寄配件 · 易仓有货，责任按规则判定为物流问题，改选需填理由（R-AS-03），承担比例按责任预填（%s，不协商，向 UPS 索赔）；'
+                   '② 报备：快递费用 %s（易仓运费试算）；③ 同时创建售后单（路径 B，只在含报备或寄件动作时出现）：处理方式 寄配件 · 易仓有货，责任按规则判定为物流问题，改选需填理由（R-AS-03），承担比例按责任预填（%s，不协商，向 UPS 索赔）；'
                    '④ 绑定回复（可选）：从回复框带入中文、英语译文将发送，回复类型「结论性回复」，积加回传已推送易仓且未缺货后自动发出；⑤ 审批人与时限自动计算（客服主管 %s · %d 小时 · %s 前）与 R-SL-05 提示。'
                    '底部「提交审批」进入 I8 确认，确认后浮层「已提交审批，周敏会在 4 小时内处理」，工单保持转人工并进入「审批中」分段（D-11、AC-P2-03）；第三阶段 AI 草稿带出的审批项用同一面板。'
                    '② 校验在点「提交审批」时进行：字段下方报错，顶部写错误数，提交按钮保持可点并定位到第一个错误；校验通过才进入 I8。' % (
@@ -614,6 +615,28 @@ def attach_row(name, kind, note, at):
         nowrap('%s 来信' % at, 11, T['ink4']))
 
 
+def i21_base(h):
+    """I21 底图：第二阶段收件箱（I19 同一界面）选中 Olivia Turner，中栏为她 15:46 的回信与空回复框；导航不含知识库。"""
+    f = P2_OLIVIA_FOLLOWUP
+    t = dict(p2_ticket(OLIVIA_T['no']), sla_left=P2_ESCALATE['sla_left'], sla_level='normal', tags=[])
+    head = conv_head(t, '婷', actions=merge_btn(t) + btn('内部备注', 'secondary', 'sm', 'message') + icon_btn('more', 'secondary', 28),
+                     intent=False, status_html=p2_status())
+    two = grid('<div>%s</div>' % f['en'] + '<div style="color: %s; border-left: 1px solid %s; padding-left: 14px;">%s</div>' % (T['ink2'], T['line'], f['zh']),
+               gap=14, template='minmax(0, 1.2fr) minmax(0, 1fr)')
+    msg = customer_msg('Olivia Turner', 'Gmail · support@forcome.com · %s · 附照片与视频' % f['at'], two, '', seg(['并排', '原文', '译文'], '并排', 'sm'))
+    reply = p2_reply({'reply_zh': '', 'reply_en': '', 'reply_back': ''}, '以 support@forcome.com 发出')
+    mid = middle(head, msg + reply, pad='10px 20px', gap=10)
+    o = ORDERS[OLIVIA_T['order']]
+    right = right_column(build_inbox.cust_sec('Olivia Turner', 'OT', OLIVIA['email'], OLIVIA['summary'], OLIVIA['summary_basis']) +
+                         rsec('订单', col(between(nowrap(OLIVIA_T['order'], 13, T['ink'], 700), state('已签收')) + kv('商品', '%s · %s' % (o['item'], o['amount'])) +
+                                          kv('保修', '保修期内 · 已购买 %s' % o['age'], 'success'), 4), extra=link('Shopify 后台', 12, 'external')) +
+                         rsec('关联售后 / 审批', '', extra=nowrap('暂无', 11, T['ink4']), collapsed=True) +
+                         rsec('工单信息', col(kv('店铺', OLIVIA_T['store']) + kv('负责人', '李婷') + kv('转人工原因', P2_REASON) + kv('重复联系', '0 次'), 6), last=True))
+    nav_p2 = [x for x in NAV_BY_ROLE['坐席'] if x != '知识库']
+    return app('liting', '收件箱', ['收件箱', '待处理', OLIVIA_T['no']], three_col(p2_queue(OLIVIA_T['no']), mid, right),
+               badges={'收件箱': P2_COUNTS['需处理']}, h=h, nav=nav_p2)
+
+
 def i21_dialog():
     e, f = P2_ESCALATE, P2_OLIVIA_FOLLOWUP
     o = ORDERS[OLIVIA_T['order']]
@@ -632,13 +655,13 @@ def i21_dialog():
 def i21_after():
     """确认后：工单转等内部（原因「待售后确认 S-…」），关联售后多一张待确认单，浮层提示。"""
     e = P2_ESCALATE
-    t = dict(OLIVIA_T, status='等内部', sla_left=e['sla_left'], sla_level='normal', tags=[])
-    head = conv_head(t, '婷', actions=merge_btn(t) + btn('内部备注', 'secondary', 'sm', 'message') + icon_btn('more', 'secondary', 28))
+    t = dict(p2_ticket(OLIVIA_T['no']), status='等内部', sla_left=e['sla_left'], sla_level='normal', tags=[])
+    head = conv_head(t, '婷', actions=merge_btn(t) + btn('内部备注', 'secondary', 'sm', 'message') + icon_btn('more', 'secondary', 28), intent=False)
     ascard = '<div style="width: 330px; flex-shrink: 0; box-sizing: border-box; border: 1px solid %s; border-radius: 12px; background: %s; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">%s%s%s%s</div>' % (
         T['line'], T['surface'], between(text('关联售后 / 审批', 13, T['ink'], 600), nowrap('1 张', 11, T['ink3'])),
         between(nowrap(e['no'], 12, T['accent'], 700), state('待确认')), text('确认责任与处理方式 · 等售后负责人 王磊', 12, T['ink'], 600),
         muted('路径 A · 没有发起人 · %s 李婷转售后确认' % e['at'], 12))
-    left = col(event_line(e['at'], '李婷转售后确认 · 工单转等内部（待售后确认 %s）' % e['no']) +
+    left = col(event_line(e['at'], '李婷转售后确认 · 工单转等内部（关联售后单 %s 待确认）' % e['no']) +
                muted('客户 %s 这封来信的内部目标 SLA 仍在计时（剩 %s），需要时另发进展回复。' % (P2_OLIVIA_FOLLOWUP['at'], e['sla_left']), 12), 10, 'flex: 1; min-width: 0px; padding-top: 4px;')
     ts = '<div style="position: absolute; right: 20px; bottom: 16px;">%s</div>' % toast(
         'success', '已转售后确认 %s · 等王磊确认' % e['no'], '王磊已收到站内通知，在 P08 确认责任与处理方式。')
@@ -648,13 +671,13 @@ def i21_after():
 
 
 def i21():
-    a = scrim_frame(page_scaled(build_inbox.p02, I21_H), i21_dialog(), h=I21_H)
-    frame = stack(('① 李婷在 Olivia Turner 工单点「转售后确认」（%s 来信附照片与视频之后；底图为 P02 的 %s 画面，仅示意）' % (P2_OLIVIA_FOLLOWUP['at'], NOW[-5:]), a),
+    a = scrim_frame(page_scaled(i21_base, I21_H), i21_dialog(), h=I21_H)
+    frame = stack(('① 李婷在 Olivia Turner 工单点「转售后确认」（%s 来信附照片与视频之后；底图为第二阶段收件箱）' % P2_OLIVIA_FOLLOWUP['at'], a),
                   ('② 确认后：工单转等内部，关联售后多一张待确认单', i21_after()))
     return variant('I21 转售后确认',
                    '弹窗「转售后确认 · %s %s」：故障描述（必填）· 来信附件多选（照片、视频，取自本工单来信，默认全选）· 已做的排查（可选）· 涉及配件（可选，按订单商品选）；'
                    '说明「生成待确认售后单（路径 A，没有发起人），由售后负责人王磊在 P08 确认责任与处理方式；工单转等内部」。'
-                   '确认后浮层「已转售后确认 %s · 等王磊确认」，工单状态转等内部（原因「待售后确认 %s」），王磊收到站内通知（AC-P2-04）。坐席、客服主管可用；第三阶段 AI 排查两轮未解决时自动创建，按钮保留。' % (
+                   '确认后浮层「已转售后确认 %s · 等王磊确认」，工单状态转等内部（关联售后单 %s 待确认），王磊收到站内通知（AC-P2-04）。坐席、客服主管可用；第三阶段 AI 排查两轮未解决时自动创建，按钮保留。' % (
                        OLIVIA_T['no'], OLIVIA_T['customer'], P2_ESCALATE['no'], P2_ESCALATE['no']),
                    frame, VW, trigger='坐席或客服主管在工单上点「转售后确认」。本例在演示时刻之后：Olivia Turner %s 回信说滤芯早已清洗并晾干 24 小时、吸力仍弱，附照片与视频；李婷 %s 转售后确认。' % (
                        P2_OLIVIA_FOLLOWUP['at'], P2_ESCALATE['at']))

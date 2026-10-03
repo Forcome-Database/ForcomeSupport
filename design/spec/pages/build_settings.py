@@ -496,7 +496,10 @@ def factory_card(code):
     ppl = (person(c, '对接人', '%s · 最近登录 %s' % (STAFF[c]['dept'], STAFF[c]['last_login']), row(state('已启用') + icon_btn('more', size=24), 6)) +
            divider() + person(h, '负责人', '不分配系统角色，不登录系统', chip('比例升级商定人', 'neutral', 11)))
     ppl_sec = col(label('成员') + card(ppl, pad='10px 14px', gap=10), 8)
-    return card(head + sku_sec + ppl_sec, pad='16px 18px', gap=16)
+    # 来信邮箱：识别生产厂来信（来源「生产厂」，R-FT-06、E-27）；第一阶段为种子数据，第二阶段起在这里维护（D-27）
+    mail_sec = col(between(row(label('来信邮箱') + nowrap('用于识别生产厂来信', 12, T['ink4']), 8), btn('编辑', 'secondary', 'sm', 'edit')) +
+                   row(''.join(chip(m, 'neutral', 12) for m in f['mail']), 6, wrap=True), 8)
+    return card(head + sku_sec + mail_sec + ppl_sec, pad='16px 18px', gap=16)
 
 
 def p24():
