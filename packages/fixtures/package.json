@@ -1,0 +1,20 @@
+{
+  "name": "@forcome/fixtures",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "原型示例数据 design/spec/data.py 转成的 JSON 夹具，供种子数据、Fake 回放与 Playwright 共用（ADR 0009 修订）",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@forcome/config": "workspace:*"
+  }
+}

@@ -2,15 +2,19 @@
 import { serve } from '@hono/node-server';
 import { createApp } from './app';
 import { createLogger, loadConfig, startRuntime } from './modules/core';
+import { createIntegrationClients } from './modules/integration';
 import { onShutdown } from './shutdown';
 
 const config = loadConfig();
 const logger = createLogger({ level: config.logLevel, name: 'api' });
 const { runtime, stop } = await startRuntime(config.databaseUrl, { role: 'api', logger });
 
-const app = createApp({ runtime, logger });
+const app = createApp({ runtime, logger, config, clients: createIntegrationClients(config) });
 const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
-  logger.info({ port: info.port, appEnv: config.appEnv }, 'api 已启动');
+  logger.info(
+    { port: info.port, appEnv: config.appEnv, devLogin: config.devLoginEnabled },
+    'api 已启动',
+  );
 });
 
 onShutdown(logger, async () => {

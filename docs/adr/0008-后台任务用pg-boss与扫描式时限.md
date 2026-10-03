@@ -44,3 +44,8 @@ status: accepted
 - **发件箱的写法**：`core` 的 `transaction(runtime, fn)` 提供 `tx.enqueue(任务, 载荷)`，经 pg-boss 官方的 `fromDrizzle` 适配器在同一个数据库事务里插入任务，事务回滚任务一并撤销。载荷用 zod 模式在发送与消费两端校验。有意去重（`singletonKey`、`singletonSeconds`，或队列策略不是 `standard`）且已有同类任务时返回 null；其余情况插入不成功一律报错，不静默丢事件。
 - **任务命名与队列**：任务名为「模块.任务」（小写 snake_case，如 `ticket.merge_inbound`），用 `defineJob` 定义、`handleJob` 绑定处理器；队列由 migrate 与 worker 启动时幂等创建。
 - **pg-boss 按进程分工**：migrate 安装与升级 pg-boss 自己的表（schema `pgboss`）；api 只插入任务；worker 消费任务并负责维护与定时。api、worker 启动时不改表结构，所以部署必须先跑 migrate。
+
+## 修订（2026-10-04，待办 02 落地）
+
+- **任务总表按依赖组装**：`apps/server/src/jobs.ts` 分成静态的 `jobDefinitions`（migrate 据此建队列）与 `createJobHandlers(deps)`（worker 订阅、测试「跑完任务」用）；处理器要用的外部客户端从 `deps.clients` 取，测试里就是 Fake。`test/jobs.test.ts` 核对两边一一对应。worker 与测试共用 `core` 的 `runJob`（校验载荷后调处理器）。
+- **测试里「跑完已排队任务」**（`apps/server/test/run-jobs.ts`，测试工具的 `t.runJobs()`）：反复取出处理器队列里的全部任务（`fetch` 带 `ignoreStartAfter`，不管延后开始与重试间隔，测试时间由手动时钟控制），按计划开始时间、再按创建时间先后处理，处理中新排进来的任务也一并跑完，直到空闲。失败的任务本次不重试，跑完后才交给 pg-boss 记失败（还有重试次数的，下次 `runJobs` 再跑）；默认有失败就抛错，`allowFailures` 时只列在报告里。不跑 cron 定时：定时扫描在测试里用 `t.enqueue` 显式排一次。业务时限仍按本 ADR 靠每分钟扫描与表里的截止时间列，不依赖任务的延后开始。

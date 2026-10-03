@@ -47,3 +47,9 @@ status: accepted
 - **审计表** `core.audit_log`：操作人姓名与角色在写入时快照；带对象所属店铺 `store_id`，供 PRD 10.2 的店铺范围过滤；动作写成「对象.动词」（如 `store.create`、`member.disable`、`auth.login`），对象类型取 `contracts` 的 `auditObjectTypeLabels`（与 P27 筛选一致）。`core` 只对外提供写入 `recordAudit`；不带店铺范围的读取函数只供 `core` 内部与测试，不从 `index.ts` 导出（ADR 0010），P27 的查询由 30 号待办按 10.2 实现。
 - **事务的当前时间**：`core` 的 `transaction(runtime, fn)` 在事务开始时从可注入时钟取一次时间（`tx.now`），事务内的审计与业务写入共用；回放与测试换成手动时钟即可。
 - **业务编号**：`core.business_number_counter` 按（编号种类，计数周期）upsert 加 1，并发事务在同一行上排队，事务回滚则号不被占用。
+
+## 修订（2026-10-04，待办 02 落地）
+
+- **前端调接口**不用 `hono/client`，改为 `fetch` + `contracts` 的 zod 模式解析，原因见 ADR 0007 修订（前端不能引用后端代码）；接口仍用 `@hono/zod-openapi` 以 `contracts` 的模式声明。
+- **接口约定**：请求参数不符合模式返回 400（`{ error: 'invalid_request', message: '请求参数不对：…' }`），不存在的接口返回 404 的 JSON（`{ error: 'not_found', message: '接口不存在' }`），错误码与说明的形状是 `contracts` 的 `apiErrorSchema`。
+- **会话表** `org.session`（ADR 0010 修订）：令牌只存 SHA-256，`member_id` 有索引供停用时失效会话。

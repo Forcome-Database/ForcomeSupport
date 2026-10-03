@@ -18,6 +18,11 @@ dist/
 coverage/
 *.tsbuildinfo
 
+# Playwright 的运行结果
+test-results/
+playwright-report/
+blob-report/
+
 # 本机环境变量（.env.example 进仓库）
 .env
 .env.*

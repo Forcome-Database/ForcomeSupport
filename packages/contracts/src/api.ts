@@ -1,0 +1,12 @@
+import { z } from 'zod';
+
+/**
+ * 接口的错误响应：error 是给前端判断用的错误码，message 是可以直接显示的中文说明。
+ * 已有的错误码：unauthenticated（401 未登录）、invalid_request（400 参数不对）、not_found（404）、
+ * optimistic_lock（409 乐观锁冲突，G7）、internal（500）。
+ */
+export const apiErrorSchema = z.object({
+  error: z.string(),
+  message: z.string(),
+});
+export type ApiError = z.infer<typeof apiErrorSchema>;

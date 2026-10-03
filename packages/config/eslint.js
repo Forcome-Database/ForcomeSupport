@@ -47,7 +47,16 @@ export default [
     files: ['apps/web/**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks },
     languageOptions: { globals: globals.browser },
-    rules: reactHooks.configs.recommended.rules,
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      // TanStack Router 用 throw redirect() 在 beforeLoad 里跳转（ADR 0007），只放行它的 Redirect
+      '@typescript-eslint/only-throw-error': [
+        'error',
+        {
+          allow: [{ from: 'package', package: '@tanstack/router-core', name: 'Redirect' }],
+        },
+      ],
+    },
   },
   ...boundariesConfig,
   prettier,

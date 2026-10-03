@@ -1,0 +1,169 @@
+/*
+ * 设计令牌（ADR 0007）：由原型 design/spec/ui.py 的 T、阴影、圆角、字号刻度与设计规范板第 12 节
+ * 「研发映射」一次性转来，此后以本文件为准；原型改令牌时两边同步改。
+ * 设计规范板列出的变量照抄；ui.T 里其余的键按同样的命名规则补齐（*-soft 浅底、*-line 描边、*-text 文字色）。
+ * 第一期只做浅色；舒适 / 紧凑两档密度随 04 号待办加在 <html data-density> 上。
+ */
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+:root {
+  /* 背景与线 */
+  --background: #f5f6fa; /* canvas */
+  --foreground: #0f1320; /* ink */
+  --card: #ffffff; /* surface */
+  --card-foreground: #0f1320;
+  --popover: #ffffff;
+  --popover-foreground: #0f1320;
+  --muted: #f7f8fc; /* subtle */
+  --muted-foreground: #5a6376; /* ink3 */
+  --secondary: #f1f3f9; /* track */
+  --secondary-foreground: #3b4356; /* ink2 */
+  --accent: #f1f3f9; /* hover */
+  --accent-foreground: #0f1320;
+  --border: #e7e9f1; /* line */
+  --border-soft: #eff1f7; /* line2 */
+  --input: #d8dce7; /* line_strong */
+  --ink-2: #3b4356; /* ink2 */
+  --subtle-foreground: #656e82; /* ink4 */
+  --placeholder: #9099ab; /* ink5：只用于占位符与禁用 */
+
+  /* 主色 */
+  --primary: #4f46e5; /* accent */
+  --primary-foreground: #ffffff;
+  --primary-hover: #4338ca; /* accent_hover */
+  --primary-text: #4338ca; /* accent_ink */
+  --primary-soft: #f0effd; /* accent_bg */
+  --primary-line: #d3d1f9; /* accent_line */
+  --primary-active: #3730a3; /* 主按钮按下（ui.BTN_HOVER） */
+  --ring: #4f46e5;
+  --brand-2: #06b6d4; /* cyan，渐变第二色 */
+
+  /* 语义色：*-text 浅底上的字，实心色（无后缀）用于白字实心底与圆点 */
+  --success: #0b7a4d;
+  --success-text: #0a7a4c;
+  --success-soft: #e7f5ee;
+  --success-line: #bfe4d2;
+  --warning: #a65f06;
+  --warning-text: #94560a;
+  --warning-soft: #faf0e2;
+  --warning-line: #efd4aa;
+  --destructive: #c8313b;
+  --destructive-text: #c8313b;
+  --destructive-soft: #fcedee;
+  --destructive-line: #f4c8cb;
+  --flow: #6d28d9;
+  --flow-soft: #f4f1fe;
+  --flow-line: #ddd6fe;
+  --info: #0e7490;
+  --info-soft: #e7f6f9;
+  --info-line: #b9e3ec;
+
+  /* 渠道识别色 */
+  --channel-amazon: #b45309;
+  --channel-amazon-soft: #fff5ea;
+  --channel-amazon-line: #f6d9b5;
+  --channel-shopify: #0b7a4d;
+  --channel-mail: #5a6376;
+
+  --radius: 12px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+  --color-input: var(--input);
+  --color-ink-2: var(--ink-2);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-placeholder: var(--placeholder);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-text: var(--primary-text);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-line: var(--primary-line);
+  --color-primary-active: var(--primary-active);
+  --color-ring: var(--ring);
+  --color-brand-2: var(--brand-2);
+  --color-success: var(--success);
+  --color-success-text: var(--success-text);
+  --color-success-soft: var(--success-soft);
+  --color-success-line: var(--success-line);
+  --color-warning: var(--warning);
+  --color-warning-text: var(--warning-text);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-line: var(--warning-line);
+  --color-destructive: var(--destructive);
+  --color-destructive-text: var(--destructive-text);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-destructive-line: var(--destructive-line);
+  --color-flow: var(--flow);
+  --color-flow-soft: var(--flow-soft);
+  --color-flow-line: var(--flow-line);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-line: var(--info-line);
+  --color-channel-amazon: var(--channel-amazon);
+  --color-channel-amazon-soft: var(--channel-amazon-soft);
+  --color-channel-amazon-line: var(--channel-amazon-line);
+  --color-channel-shopify: var(--channel-shopify);
+  --color-channel-mail: var(--channel-mail);
+
+  /* 圆角：徽标 6 / 控件 8 / 卡片 12 / 面板 16（ui.R） */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: var(--radius);
+  --radius-xl: 16px;
+
+  /* 阴影（ui.SHADOW_*） */
+  --shadow-xs: 0 1px 2px rgba(16, 20, 35, 0.07);
+  --shadow-card: 0 12px 32px -18px rgba(16, 20, 35, 0.24);
+  --shadow-md: 0 16px 36px -14px rgba(16, 20, 35, 0.28);
+  --shadow-lg: 0 28px 64px -20px rgba(16, 20, 35, 0.4);
+  --shadow-pop: 0 8px 18px -8px rgba(79, 70, 229, 0.5);
+  --shadow-press: inset 0 1px 2px rgba(16, 20, 35, 0.18); /* 次按钮按下（ui.btn st=active） */
+
+  /* 字号刻度（ui.FS_SCALE）：text-11 … text-24，正文 13 */
+  --text-11: 11px;
+  --text-12: 12px;
+  --text-13: 13px;
+  --text-14: 14px;
+  --text-16: 16px;
+  --text-20: 20px;
+  --text-24: 24px;
+
+  /* 字体：Inter 与 Noto Sans SC 随应用打包（@fontsource-variable），不依赖外网 */
+  --font-sans:
+    'Inter Variable', 'Inter', 'PingFang SC', 'HarmonyOS Sans SC', 'Noto Sans SC Variable',
+    'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+
+/* 品牌渐变：只用于 AI 标识、品牌标与内部成员头像（设计规范第 1 节） */
+@utility bg-brand-gradient {
+  background-image: linear-gradient(120deg, var(--primary), var(--brand-2));
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    font-variant-numeric: tabular-nums;
+  }
+}

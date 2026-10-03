@@ -362,7 +362,12 @@ P04、P05 第一期版本的列、筛选、排序、取值与隐藏项见 PRD P0
 
 ### 先例
 
-仓库还没有代码，没有测试先例。第 1 片（工程骨架）必须同时交付：主接缝的测试工具（进程内 API 客户端、按角色登录、Fake 注入、时钟推进、同步跑完任务）、示例数据夹具加载器、一个示范用例；后续各片按这个样板写。
+第 1 片（工程骨架）已交付样板（待办 01、02），后续各片按它写：
+- 主接缝的测试工具 `apps/server/test/harness.ts`（`startTestHarness()`：进程内 API 客户端、`loginAs` 按角色登录、`clients.fake` 注入 Fake 与 `resetFakes`、`clock` 推进时钟、`runJobs` 同步跑完任务、`auditRecords` 核对审计），示范用例 `apps/server/test/dev-login.int.test.ts`；
+- Fake 框架与示范 Fake `apps/server/src/modules/integration/fake-framework.test.ts`（按店铺选择、故障注入）；
+- 示例数据夹具 `@forcome/fixtures`（`pnpm fixtures:generate` 从 data.py 生成）与加载器（各模块在 `apps/server/src/fixtures.ts` 登记加载步骤）；
+- Playwright `apps/web/e2e/dev-login.spec.ts`（开发登录 → 首页顶栏）。
+做法与取舍见 ADR 0005–0010、0013 的「待办 02 落地」修订。
 
 ## Out of Scope
 

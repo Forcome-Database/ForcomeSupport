@@ -1,0 +1,106 @@
+import {
+  apiErrorSchema,
+  currentMemberSchema,
+  devLoginRequestSchema,
+  devMembersResponseSchema,
+  type DevMember,
+} from '@forcome/contracts';
+import { demoFixture } from '@forcome/fixtures';
+import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
+import { recordAudit, transaction, type AppEnv, type Runtime } from '../core';
+import { clientIp, openSession, setSessionCookie } from './session';
+
+/*
+ * 开发登录（ADR 0010 修订）：本机、CI 与 Playwright 绕过钉钉扫码，选一位成员直接登录，
+ * 换出与扫码登录（05）同一种会话，并像正式登录一样记审计。
+ * 只在非生产环境由 DEV_LOGIN_ENABLED=true 开启：生产环境配置了就拒绝启动（core 的 loadConfig），
+ * 接口层再判断一次，生产环境不挂这组路由。
+ * 可选的成员来自示例数据夹具（id 是确定的）；04 号待办有了成员表后改为从成员表取。
+ */
+
+/** 示例数据里钉钉通讯录的成员（04 号待办改为成员表） */
+const DEV_MEMBERS: readonly DevMember[] = demoFixture.members.map((m) => ({
+  id: m.id,
+  name: m.name,
+  roles: [m.role],
+  dept: m.dept,
+}));
+
+const membersRoute = createRoute({
+  method: 'get',
+  path: '/api/dev/members',
+  summary: '开发登录可选的成员（只在非生产环境开启时存在）',
+  responses: {
+    200: {
+      description: '成员列表',
+      content: { 'application/json': { schema: devMembersResponseSchema } },
+    },
+  },
+});
+
+const loginRoute = createRoute({
+  method: 'post',
+  path: '/api/dev/login',
+  summary: '开发登录：以某位成员登录（只在非生产环境开启时存在）',
+  request: {
+    body: { content: { 'application/json': { schema: devLoginRequestSchema } }, required: true },
+  },
+  responses: {
+    200: {
+      description: '已登录，会话 Cookie 在响应头里',
+      content: { 'application/json': { schema: currentMemberSchema } },
+    },
+    404: {
+      description: '没有这位成员',
+      content: { 'application/json': { schema: apiErrorSchema } },
+    },
+  },
+});
+
+/** 是否挂开发登录：配置开启且不是生产环境（生产环境的配置已在启动时拒绝，这里再挡一次） */
+export function devLoginAvailable(config: { appEnv: AppEnv; devLoginEnabled: boolean }): boolean {
+  return config.devLoginEnabled && config.appEnv !== 'production';
+}
+
+export function createDevLoginRoutes(deps: { runtime: Runtime; appEnv: AppEnv }) {
+  if (deps.appEnv === 'production') {
+    throw new Error('生产环境不能开启开发登录');
+  }
+  const routes = new OpenAPIHono();
+
+  routes.openapi(membersRoute, (c) => c.json({ members: [...DEV_MEMBERS] }, 200));
+
+  routes.openapi(loginRoute, async (c) => {
+    const { memberId } = c.req.valid('json');
+    const found = DEV_MEMBERS.find((m) => m.id === memberId);
+    if (!found) {
+      return c.json({ error: 'not_found', message: '没有这位成员' }, 404);
+    }
+    const member = { id: found.id, name: found.name, roles: found.roles };
+    const { token } = await transaction(deps.runtime, async (tx) => {
+      const opened = await openSession(tx, member);
+      await recordAudit(
+        tx,
+        {
+          kind: 'member',
+          memberId: member.id,
+          name: member.name,
+          roles: member.roles,
+          ip: clientIp(c),
+        },
+        {
+          action: 'auth.login',
+          objectType: 'login',
+          objectId: opened.id,
+          objectLabel: '开发登录',
+          after: { method: 'dev' },
+        },
+      );
+      return opened;
+    });
+    setSessionCookie(c, token, deps.appEnv);
+    return c.json(member, 200);
+  });
+
+  return routes;
+}

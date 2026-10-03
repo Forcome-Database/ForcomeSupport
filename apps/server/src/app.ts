@@ -2,12 +2,9 @@ import { healthResponseSchema, type HealthResponse } from '@forcome/contracts';
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import type { ServerDeps } from './deps';
 import { OptimisticLockError, type Logger, type Runtime } from './modules/core';
-
-export interface AppDeps {
-  runtime: Runtime;
-  logger: Logger;
-}
+import { createDevLoginRoutes, createOrgRoutes, devLoginAvailable } from './modules/org';
 
 const DATABASE_CHECK_TIMEOUT_MS = 3_000;
 
@@ -50,11 +47,22 @@ async function databaseIsUp(runtime: Runtime, logger: Logger): Promise<boolean> 
 }
 
 /**
- * HTTP 应用（ADR 0006）：接口用 contracts 的 zod 模式声明并生成 OpenAPI 文档。
- * 入口 api.ts 用它起服务；测试在进程内直接调用 app.request（规格「测试接缝」主接缝）。
+ * HTTP 应用（ADR 0006）：接口用 contracts 的 zod 模式声明并生成 OpenAPI 文档；各模块的接口从模块的
+ * index.ts 取来挂上。入口 api.ts 用它起服务；测试在进程内直接调用 app.request（规格「测试接缝」主接缝）。
  */
-export function createApp({ runtime, logger }: AppDeps) {
-  const app = new OpenAPIHono();
+export function createApp(deps: ServerDeps) {
+  const { runtime, logger, config } = deps;
+  const app = new OpenAPIHono({
+    // 请求参数不符合 contracts 的模式：400，写明哪里不对
+    defaultHook: (result, c) => {
+      if (!result.success) {
+        const detail = result.error.issues
+          .map((issue) => `${issue.path.join('.') || '请求'}：${issue.message}`)
+          .join('；');
+        return c.json({ error: 'invalid_request', message: `请求参数不对：${detail}` }, 400);
+      }
+    },
+  });
 
   app.openapi(healthRoute, async (c) => {
     const up = await databaseIsUp(runtime, logger);
@@ -66,10 +74,17 @@ export function createApp({ runtime, logger }: AppDeps) {
     return up ? c.json(body, 200) : c.json(body, 503);
   });
 
+  app.route('/', createOrgRoutes({ runtime }));
+  if (devLoginAvailable(config)) {
+    app.route('/', createDevLoginRoutes({ runtime, appEnv: config.appEnv }));
+  }
+
   app.doc31('/api/openapi.json', {
     openapi: '3.1.0',
     info: { title: 'Forcome Support API', version: '0.0.0' },
   });
+
+  app.notFound((c) => c.json({ error: 'not_found', message: '接口不存在' }, 404));
 
   app.onError((error, c) => {
     if (error instanceof OptimisticLockError) {

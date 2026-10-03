@@ -7,3 +7,5 @@ pnpm-lock.yaml
 apps/server/drizzle/
 **/dist/
 **/coverage/
+# 生成物：示例数据夹具由 scripts/fixtures/export_demo_fixture.py 生成，与生成结果逐字节一致
+packages/fixtures/data/

@@ -82,44 +82,60 @@ python shot_phase1.py
 生产系统的代码在 `apps/` 与 `packages/`（pnpm 工作区，ADR 0005）：
 
 ```
-apps/web                 前端：Vite + React 19 单页应用（ADR 0007）
+apps/web                 前端：Vite + React 19 单页应用，shadcn/ui + Tailwind v4（ADR 0007）
+├── src/styles/globals.css  设计令牌（由设计规范板转来，此后以它为准）
+├── src/components/ui/   shadcn/ui 组件（已按设计规范改过默认样式）
+├── src/router.tsx       路由（TanStack Router）；登录后的页面挂在 app 布局下
+└── e2e/                 Playwright 端到端（playwright.config.ts）
 apps/server              后端：一个镜像，三个入口（ADR 0005、0006、0008）
 ├── src/api.ts           入口：HTTP 服务（app.ts 组装接口）
-├── src/worker.ts        入口：后台任务（jobs.ts 汇总各模块的任务处理器）
+├── src/worker.ts        入口：后台任务（jobs.ts 汇总各模块的任务定义与处理器）
 ├── src/migrate.ts       入口：只向前执行迁移（一次性，先于 api 与 worker）
+├── src/seed.ts          入口：灌示例数据（只用于非生产环境；fixtures.ts 汇总各模块的加载步骤）
+├── src/deps.ts          组装根：接口与任务共用的依赖（运行时、日志、配置、外部客户端）
 ├── src/modules/<模块>/  12 个模块；index.ts 是唯一对外入口，schema.ts 放本模块的表（一个模块一个 schema）
 ├── drizzle/             drizzle-kit 生成的 SQL 迁移（提交进仓库，不手改；自定义 SQL 用 drizzle-kit generate --custom）
-├── test/                集成测试的数据库准备与跨模块测试
+├── test/                集成测试的数据库准备、主接缝测试工具（harness.ts）与跨模块测试
+├── scripts/e2e-api.ts   Playwright 用的 api（重建 e2e 库、迁移、灌示例数据后启动）
+├── dev.env · e2e.env    本机开发与 e2e 的环境变量默认值（只有本机库口令，没有外部凭据）
 └── Dockerfile           后端镜像
 packages/contracts       前后端共享的 zod 模式与类型
 packages/calendar        日界与工作日历纯函数
+packages/fixtures        示例数据夹具：data/demo.json 由 data.py 生成（不手改），加载时按模式校验
 packages/config          共享的 tsconfig 与 ESLint 配置（含模块边界规则 eslint-boundaries.js）
-scripts/                 仓库级检查脚本
+scripts/                 仓库级脚本：迁移一致性、工作流语法、示例数据夹具（fixtures/ 下是生成脚本）
 .github/workflows/ci.yml CI
 ```
 
 共享包以 TypeScript 源码被引用（`exports` 指向 `src/index.ts`），由前端的 Vite 与后端的 tsdown 打进各自的产物，它们的 `build` 只做类型检查。
 
-**环境**：Node 24（`.node-version`）；pnpm 10，先 `corepack enable`，版本按 `package.json` 的 `packageManager` 自动取用；Docker（含 compose）。不需要任何外部账号，外部服务一律用 Fake。
+**环境**：Node 24（`.node-version`）；pnpm 10，先 `corepack enable`，版本按 `package.json` 的 `packageManager` 自动取用；Docker（含 compose）；Python 3（只在重新生成示例数据夹具时需要）。不需要任何外部账号，外部服务一律用 Fake。
+
+**本机端口**（本期本机可用 4510–4520，ADR 0013 修订）：开发库 4520 · api 4516 · 前端开发服务器 4517 · Playwright 用的 e2e api 4518 与前端预览 4519；4510–4515 留给开发测试与生产两套 Compose。
 
 | 命令 | 作用 |
 |---|---|
 | `pnpm install` | 安装依赖 |
 | `pnpm db:up` / `pnpm db:down` | 起停本机 PostgreSQL 18（`docker-compose.dev.yml`，端口 4520，可用 `DEV_PG_PORT` 覆盖） |
-| `pnpm db:migrate` | 对 `DATABASE_URL` 指向的库执行迁移（本机开发库为 `postgres://forcome:forcome@127.0.0.1:4520/forcome`） |
+| `pnpm db:migrate` | 执行迁移；默认对本机开发库（`apps/server/dev.env`），设 `DATABASE_URL` 可指向别的库 |
+| `pnpm db:seed` | 灌示例数据夹具（各模块登记的加载步骤；生产环境拒绝），先跑 `db:migrate` |
 | `pnpm db:generate` | 改了某个模块的 `schema.ts` 后生成迁移 |
-| `pnpm --filter @forcome/server dev:api` / `dev:worker` | 本机运行 api（默认端口 3000）/ worker，需要 `DATABASE_URL` |
-| `pnpm --filter @forcome/web dev` | 本机运行前端，`/api` 转给本机 api |
+| `pnpm --filter @forcome/server dev:api` / `dev:worker` | 本机运行 api（4516）/ worker，环境变量默认取 `apps/server/dev.env`（开启开发登录） |
+| `pnpm --filter @forcome/web dev` | 本机运行前端（http://127.0.0.1:4517），`/api` 转给本机 api；未登录时进入开发登录页，选一位示例成员即可登录 |
 | `pnpm typecheck` · `pnpm lint` · `pnpm build` | 类型检查 · lint（含模块边界）与格式 · 构建 |
 | `pnpm lint:workflows` | 用 actionlint（Docker）校验 CI 工作流语法 |
+| `pnpm fixtures:generate` · `pnpm fixtures:verify` | 从 `design/spec/data.py` 重新生成示例数据夹具 · 核对产物与 data.py 一致 |
 | `pnpm test:unit` · `pnpm test:integration` | 单元测试 · 集成测试（需要 `pnpm db:up`；CI 经 `TEST_DATABASE_URL` 指向服务容器） |
+| `pnpm test:e2e` | Playwright 端到端（需要 `pnpm db:up`；自己起 4518、4519 两个服务，用 e2e 专用库 `forcome_e2e`） |
 | `pnpm ci:local` | 本机跑一遍与 CI 相同的检查（先 `pnpm db:up`，并且需要 Docker 构建镜像） |
 
-**测试**：`*.test.ts` 是单元测试；`*.int.test.ts` 是集成测试，用真实 PostgreSQL 18——每次运行先建模板库并迁移，各测试文件再复制出自己的库，互不干扰。时间一律经可注入时钟（`ManualClock`）控制。
+**测试**：`*.test.ts` 是单元测试；`*.int.test.ts` 是集成测试，用真实 PostgreSQL 18——每次运行先建模板库并迁移，各测试文件再复制出自己的库，互不干扰。集成测试只经主接缝（规格「测试接缝」）：用 `apps/server/test/harness.ts` 的 `startTestHarness()` 在测试进程内调用 HTTP 接口，`t.loginAs('坐席')` 以某个角色登录，`t.clients.fake(…)` 往 Fake 里放数据、注入故障，`t.clock` 推进时钟，`t.runJobs()` 把后台任务跑到空闲，`t.auditRecords()` 核对审计；样板见 `apps/server/test/dev-login.int.test.ts`。外部客户端的「接口 + 真实现 + Fake」写法见 `apps/server/src/modules/integration/fake-framework.test.ts`。
 
-**CI 与合并**：`.github/workflows/ci.yml` 在 PR 与 main 上跑类型检查、lint、迁移一致性、构建、单元与集成测试、镜像构建，最后由「CI 通过」汇总。仓库推到 GitHub 后，在 Settings → Branches 为 `main` 加保护规则：Require a pull request before merging（至少 1 个批准）、Require status checks to pass（必需检查选「CI 通过」）。仓库暂不上 GitHub，期间用 `pnpm ci:local` 代替。
+**开发登录**：只在非生产环境、`DEV_LOGIN_ENABLED=true` 时开启（`dev.env` 已开启），从示例数据的成员里选一位直接登录，换出与钉钉扫码登录相同的会话；生产环境配置了就拒绝启动（ADR 0010 修订）。
 
-**镜像**：`docker build -f apps/server/Dockerfile -t forcome-server .`（构建上下文是仓库根目录）；默认运行 api，`node dist/worker.mjs`、`node dist/migrate.mjs` 运行另两个入口。
+**CI 与合并**：`.github/workflows/ci.yml` 在 PR 与 main 上跑类型检查、lint、迁移一致性、示例数据夹具一致性、构建、单元与集成测试、镜像构建，最后由「CI 通过」汇总。仓库推到 GitHub 后，在 Settings → Branches 为 `main` 加保护规则：Require a pull request before merging（至少 1 个批准）、Require status checks to pass（必需检查选「CI 通过」）。仓库暂不上 GitHub，期间用 `pnpm ci:local` 代替。Playwright 端到端按 ADR 0013 在合并后对开发测试环境运行（03 号待办），本机用 `pnpm test:e2e`。
+
+**镜像**：`docker build -f apps/server/Dockerfile -t forcome-server .`（构建上下文是仓库根目录）；默认运行 api，`node dist/worker.mjs`、`node dist/migrate.mjs` 运行另两个入口，`node dist/seed.mjs` 在非生产环境灌示例数据。
 
 ## 约定
 

@@ -1,3 +1,24 @@
 // integration：全部外部适配器与客户端、调用记录；只能依赖 core（ADR 0005；第一期起）。
 // 其他模块只能经本文件调用本模块，不能引用内部文件或读写本模块的表。
-export {};
+export {
+  createIntegrationClients,
+  defineClient,
+  FakeNotAllowedError,
+  IntegrationClients,
+  type AnyClientDefinition,
+  type ClientDefinition,
+  type ClientScope,
+  type FakeClient,
+  type IntegrationClientsOptions,
+  type RealClientContext,
+  type StoreClientSelection,
+} from './clients';
+export {
+  ConnectionLostError,
+  CursorExpiredError,
+  ExternalCallFailedError,
+  ExternalServiceError,
+  ExternalTimeoutError,
+  FaultInjector,
+  type FaultSpec,
+} from './faults';

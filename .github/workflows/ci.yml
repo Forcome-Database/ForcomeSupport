@@ -33,6 +33,8 @@ jobs:
         run: pnpm lint
       - name: 迁移与表结构一致
         run: pnpm db:verify
+      - name: 示例数据夹具与 data.py 一致（运行器自带 python3）
+        run: pnpm fixtures:verify
       - name: 构建
         run: pnpm build
 

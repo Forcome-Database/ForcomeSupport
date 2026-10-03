@@ -41,3 +41,9 @@ status: accepted
 - **暂不上 GitHub 期间**（2026-10-04 用户口径）：工作流照写；同样的检查用 `pnpm ci:local` 在本机执行，其中 `pnpm lint:workflows` 用 actionlint（Docker 镜像 `rhysd/actionlint:1.7.12`）校验工作流语法。仓库推到 GitHub 时补设分支保护。
 - **迁移只向前**：migrate 执行 drizzle-kit 生成的迁移，并安装或升级 pg-boss 的表（ADR 0008 修订）；迁移目录不放回滚脚本，测试核对迁移目录只有 drizzle-kit 日志登记过的 SQL。
 - **本机开发**：`docker-compose.dev.yml` 只起 PostgreSQL 18，端口 4520（本期本机可用 4510–4520，其余留给开发测试与生产两套 Compose）；集成测试每次运行先建模板库并迁移，各测试文件复制出独立的库。
+
+## 修订（2026-10-04，待办 02 落地）
+
+- **本机端口**（本期本机可用 4510–4520）：开发库 4520；本机开发的 api 4516、前端开发服务器 4517；Playwright 用的 e2e api 4518、前端预览 4519；4510–4515 留给 03 号待办的开发测试与生产两套 Compose。本机开发的环境变量默认值在 `apps/server/dev.env`（`pnpm dev:api`、`dev:worker`、`db:migrate`、`db:seed` 读取，命令行里已设的变量优先），e2e 的在 `apps/server/e2e.env`；两者只含本机开发库的口令，不含任何外部凭据。
+- **示例数据**：镜像多一个只用于非生产环境的入口 `node dist/seed.mjs`（灌示例数据夹具，生产环境拒绝，ADR 0009 修订）。CI 的 static 作业加 `pnpm fixtures:verify`（运行器自带 python3），`pnpm ci:local` 同样执行。
+- **Playwright**：`pnpm test:e2e` 在本机运行（需要 `pnpm db:up`）。按本 ADR，端到端在合并后对开发测试环境运行，随 03 号待办接入，不放进 PR 的 CI。

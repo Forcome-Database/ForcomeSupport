@@ -112,6 +112,29 @@ export interface WorkerOptions {
   pollingIntervalSeconds?: number;
 }
 
+/** 已从队列取到的一个任务（pg-boss 的 Job 的子集） */
+export interface FetchedJob {
+  readonly id: string;
+  readonly data: unknown;
+  readonly signal: AbortSignal;
+}
+
+/**
+ * 处理一个已取到的任务：校验载荷后交给处理器。worker 与测试的「跑完已排队任务」
+ * （apps/server/test/harness.ts）共用这一段，测试走的就是生产的处理路径。
+ */
+export async function runJob(
+  runtime: Runtime,
+  handler: AnyJobHandler,
+  job: FetchedJob,
+  logger: Logger,
+): Promise<void> {
+  const log = logger.child({ job: handler.job.name, jobId: job.id });
+  // 载荷不符合模式说明发送端与消费端版本不一致：抛错让任务失败，留待排查
+  const payload: unknown = handler.job.payload.parse(job.data);
+  await handler.handle(payload, { jobId: job.id, runtime, logger: log, signal: job.signal });
+}
+
 /** 启动 worker：为每个处理器订阅它的队列，逐个取任务、校验载荷后处理 */
 export async function startWorker(
   runtime: Runtime,
@@ -128,10 +151,7 @@ export async function startWorker(
       { batchSize: 1, pollingIntervalSeconds: options.pollingIntervalSeconds ?? 2 },
       async (jobs) => {
         for (const job of jobs) {
-          const logger = options.logger.child({ job: handler.job.name, jobId: job.id });
-          // 载荷不符合模式说明发送端与消费端版本不一致：抛错让任务失败，留待排查
-          const payload: unknown = handler.job.payload.parse(job.data);
-          await handler.handle(payload, { jobId: job.id, runtime, logger, signal: job.signal });
+          await runJob(runtime, handler, job, options.logger);
         }
       },
     );

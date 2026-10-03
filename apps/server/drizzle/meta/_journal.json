@@ -15,6 +15,13 @@
       "when": 1791046392004,
       "tag": "0001_report_reader_role",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791050842499,
+      "tag": "0002_org_session",
+      "breakpoints": true
     }
   ]
 }

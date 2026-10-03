@@ -15,13 +15,17 @@
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
+    "test:e2e": "pnpm --filter @forcome/web test:e2e",
+    "fixtures:generate": "node scripts/fixtures.mjs generate",
+    "fixtures:verify": "node scripts/fixtures.mjs verify",
     "db:up": "docker compose -f docker-compose.dev.yml up -d --wait",
     "db:down": "docker compose -f docker-compose.dev.yml down",
     "db:generate": "pnpm --filter @forcome/server db:generate",
     "db:check": "pnpm --filter @forcome/server db:check",
     "db:migrate": "pnpm --filter @forcome/server db:migrate",
+    "db:seed": "pnpm --filter @forcome/server db:seed",
     "db:verify": "pnpm --filter @forcome/server db:check && node scripts/check-migrations.mjs",
-    "ci:local": "pnpm typecheck && pnpm lint && pnpm lint:workflows && pnpm db:verify && pnpm build && pnpm test:unit && pnpm test:integration && docker build -f apps/server/Dockerfile -t forcome-server:ci ."
+    "ci:local": "pnpm typecheck && pnpm lint && pnpm lint:workflows && pnpm db:verify && pnpm fixtures:verify && pnpm build && pnpm test:unit && pnpm test:integration && docker build -f apps/server/Dockerfile -t forcome-server:ci ."
   },
   "devDependencies": {
     "@forcome/config": "workspace:*",
