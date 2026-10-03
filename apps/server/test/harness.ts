@@ -126,17 +126,21 @@ export async function startTestHarness(
   }
   const api = createApiClient(app, { ip: TEST_CLIENT_IP });
 
+  /** 两种写法都以开发登录接口列出的成员为准（第一期不能进入的成员不在里面） */
   async function memberId(target: LoginTarget): Promise<string> {
-    if (typeof target !== 'string') {
-      const member = getDemoFixture().members.find((m) => m.key === target.member);
-      if (!member) throw new Error(`示例数据里没有成员 ${target.member}`);
-      return member.id;
-    }
     const res = await api.get('/api/dev/members');
     const { members } = devMembersResponseSchema.parse(await res.json());
-    const member = members.find((m) => m.roles.includes(target));
-    if (!member) throw new Error(`没有角色为「${target}」的成员可以登录`);
-    return member.id;
+    if (typeof target === 'string') {
+      const member = members.find((m) => m.roles.includes(target));
+      if (!member) throw new Error(`没有角色为「${target}」的成员可以登录`);
+      return member.id;
+    }
+    const fixture = getDemoFixture().members.find((m) => m.key === target.member);
+    if (!fixture) throw new Error(`示例数据里没有成员 ${target.member}`);
+    if (!members.some((m) => m.id === fixture.id)) {
+      throw new Error(`成员 ${target.member}（${fixture.role}）不在开发登录的可选成员里`);
+    }
+    return fixture.id;
   }
 
   return {

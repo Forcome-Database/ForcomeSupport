@@ -51,5 +51,5 @@ status: accepted
 ## 修订（2026-10-04，待办 02 落地）
 
 - **前端调接口**不用 `hono/client`，改为 `fetch` + `contracts` 的 zod 模式解析，原因见 ADR 0007 修订（前端不能引用后端代码）；接口仍用 `@hono/zod-openapi` 以 `contracts` 的模式声明。
-- **接口约定**：请求参数不符合模式返回 400（`{ error: 'invalid_request', message: '请求参数不对：…' }`），不存在的接口返回 404 的 JSON（`{ error: 'not_found', message: '接口不存在' }`），错误码与说明的形状是 `contracts` 的 `apiErrorSchema`。
+- **接口约定**：请求参数不符合模式返回 400（`{ error: 'invalid_request', message: '请求参数不对：…' }`），不存在的接口返回 404 的 JSON（`{ error: 'not_found', message: '接口不存在' }`），请求体不是合法 JSON 返回 400 `invalid_request`，框架抛出的其他 HTTP 错误为 `http_error`，错误码与说明的形状是 `contracts` 的 `apiErrorSchema`。
 - **会话表** `org.session`（ADR 0010 修订）：令牌只存 SHA-256，`member_id` 有索引供停用时失效会话。

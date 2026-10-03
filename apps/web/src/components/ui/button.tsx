@@ -1,4 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority';
+import { Loader2 } from 'lucide-react';
 import { Slot } from 'radix-ui';
 import type * as React from 'react';
 import { cn } from '@/lib/utils';
@@ -7,7 +8,8 @@ import { cn } from '@/lib/utils';
  * 按钮（shadcn Button，按设计规范板第 4、12 节改过默认样式）：
  * variant 对应原型 btn() 的 primary → default、secondary → outline、ghost、link；
  * size：sm 28 / default 32 / lg 36，字号 12 / 13 / 14；圆角 8；焦点环 ring-2 + offset-2；
- * 禁用时浅灰底、占位色字（必须另给悬停说明原因，原型 btn(reason=)）。
+ * 禁用时浅灰底、占位色字（必须另给悬停说明原因，原型 btn(reason=)）；
+ * 处理中（loading）时前面的图标换成转圈、透明度 0.85，并且不再响应点击，防止重复提交（设计规范第 4 节）。
  * 危险、警示、浅色强调等变体与图标按钮（原型 icon_btn）等第一次用到的待办按原型补上，不留未核对过的默认样式。
  */
 const buttonVariants = cva(
@@ -41,10 +43,15 @@ function Button({
   variant = 'default',
   size = 'default',
   asChild = false,
+  loading = false,
+  children,
+  onClick,
   ...props
 }: React.ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    /** 处理中：把前面的图标换成转圈（调用方不再渲染自己的前置图标），点击无效 */
+    loading?: boolean;
   }) {
   const Comp = asChild ? Slot.Root : 'button';
 
@@ -53,9 +60,14 @@ function Button({
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
+      aria-busy={loading || undefined}
+      className={cn(buttonVariants({ variant, size, className }), loading && 'opacity-85')}
+      onClick={loading ? (event) => event.preventDefault() : onClick}
       {...props}
-    />
+    >
+      {loading && !asChild && <Loader2 className="size-3.5 animate-spin" strokeWidth={2.2} />}
+      {children}
+    </Comp>
   );
 }
 

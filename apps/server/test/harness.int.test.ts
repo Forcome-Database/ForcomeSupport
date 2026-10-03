@@ -49,6 +49,8 @@ const checkDelivery = defineJob('example.check_delivery', z.object({ trackingNo:
   retryLimit: 2,
 });
 const notifyDelivered = defineJob('example.notify_delivered', z.object({ trackingNo: z.string() }));
+// 示范的坏任务：每次处理都再排一个自己，用来验证 runJobs 不会无限跑下去
+const runaway = defineJob('example.runaway', z.object({ n: z.number() }), { retryLimit: 0 });
 
 let t: TestHarness;
 const handled: string[] = [];
@@ -62,6 +64,9 @@ beforeAll(async () => {
         if (await clients.global(exampleTracking).delivered(trackingNo)) {
           await transaction(runtime, (tx) => tx.enqueue(notifyDelivered, { trackingNo }));
         }
+      }),
+      handleJob(runaway, async ({ n }, { runtime }) => {
+        await transaction(runtime, (tx) => tx.enqueue(runaway, { n: n + 1 }));
       }),
       handleJob(notifyDelivered, async ({ trackingNo }, { runtime }) => {
         handled.push(`notify:${trackingNo}`);
@@ -141,6 +146,13 @@ describe('跑完所有已排队任务（runJobs）', () => {
     await t.runJobs({ allowFailures: true });
     expect(await t.runJobs()).toEqual({ completed: [], failed: [] });
   });
+
+  it('任务互相触发、一直跑不完时，超过轮数就停下并报错，留下的任务记为失败', async () => {
+    await t.enqueue(runaway, { n: 0 });
+
+    await expect(t.runJobs({ maxRounds: 3 })).rejects.toThrow(/跑了 3 轮.*example\.runaway/);
+    expect(await t.runJobs()).toEqual({ completed: [], failed: [] });
+  });
 });
 
 describe('推进时钟', () => {
@@ -188,6 +200,10 @@ describe('按角色建会话', () => {
   it('示例数据里没有的角色或成员给出明确的错误', async () => {
     await expect(t.loginAs('仓库管理员')).rejects.toThrow(/没有角色为「仓库管理员」的成员/);
     await expect(t.loginAs({ member: 'nobody' })).rejects.toThrow(/没有成员 nobody/);
+    // 生产厂对接人第一期不能进入（PRD 4.1），开发登录不列出
+    await expect(t.loginAs({ member: 'chengong' })).rejects.toThrow(
+      /chengong（生产厂对接人）不在开发登录的可选成员里/,
+    );
   });
 });
 

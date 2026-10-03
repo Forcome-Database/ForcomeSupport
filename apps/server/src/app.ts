@@ -92,7 +92,8 @@ export function createApp(deps: ServerDeps) {
       return c.json({ error: 'optimistic_lock', message: '数据已被他人修改' }, 409);
     }
     if (error instanceof HTTPException) {
-      // 自带响应的照原样返回；Hono 自己抛的（请求体不是合法 JSON、Content-Type 不对等）按 contracts 的错误形状返回
+      // 自带响应的照原样返回；Hono 自己抛的按 contracts 的错误形状返回。接口只收 JSON，
+      // 框架抛 400 只在请求体不是合法 JSON 时（Content-Type 不对时校验器跳过，由 zod 模式报 400）
       if (error.res) return error.getResponse();
       return error.status === 400
         ? c.json(

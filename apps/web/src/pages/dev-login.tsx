@@ -33,25 +33,33 @@ export function DevLoginPage() {
           <p className="text-12 text-muted-foreground">选择一位示例成员直接登录，不经钉钉扫码</p>
         </div>
         <ul className="flex w-full flex-col gap-2">
-          {(members ?? []).map((member) => (
-            <li key={member.id}>
-              <Button
-                variant="outline"
-                size="lg"
-                className="w-full justify-start gap-2"
-                disabled={login.isPending}
-                onClick={() => login.mutate(member.id)}
-              >
-                <Avatar size="sm">
-                  <AvatarFallback>{avatarText(member.name)}</AvatarFallback>
-                </Avatar>
-                <span className="text-13 font-semibold text-foreground">{member.name}</span>
-                <span className="ml-auto text-12 font-normal text-subtle-foreground">
-                  {member.roles.join('、')} · {member.dept}
-                </span>
-              </Button>
-            </li>
-          ))}
+          {(members ?? []).map((member) => {
+            const loading = login.isPending && login.variables === member.id;
+            return (
+              <li key={member.id}>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full justify-start gap-2"
+                  loading={loading}
+                  // 处理中时其他成员的按钮也不再提交，防止重复登录（设计规范第 4 节）
+                  onClick={() => {
+                    if (!login.isPending) login.mutate(member.id);
+                  }}
+                >
+                  {!loading && (
+                    <Avatar size="sm">
+                      <AvatarFallback>{avatarText(member.name)}</AvatarFallback>
+                    </Avatar>
+                  )}
+                  <span className="text-13 font-semibold text-foreground">{member.name}</span>
+                  <span className="ml-auto text-12 font-normal text-subtle-foreground">
+                    {member.roles.join('、')} · {member.dept}
+                  </span>
+                </Button>
+              </li>
+            );
+          })}
         </ul>
         {login.isError && (
           <p role="alert" className="w-full text-12 text-destructive-text">
