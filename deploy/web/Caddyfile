@@ -1,0 +1,52 @@
+# caddy（ADR 0003、0007、0013）：内网 HTTPS、托管前端静态文件、把 /api 转给 api。
+# 变量来自 Compose：SITE_HOST 内网域名，TLS_MODE 证书方式（目前只有 internal）。
+{
+	# 容器里没有要装根证书的系统证书库；根证书由部署脚本导出、发给员工浏览器安装
+	skip_install_trust
+	pki {
+		ca local {
+			name "Forcome Support"
+			root_cn "Forcome Support Internal Root CA"
+			intermediate_cn "Forcome Support Internal Intermediate CA"
+		}
+	}
+}
+
+# 内部 CA（tls internal）：根证书在 caddy_data 卷的 /data/caddy/pki/authorities/local/root.crt，
+# 卷不删就一直是同一个根证书。公司域名与 DNS-01 到位后加一个 (tls_dns) 片段并把 TLS_MODE 改为 dns（docs/部署说明.md）。
+(tls_internal) {
+	tls internal
+}
+
+{$SITE_HOST} {
+	import tls_{$TLS_MODE:internal}
+	encode zstd gzip
+	log {
+		output stdout
+		format json
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# 接口：X-Forwarded-For 用真实客户端地址改写、不信任客户端自带的值（不设 trusted_proxies），
+	# api 取它的第一段记审计（ADR 0010 修订）
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	# 前端单页：带哈希的资源长期缓存，index.html 每次校验，其余路径交给前端路由
+	handle {
+		root * /srv
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@pages not path /assets/*
+		header @pages Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

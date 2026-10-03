@@ -1,0 +1,151 @@
+# 开发测试与生产共用的 Compose（ADR 0013）。由部署脚本 deploy/deploy.mjs 按环境调用：
+#   docker compose -p <项目名> -f deploy/compose.yml --env-file <环境文件> …
+# 项目名固定（开发测试 forcome-staging；生产 forcome-production 随 28 号待办），容器、卷、网络都以它为前缀，
+# 两套环境互不影响。变量见 deploy/.env.example；RELEASE（镜像版本，即 git 提交号）与 PLAYWRIGHT_VERSION
+# 由部署脚本给出，手工执行 compose 命令时用 node deploy/deploy.mjs <环境> compose … 代为填好。
+
+x-app: &app
+  image: forcome-server:${RELEASE:?由部署脚本给出}
+  # 自建镜像都由部署脚本先构建（docker compose build），任何时候都不去镜像仓库拉同名镜像
+  pull_policy: never
+  environment:
+    APP_ENV: ${APP_ENV:?}
+    DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+    DEV_LOGIN_ENABLED: ${DEV_LOGIN_ENABLED:-false}
+    # 发信白名单（不设时非生产环境只向白名单发信，白名单为空即一封也不发）
+    MAIL_SEND_ALLOWLIST_ONLY: ${MAIL_SEND_ALLOWLIST_ONLY:-}
+    MAIL_SEND_ALLOWLIST: ${MAIL_SEND_ALLOWLIST:-}
+    # 出站代理（ADR 0003）：境外经固定代理，境内与内部服务按 NO_PROXY 直连。大小写两种都显式给出：
+    # undici 优先读小写，而 Docker 客户端配置了代理时会往容器里注入小写变量，不写就会盖过环境文件
+    HTTPS_PROXY: ${HTTPS_PROXY:-}
+    https_proxy: ${HTTPS_PROXY:-}
+    HTTP_PROXY: ${HTTP_PROXY:-}
+    http_proxy: ${HTTP_PROXY:-}
+    NO_PROXY: ${NO_PROXY:-}
+    no_proxy: ${NO_PROXY:-}
+    TZ: UTC
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    build:
+      context: ..
+      dockerfile: deploy/postgres/Dockerfile
+    # 不随版本变：镜像没变时数据库容器不重建
+    image: forcome-postgres:18
+    pull_policy: never
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      TZ: UTC
+    # 只在本机回环地址上开放，供运维用 psql 排查
+    ports:
+      - '127.0.0.1:${PG_PORT:?}:5432'
+    # PostgreSQL 18 镜像的数据目录在 /var/lib/postgresql/18/docker，卷挂到上一级
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  # 一次性：只向前执行迁移并安装 pg-boss 的表，先于 api 与 worker（部署脚本先单独运行它）
+  migrate:
+    <<: *app
+    # 后端镜像只在这里构建一次，seed、api、worker 共用
+    build:
+      context: ..
+      dockerfile: apps/server/Dockerfile
+    command: ['node', 'dist/migrate.mjs']
+    restart: 'no'
+
+  # 一次性，只用于非生产环境：灌示例数据夹具（各加载步骤幂等，重复部署不产生重复数据）
+  seed:
+    <<: *app
+    profiles: [seed]
+    command: ['node', 'dist/seed.mjs']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: 'no'
+
+  api:
+    <<: *app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    stop_grace_period: 15s
+    restart: unless-stopped
+
+  worker:
+    <<: *app
+    command: ['node', 'dist/worker.mjs']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # worker 停止时最多等 30 秒让正在处理的任务结束
+    stop_grace_period: 40s
+    restart: unless-stopped
+
+  caddy:
+    build:
+      context: ..
+      dockerfile: deploy/web/Dockerfile
+    image: forcome-web:${RELEASE:?由部署脚本给出}
+    pull_policy: never
+    environment:
+      SITE_HOST: ${SITE_HOST:?}
+      TLS_MODE: ${TLS_MODE:-internal}
+    ports:
+      - '${HTTPS_BIND:-127.0.0.1}:${HTTPS_PORT:?}:443'
+    volumes:
+      # 内部 CA 的根证书与私钥在这里：删掉这个卷，根证书就变了，员工要重新安装
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      default:
+        # 冒烟容器在 Compose 网络里按内网域名访问 caddy，模拟内网 DNS 的解析
+        aliases:
+          - ${SITE_HOST:?}
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 一次性：部署后对本环境跑 Playwright 冒烟（只信任本环境 caddy 的根证书）
+  smoke:
+    build:
+      context: ..
+      dockerfile: deploy/smoke/Dockerfile
+      args:
+        PLAYWRIGHT_VERSION: ${PLAYWRIGHT_VERSION:-}
+    image: forcome-smoke:${RELEASE:?由部署脚本给出}
+    pull_policy: never
+    profiles: [smoke]
+    environment:
+      E2E_BASE_URL: https://${SITE_HOST:?}
+      CI: 'true'
+    volumes:
+      - caddy_data:/caddy-data:ro
+    restart: 'no'
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

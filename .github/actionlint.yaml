@@ -1,0 +1,4 @@
+# actionlint 的配置（scripts/lint-workflows.mjs）：自托管运行器的自定义标签（ADR 0013 修订、docs/部署说明.md）
+self-hosted-runner:
+  labels:
+    - forcome-staging

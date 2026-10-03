@@ -3,6 +3,7 @@
 /packages/** text=auto eol=lf
 /.github/** text=auto eol=lf
 /scripts/** text=auto eol=lf
+/deploy/** text=auto eol=lf
 /*.json text eol=lf
 /*.js text eol=lf
 /*.ts text eol=lf

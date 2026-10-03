@@ -1,5 +1,7 @@
 import type { AdapterMode } from '@forcome/contracts';
-import { clientModeVariable, type AppConfig, type AppEnv } from '../core';
+import { getDemoFixture, type DemoFixture } from '@forcome/fixtures';
+import { clientModeVariable, type AppConfig, type AppEnv, type MailSendPolicy } from '../core';
+import { MailRecipientGuard } from './mail-recipient-guard';
 import { clientDefinitions } from './registry';
 
 /*
@@ -8,7 +10,9 @@ import { clientDefinitions } from './registry';
  * - 店铺级客户端（Gmail、订单）按店铺配置选择真实现或 Fake，全局客户端（钉钉、汇率）按环境变量
  *   CLIENT_MODE_<系统> 选择，不设时非生产用 Fake、生产用真实现；生产环境任何时候都不给 Fake；
  * - 一个进程一个 IntegrationClients，Fake 实例在其中共享：测试往 Fake 里放数据、注入故障，
- *   被测代码经同一个 IntegrationClients 取到的就是这个 Fake（apps/server/test/harness.ts）。
+ *   被测代码经同一个 IntegrationClients 取到的就是这个 Fake（apps/server/test/harness.ts）；
+ * - 非生产环境的进程（本机开发、开发测试环境、Playwright 的 api）启动时，Fake 从示例数据夹具回放数据；
+ *   api 与 worker 各有一份 Fake，靠同一份夹具保持一致。测试不自动回放，需要时自己调 replayFixtures。
  */
 
 export type ClientScope = 'store' | 'global';
@@ -16,6 +20,8 @@ export type ClientScope = 'store' | 'global';
 /** 真实现的构造参数；店铺级客户端带店铺 ID。凭据与出站 HTTP 客户端随各集成的待办加入 */
 export interface RealClientContext {
   readonly storeId?: string;
+  /** 发信白名单（ADR 0013 修订）：会发信的真实现在发出前对全部收件人调用 assertAllowed */
+  readonly mailRecipientGuard: MailRecipientGuard;
 }
 
 /** Fake 的最小约定：给出（某店铺视角的）客户端，能重置到初始状态 */
@@ -24,6 +30,8 @@ export interface FakeClient<C> {
   client(storeId?: string): C;
   /** 清空数据、故障与调用记录 */
   reset(): void;
+  /** 从示例数据夹具装入数据（ADR 0009 修订）；没有可回放的数据就不实现 */
+  replay?(fixture: DemoFixture): void;
 }
 
 export interface ClientDefinition<C, F extends FakeClient<C> = FakeClient<C>> {
@@ -65,6 +73,8 @@ export interface IntegrationClientsOptions {
   readonly clientModes?: Readonly<Record<string, AdapterMode>>;
   /** 登记的客户端；默认 registry.ts 的清单，测试可以换成自己的 */
   readonly definitions?: readonly AnyClientDefinition[];
+  /** 发信白名单（AppConfig.mailSend）；不传时按环境取默认：非生产只向白名单发信且白名单为空，生产不限制 */
+  readonly mailSend?: MailSendPolicy;
 }
 
 export class IntegrationClients {
@@ -72,9 +82,14 @@ export class IntegrationClients {
   readonly #definitions: ReadonlySet<AnyClientDefinition>;
   readonly #modes: Readonly<Record<string, AdapterMode>>;
   readonly #fakes = new Map<AnyClientDefinition, FakeClient<unknown>>();
+  /** 发信白名单守卫，经 RealClientContext 交给真实现 */
+  readonly mailRecipientGuard: MailRecipientGuard;
 
   constructor(options: IntegrationClientsOptions) {
     this.#production = options.appEnv === 'production';
+    this.mailRecipientGuard = new MailRecipientGuard(
+      options.mailSend ?? { allowlistOnly: !this.#production, allowlist: [] },
+    );
     this.#definitions = new Set(options.definitions ?? clientDefinitions);
     this.#modes = options.clientModes ?? {};
     for (const [system, mode] of Object.entries(this.#modes)) {
@@ -107,7 +122,10 @@ export class IntegrationClients {
       }
       return this.fake(definition).client(store.id);
     }
-    return definition.createReal({ storeId: store.id });
+    return definition.createReal({
+      storeId: store.id,
+      mailRecipientGuard: this.mailRecipientGuard,
+    });
   }
 
   /** 取全局客户端：按 CLIENT_MODE_<系统> 给真实现或 Fake */
@@ -117,7 +135,9 @@ export class IntegrationClients {
       throw new Error(`${definition.system} 是店铺级客户端，用 forStore() 按店铺取`);
     }
     const mode = this.#modes[definition.system] ?? (this.#production ? 'real' : 'fake');
-    return mode === 'fake' ? this.fake(definition).client() : definition.createReal({});
+    return mode === 'fake'
+      ? this.fake(definition).client()
+      : definition.createReal({ mailRecipientGuard: this.mailRecipientGuard });
   }
 
   /** 本进程里该客户端的 Fake 实例（测试与开发环境往里放数据、注入故障）；生产环境拒绝 */
@@ -135,6 +155,25 @@ export class IntegrationClients {
     return fake as F;
   }
 
+  /**
+   * 让登记的 Fake 从示例数据夹具装入数据（有 replay 方法的才装），返回回放了哪些外部系统；生产环境拒绝。
+   * 非生产环境的进程启动时由 createIntegrationClients 调用。
+   */
+  replayFixtures(fixture: DemoFixture): string[] {
+    if (this.#production) {
+      throw new FakeNotAllowedError('生产环境不允许使用 Fake，不能回放示例数据');
+    }
+    const replayed: string[] = [];
+    for (const definition of this.#definitions) {
+      const fake = this.fake(definition);
+      if (fake.replay) {
+        fake.replay(fixture);
+        replayed.push(definition.system);
+      }
+    }
+    return replayed;
+  }
+
   /** 把已创建的 Fake 全部重置到初始状态 */
   resetFakes(): void {
     for (const fake of this.#fakes.values()) {
@@ -149,9 +188,22 @@ export class IntegrationClients {
   }
 }
 
-/** 按运行配置组装本进程的外部客户端（api、worker 入口用） */
+/**
+ * 按运行配置组装本进程的外部客户端（api、worker 入口用）。非生产环境同时让 Fake 从示例数据夹具回放；
+ * 生产环境不回放，也不解析夹具。options 只给测试用：换登记清单与夹具。
+ */
 export function createIntegrationClients(
-  config: Pick<AppConfig, 'appEnv' | 'clientModes'>,
+  config: Pick<AppConfig, 'appEnv' | 'clientModes' | 'mailSend'>,
+  options: { definitions?: readonly AnyClientDefinition[]; fixture?: () => DemoFixture } = {},
 ): IntegrationClients {
-  return new IntegrationClients({ appEnv: config.appEnv, clientModes: config.clientModes });
+  const clients = new IntegrationClients({
+    appEnv: config.appEnv,
+    clientModes: config.clientModes,
+    mailSend: config.mailSend,
+    definitions: options.definitions,
+  });
+  if (config.appEnv !== 'production') {
+    clients.replayFixtures((options.fixture ?? getDemoFixture)());
+  }
+  return clients;
 }

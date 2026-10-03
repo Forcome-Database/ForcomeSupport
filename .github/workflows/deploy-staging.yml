@@ -1,0 +1,50 @@
+# 部署到开发测试环境（ADR 0013 修订）：main 上的 CI 通过后，由内网的开发测试运行器执行部署脚本
+# deploy/deploy.mjs（构建镜像 → 先跑 migrate → 灌示例数据 → 起服务 → 用根证书核对 HTTPS → Playwright 冒烟），
+# 结果写进作业摘要，冒烟报告作为产物上传。构建与测试只在云端运行器（ci.yml），这里只部署。
+# 仓库暂不上 GitHub（2026-10-04 用户口径）：本工作流照写并经 actionlint 校验，期间在本机运行 pnpm deploy:staging；
+# 上 GitHub 后的启用步骤（运行器用户、标签、环境文件）见 docs/部署说明.md。
+name: 部署到开发测试环境
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+# 一次只部署一个版本；正在部署的不取消，排队的只留最新一个
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: 部署并冒烟
+    # 只部署 main 上推送触发、并且通过了的 CI；PR 的 CI 不会触发部署
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    # 只调度到开发测试运行器（独立系统用户 + 自己的 rootless Docker，碰不到生产的 Compose 项目）
+    runs-on: [self-hosted, linux, forcome-staging]
+    environment: staging
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - name: 部署（构建镜像 → migrate → 示例数据 → 起服务 → HTTPS 核对 → Playwright 冒烟）
+        run: node deploy/deploy.mjs staging
+        env:
+          # 环境文件放在工作区以外（checkout 会清掉工作区里未跟踪的文件），权限 600
+          FORCOME_ENV_FILE: /etc/forcome/staging.env
+      - name: 上传部署与冒烟报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-report-${{ github.event.workflow_run.head_sha }}
+          path: deploy/.state/staging/
+          if-no-files-found: ignore
+          retention-days: 30

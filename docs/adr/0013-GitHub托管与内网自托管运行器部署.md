@@ -47,3 +47,16 @@ status: accepted
 - **本机端口**（本期本机可用 4510–4520）：开发库 4520；本机开发的 api 4516、前端开发服务器 4517；Playwright 用的 e2e api 4518、前端预览 4519；4510–4515 留给 03 号待办的开发测试与生产两套 Compose。本机开发的环境变量默认值在 `apps/server/dev.env`（`pnpm dev:api`、`dev:worker`、`db:migrate`、`db:seed` 读取，命令行里已设的变量优先），e2e 的在 `apps/server/e2e.env`；两者只含本机开发库的口令，不含任何外部凭据。
 - **示例数据**：镜像多一个只用于非生产环境的入口 `node dist/seed.mjs`（灌示例数据夹具，生产环境拒绝，ADR 0009 修订）。CI 的 static 作业加 `pnpm fixtures:verify`（运行器自带 python3），`pnpm ci:local` 同样执行。
 - **Playwright**：`pnpm test:e2e` 在本机运行（需要 `pnpm db:up`）。按本 ADR，端到端在合并后对开发测试环境运行，随 03 号待办接入，不放进 PR 的 CI。
+
+## 修订（2026-10-04，待办 03 落地；按用户 2026-10-04 口径）
+
+用户口径：服务器与 GitHub 暂未就绪，先在本机用 Docker 部署与测试；暂不上 GitHub，「合并到 main 触发部署」「在 Actions 上报告结果」「内网自托管运行器」本期改为本机部署脚本，上 GitHub 后启用；外部资质只有钉钉企业内部应用，开发测试环境默认全部 Fake。
+
+- **部署脚本**：`deploy/deploy.mjs`（`pnpm deploy:staging`）只依赖 Node、git 与 Docker，Windows 本机与 Linux 服务器通用。步骤：校验环境文件 → 构建镜像 → 起数据库 → 单独运行 `migrate`（失败即停，api 与 worker 仍是上一版本）→ 非生产环境运行 `seed`（加载步骤幂等，每次部署都跑）→ 起 api、worker、caddy 并核对三者运行的是本次构建的镜像 → 导出 caddy 根证书核对 HTTPS → Playwright 冒烟 → 报告。任一步失败，之后的步骤不执行、退出码 1，不回滚。报告写到终端、`deploy/.state/<环境>/report.md`，有 `GITHUB_STEP_SUMMARY` 时同时写入作业摘要。另有 `smoke`（只重跑核对与冒烟）、`cert`、`compose …`、`down` 子命令。
+- **上 GitHub 后**：`.github/workflows/deploy-staging.yml` 由 main 上 CI 成功的 `workflow_run` 触发（PR 的 CI 不触发），`runs-on: [self-hosted, linux, forcome-staging]`，调用同一个脚本，环境文件 `/etc/forcome/staging.env`（工作区以外，600），`deploy/.state/staging/` 作为产物上传。运行器隔离：独立系统用户 + 该用户自己的 rootless Docker，只看得到自己的 Compose 项目；生产运行器另设用户与标签（28 号待办）。actionlint 的配置 `.github/actionlint.yaml` 登记自定义标签，`pnpm lint:workflows` 校验全部工作流。CI 的 image 作业另跑 `deploy/verify.mjs`（Compose 文件插值、前端镜像构建、`caddy validate`），`pnpm ci:local` 同样执行。
+- **Compose**：`deploy/compose.yml` 两套环境共用，项目名由脚本按环境固定（开发测试 `forcome-staging`，生产 `forcome-production`）。镜像：`forcome-server`（由 migrate 服务构建一次，seed、api、worker 共用）、`forcome-web`（caddy + 前端静态文件）、`forcome-postgres:18`（自建，固定标签，镜像不变时数据库容器不重建；WAL-G 随 28 号待办）、`forcome-smoke`；版本标签是 git 提交号（工作区不干净时加 `-dirty`）。自建镜像一律 `pull_policy: never`，不会去镜像仓库拉同名镜像。
+- **环境文件**：变量只写在环境文件（默认 `deploy/.env.<环境>`，可用 `FORCOME_ENV_FILE` 指到别处；模板 `deploy/.env.example`）。本机第一次部署开发测试环境时由脚本生成并填随机口令；生产的由运维填写，缺了就报错。脚本调用 Compose 时把环境文件里有的变量从子进程环境去掉（Compose 让 shell 变量优先于 `--env-file`）。口令只用 URL 里不需要转义的字符（直接拼进连接串）。环境变量的空值在 `loadConfig` 里视同未设置（Compose 把留空的变量传成空字符串）。
+- **端口**（本期本机 4510–4520）：开发测试 4510（HTTPS，`HTTPS_BIND` 本机默认 127.0.0.1）与 4511（PostgreSQL，只开在 127.0.0.1）；4512–4513 预留给生产（28 号待办）；4514–4515 机动。
+- **冒烟**：在一次性容器里运行（底是与 `pnpm-lock.yaml` 中 `@playwright/test` 同版本的官方镜像，加装 certutil），只把本环境 caddy 的根证书加进容器内 Chromium 的证书库，经 Compose 网络按内网域名访问 caddy（模拟内网 DNS），不忽略证书错误、不改宿主机证书库；不装根证书时同样的用例以 `ERR_CERT_AUTHORITY_INVALID` 失败。报告用 `docker cp` 取出，不挂宿主机目录。e2e 用例的断言不依赖端口与协议，HTTPS 下另核对会话 Cookie 带 `Secure`。部署后跑 `apps/web/e2e` 全部用例：以后加入的端到端用例要能在长期运行、已灌示例数据的开发测试环境上重复执行。
+- **发信白名单**：`MAIL_SEND_ALLOWLIST_ONLY`（不设时非生产 `true`、生产 `false`）与 `MAIL_SEND_ALLOWLIST`（逗号分隔的完整地址或 `@域名`，`@域名` 不含子域名，空白名单即一封也不发）。`integration` 的 `MailRecipientGuard` 经 `RealClientContext.mailRecipientGuard` 交给真实现：会发信的真实现（第二期的 Gmail 发信）发出前必须对全部收件人调用 `assertAllowed`，有一个不在白名单就整封不发（`MailRecipientNotAllowedError`）。Fake 不真的发信，不检查。
+- **部署说明**：组成、命令、根证书安装、切换 DNS-01、放行域名与 `NO_PROXY` 清单、内网 DNS、迁移到 Linux 服务器与上 GitHub 后的启用步骤写在 `docs/部署说明.md`。

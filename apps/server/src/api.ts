@@ -12,7 +12,12 @@ const { runtime, stop } = await startRuntime(config.databaseUrl, { role: 'api', 
 const app = createApp({ runtime, logger, config, clients: createIntegrationClients(config) });
 const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   logger.info(
-    { port: info.port, appEnv: config.appEnv, devLogin: config.devLoginEnabled },
+    {
+      port: info.port,
+      appEnv: config.appEnv,
+      devLogin: config.devLoginEnabled,
+      mailSendAllowlistOnly: config.mailSend.allowlistOnly,
+    },
     'api 已启动',
   );
 });

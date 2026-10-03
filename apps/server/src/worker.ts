@@ -15,7 +15,14 @@ const handlers = createJobHandlers({
   clients: createIntegrationClients(config),
 });
 await startWorker(runtime, handlers, { logger });
-logger.info({ jobs: handlers.map((h) => h.job.name), appEnv: config.appEnv }, 'worker 已启动');
+logger.info(
+  {
+    jobs: handlers.map((h) => h.job.name),
+    appEnv: config.appEnv,
+    mailSendAllowlistOnly: config.mailSend.allowlistOnly,
+  },
+  'worker 已启动',
+);
 
 // 停止时等正在处理的任务结束（最多 30 秒），再关连接
 onShutdown(logger, () => stop({ timeoutMs: 30_000 }));

@@ -13,6 +13,7 @@ export {
   type RealClientContext,
   type StoreClientSelection,
 } from './clients';
+export { MailRecipientGuard, MailRecipientNotAllowedError } from './mail-recipient-guard';
 export {
   ConnectionLostError,
   CursorExpiredError,

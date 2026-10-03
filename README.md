@@ -10,8 +10,9 @@ AGENTS.md                            其他代理（Codex 等）的入口，指�
 CONTEXT.md                           项目级术语（业务术语以 PRD 1.4 为准）
 docs/agents/                         上述配置的细则，含原型对照（prototype.md）
 docs/技术方案.md                     技术方案总文档（v1.2；口径以 PRD 与各期规格为准）
+docs/部署说明.md                     部署与运维清单：开发测试环境、根证书、放行域名与 NO_PROXY、迁移到服务器
 docs/adr/                            技术决策记录 0001–0014（后续修订写在各篇末尾）
-apps/、packages/                     生产系统代码（pnpm 工作区，见「开发」）；.github/ 为 CI，scripts/ 为仓库级检查脚本
+apps/、packages/                     生产系统代码（pnpm 工作区，见「开发」）；.github/ 为 CI，scripts/ 为仓库级检查脚本，deploy/ 为部署
 .scratch/                            本地问题跟踪：各期规格与待办（phase1-reporting、phase2-aftersales、phase3-ai-reply），技术方案阶段的过程记录（tech-plan，历史）
 design/
 ├── *.dc.html                        画板（生成物，不要手改；5 张流程图例外，见下）
@@ -104,14 +105,21 @@ packages/calendar        日界与工作日历纯函数
 packages/fixtures        示例数据夹具：data/demo.json 由 data.py 生成（不手改），加载时按模式校验
 packages/config          共享的 tsconfig 与 ESLint 配置（含模块边界规则 eslint-boundaries.js）
 scripts/                 仓库级脚本：迁移一致性、工作流语法、示例数据夹具（fixtures/ 下是生成脚本）
-.github/workflows/ci.yml CI
+deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
+├── compose.yml          开发测试与生产共用的 Compose（caddy、api、worker、migrate、seed、postgres、smoke）
+├── .env.example         环境变量模板（本机的 deploy/.env.staging 由部署脚本生成，不进 git）
+├── deploy.mjs           部署脚本；lib/ 为它的纯逻辑与测试，verify.mjs 为 CI 用的配置检查
+├── web/                 前端镜像：caddy（Caddyfile）+ 前端静态文件
+├── postgres/            自建 PostgreSQL 镜像
+└── smoke/               部署后冒烟的 Playwright 镜像
+.github/workflows/       CI（ci.yml）；部署到开发测试环境（deploy-staging.yml，上 GitHub 后启用）
 ```
 
 共享包以 TypeScript 源码被引用（`exports` 指向 `src/index.ts`），由前端的 Vite 与后端的 tsdown 打进各自的产物，它们的 `build` 只做类型检查。
 
 **环境**：Node 24（`.node-version`）；pnpm 10，先 `corepack enable`，版本按 `package.json` 的 `packageManager` 自动取用；Docker（含 compose）；Python 3（只在重新生成示例数据夹具时需要）。不需要任何外部账号，外部服务一律用 Fake。
 
-**本机端口**（本期本机可用 4510–4520，ADR 0013 修订）：开发库 4520 · api 4516 · 前端开发服务器 4517 · Playwright 用的 e2e api 4518 与前端预览 4519；4510–4515 留给开发测试与生产两套 Compose。
+**本机端口**（本期本机可用 4510–4520，ADR 0013 修订）：开发库 4520 · api 4516 · 前端开发服务器 4517 · Playwright 用的 e2e api 4518 与前端预览 4519；开发测试环境 4510（HTTPS）与 4511（PostgreSQL）；4512–4513 预留给生产（28 号待办），4514–4515 机动。
 
 | 命令 | 作用 |
 |---|---|
@@ -128,14 +136,19 @@ scripts/                 仓库级脚本：迁移一致性、工作流语法、�
 | `pnpm test:unit` · `pnpm test:integration` | 单元测试 · 集成测试（需要 `pnpm db:up`；CI 经 `TEST_DATABASE_URL` 指向服务容器） |
 | `pnpm test:e2e` | Playwright 端到端（需要 `pnpm db:up`；自己起 4518、4519 两个服务，用 e2e 专用库 `forcome_e2e`） |
 | `pnpm ci:local` | 本机跑一遍与 CI 相同的检查（先 `pnpm db:up`，并且需要 Docker 构建镜像） |
+| `pnpm deploy:staging` | 部署到开发测试环境（本机 Docker）：构建镜像 → migrate → 示例数据 → 起服务 → 用根证书核对 HTTPS → Playwright 冒烟，报告在 `deploy/.state/staging/`（`docs/部署说明.md`） |
+| `pnpm staging smoke` · `cert` · `compose …` · `down` | 对开发测试环境：只重跑冒烟 · 导出根证书 · 执行 docker compose · 停止（保留数据） |
+| `pnpm deploy:verify` | 部署配置检查：Compose 文件、前端镜像、Caddyfile（CI 与 `ci:local` 执行） |
 
 **测试**：`*.test.ts` 是单元测试；`*.int.test.ts` 是集成测试，用真实 PostgreSQL 18——每次运行先建模板库并迁移，各测试文件再复制出自己的库，互不干扰。集成测试只经主接缝（规格「测试接缝」）：用 `apps/server/test/harness.ts` 的 `startTestHarness()` 在测试进程内调用 HTTP 接口，`t.loginAs('坐席')` 以某个角色登录，`t.clients.fake(…)` 往 Fake 里放数据、注入故障，`t.clock` 推进时钟，`t.runJobs()` 把后台任务跑到空闲，`t.auditRecords()` 核对审计；样板见 `apps/server/test/dev-login.int.test.ts`。外部客户端的「接口 + 真实现 + Fake」写法见 `apps/server/src/modules/integration/fake-framework.test.ts`。
 
 **开发登录**：只在非生产环境、`DEV_LOGIN_ENABLED=true` 时开启（`dev.env` 已开启），从示例数据的成员里选一位直接登录，换出与钉钉扫码登录相同的会话；生产环境配置了就拒绝启动（ADR 0010 修订）。
 
-**CI 与合并**：`.github/workflows/ci.yml` 在 PR 与 main 上跑类型检查、lint、迁移一致性、示例数据夹具一致性、构建、单元与集成测试、镜像构建，最后由「CI 通过」汇总。仓库推到 GitHub 后，在 Settings → Branches 为 `main` 加保护规则：Require a pull request before merging（至少 1 个批准）、Require status checks to pass（必需检查选「CI 通过」）。仓库暂不上 GitHub，期间用 `pnpm ci:local` 代替。Playwright 端到端按 ADR 0013 在合并后对开发测试环境运行（03 号待办），本机用 `pnpm test:e2e`。
+**CI 与合并**：`.github/workflows/ci.yml` 在 PR 与 main 上跑类型检查、lint、迁移一致性、示例数据夹具一致性、构建、单元与集成测试、镜像构建与部署配置检查，最后由「CI 通过」汇总。仓库推到 GitHub 后，在 Settings → Branches 为 `main` 加保护规则：Require a pull request before merging（至少 1 个批准）、Require status checks to pass（必需检查选「CI 通过」）。仓库暂不上 GitHub，期间用 `pnpm ci:local` 代替。
 
-**镜像**：`docker build -f apps/server/Dockerfile -t forcome-server .`（构建上下文是仓库根目录）；默认运行 api，`node dist/worker.mjs`、`node dist/migrate.mjs` 运行另两个入口，`node dist/seed.mjs` 在非生产环境灌示例数据。
+**部署**：main 上 CI 通过后，`.github/workflows/deploy-staging.yml` 在内网的开发测试运行器上执行 `deploy/deploy.mjs`，部署后对开发测试环境跑 Playwright（`apps/web/e2e` 全部用例）并在作业摘要里报告。仓库暂不上 GitHub，期间在本机用 `pnpm deploy:staging` 部署与冒烟；启用步骤、根证书安装与运维清单见 `docs/部署说明.md`。本机开发时的端到端用 `pnpm test:e2e`。
+
+**镜像**：`docker build -f apps/server/Dockerfile -t forcome-server .`（构建上下文是仓库根目录）；默认运行 api，`node dist/worker.mjs`、`node dist/migrate.mjs` 运行另两个入口，`node dist/seed.mjs` 在非生产环境灌示例数据。前端镜像（caddy + 静态文件）、自建 PostgreSQL 与冒烟镜像在 `deploy/`，由部署脚本构建。
 
 ## 约定
 

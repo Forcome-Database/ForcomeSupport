@@ -1,6 +1,8 @@
+import { getDemoFixture, type DemoFixture } from '@forcome/fixtures';
 import { describe, expect, it } from 'vitest';
 import {
   ConnectionLostError,
+  createIntegrationClients,
   CursorExpiredError,
   defineClient,
   ExternalCallFailedError,
@@ -256,5 +258,65 @@ describe('故障注入：失败、超时、游标过期、断线恢复', () => {
       items: [],
       cursor: '0',
     });
+  });
+});
+
+describe('Fake 从示例数据夹具回放（ADR 0009 修订）', () => {
+  /** 示范：通讯录类的 Fake 按夹具里的成员装入数据（钉钉的 Fake 在 05 号待办照此实现） */
+  class FakeDirectory implements FakeClient<ExampleDirectoryClient> {
+    names: string[] = [];
+    client(): ExampleDirectoryClient {
+      return { whoami: () => Promise.resolve(this.names.join('、')) };
+    }
+    reset(): void {
+      this.names = [];
+    }
+    replay(fixture: DemoFixture): void {
+      this.names = fixture.members.map((m) => m.name);
+    }
+  }
+  const replayableDirectory = defineClient({
+    system: 'replayable_directory',
+    scope: 'global',
+    createReal: (): ExampleDirectoryClient => ({ whoami: () => Promise.resolve('real') }),
+    createFake: () => new FakeDirectory(),
+  });
+  const withReplay = [exampleFeed, replayableDirectory];
+  const demo = getDemoFixture();
+
+  it('有回放方法的 Fake 装入夹具数据，没有的跳过；返回回放了哪些系统', async () => {
+    const clients = new IntegrationClients({ appEnv: 'staging', definitions: withReplay });
+    expect(clients.replayFixtures(demo)).toEqual(['replayable_directory']);
+    await expect(clients.global(replayableDirectory).whoami()).resolves.toContain('王磊');
+  });
+
+  it('生产环境拒绝回放', () => {
+    const clients = new IntegrationClients({ appEnv: 'production', definitions: withReplay });
+    expect(() => clients.replayFixtures(demo)).toThrow(FakeNotAllowedError);
+  });
+
+  it('非生产环境的进程（开发、开发测试环境、Playwright 的 api）组装客户端时自动回放', async () => {
+    for (const appEnv of ['development', 'staging', 'test'] as const) {
+      const clients = createIntegrationClients(
+        { appEnv, clientModes: {}, mailSend: { allowlistOnly: true, allowlist: [] } },
+        { definitions: withReplay, fixture: () => demo },
+      );
+      await expect(clients.global(replayableDirectory).whoami()).resolves.toContain('王磊');
+    }
+  });
+
+  it('生产环境组装客户端时不回放，也不解析夹具', () => {
+    let parsed = false;
+    createIntegrationClients(
+      { appEnv: 'production', clientModes: {}, mailSend: { allowlistOnly: false, allowlist: [] } },
+      {
+        definitions: withReplay,
+        fixture: () => {
+          parsed = true;
+          return demo;
+        },
+      },
+    );
+    expect(parsed).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 # 质量门槛（ADR 0013）：每个 PR 与 main 的推送都在云端运行器上跑类型检查、lint（含模块边界）、
-# 单元测试、集成测试（真实 PostgreSQL 18 服务容器 + Fake），并确认后端镜像可构建。
+# 单元测试、集成测试（真实 PostgreSQL 18 服务容器 + Fake），并确认后端镜像可构建、部署配置有效。
 # 分支保护把「CI 通过」设为必需检查：任一作业失败，它就失败，PR 不能合并（设置方法见 README「开发」）。
+# main 上 CI 通过后，deploy-staging.yml 在内网运行器上部署到开发测试环境（仓库上 GitHub 后启用）。
 name: CI
 
 on:
@@ -81,12 +82,17 @@ jobs:
       - run: pnpm test:integration
 
   image:
-    name: 后端镜像可构建
+    name: 镜像与部署配置
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: 构建镜像（不推送；部署由运行器另行构建，ADR 0013）
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - name: 构建后端镜像（不推送；部署由运行器另行构建，ADR 0013）
         run: docker build -f apps/server/Dockerfile -t forcome-server:ci .
+      - name: 部署配置：Compose 文件、前端镜像与 Caddyfile（deploy/verify.mjs）
+        run: node deploy/verify.mjs
 
   ci-ok:
     name: CI 通过

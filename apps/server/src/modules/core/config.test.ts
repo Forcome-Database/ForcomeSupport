@@ -12,6 +12,7 @@ describe('配置读取', () => {
       logLevel: 'info',
       devLoginEnabled: false,
       clientModes: {},
+      mailSend: { allowlistOnly: true, allowlist: [] },
     });
   });
 
@@ -42,6 +43,99 @@ describe('配置读取', () => {
 
   it('缺少数据库地址时报错', () => {
     expect(() => loadConfig({})).toThrow(/DATABASE_URL/);
+  });
+
+  it('空值视同未设置：Compose 把 .env 里没填的变量传成空字符串，取默认值而不是报错', () => {
+    const config = loadConfig({
+      DATABASE_URL,
+      APP_ENV: '',
+      LOG_LEVEL: '',
+      DEV_LOGIN_ENABLED: '',
+      CLIENT_MODE_DINGTALK: '',
+    });
+    expect(config).toMatchObject({
+      appEnv: 'development',
+      logLevel: 'info',
+      devLoginEnabled: false,
+      clientModes: {},
+    });
+    expect(() => loadConfig({ DATABASE_URL: '' })).toThrow(/DATABASE_URL：必填/);
+  });
+});
+
+describe('出站代理（ADR 0003：境外经固定代理，境内与内部服务经 NO_PROXY 直连）', () => {
+  it('代理地址是 http(s):// 开头的 URL 时正常启动，NO_PROXY 不限格式', () => {
+    expect(() =>
+      loadConfig({
+        DATABASE_URL,
+        HTTPS_PROXY: 'http://proxy.corp.internal:3128',
+        http_proxy: 'http://user:secret@proxy.corp.internal:3128',
+        NO_PROXY: 'localhost,127.0.0.1,postgres,dingtalk.com',
+      }),
+    ).not.toThrow();
+  });
+
+  it('代理地址写错时拒绝启动，大小写两种写法都检查，且不回显取值（可能含口令）', () => {
+    let error: unknown;
+    try {
+      loadConfig({
+        DATABASE_URL,
+        HTTPS_PROXY: 'proxy.corp.internal:3128',
+        http_proxy: 'socks5://user:top-secret@proxy:1080',
+      });
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ConfigError);
+    const message = (error as Error).message;
+    expect(message).toContain('HTTPS_PROXY：必须是 http:// 或 https:// 开头的代理地址');
+    expect(message).toContain('http_proxy：必须是 http:// 或 https:// 开头的代理地址');
+    expect(message).not.toContain('top-secret');
+  });
+});
+
+describe('发信白名单开关（ADR 0013：开发测试环境默认禁止向白名单外地址发信）', () => {
+  it('非生产环境默认只向白名单发信、白名单为空（即一封也不发）；生产环境默认不限制', () => {
+    for (const appEnv of ['staging', 'development', 'test']) {
+      expect(loadConfig({ DATABASE_URL, APP_ENV: appEnv }).mailSend).toEqual({
+        allowlistOnly: true,
+        allowlist: [],
+      });
+    }
+    expect(loadConfig({ DATABASE_URL, APP_ENV: 'production' }).mailSend).toEqual({
+      allowlistOnly: false,
+      allowlist: [],
+    });
+  });
+
+  it('白名单写完整地址或 @域名，逗号分隔，去空格、转小写', () => {
+    expect(
+      loadConfig({
+        DATABASE_URL,
+        APP_ENV: 'staging',
+        MAIL_SEND_ALLOWLIST: ' QA.Mailbox@Forcome.com , @forcome-test.com,',
+      }).mailSend.allowlist,
+    ).toEqual(['qa.mailbox@forcome.com', '@forcome-test.com']);
+  });
+
+  it('开关可以显式关闭或打开', () => {
+    expect(
+      loadConfig({ DATABASE_URL, APP_ENV: 'staging', MAIL_SEND_ALLOWLIST_ONLY: 'false' }).mailSend
+        .allowlistOnly,
+    ).toBe(false);
+    expect(
+      loadConfig({ DATABASE_URL, APP_ENV: 'production', MAIL_SEND_ALLOWLIST_ONLY: 'true' }).mailSend
+        .allowlistOnly,
+    ).toBe(true);
+  });
+
+  it('白名单条目格式不对、开关不是 true / false 时拒绝启动', () => {
+    expect(() =>
+      loadConfig({ DATABASE_URL, MAIL_SEND_ALLOWLIST: 'forcome.com,qa@forcome.com' }),
+    ).toThrow(/MAIL_SEND_ALLOWLIST：「forcome.com」不是完整地址或 @域名/);
+    expect(() => loadConfig({ DATABASE_URL, MAIL_SEND_ALLOWLIST_ONLY: 'yes' })).toThrow(
+      /MAIL_SEND_ALLOWLIST_ONLY/,
+    );
   });
 });
 

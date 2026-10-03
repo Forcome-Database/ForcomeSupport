@@ -198,8 +198,8 @@ P04、P05 第一期版本的列、筛选、排序、取值与隐藏项见 PRD P0
 - 模块化单体（ADR 0005）：pnpm workspace，前端一个应用、后端一个应用（`api`、`worker`、`migrate` 三个入口）、共享包 `contracts`（zod 模式、状态枚举中英对照、能力矩阵）、`calendar`（工作日历纯函数）、`config`。模块只经各自入口导出的服务互调，不跨模块读写表；唯一例外是 `report` 用只读数据库角色直读各模块的表。边界在 CI 用 lint 强制。
 - 跨模块联动在业务事务内发领域事件（插入 pg-boss 任务，任务表即发件箱，ADR 0008），由 worker 处理。第一期的关键事件：`channel`「来信已接收」→ `ticket` 归并；`channel`「我方发信已同步」→ `ticket` 回复识别；`org`「成员已停用」→ `aftersales` 改派队列。
 - 后端 Node 24 + Hono（`@hono/zod-openapi`，接口直接用 `contracts` 的 zod 模式声明）+ Drizzle + PostgreSQL 18，一个模块一个 schema（ADR 0006）。前端 Vite + React 19 单页应用，TanStack Router（筛选条件经 zod 校验放在 URL）/ Query / Table，react-hook-form，shadcn/ui + Tailwind v4，shadcn Charts（ADR 0007）。界面只做中文、只做浅色，两档密度。
-- 部署：Docker Compose（`caddy`、`api`、`worker`、`migrate`、自建 `postgres` 镜像内置 WAL-G），无 Redis、无对象存储。所有外部调用主动连出：境外经固定代理，境内（钉钉）经 `NO_PROXY` 直连（ADR 0003）。**第一期就需要内网 HTTPS**（内网子域名 + DNS-01 证书），会话 Cookie 为 `Secure`。
-- 部署流水线：GitHub + Actions 云端跑类型检查、lint（含边界）、单元测试、集成测试（真实 PG 18 + Fake），至少 1 名人工评审；内网自托管运行器按两类任务部署（开发测试 / 生产，生产需打标签 + 人工批准）（ADR 0013）。
+- 部署：Docker Compose（`caddy`、`api`、`worker`、`migrate`、自建 `postgres` 镜像内置 WAL-G），无 Redis、无对象存储。所有外部调用主动连出：境外经固定代理，境内（钉钉）经 `NO_PROXY` 直连（ADR 0003）。**第一期就需要内网 HTTPS**（内网子域名 + DNS-01 证书），会话 Cookie 为 `Secure`。服务器与公司域名到位前（2026-10-04 用户口径），先在本机用 Docker 部署开发测试环境，caddy 用内部 CA（`tls internal`）签发证书、员工浏览器安装导出的根证书，到位后切 DNS-01（ADR 0003 修订、`docs/部署说明.md`）。
+- 部署流水线：GitHub + Actions 云端跑类型检查、lint（含边界）、单元测试、集成测试（真实 PG 18 + Fake），至少 1 名人工评审；内网自托管运行器按两类任务部署（开发测试 / 生产，生产需打标签 + 人工批准）（ADR 0013）。仓库暂不上 GitHub（2026-10-04 用户口径）：开发测试环境由本机部署脚本 `pnpm deploy:staging` 部署（构建镜像 → 先跑 `migrate` → 灌示例数据 → 起 `forcome-staging` Compose 项目 → 用根证书核对 HTTPS → Playwright 冒烟并输出报告）；部署工作流 `deploy-staging.yml` 照写，上 GitHub 后由 main 上 CI 通过触发、在开发测试运行器上调用同一脚本（ADR 0013 修订）。
 
 ### 数据约定
 
@@ -341,7 +341,7 @@ P04、P05 第一期版本的列、筛选、排序、取值与隐藏项见 PRD P0
 
 1. **主接缝（唯一的集成接缝）**：后端 HTTP 接口，在测试进程内直接调用 Hono 应用 + 真实 PostgreSQL 18 + 全部外部客户端用 Fake + 可注入时钟 + 测试里同步把 worker 任务跑到空闲。典型写法：往 Fake Gmail / Fake 订单源里放数据 → 推进时钟 → 跑完任务 → 以某个角色身份调接口，断言工单、SLA、台账、报表视图与审计。绝大多数行为（归并、生命周期、回复识别、SLA、店铺范围、财务字段过滤、完整率、售后成本一致性、汇率回退、历史回放、成员停用）都在这一层验证。
 2. **辅助接缝一：纯函数单元测试**（`contracts`、`calendar` 与各模块的纯函数）：工单迁移表全部迁移与非法迁移、工作日历、订单号抽取、来源规则匹配、站点判定、必填矩阵与「适用字段是否齐全」、承担金额计算、汇率交叉计算。ADR 0008 要求迁移表单元测试全覆盖。
-3. **辅助接缝二：Playwright 端到端**：在开发测试环境（全部 Fake + 开发登录 + 示例数据夹具）上跑第一期 AC 子集，合并后自动运行。
+3. **辅助接缝二：Playwright 端到端**：在开发测试环境（全部 Fake + 开发登录 + 示例数据夹具）上跑第一期 AC 子集，合并后自动运行（暂不上 GitHub 期间由部署脚本在每次部署后运行；开发测试环境长期运行、数据会累积，用例要能重复执行）。
 
 不为模块内部服务单独设接缝；不做像素级截图比对，视觉对照原型人工验收。
 
@@ -366,8 +366,9 @@ P04、P05 第一期版本的列、筛选、排序、取值与隐藏项见 PRD P0
 - 主接缝的测试工具 `apps/server/test/harness.ts`（`startTestHarness()`：进程内 API 客户端、`loginAs` 按角色登录、`clients.fake` 注入 Fake 与 `resetFakes`、`clock` 推进时钟、`runJobs` 同步跑完任务、`auditRecords` 核对审计），示范用例 `apps/server/test/dev-login.int.test.ts`；
 - Fake 框架与示范 Fake `apps/server/src/modules/integration/fake-framework.test.ts`（按店铺选择、故障注入）；
 - 示例数据夹具 `@forcome/fixtures`（`pnpm fixtures:generate` 从 data.py 生成）与加载器（各模块在 `apps/server/src/fixture-steps.ts` 登记加载步骤）；
-- Playwright `apps/web/e2e/dev-login.spec.ts`（开发登录 → 首页顶栏）。
-做法与取舍见 ADR 0005–0010、0013 的「待办 02 落地」修订。
+- Playwright `apps/web/e2e/dev-login.spec.ts`（开发登录 → 首页顶栏）；
+- 部署（待办 03）：`deploy/`（Compose、镜像、部署脚本 `deploy.mjs`）与 `docs/部署说明.md`；开发测试环境的外部客户端默认 Fake，进程启动时 Fake 从示例数据夹具回放（`FakeClient.replay`）；发信的真实现发出前经 `MailRecipientGuard` 检查发信白名单。
+做法与取舍见 ADR 0005–0010、0013 的「待办 02 落地」修订，以及 ADR 0003、0009、0013 的「待办 03 落地」修订。
 
 ## Out of Scope
 

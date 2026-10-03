@@ -9,6 +9,10 @@ import { z } from 'zod';
  * - `CLIENT_MODE_<系统>`：全局外部客户端（钉钉、汇率）用真实接口还是 Fake（ADR 0009 修订），
  *   如 `CLIENT_MODE_DINGTALK=real`；不设时非生产用 fake、生产用 real，生产环境不允许 fake。
  *   店铺级客户端（Gmail、订单）按店铺配置选择，不在这里。
+ * - `MAIL_SEND_ALLOWLIST_ONLY` / `MAIL_SEND_ALLOWLIST`：只向白名单发信（ADR 0013 修订）。不设时非生产环境
+ *   打开、生产环境关闭；白名单为逗号分隔的完整地址或 `@域名`，空白名单表示一封也不发。
+ * - `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`：出站代理（ADR 0003），只校验格式。
+ * 空值视同未设置。
  */
 const envSchema = z.object({
   APP_ENV: z.enum(['production', 'staging', 'development', 'test']).default('development'),
@@ -21,12 +25,32 @@ const envSchema = z.object({
     .enum(['true', 'false'], { error: '只能是 true 或 false' })
     .default('false')
     .transform((v) => v === 'true'),
+  MAIL_SEND_ALLOWLIST_ONLY: z
+    .enum(['true', 'false'], { error: '只能是 true 或 false' })
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
+  MAIL_SEND_ALLOWLIST: z.string().default(''),
 });
 
 export type AppEnv = z.infer<typeof envSchema>['APP_ENV'];
 
 const CLIENT_MODE_PREFIX = 'CLIENT_MODE_';
 const SYSTEM_NAME = /^[A-Z][A-Z0-9_]*$/;
+
+/** 出站代理变量（ADR 0003）；undici 与多数工具大小写两种写法都认 */
+const PROXY_VARIABLES = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy'] as const;
+
+/** 发信白名单的一条：完整地址（qa@forcome.com）或整个域名（@forcome.com） */
+const ALLOWLIST_ENTRY = /^[^\s@,]*@[^\s@,]+\.[^\s@,]+$/;
+
+function isProxyUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname !== '';
+  } catch {
+    return false;
+  }
+}
 
 /** 某个外部系统（小写 snake_case，如 dingtalk）对应的环境变量名，如 CLIENT_MODE_DINGTALK */
 export function clientModeVariable(system: string): string {
@@ -42,13 +66,25 @@ export interface AppConfig {
   devLoginEnabled: boolean;
   /** 显式配置了的全局外部客户端模式，键为小写 snake_case 的系统名（如 dingtalk、exchange_rate） */
   clientModes: Readonly<Record<string, AdapterMode>>;
+  /** 发信白名单开关：打开时只能向白名单里的地址发信（integration 的 MailRecipientGuard 执行） */
+  mailSend: MailSendPolicy;
+}
+
+export interface MailSendPolicy {
+  readonly allowlistOnly: boolean;
+  /** 小写的完整地址或 `@域名` */
+  readonly allowlist: readonly string[];
 }
 
 export class ConfigError extends Error {
   override name = 'ConfigError';
 }
 
-export function loadConfig(env: Record<string, string | undefined> = process.env): AppConfig {
+export function loadConfig(rawEnv: Record<string, string | undefined> = process.env): AppConfig {
+  // 空值视同未设置：Compose 会把 .env 里留空的变量原样传成空字符串（待办 03）
+  const env = Object.fromEntries(
+    Object.entries(rawEnv).filter(([, value]) => value !== undefined && value !== ''),
+  );
   // 只列变量名与原因，不回显取值（可能含口令）
   const problems: string[] = [];
   const result = envSchema.safeParse(env);
@@ -75,6 +111,24 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     }
   }
 
+  // 出站代理由 HTTP 客户端工厂（undici EnvHttpProxyAgent，随第一个真实现加入）直接读环境变量，这里只把关格式
+  for (const variable of PROXY_VARIABLES) {
+    const value = env[variable];
+    if (value !== undefined && !isProxyUrl(value)) {
+      problems.push(`${variable}：必须是 http:// 或 https:// 开头的代理地址`);
+    }
+  }
+
+  const allowlist = (result.data?.MAIL_SEND_ALLOWLIST ?? '')
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry !== '');
+  for (const entry of allowlist) {
+    if (!ALLOWLIST_ENTRY.test(entry)) {
+      problems.push(`MAIL_SEND_ALLOWLIST：「${entry}」不是完整地址或 @域名`);
+    }
+  }
+
   if (result.success && result.data.APP_ENV === 'production' && result.data.DEV_LOGIN_ENABLED) {
     problems.push('DEV_LOGIN_ENABLED：生产环境不能开启开发登录');
   }
@@ -82,7 +136,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   if (!result.success || problems.length > 0) {
     throw new ConfigError(`环境变量配置有误：\n${problems.join('\n')}`);
   }
-  const { APP_ENV, DATABASE_URL, PORT, LOG_LEVEL, DEV_LOGIN_ENABLED } = result.data;
+  const { APP_ENV, DATABASE_URL, PORT, LOG_LEVEL, DEV_LOGIN_ENABLED, MAIL_SEND_ALLOWLIST_ONLY } =
+    result.data;
   return {
     appEnv: APP_ENV,
     databaseUrl: DATABASE_URL,
@@ -90,5 +145,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     logLevel: LOG_LEVEL,
     devLoginEnabled: DEV_LOGIN_ENABLED,
     clientModes,
+    mailSend: {
+      allowlistOnly: MAIL_SEND_ALLOWLIST_ONLY ?? APP_ENV !== 'production',
+      allowlist,
+    },
   };
 }
