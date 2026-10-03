@@ -31,6 +31,20 @@ export class ApiRequestError extends Error {
   }
 }
 
+/** 连不上服务器（断网、服务未启动）：fetch 本身失败，没有拿到响应 */
+export class NetworkError extends ApiRequestError {
+  override name = 'NetworkError';
+
+  constructor() {
+    super(0, 'network', '网络不可用');
+  }
+}
+
+/** 失败的原因，接在「保存失败：」之类的标题后面：接口错误取后端的中文说明，连不上写「网络不可用」 */
+export function failureReason(error: unknown): string {
+  return error instanceof ApiRequestError ? error.message : '请稍后再试';
+}
+
 /** 登录被拒（G12）：reason 决定显示哪一种被拒画面 */
 export class LoginDeniedError extends ApiRequestError {
   override name = 'LoginDeniedError';
@@ -46,6 +60,8 @@ async function send(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(path, {
     ...init,
     headers: { accept: 'application/json', ...init?.headers },
+  }).catch(() => {
+    throw new NetworkError();
   });
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);

@@ -143,35 +143,56 @@ test('只有生产厂对接人角色的成员登录被拒，显示无法进入�
   await expect(page).toHaveURL(/\/dev-login$/);
 });
 
+/** 让偏好保存接口按顺序给出的结果：'500' 失败、'401' 会话已结束、'ok' 放行；'slow500' 等 release() 后才失败 */
+async function scriptPreferences(page: Page, script: ('500' | '401' | 'ok' | 'slow500')[]) {
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/me/preferences', async (route) => {
+    const next = script.shift() ?? 'ok';
+    if (next === 'ok') return route.continue();
+    if (next === 'slow500') await gate;
+    const status = next === '401' ? 401 : 500;
+    const body =
+      status === 401
+        ? { error: 'session_expired', message: '7 天未操作，已退出登录' }
+        : { error: 'internal', message: '服务器内部错误' };
+    return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+  return { release };
+}
+
+const toasts = (page: Page) => page.locator('[data-sonner-toast]');
+
 test('密度保存失败：弹出不自动消失的失败浮层，点「立即重试」成功后浮层消失、密度保持（G5）', async ({
   page,
 }) => {
   await loginAs(page, '周敏');
   await chooseDensity(page, '舒适');
   await expect.poll(() => density(page)).toBe('comfortable');
+  const { release } = await scriptPreferences(page, ['500', '500', 'slow500', 'ok']);
 
-  let fail = true;
-  await page.route('**/api/me/preferences', (route) =>
-    fail
-      ? route.fulfill({
-          status: 500,
-          contentType: 'application/json',
-          body: JSON.stringify({ error: 'internal', message: '服务器内部错误' }),
-        })
-      : route.continue(),
-  );
   await page.getByRole('button', { name: /^密度：舒适/ }).click();
-
-  const toast = page.getByRole('alert').filter({ hasText: '保存失败：服务器内部错误' });
-  await expect(toast).toBeVisible();
+  const toast = toasts(page);
+  await expect(toast).toContainText('保存失败：服务器内部错误');
   await expect(toast).toContainText('密度已恢复为「舒适」，重试成功后改为「紧凑」。');
   expect(await density(page)).toBe('comfortable');
   // 失败浮层不自动消失（成功与信息才 3 秒消失）
   await page.waitForTimeout(3500);
   await expect(toast).toBeVisible();
+  // 同一件事再失败：替换旧浮层，不再叠一条
+  await page.getByRole('button', { name: /^密度：舒适/ }).click();
+  await expect(toast).toHaveCount(1);
 
-  fail = false;
-  await toast.getByRole('button', { name: '立即重试' }).click();
+  // 重试中：处理中、不能重复点；再失败：标题换成「保存仍失败」，浮层留着
+  const retry = toast.getByRole('button', { name: '立即重试' });
+  await retry.click();
+  await expect(retry).toHaveAttribute('aria-busy', 'true');
+  release();
+  await expect(toast).toContainText('保存仍失败：服务器内部错误');
+  await expect(retry).not.toHaveAttribute('aria-busy');
+
+  // 再重试成功：浮层消失，改为紧凑
+  await retry.click();
   await expect(toast).toHaveCount(0);
   await expect.poll(() => density(page)).toBe('compact');
 
@@ -182,4 +203,18 @@ test('密度保存失败：弹出不自动消失的失败浮层，点「立即�
   expect(await density(page)).toBe('compact');
   await chooseDensity(page, '舒适');
   await expect.poll(() => density(page)).toBe('comfortable');
+});
+
+test('重试时会话已结束（401）：浮层撤掉，回到登录入口', async ({ page }) => {
+  await loginAs(page, '周敏');
+  await chooseDensity(page, '舒适');
+  await expect.poll(() => density(page)).toBe('comfortable');
+  await scriptPreferences(page, ['500', '401']);
+
+  await page.getByRole('button', { name: /^密度：舒适/ }).click();
+  await expect(toasts(page)).toContainText('保存失败：服务器内部错误');
+  await toasts(page).getByRole('button', { name: '立即重试' }).click();
+
+  await expect(page).toHaveURL(/\/dev-login$/);
+  await expect(toasts(page)).toHaveCount(0);
 });

@@ -58,6 +58,24 @@ export default [
       ],
     },
   },
+  {
+    // 浮层提示（G5）统一经 src/lib/notify.tsx 弹出（ADR 0007 修订），页面不直接调 sonner
+    files: ['apps/web/src/**/*.{ts,tsx}'],
+    ignores: ['apps/web/src/lib/notify.tsx', 'apps/web/src/components/ui/sonner.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'sonner',
+              message: '浮层提示（G5）统一用 @/lib/notify 的 showError 等入口，样式与行为照原型',
+            },
+          ],
+        },
+      ],
+    },
+  },
   ...boundariesConfig,
   prettier,
 ];

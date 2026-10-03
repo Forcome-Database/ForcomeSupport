@@ -14,7 +14,7 @@ import {
 } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { api, ApiRequestError } from './api';
-import { failureReason, showError } from './notify';
+import { dismissAllToasts, dismissToast, showError } from './notify';
 
 /**
  * 当前成员；未登录或会话过期（401）为 null（不当作错误）。一分钟后过期：切回窗口时重新取，
@@ -57,14 +57,20 @@ export const adminContactsQuery = queryOptions({
 });
 
 /**
- * 应用的查询缓存。任何接口返回 401（会话过期、被停用、在别处退出）都视为会话已结束：当前成员置空，
- * 外壳随之换成登录入口，不必等刷新页面。
+ * 会话已结束（接口返回 401：过期、被停用、在别处退出）时：当前成员置空，外壳随之换成登录入口，
+ * 留着的浮层一并撤掉。返回是否是这种情况。查询与写操作的统一处理、以及不经查询缓存的请求（如浮层里的重试）都用它。
  */
+export function endSessionIfUnauthenticated(queryClient: QueryClient, error: unknown): boolean {
+  if (!(error instanceof ApiRequestError && error.status === 401)) return false;
+  queryClient.setQueryData(currentMemberQuery.queryKey, null);
+  dismissAllToasts();
+  return true;
+}
+
+/** 应用的查询缓存：任何查询或写操作返回 401 都视为会话已结束（endSessionIfUnauthenticated），不必等刷新页面 */
 export function createQueryClient(): QueryClient {
   const onError = (error: Error) => {
-    if (error instanceof ApiRequestError && error.status === 401) {
-      queryClient.setQueryData(currentMemberQuery.queryKey, null);
-    }
+    endSessionIfUnauthenticated(queryClient, error);
   };
   const queryClient: QueryClient = new QueryClient({
     queryCache: new QueryCache({ onError }),
@@ -91,33 +97,52 @@ export function applyDensity(density: Density | null): void {
   }
 }
 
+/** 密度保存失败的浮层：同一时间只留一条，之后保存成功就撤掉 */
+const DENSITY_TOAST = 'density-save';
+
 /**
  * 切换密度：先改缓存里的当前成员（外壳据此改 <html data-density>，页面立即变化），同时保存到服务端
  * （刷新、重新登录后保持，AC-ST-04）。保存失败退回原来的密度，并弹出不自动消失的失败浮层（G5），
- * 「立即重试」保存成功后改为新的密度、浮层消失；会话已结束（401）时不弹，外壳会换成登录入口。
+ * 「立即重试」保存成功后改为新的密度、浮层消失；会话已结束（401）时不弹，外壳换成登录入口。
  */
 export function useSaveDensity() {
   const queryClient = useQueryClient();
-  const setDensity = (density: Density) => {
+  const currentDensity = () => queryClient.getQueryData(currentMemberQuery.queryKey)?.density;
+  const showDensity = (density: Density) => {
     const current = queryClient.getQueryData(currentMemberQuery.queryKey);
     if (current) {
       const updated: CurrentMember = { ...current, density };
       queryClient.setQueryData(currentMemberQuery.queryKey, updated);
     }
-    return current;
   };
+  const save = (density: Density) => api.savePreferences({ density });
+
   return useMutation({
-    mutationFn: (density: Density) => api.savePreferences({ density }),
-    onMutate: (density) => setDensity(density)?.density,
+    mutationFn: save,
+    onMutate: (density) => {
+      const previous = currentDensity();
+      showDensity(density);
+      return previous;
+    },
+    onSuccess: () => dismissToast(DENSITY_TOAST),
     onError: (error, density, previous) => {
       if (!previous) return;
-      setDensity(previous);
-      if (error instanceof ApiRequestError && error.status === 401) return;
-      showError(`保存失败：${failureReason(error)}`, {
+      showDensity(previous);
+      if (endSessionIfUnauthenticated(queryClient, error)) return;
+      showError({
+        key: DENSITY_TOAST,
+        action: '保存',
+        error,
         description: `密度已恢复为「${densityLabels[previous]}」，重试成功后改为「${densityLabels[density]}」。`,
         retry: async () => {
-          await api.savePreferences({ density });
-          setDensity(density);
+          try {
+            await save(density);
+          } catch (retryError) {
+            // 会话已结束：浮层随之撤掉，外壳换成登录入口
+            if (endSessionIfUnauthenticated(queryClient, retryError)) return;
+            throw retryError;
+          }
+          showDensity(density);
         },
       });
     },
@@ -133,6 +158,7 @@ export function useLogout() {
     // 会话已经失效（401）也当作已退出
     onSettled: async () => {
       queryClient.clear();
+      dismissAllToasts();
       applyDensity(null);
       await navigate({ to: '/' });
     },
