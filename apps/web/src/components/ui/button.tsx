@@ -65,8 +65,15 @@ function Button({
       onClick={loading ? (event) => event.preventDefault() : onClick}
       {...props}
     >
-      {loading && !asChild && <Loader2 className="size-3.5 animate-spin" strokeWidth={2.2} />}
-      {children}
+      {/* asChild 时 Slot 只接受一个子元素，处理中的转圈由调用方自己放 */}
+      {asChild ? (
+        children
+      ) : (
+        <>
+          {loading && <Loader2 className="size-3.5 animate-spin" strokeWidth={2.2} />}
+          {children}
+        </>
+      )}
     </Comp>
   );
 }
