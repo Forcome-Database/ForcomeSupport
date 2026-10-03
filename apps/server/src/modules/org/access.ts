@@ -1,5 +1,7 @@
 import {
+  BACKGROUND_REQUEST_HEADER,
   can,
+  canViewFinance,
   homeFor,
   navFor,
   type AuditObjectType,
@@ -39,7 +41,6 @@ export interface SessionMember {
   readonly dept: string;
   readonly roles: readonly Role[];
   readonly density: Density;
-  readonly factoryCode: string | null;
 }
 
 /** 越权访问的目标（E-24 审计记的对象） */
@@ -52,16 +53,20 @@ export interface StoreAccessTarget {
   readonly objectLabel?: string | null;
 }
 
+/** 成员表的一行在访问控制里用到的部分：当前成员与店铺范围 */
+export interface MemberAccess {
+  readonly member: SessionMember;
+  /** 店铺数据范围：仓储查询的必需参数（core 的 StoreScope） */
+  readonly stores: StoreScope;
+}
+
 /**
  * 请求的访问上下文（ADR 0010）：受保护的接口经 requireSession 拿到它（c.get('access')），
  * 用它判断能力、取店铺范围交给仓储查询、决定是否返回财务字段、记审计的操作人。
  */
-export interface Access {
+export interface Access extends MemberAccess {
   readonly sessionId: string;
-  readonly member: SessionMember;
-  /** 店铺数据范围：仓储查询的必需参数（core 的 StoreScope） */
-  readonly stores: StoreScope;
-  /** 能否看到成本、承担比例与结算金额（finance.view）；输出时交给 contracts 的 stripFinanceFields / maskFinanceFields */
+  /** 能否看到成本、承担比例与结算金额（contracts 的 canViewFinance）；输出时交给 stripFinanceFields / maskFinanceFields */
   readonly financeVisible: boolean;
   /** 审计的操作人（成员、角色快照、来源 IP） */
   readonly actor: Actor;
@@ -79,14 +84,10 @@ export interface AccessVariables {
   access: Access;
 }
 
-export function sessionMemberOf(row: MemberRow): SessionMember {
+export function memberAccessOf(row: MemberRow): MemberAccess {
   return {
-    id: row.id,
-    name: row.name,
-    dept: row.dept,
-    roles: row.roles,
-    density: row.density,
-    factoryCode: row.factoryCode,
+    member: { id: row.id, name: row.name, dept: row.dept, roles: row.roles, density: row.density },
+    stores: memberStoreScope(row),
   };
 }
 
@@ -96,16 +97,15 @@ export function memberActor(member: SessionMember, ip: string | null): Actor {
 }
 
 function buildAccess(runtime: Runtime, c: Context, sessionId: string, row: MemberRow): Access {
-  const sessionMember = sessionMemberOf(row);
-  const stores = memberStoreScope(row);
-  const actor = memberActor(sessionMember, clientIp(c));
+  const { member, stores } = memberAccessOf(row);
+  const actor = memberActor(member, clientIp(c));
   return {
     sessionId,
-    member: sessionMember,
+    member,
     stores,
-    financeVisible: can(row.roles, 'finance.view'),
+    financeVisible: canViewFinance(member.roles),
     actor,
-    can: (capability) => can(row.roles, capability),
+    can: (capability) => can(member.roles, capability),
     async requireStores(target) {
       const outside = storesOutsideScope(stores, target.storeIds);
       if (outside.length === 0) return;
@@ -131,7 +131,9 @@ function buildAccess(runtime: Runtime, c: Context, sessionId: string, row: Membe
 
 /**
  * 受保护的接口：没有有效会话返回 401。7 天无操作的会话过期（401 session_expired，G12「会话过期」）；
- * 成员已停用或不再能进入（loginDenial）时会话作废（401 unauthenticated）。每次请求都算一次操作，会话随之续期。
+ * 成员已停用或不再能进入（loginDenial）时会话作废（401 unauthenticated）。
+ * 每次请求都算一次操作，会话随之续期；带 BACKGROUND_REQUEST_HEADER 的请求（轮询、实时推送触发的重新拉取）
+ * 不是人的操作，照常校验但不续期，否则开着页面就永远不会过期。
  */
 export function requireSession(
   runtime: Runtime,
@@ -139,24 +141,27 @@ export function requireSession(
 ): MiddlewareHandler<{ Variables: AccessVariables }> {
   return async (c, next) => {
     const token = sessionToken(c);
-    const found = token
-      ? await lookupSession(runtime.db, token, runtime.clock.now())
-      : ({ status: 'missing' } as const);
+    if (!token) return unauthenticated(c);
+    const found = await lookupSession(runtime.db, token, runtime.clock.now(), {
+      renew: c.req.header(BACKGROUND_REQUEST_HEADER) !== '1',
+    });
     if (found.status === 'expired') {
       clearSessionCookie(c, appEnv);
       return c.json({ error: 'session_expired', message: '7 天未操作，已退出登录' }, 401);
     }
-    if (found.status === 'active' && loginDenial(found.member) !== null) {
-      await closeSession(runtime.db, found.sessionId);
+    if (found.status === 'missing' || loginDenial(found.member) !== null) {
+      if (found.status === 'active') await closeSession(runtime.db, found.sessionId);
+      clearSessionCookie(c, appEnv);
+      return unauthenticated(c);
     }
-    if (found.status !== 'active' || loginDenial(found.member) !== null) {
-      if (token) clearSessionCookie(c, appEnv);
-      return c.json({ error: 'unauthenticated', message: '未登录或会话已失效，请重新登录' }, 401);
-    }
-    if (found.renewed && token) setSessionCookie(c, token, appEnv);
+    if (found.renewed) setSessionCookie(c, token, appEnv);
     c.set('access', buildAccess(runtime, c, found.sessionId, found.member));
     await next();
   };
+}
+
+function unauthenticated(c: Context) {
+  return c.json({ error: 'unauthenticated', message: '未登录或会话已失效，请重新登录' }, 401);
 }
 
 /** 需要某项能力的接口（挂在 requireSession 之后）：没有则 403（PRD 10.1；界面不会给没有能力的人入口） */
@@ -165,14 +170,14 @@ export function requireCapability(
 ): MiddlewareHandler<{ Variables: AccessVariables }> {
   return async (c, next) => {
     if (!c.get('access').can(capability)) {
-      return c.json({ error: 'forbidden', message: '你的角色没有这项权限' }, 403);
+      throw new AccessDeniedError('你的角色没有这项权限');
     }
     await next();
   };
 }
 
 /** /api/me 与登录接口返回的当前成员：身份、店铺范围、密度，以及按角色算出的导航与默认首页（PRD 4.1） */
-export function currentMember(member: SessionMember, stores: StoreScope): CurrentMember {
+export function currentMember({ member, stores }: MemberAccess): CurrentMember {
   const home = homeFor(member.roles);
   if (!home) throw new Error(`成员 ${member.id} 没有默认首页，不应能登录`);
   return {

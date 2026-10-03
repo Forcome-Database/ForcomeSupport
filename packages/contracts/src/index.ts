@@ -8,6 +8,7 @@ export {
 } from './audit';
 export {
   adminContactsSchema,
+  BACKGROUND_REQUEST_HEADER,
   contactAdmins,
   currentMemberSchema,
   densities,
@@ -16,9 +17,13 @@ export {
   devLoginRequestSchema,
   devMemberSchema,
   devMembersResponseSchema,
+  loginDenialMessage,
   loginDenialReasons,
   loginDenialReasonSchema,
+  loginDenialTitles,
   loginDeniedSchema,
+  memberStatuses,
+  memberStatusSchema,
   preferencesSchema,
   storeScopeSchema,
   type AdminContacts,
@@ -29,6 +34,7 @@ export {
   type DevMembersResponse,
   type LoginDenialReason,
   type LoginDenied,
+  type MemberStatus,
   type Preferences,
   type StoreScopeValue,
 } from './auth';
@@ -48,6 +54,7 @@ export {
   type Phase,
 } from './capabilities';
 export {
+  canViewFinance,
   financeField,
   FINANCE_HIDDEN,
   financeHiddenSchema,

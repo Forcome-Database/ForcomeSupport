@@ -1,14 +1,20 @@
-import { roleNames, type DevMember, type LoginDenialReason } from '@forcome/contracts';
+import {
+  loginDenialTitles,
+  roleNames,
+  type DevMember,
+  type LoginDenialReason,
+} from '@forcome/contracts';
 import { Factory, Lock, User, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { avatarText } from '@/lib/avatar';
 import { EmptyState } from './empty-state';
 
-const DENIALS: Record<LoginDenialReason, { icon: LucideIcon; title: string }> = {
-  no_role: { icon: User, title: '还没有分配角色' },
-  disabled: { icon: Lock, title: '账号已停用' },
-  factory_phase1: { icon: Factory, title: '暂时无法进入' },
+/** 各种被拒画面的图标（原型 deny() 的 user、lock、factory）；标题与说明的文案在 contracts */
+const ICONS: Record<LoginDenialReason, LucideIcon> = {
+  no_role: User,
+  disabled: Lock,
+  factory_phase1: Factory,
 };
 
 /**
@@ -26,7 +32,6 @@ export function LoginDenied({
   member?: Pick<DevMember, 'name' | 'dept' | 'roles'>;
   action?: ReactNode;
 }) {
-  const { icon, title } = DENIALS[reason];
   return (
     <>
       {reason === 'factory_phase1' && member && (
@@ -39,7 +44,13 @@ export function LoginDenied({
           </span>
         </div>
       )}
-      <EmptyState icon={icon} title={title} description={message} action={action} compact />
+      <EmptyState
+        icon={ICONS[reason]}
+        title={loginDenialTitles[reason]}
+        description={message}
+        action={action}
+        compact
+      />
     </>
   );
 }

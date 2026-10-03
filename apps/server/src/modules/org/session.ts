@@ -55,13 +55,15 @@ export type SessionLookup =
     };
 
 /**
- * 按令牌找会话：找不到为 missing；7 天无操作为 expired（同时删掉这行）；否则视这次请求为一次操作并续期。
+ * 按令牌找会话：找不到为 missing；7 天无操作为 expired（同时删掉这行）；否则视这次请求为一次操作并续期
+ * （renew 为 false 时不续期：后台请求不算人的操作）。
  * 成员一并读出——角色、店铺范围与状态每次请求都以成员表为准（ADR 0010）。
  */
 export async function lookupSession(
   db: DbExecutor,
   token: string,
   now: Date,
+  options: { readonly renew: boolean },
 ): Promise<SessionLookup> {
   const [row] = await db
     .select({ session, member })
@@ -75,7 +77,7 @@ export async function lookupSession(
     await db.delete(session).where(eq(session.id, row.session.id));
     return { status: 'expired' };
   }
-  const renewed = idle >= RENEW_INTERVAL_MS;
+  const renewed = options.renew && idle >= RENEW_INTERVAL_MS;
   if (renewed) {
     await db.update(session).set({ lastActiveAt: now }).where(eq(session.id, row.session.id));
   }

@@ -70,16 +70,29 @@ async function chooseDensity(page: Page, label: '舒适' | '紧凑'): Promise<vo
 const density = (page: Page) => page.locator('html').getAttribute('data-density');
 const bodyFontSize = (page: Page) => page.evaluate(() => getComputedStyle(document.body).fontSize);
 
+/** 打开头像菜单量「审计日志」菜单项的字号，再关上 */
+async function menuItemFontSize(page: Page): Promise<string> {
+  await page.getByRole('banner').getByRole('button', { name: /周敏/ }).click();
+  const size = await page
+    .getByRole('menuitem', { name: /审计日志/ })
+    .evaluate((el) => getComputedStyle(el).fontSize);
+  await page.keyboard.press('Escape');
+  return size;
+}
+
 test('密度切到紧凑后，刷新与重新登录都保持（AC-ST-04、G9）', async ({ page }) => {
   await loginAs(page, '周敏');
   await chooseDensity(page, '舒适');
   await expect.poll(() => density(page)).toBe('comfortable');
   expect(await bodyFontSize(page)).toBe('13px');
 
+  expect(await menuItemFontSize(page)).toBe('13px');
+
   await chooseDensity(page, '紧凑');
   await expect.poll(() => density(page)).toBe('compact');
-  // 设计规范第 12 节紧凑档：正文 12
+  // 设计规范第 12 节紧凑档：正文 12（页面正文与菜单项都随之变化）
   expect(await bodyFontSize(page)).toBe('12px');
+  expect(await menuItemFontSize(page)).toBe('12px');
 
   await page.reload();
   await expect(page.getByRole('banner').getByText('周敏')).toBeVisible();

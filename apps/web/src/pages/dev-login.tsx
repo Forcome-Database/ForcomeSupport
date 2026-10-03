@@ -1,3 +1,4 @@
+import { roleNames } from '@forcome/contracts';
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { ChevronLeft } from 'lucide-react';
@@ -9,12 +10,13 @@ import { Card } from '@/components/ui/card';
 import { api, LoginDeniedError } from '@/lib/api';
 import { avatarText } from '@/lib/avatar';
 import { devMembersQuery, rememberMember } from '@/lib/session';
-import { roleNames } from '@forcome/contracts';
 
 /**
  * 开发登录页（只在非生产环境、开启开发登录时出现；原型没有这个画面，见 prototype.md「当期没有原型的界面」）：
  * 照登录卡片（G11）的布局——居中卡片、品牌标、标题与说明、分隔线下的注释——把二维码换成成员列表。
- * 登录被拒（第一期的生产厂对接人等）时卡片换成 G12 的被拒说明（宽 410），「返回登录页」回到成员列表。
+ * 登录被拒（第一期的生产厂对接人等）时卡片换成 G12 的被拒说明（宽 410）。开发登录要能换一位成员再试，
+ * 所以三种被拒都带「返回登录页」（取自 G12 另两种被拒的按钮）；原型里生产厂对接人那一种没有按钮，
+ * 钉钉扫码登录页（05）照原型不加。
  */
 export function DevLoginPage() {
   const { data: members } = useSuspenseQuery(devMembersQuery);

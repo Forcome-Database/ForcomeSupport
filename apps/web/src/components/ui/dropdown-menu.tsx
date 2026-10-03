@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 /*
  * 下拉菜单（shadcn DropdownMenu，按原型 avatar_menu() 与设计规范第 12 节「头像菜单（G10）」改过默认样式）：
- * 白底、1px 边线、12 圆角、md 阴影、内边距 5；菜单项 13px、次要深色字、内边距 7 / 10、6 圆角、图标 15，
+ * 白底、1px 边线、12 圆角、md 阴影、内边距 5；菜单项正文字号（13，紧凑 12）、次要深色字、内边距 7 / 10、6 圆角、图标 15，
  * 键盘或悬停聚焦时浅灰底；分隔线为浅线色、上下 4。只保留用到的部件（菜单项、分隔线、单选子菜单），
  * 勾选项、快捷键等第一次用到的待办按原型补上。
  */
@@ -41,7 +41,7 @@ function DropdownMenuContent({
 }
 
 const itemClass =
-  "flex cursor-default items-center gap-2 rounded-sm px-2.5 py-1.75 text-13 text-ink-2 outline-none select-none focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:text-placeholder [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.75";
+  "flex cursor-default items-center gap-2 rounded-sm px-2.5 py-1.75 text-body text-ink-2 outline-none select-none focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:text-placeholder [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.75";
 
 function DropdownMenuItem({
   className,

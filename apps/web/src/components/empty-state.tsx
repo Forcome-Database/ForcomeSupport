@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * 空、无权限、失败的通用画面（原型 empty()，设计规范第 9 节）：浅靛蓝图标块 44、14px 标题、
- * 13px 说明（最宽 340、居中）与一个操作；compact 用于卡片里（图标块 38、内边距 20，原型 compact=True）。
+ * 正文字号的说明（13，紧凑 12；最宽 340、居中）与一个操作；compact 用于卡片里（图标块 38、内边距 20，原型 compact=True）。
  * 加载失败（LoadError）、无权限（Forbidden，G2）、登录被拒（LoginDenied，G12）都由它拼成。
  */
 export function EmptyState({
@@ -37,7 +37,7 @@ export function EmptyState({
       </div>
       <div className="text-14 font-semibold text-foreground">{title}</div>
       {description && (
-        <div className="max-w-85 text-center text-13 leading-[1.6] text-muted-foreground">
+        <div className="max-w-85 text-center text-body leading-[1.6] text-muted-foreground">
           {description}
         </div>
       )}

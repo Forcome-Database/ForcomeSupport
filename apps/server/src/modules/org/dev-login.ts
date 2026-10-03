@@ -4,11 +4,12 @@ import {
   devLoginRequestSchema,
   devMembersResponseSchema,
   loginDeniedSchema,
+  loginDenialMessage,
 } from '@forcome/contracts';
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
-import { memberStoreScope, recordAudit, transaction, type AppEnv, type Runtime } from '../core';
-import { currentMember, memberActor, sessionMemberOf } from './access';
-import { loginDenial, loginDenialMessage } from './login';
+import { recordAudit, transaction, type AppEnv, type Runtime } from '../core';
+import { currentMember, memberAccessOf, memberActor } from './access';
+import { loginDenial } from './login';
 import { findMember, listActiveMembers, listAdmins } from './members';
 import { clientIp, openSession, setSessionCookie } from './session';
 
@@ -91,10 +92,10 @@ export function createDevLoginRoutes(deps: { runtime: Runtime; appEnv: AppEnv })
       );
       return c.json({ error: 'login_denied' as const, reason: denied, message }, 403);
     }
-    const sessionMember = sessionMemberOf(found);
+    const access = memberAccessOf(found);
     const { token } = await transaction(runtime, async (tx) => {
       const opened = await openSession(tx, found.id);
-      await recordAudit(tx, memberActor(sessionMember, clientIp(c)), {
+      await recordAudit(tx, memberActor(access.member, clientIp(c)), {
         action: 'auth.login',
         objectType: 'login',
         objectId: opened.id,
@@ -104,7 +105,7 @@ export function createDevLoginRoutes(deps: { runtime: Runtime; appEnv: AppEnv })
       return opened;
     });
     setSessionCookie(c, token, appEnv);
-    return c.json(currentMember(sessionMember, memberStoreScope(found)), 200);
+    return c.json(currentMember(access), 200);
   });
 
   return routes;

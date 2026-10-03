@@ -64,7 +64,7 @@ function SegmentedNav({ member }: { member: CurrentMember }) {
           key={section.key}
           to={sectionPaths[section.key]}
           // 当前项由 Link 标上 data-status="active" 与 aria-current="page"（地址以该入口的路径开头即算当前）
-          className="rounded-md px-3 py-1.25 text-13 font-medium whitespace-nowrap text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[status=active]:border data-[status=active]:border-border data-[status=active]:bg-card data-[status=active]:py-1 data-[status=active]:font-semibold data-[status=active]:text-primary-text data-[status=active]:shadow-xs"
+          className="rounded-md px-3 py-1.25 text-13 font-medium whitespace-nowrap text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring data-[status=active]:border data-[status=active]:border-border data-[status=active]:bg-card data-[status=active]:py-1 data-[status=active]:font-semibold data-[status=active]:text-primary-text data-[status=active]:shadow-xs"
         >
           {section.label}
         </Link>

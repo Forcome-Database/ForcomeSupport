@@ -1,9 +1,19 @@
 import type { CurrentMember, Density, DevMember } from '@forcome/contracts';
-import { queryOptions, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import {
+  MutationCache,
+  QueryCache,
+  QueryClient,
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { api, ApiRequestError } from './api';
 
-/** 当前成员；未登录或会话过期（401）为 null（不当作错误） */
+/**
+ * 当前成员；未登录或会话过期（401）为 null（不当作错误）。一分钟后过期：切回窗口时重新取，
+ * 管理员在 P20 改了角色与店铺范围，不刷新页面也能跟上。
+ */
 export const currentMemberQuery = queryOptions({
   queryKey: ['session', 'me'],
   queryFn: async (): Promise<CurrentMember | null> => {
@@ -15,7 +25,7 @@ export const currentMemberQuery = queryOptions({
     }
   },
   retry: false,
-  staleTime: Infinity,
+  staleTime: 60 * 1000,
 });
 
 /** 开发登录可选的成员；没开启开发登录（含生产环境）时为 null */
@@ -40,8 +50,26 @@ export const adminContactsQuery = queryOptions({
   staleTime: 5 * 60 * 1000,
 });
 
-/** 登录成功后记下当前成员（不必再请求一次 /api/me） */
+/**
+ * 应用的查询缓存。任何接口返回 401（会话过期、被停用、在别处退出）都视为会话已结束：当前成员置空，
+ * 外壳随之换成登录入口，不必等刷新页面。
+ */
+export function createQueryClient(): QueryClient {
+  const onError = (error: Error) => {
+    if (error instanceof ApiRequestError && error.status === 401) {
+      queryClient.setQueryData(currentMemberQuery.queryKey, null);
+    }
+  };
+  const queryClient: QueryClient = new QueryClient({
+    queryCache: new QueryCache({ onError }),
+    mutationCache: new MutationCache({ onError }),
+  });
+  return queryClient;
+}
+
+/** 登录成功后换掉上一位成员留下的缓存，记下当前成员（不必再请求一次 /api/me） */
 export function rememberMember(queryClient: QueryClient, member: CurrentMember): void {
+  queryClient.clear();
   queryClient.setQueryData(currentMemberQuery.queryKey, member);
 }
 
@@ -57,7 +85,10 @@ export function applyDensity(density: Density | null): void {
   }
 }
 
-/** 切换密度：页面立即变化，同时保存到服务端（刷新、重新登录后保持，AC-ST-04）；保存失败退回原来的密度 */
+/**
+ * 切换密度：先改缓存里的当前成员（外壳据此改 <html data-density>，页面立即变化），同时保存到服务端
+ * （刷新、重新登录后保持，AC-ST-04）；保存失败退回原来的密度
+ */
 export function useSaveDensity() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -67,15 +98,11 @@ export function useSaveDensity() {
       if (previous) {
         const updated: CurrentMember = { ...previous, density };
         queryClient.setQueryData(currentMemberQuery.queryKey, updated);
-        applyDensity(density);
       }
       return previous;
     },
     onError: (_error, _density, previous) => {
-      if (previous) {
-        queryClient.setQueryData(currentMemberQuery.queryKey, previous);
-        applyDensity(previous.density);
-      }
+      if (previous) queryClient.setQueryData(currentMemberQuery.queryKey, previous);
     },
   });
 }

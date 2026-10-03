@@ -1,3 +1,4 @@
+import { BACKGROUND_REQUEST_HEADER } from '@forcome/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startTestHarness, TEST_CLIENT_IP, type TestHarness } from './harness';
 
@@ -66,6 +67,24 @@ describe('会话 7 天无操作过期（可注入时钟）', () => {
     expect((await agent.get('/api/me')).headers.getSetCookie()).toEqual([]);
     t.clock.advance({ seconds: 31 });
     expect((await agent.get('/api/me')).headers.getSetCookie()).toHaveLength(1);
+  });
+
+  it('后台请求（轮询、实时推送触发的重新拉取）不算操作：照常校验，但不续期', async () => {
+    t.clock.set('2026-09-11T02:20:00Z');
+    const agent = await t.loginAs('坐席');
+    const background = (path: string) =>
+      agent.request(path, { headers: { [BACKGROUND_REQUEST_HEADER]: '1' } });
+
+    t.clock.advance({ days: 6 });
+    const polled = await background('/api/me');
+    expect(polled.status).toBe(200);
+    expect(polled.headers.getSetCookie()).toEqual([]);
+
+    // 距最后一次人的操作（登录）满 7 天：即使中间一直有后台请求，也过期
+    t.clock.advance({ days: 1 });
+    const expired = await background('/api/me');
+    expect(expired.status).toBe(401);
+    expect(await expired.json()).toMatchObject({ error: 'session_expired' });
   });
 });
 

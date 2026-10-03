@@ -76,10 +76,7 @@ export function createOrgRoutes(deps: { runtime: Runtime; appEnv: AppEnv }) {
     routes.use(path, session);
   }
 
-  routes.openapi(meRoute, (c) => {
-    const { member, stores } = c.get('access');
-    return c.json(currentMember(member, stores), 200);
-  });
+  routes.openapi(meRoute, (c) => c.json(currentMember(c.get('access')), 200));
 
   routes.openapi(preferencesRoute, async (c) => {
     const { density } = c.req.valid('json');

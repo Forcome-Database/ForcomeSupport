@@ -1,4 +1,4 @@
-import { roles as allRoles, type Density, type Role } from '@forcome/contracts';
+import { roles as allRoles, type Density, type MemberStatus, type Role } from '@forcome/contracts';
 import { and, arrayContains, eq } from 'drizzle-orm';
 import type { DbExecutor, Tx } from '../core';
 import { member } from './schema';
@@ -15,7 +15,7 @@ export interface NewMember {
   readonly allStores: boolean;
   readonly storeIds?: readonly string[];
   readonly factoryCode?: string | null;
-  readonly status?: 'active' | 'disabled';
+  readonly status?: MemberStatus;
 }
 
 /** 新建成员；id 已存在时跳过（示例数据重复加载不报错），返回成员 id */

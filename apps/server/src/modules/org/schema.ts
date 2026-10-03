@@ -1,4 +1,4 @@
-import { densities, roles } from '@forcome/contracts';
+import { densities, memberStatuses, roles } from '@forcome/contracts';
 import { sql } from 'drizzle-orm';
 import { boolean, index, pgSchema, text, uuid } from 'drizzle-orm/pg-core';
 import { primaryId, timestamptz, version } from '../core';
@@ -33,9 +33,7 @@ export const member = orgSchema.table(
     /** 所属生产厂（生产厂对接人，例 FQD） */
     factoryCode: text('factory_code'),
     /** 在职 active；钉钉离职或管理员停用为 disabled（05、23 号待办） */
-    status: text('status', { enum: ['active', 'disabled'] })
-      .notNull()
-      .default('active'),
+    status: text('status', { enum: memberStatuses }).notNull().default('active'),
     /** 界面密度偏好（G9），按成员保存 */
     density: text('density', { enum: densities }).notNull().default('comfortable'),
     createdAt: timestamptz('created_at').notNull(),

@@ -72,7 +72,8 @@
 /*
  * 密度（G9、设计规范第 12 节「密度」表）：舒适（默认）与紧凑两套变量，<html data-density> 切换，按成员保存在服务端。
  * 只改字号、行距与内边距，不改布局和信息量。页面用下面 @theme 里的 text-body、text-minor、text-badge、
- * h-table-row、py-queue-row、gap-queue、px-panel、py-panel 等工具类取值；顶栏、品牌标等固定尺寸不随密度变化。
+ * h-table-row、py-queue-row、gap-queue、px-panel-x、py-panel-y 等工具类取值（卡片、菜单项、空状态说明已用上）；
+ * 顶栏、品牌标等固定尺寸不随密度变化。
  */
 :root,
 [data-density='comfortable'] {

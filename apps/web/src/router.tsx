@@ -4,10 +4,11 @@ import {
   createRootRouteWithContext,
   createRoute,
   createRouter,
+  Navigate,
   Outlet,
   redirect,
 } from '@tanstack/react-router';
-import { useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { AppShell } from '@/components/app-shell';
 import { Forbidden } from '@/components/forbidden';
 import { LoadError } from '@/components/load-error';
@@ -60,12 +61,31 @@ const appRoute = createRoute({
   component: AppLayout,
 });
 
+/** 外壳里的页面取当前成员（外壳只在已登录时渲染，这里一定有） */
+const CurrentMemberContext = createContext<CurrentMember | null>(null);
+
+function useCurrentMember(): CurrentMember {
+  const member = useContext(CurrentMemberContext);
+  if (!member) throw new Error('只能在登录后的外壳里使用当前成员');
+  return member;
+}
+
 function AppLayout() {
-  // 读缓存而不是路由上下文：切换密度后缓存里的成员会先变（useSaveDensity）
+  // 读缓存而不是路由上下文：切换密度后缓存里的成员会先变（useSaveDensity），会话结束时会被置空（createQueryClient）
   const { data: member } = useSuspenseQuery(currentMemberQuery);
-  // 未登录且没有开发登录：钉钉扫码登录页（G11）随 05 号待办，在那之前什么也不显示
-  if (!member) return null;
-  return <SignedIn member={member} />;
+  if (!member) return <SignedOut />;
+  return (
+    <CurrentMemberContext value={member}>
+      <SignedIn member={member} />
+    </CurrentMemberContext>
+  );
+}
+
+/** 会话在使用中结束（过期、被停用、退出）：回到登录入口；钉钉扫码登录页（G11）随 05 号待办，在那之前只有开发登录 */
+function SignedOut() {
+  const { data: devMembers } = useSuspenseQuery(devMembersQuery);
+  useEffect(() => applyDensity(null), []);
+  return devMembers ? <Navigate to="/dev-login" /> : null;
 }
 
 function SignedIn({ member }: { member: CurrentMember }) {
@@ -88,8 +108,7 @@ const homeRoute = createRoute({
 
 /** 按能力把关的页面：有能力显示页面内容，没有显示 G2（写明哪个角色能看，按钮「返回首页」） */
 function PageGate({ page, children }: { page: PageDefinition; children?: ReactNode }) {
-  const { data: member } = useSuspenseQuery(currentMemberQuery);
-  if (!member) return null;
+  const member = useCurrentMember();
   if (!can(member.roles, page.capability)) return <Forbidden page={page} member={member} />;
   return children ?? null;
 }

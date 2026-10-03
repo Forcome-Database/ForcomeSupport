@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
+  canViewFinance,
   financeField,
   FINANCE_HIDDEN,
   isFinanceField,
@@ -92,12 +93,60 @@ describe('财务字段过滤（PRD 10.3：成本、承担比例、结算金额�
     expect(maskFinanceFields(ledgerRow, row, true)).toEqual(row);
   });
 
-  it('结构里没有的键原样保留，不是对象的值原样返回', () => {
-    expect(stripFinanceFields(ledgerRow, { ...row, extra: 1 } as typeof row, false)).toHaveProperty(
-      'extra',
-      1,
-    );
+  it('不认识的一律不放行：结构里没声明的键也去掉（两种模式都是），不是对象的值原样返回', () => {
+    const withExtra = { ...row, extra: '9.99' } as typeof row;
+    expect(stripFinanceFields(ledgerRow, withExtra, false)).not.toHaveProperty('extra');
+    expect(maskFinanceFields(ledgerRow, withExtra, false)).not.toHaveProperty('extra');
+    expect(stripFinanceFields(ledgerRow, withExtra, true)).toHaveProperty('extra');
     expect(maskFinanceFields(ledgerRow, null, false)).toBeNull();
     expect(maskFinanceFields(ledgerRow, 'S-1', false)).toBe('S-1');
+  });
+
+  it('标记过的字段再加说明、只读或可空包装，仍按财务字段过滤', () => {
+    const decorated = z.object({
+      no: z.string(),
+      described: financeField(z.string()).describe('产品成本'),
+      meta: financeField(z.string()).meta({ title: '运费' }),
+      readonly: financeField(z.string()).readonly(),
+      wrapped: financeField(z.string()).nullable().default(null),
+    });
+    expect(
+      stripFinanceFields(
+        decorated,
+        { no: 'S-1', described: '1.00', meta: '2.00', readonly: '3.00', wrapped: '4.00' },
+        false,
+      ),
+    ).toEqual({ no: 'S-1' });
+  });
+
+  it('财务字段放进联合类型等认不出分支的结构里：过滤时直接报错，不放行', () => {
+    const union = z.object({
+      fee: z.union([
+        z.object({ usd: financeField(z.string()) }),
+        z.object({ none: z.literal(true) }),
+      ]),
+    });
+    expect(() => stripFinanceFields(union, { fee: { usd: '1.00' } }, false)).toThrow(
+      /财务字段只能放在对象与列表里/,
+    );
+    // 联合类型里没有财务字段时照常
+    const plain = z.object({ status: z.union([z.literal('a'), z.literal('b')]) });
+    expect(stripFinanceFields(plain, { status: 'a' }, false)).toEqual({ status: 'a' });
+  });
+});
+
+describe('谁能看到财务字段', () => {
+  it.each([
+    [['supervisor'], true],
+    [['aftersales_owner'], true],
+    [['agent'], false],
+    [['knowledge_owner'], false],
+    [['admin'], false],
+    // 生产厂对接人的「本厂部分」只在工厂工作台给，兼了坐席也看不到客服系统里的财务字段
+    [['factory_contact'], false],
+    [['agent', 'factory_contact'], false],
+    [['agent', 'supervisor'], true],
+  ] as const)('%j：%s', (memberRoles, expected) => {
+    expect(canViewFinance(memberRoles)).toBe(expected);
   });
 });

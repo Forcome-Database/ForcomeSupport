@@ -19,9 +19,48 @@ async function boundaryErrors(module: string, code: string): Promise<string[]> {
     filePath: `${repoRoot}/apps/server/src/modules/${module}/index.ts`,
   });
   return (result?.messages ?? [])
-    .filter((m) => m.ruleId === 'boundaries/dependencies' || m.ruleId === 'no-restricted-syntax')
+    .filter((m) =>
+      ['boundaries/dependencies', 'no-restricted-syntax', 'no-restricted-imports'].includes(
+        m.ruleId ?? '',
+      ),
+    )
     .map((m) => m.message);
 }
+
+describe('店铺数据范围只由 org 构造（ADR 0010 修订）', () => {
+  it('其他模块自己造成员的店铺范围报错', async () => {
+    const errors = await boundaryErrors(
+      'ticket',
+      `import { memberStoreScope } from '../core';
+export const s = memberStoreScope({ allStores: true, storeIds: [] });
+`,
+    );
+    expect(errors).toEqual([
+      expect.stringContaining(
+        "店铺范围（ADR 0010）：成员的店铺范围只由 org 构造，接口里用 c.get('access').stores",
+      ),
+    ]);
+  });
+
+  it('org 构造成员的范围、其他模块用类型与查询条件是允许的', async () => {
+    expect(
+      await boundaryErrors(
+        'org',
+        `import { memberStoreScope } from '../core';
+export const s = memberStoreScope;
+`,
+      ),
+    ).toEqual([]);
+    expect(
+      await boundaryErrors(
+        'ticket',
+        `import { storeScopeCondition, type StoreScope } from '../core';
+export const f = (s: StoreScope) => storeScopeCondition;
+`,
+      ),
+    ).toEqual([]);
+  });
+});
 
 describe('模块边界 lint', () => {
   it('跨模块读别的模块的表（import 它的 schema.ts）报错', async () => {

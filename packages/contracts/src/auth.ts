@@ -5,6 +5,11 @@ import { roleSchema } from './roles';
 
 /** 登录与会话（ADR 0010 及其修订）：会话在服务端，角色与店铺范围每次请求从成员表实时读取 */
 
+/** 成员状态：在职；钉钉离职或管理员停用后为已停用（不做物理删除） */
+export const memberStatuses = ['active', 'disabled'] as const;
+export const memberStatusSchema = z.enum(memberStatuses);
+export type MemberStatus = z.infer<typeof memberStatusSchema>;
+
 /** 界面密度（G9、设计规范第 12 节）：舒适（默认）与紧凑两档，按成员保存在服务端 */
 export const densities = ['comfortable', 'compact'] as const;
 export const densitySchema = z.enum(densities);
@@ -34,6 +39,12 @@ export const currentMemberSchema = z.object({
 });
 export type CurrentMember = z.infer<typeof currentMemberSchema>;
 
+/**
+ * 后台请求的标记：轮询、实时推送触发的重新拉取等不是人的操作，带上这个请求头（值为 1），
+ * 服务端照常校验会话但不续期——「7 天无操作过期」只按人的操作算（ADR 0010 修订）。
+ */
+export const BACKGROUND_REQUEST_HEADER = 'x-forcome-background';
+
 /** 个人偏好（PUT /api/me/preferences） */
 export const preferencesSchema = z.object({ density: densitySchema });
 export type Preferences = z.infer<typeof preferencesSchema>;
@@ -45,6 +56,27 @@ export type Preferences = z.infer<typeof preferencesSchema>;
 export const loginDenialReasons = ['no_role', 'disabled', 'factory_phase1'] as const;
 export const loginDenialReasonSchema = z.enum(loginDenialReasons);
 export type LoginDenialReason = z.infer<typeof loginDenialReasonSchema>;
+
+/** G12 被拒画面的标题与说明（原型文案）；说明里的管理员由后端按在职管理员填上 */
+export const loginDenialTitles: Record<LoginDenialReason, string> = {
+  no_role: '还没有分配角色',
+  disabled: '账号已停用',
+  factory_phase1: '暂时无法进入',
+};
+
+export function loginDenialMessage(
+  reason: LoginDenialReason,
+  adminNames: readonly string[],
+): string {
+  switch (reason) {
+    case 'no_role':
+      return `你的钉钉账号还没有在本系统分配角色，请${contactAdmins(adminNames)}。`;
+    case 'disabled':
+      return '你的账号已停用（钉钉离职或管理员停用）。';
+    case 'factory_phase1':
+      return '工厂工作台第二阶段上线，目前无法进入。';
+  }
+}
 
 /** 登录被拒（403，error 为 login_denied）：reason 供界面选择 G12 的画面，message 可直接显示 */
 export const loginDeniedSchema = apiErrorSchema.extend({

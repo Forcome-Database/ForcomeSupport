@@ -98,6 +98,27 @@ export const boundariesConfig = [
     },
   },
   {
+    // 店铺数据范围（ADR 0010 修订）：成员的范围只由 org 按会话构造，其他模块从访问上下文取（c.get('access').stores），
+    // 不能自己造一个「全部店铺」绕过范围；系统操作用 SYSTEM_STORE_SCOPE，由评审检查调用方。
+    files: [`${MODULES_DIR}/*/**/*.ts`],
+    ignores: [`${MODULES_DIR}/org/**`, `${MODULES_DIR}/core/**`],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/core', '**/core/index'],
+              importNames: ['memberStoreScope'],
+              message:
+                "店铺范围（ADR 0010）：成员的店铺范围只由 org 构造，接口里用 c.get('access').stores",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // 堵住「经 index.ts 转手把表交出去」的口子：入口要逐个列出导出项，且不能直接转出 schema.ts。
     // 先 import 表再按名字导出的写法 lint 查不到，靠评审把关（ADR 0005 修订）。
     files: [`${MODULES_DIR}/*/index.ts`],
