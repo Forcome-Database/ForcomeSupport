@@ -5,7 +5,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { api } from '@/lib/api';
-import { avatarText, devMembersQuery, rememberMember } from '@/lib/session';
+import { avatarText } from '@/lib/avatar';
+import { devMembersQuery, rememberMember } from '@/lib/session';
 
 /**
  * 开发登录页（只在非生产环境、开启开发登录时出现；原型没有这个画面，见 prototype.md「当期没有原型的界面」）：

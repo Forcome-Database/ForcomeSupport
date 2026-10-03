@@ -28,6 +28,11 @@ export type AppEnv = z.infer<typeof envSchema>['APP_ENV'];
 const CLIENT_MODE_PREFIX = 'CLIENT_MODE_';
 const SYSTEM_NAME = /^[A-Z][A-Z0-9_]*$/;
 
+/** 某个外部系统（小写 snake_case，如 dingtalk）对应的环境变量名，如 CLIENT_MODE_DINGTALK */
+export function clientModeVariable(system: string): string {
+  return `${CLIENT_MODE_PREFIX}${system.toUpperCase()}`;
+}
+
 export interface AppConfig {
   appEnv: AppEnv;
   databaseUrl: string;

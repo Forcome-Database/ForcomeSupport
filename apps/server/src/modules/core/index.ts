@@ -4,7 +4,7 @@
 export { recordAudit, systemActor, type Actor, type AuditEntry } from './audit';
 export { ManualClock, systemClock, type Clock, type Duration } from './clock';
 export { amount, currency, primaryId, timestamptz, version } from './columns';
-export { ConfigError, loadConfig, type AppConfig, type AppEnv } from './config';
+export { clientModeVariable, ConfigError, loadConfig, type AppConfig, type AppEnv } from './config';
 export { type Database, type DbExecutor, type DbTransaction } from './db';
 export {
   defineFixtureStep,

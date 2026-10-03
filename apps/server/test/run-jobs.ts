@@ -27,6 +27,13 @@ export interface RunJobsOptions {
 
 const BATCH_SIZE = 100;
 
+/** 本次处理失败的任务这时才交给 pg-boss 记失败（还有重试次数的进入 retry） */
+async function failAll(runtime: Runtime, failed: readonly FailedJobRun[]): Promise<void> {
+  for (const f of failed) {
+    await runtime.boss.fail(f.name, f.id, { message: String(f.error) });
+  }
+}
+
 /**
  * 同步把已排队的任务跑到空闲（规格「测试接缝」主接缝）：反复取出这些处理器队列里的全部任务，
  * 按计划开始时间（同时按创建时间）先后，经与 worker 相同的 runJob 处理；处理中新排进来的任务也一并跑完。
@@ -62,6 +69,7 @@ export async function runQueuedJobs(
       for (const job of batch) {
         await runtime.boss.fail(job.name, job.id, { message: '测试中止：任务一直没有跑完' });
       }
+      await failAll(runtime, failed);
       throw new Error(
         `跑了 ${maxRounds} 轮任务仍未空闲，可能有任务在循环产生新任务：${[
           ...new Set(batch.map((j) => j.name)),
@@ -86,9 +94,7 @@ export async function runQueuedJobs(
     }
   }
 
-  for (const f of failed) {
-    await runtime.boss.fail(f.name, f.id, { message: String(f.error) });
-  }
+  await failAll(runtime, failed);
   if (failed.length > 0 && !options.allowFailures) {
     throw new AggregateError(
       failed.map((f) => f.error),

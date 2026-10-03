@@ -5,10 +5,10 @@ import {
   devMembersResponseSchema,
   type DevMember,
 } from '@forcome/contracts';
-import { demoFixture } from '@forcome/fixtures';
+import { getDemoFixture } from '@forcome/fixtures';
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { recordAudit, transaction, type AppEnv, type Runtime } from '../core';
-import { clientIp, openSession, setSessionCookie } from './session';
+import { clientIp, memberActor, openSession, setSessionCookie } from './session';
 
 /*
  * 开发登录（ADR 0010 修订）：本机、CI 与 Playwright 绕过钉钉扫码，选一位成员直接登录，
@@ -18,13 +18,15 @@ import { clientIp, openSession, setSessionCookie } from './session';
  * 可选的成员来自示例数据夹具（id 是确定的）；04 号待办有了成员表后改为从成员表取。
  */
 
-/** 示例数据里钉钉通讯录的成员（04 号待办改为成员表） */
-const DEV_MEMBERS: readonly DevMember[] = demoFixture.members.map((m) => ({
-  id: m.id,
-  name: m.name,
-  roles: [m.role],
-  dept: m.dept,
-}));
+/**
+ * 第一期能进入客服系统的示例成员（04 号待办改为成员表）。生产厂对接人第一期不分配、登录被拒（PRD 4.1、G12），
+ * 不列出；04 号待办实现登录被拒时，连同被拒的场景一起加回来。
+ */
+function devMembers(): DevMember[] {
+  return getDemoFixture()
+    .members.filter((m) => m.role !== '生产厂对接人')
+    .map((m) => ({ id: m.id, name: m.name, roles: [m.role], dept: m.dept }));
+}
 
 const membersRoute = createRoute({
   method: 'get',
@@ -66,36 +68,28 @@ export function createDevLoginRoutes(deps: { runtime: Runtime; appEnv: AppEnv })
   if (deps.appEnv === 'production') {
     throw new Error('生产环境不能开启开发登录');
   }
+  // 只在开启开发登录时才取用示例数据，生产环境的 api 不解析夹具
+  const members = devMembers();
   const routes = new OpenAPIHono();
 
-  routes.openapi(membersRoute, (c) => c.json({ members: [...DEV_MEMBERS] }, 200));
+  routes.openapi(membersRoute, (c) => c.json({ members }, 200));
 
   routes.openapi(loginRoute, async (c) => {
     const { memberId } = c.req.valid('json');
-    const found = DEV_MEMBERS.find((m) => m.id === memberId);
+    const found = members.find((m) => m.id === memberId);
     if (!found) {
       return c.json({ error: 'not_found', message: '没有这位成员' }, 404);
     }
     const member = { id: found.id, name: found.name, roles: found.roles };
     const { token } = await transaction(deps.runtime, async (tx) => {
       const opened = await openSession(tx, member);
-      await recordAudit(
-        tx,
-        {
-          kind: 'member',
-          memberId: member.id,
-          name: member.name,
-          roles: member.roles,
-          ip: clientIp(c),
-        },
-        {
-          action: 'auth.login',
-          objectType: 'login',
-          objectId: opened.id,
-          objectLabel: '开发登录',
-          after: { method: 'dev' },
-        },
-      );
+      await recordAudit(tx, memberActor(member, clientIp(c)), {
+        action: 'auth.login',
+        objectType: 'login',
+        objectId: opened.id,
+        objectLabel: '开发登录',
+        after: { method: 'dev' },
+      });
       return opened;
     });
     setSessionCookie(c, token, deps.appEnv);

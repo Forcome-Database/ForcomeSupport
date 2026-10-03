@@ -1,5 +1,5 @@
 import type { AdapterMode } from '@forcome/contracts';
-import type { AppConfig, AppEnv } from '../core';
+import { clientModeVariable, type AppConfig, type AppEnv } from '../core';
 import { clientDefinitions } from './registry';
 
 /*
@@ -79,13 +79,14 @@ export class IntegrationClients {
     this.#modes = options.clientModes ?? {};
     for (const [system, mode] of Object.entries(this.#modes)) {
       const definition = [...this.#definitions].find((d) => d.system === system);
-      const variable = `CLIENT_MODE_${system.toUpperCase()}`;
+      const variable = clientModeVariable(system);
       if (!definition) {
         throw new Error(`${variable}：没有登记这个外部客户端，检查系统名是否写错`);
       }
       if (definition.scope === 'store') {
         throw new Error(`${variable}：${system} 是店铺级客户端，按店铺配置选择，不用环境变量`);
       }
+      // loadConfig 已在启动时拒绝；直接构造（测试、脚本）时这里再挡一次
       if (this.#production && mode === 'fake') {
         throw new FakeNotAllowedError(`${variable}：生产环境不允许使用 Fake`);
       }

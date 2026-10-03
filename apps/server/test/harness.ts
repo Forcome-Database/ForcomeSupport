@@ -1,9 +1,9 @@
 import { devMembersResponseSchema } from '@forcome/contracts';
-import { demoFixture } from '@forcome/fixtures';
+import { getDemoFixture } from '@forcome/fixtures';
 import type { JobOptions } from 'pg-boss';
 import { createApp } from '../src/app';
 import type { ServerDeps } from '../src/deps';
-import { fixtureSteps } from '../src/fixtures';
+import { fixtureSteps } from '../src/fixture-steps';
 import { createJobHandlers } from '../src/jobs';
 import { findAuditRecords, type AuditQuery, type AuditRecord } from '../src/modules/core/audit';
 import {
@@ -34,7 +34,7 @@ import { runQueuedJobs, type JobRunReport, type RunJobsOptions } from './run-job
 export const TEST_CLIENT_IP = '10.20.3.27';
 
 /** 默认时刻：原型演示时刻 2026-09-11 周五 10:20 北京时间 */
-export const DEMO_NOW = demoFixture.meta.now;
+export const DEMO_NOW = getDemoFixture().meta.now;
 
 export interface StartTestHarnessOptions {
   /** 运行环境，默认 test；验证「生产不允许」之类的行为时可改 */
@@ -95,6 +95,13 @@ export async function startTestHarness(
     throw error;
   });
   const { runtime } = started;
+  async function close(): Promise<void> {
+    try {
+      await started.stop({ graceful: false });
+    } finally {
+      await database.drop();
+    }
+  }
 
   const clients = new IntegrationClients({ appEnv, definitions: options.clientDefinitions });
   const deps: ServerDeps = {
@@ -103,18 +110,25 @@ export async function startTestHarness(
     config: { appEnv, devLoginEnabled: true },
     clients,
   };
-  const app = createApp(deps);
-  const handlers = (options.jobHandlers ?? createJobHandlers)(deps);
-  // 模板库只建了 jobs.ts 登记的队列；测试自己的处理器在这里补建
-  await ensureQueues(
-    runtime.boss,
-    handlers.map((h) => h.job),
-  );
+  let app: ReturnType<typeof createApp>;
+  let handlers: readonly AnyJobHandler[];
+  try {
+    app = createApp(deps);
+    handlers = (options.jobHandlers ?? createJobHandlers)(deps);
+    // 模板库只建了 jobs.ts 登记的队列；测试自己的处理器在这里补建
+    await ensureQueues(
+      runtime.boss,
+      handlers.map((h) => h.job),
+    );
+  } catch (error) {
+    await close();
+    throw error;
+  }
   const api = createApiClient(app, { ip: TEST_CLIENT_IP });
 
   async function memberId(target: LoginTarget): Promise<string> {
     if (typeof target !== 'string') {
-      const member = demoFixture.members.find((m) => m.key === target.member);
+      const member = getDemoFixture().members.find((m) => m.key === target.member);
       if (!member) throw new Error(`示例数据里没有成员 ${target.member}`);
       return member.id;
     }
@@ -149,16 +163,10 @@ export async function startTestHarness(
     resetFakes: () => clients.resetFakes(),
 
     loadFixtures: () =>
-      loadFixtures(runtime, { appEnv, fixture: demoFixture, steps: fixtureSteps }),
+      loadFixtures(runtime, { appEnv, fixture: getDemoFixture(), steps: fixtureSteps }),
 
     auditRecords: (query) => findAuditRecords(runtime.db, query),
 
-    async close() {
-      try {
-        await started.stop({ graceful: false });
-      } finally {
-        await database.drop();
-      }
-    },
+    close,
   };
 }

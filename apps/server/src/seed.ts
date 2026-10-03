@@ -1,5 +1,5 @@
 // 入口：seed（一次性，只用于非生产环境）。把示例数据夹具灌进 DATABASE_URL 指向的库（待办 02），
-// 供本机与开发测试环境使用；先跑 migrate。生产环境拒绝。
+// 供本机与开发测试环境使用；先跑 migrate。生产环境拒绝。加载步骤登记在 fixture-steps.ts。
 import { createLogger, loadConfig } from './modules/core';
 import { seedDemoData } from './seed-data';
 

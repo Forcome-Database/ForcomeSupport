@@ -36,8 +36,3 @@ export const devMembersQuery = queryOptions({
 export function rememberMember(queryClient: QueryClient, member: CurrentMember): void {
   queryClient.setQueryData(currentMemberQuery.queryKey, member);
 }
-
-/** 头像里的字：原型取名字的最后一个字（李婷 → 婷） */
-export function avatarText(name: string): string {
-  return [...name].at(-1) ?? '';
-}

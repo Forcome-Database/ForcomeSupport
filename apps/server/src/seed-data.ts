@@ -1,5 +1,5 @@
-import { demoFixture } from '@forcome/fixtures';
-import { fixtureSteps } from './fixtures';
+import { getDemoFixture } from '@forcome/fixtures';
+import { fixtureSteps } from './fixture-steps';
 import {
   loadFixtures,
   startRuntime,
@@ -10,7 +10,7 @@ import {
 
 /**
  * 把示例数据夹具灌进指定的库（迁移要先执行）。pnpm db:seed 与 Playwright 的 e2e api 共用；
- * 加载步骤登记在 fixtures.ts。生产环境拒绝（loadFixtures 里判断）。
+ * 加载步骤登记在 fixture-steps.ts。生产环境拒绝（loadFixtures 里判断）。
  */
 export async function seedDemoData(
   databaseUrl: string,
@@ -19,7 +19,7 @@ export async function seedDemoData(
 ): Promise<FixtureLoadReport> {
   const { runtime, stop } = await startRuntime(databaseUrl, { role: 'api', logger, poolMax: 1 });
   try {
-    return await loadFixtures(runtime, { appEnv, fixture: demoFixture, steps: fixtureSteps });
+    return await loadFixtures(runtime, { appEnv, fixture: getDemoFixture(), steps: fixtureSteps });
   } finally {
     await stop({ graceful: false });
   }

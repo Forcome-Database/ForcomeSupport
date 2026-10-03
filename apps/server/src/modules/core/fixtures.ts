@@ -6,7 +6,7 @@ import { transaction, type Runtime, type Tx } from './runtime';
  * 示例数据加载器（待办 02）：把示例数据夹具（@forcome/fixtures，原型 data.py 转成的 JSON）灌进数据库，
  * 供本机与开发测试环境的种子数据（pnpm db:seed）、Playwright 与集成测试共用。
  * 加载器只是框架：各模块建表后在自己的待办里定义加载步骤（defineFixtureStep），
- * 从模块的 index.ts 导出，并登记到 apps/server/src/fixtures.ts（工单在 08、台账在 19）。
+ * 从模块的 index.ts 导出，并登记到 apps/server/src/fixture-steps.ts（工单在 08、台账在 19）。
  */
 
 export interface FixtureStep {

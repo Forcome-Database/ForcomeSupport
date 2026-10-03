@@ -1,4 +1,4 @@
-import { demoFixture } from '@forcome/fixtures';
+import { getDemoFixture } from '@forcome/fixtures';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -52,7 +52,7 @@ describe('示例数据加载器（各模块登记加载步骤）', () => {
   it('没有登记任何步骤时，空库上运行不报错', async () => {
     const report = await loadFixtures(t.runtime, {
       appEnv: 'test',
-      fixture: demoFixture,
+      fixture: getDemoFixture(),
       steps: [],
     });
     expect(report).toEqual({ steps: [] });
@@ -61,7 +61,7 @@ describe('示例数据加载器（各模块登记加载步骤）', () => {
   it('按依赖顺序执行，与登记顺序无关', async () => {
     const report = await loadFixtures(t.runtime, {
       appEnv: 'test',
-      fixture: demoFixture,
+      fixture: getDemoFixture(),
       steps: [
         writer('aftersales.ledger', ['org.members', 'channel.stores']),
         writer('channel.stores'),
@@ -81,7 +81,7 @@ describe('示例数据加载器（各模块登记加载步骤）', () => {
     await expect(
       loadFixtures(t.runtime, {
         appEnv: 'test',
-        fixture: demoFixture,
+        fixture: getDemoFixture(),
         steps: [writer('channel.stores'), failing],
       }),
     ).rejects.toThrow(/ticket\.tickets.*写入失败/);
@@ -90,7 +90,7 @@ describe('示例数据加载器（各模块登记加载步骤）', () => {
 
   it('依赖了没登记的步骤、循环依赖或重名，在写库之前报错', async () => {
     const run = (steps: ReturnType<typeof writer>[]) =>
-      loadFixtures(t.runtime, { appEnv: 'test', fixture: demoFixture, steps });
+      loadFixtures(t.runtime, { appEnv: 'test', fixture: getDemoFixture(), steps });
 
     await expect(run([writer('ticket.tickets', ['channel.stores'])])).rejects.toThrow(
       /ticket\.tickets 依赖的 channel\.stores 没有登记/,
@@ -106,7 +106,7 @@ describe('示例数据加载器（各模块登记加载步骤）', () => {
     await expect(
       loadFixtures(t.runtime, {
         appEnv: 'production',
-        fixture: demoFixture,
+        fixture: getDemoFixture(),
         steps: [writer('channel.stores')],
       }),
     ).rejects.toThrow(/生产环境不能加载示例数据/);

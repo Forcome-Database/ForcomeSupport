@@ -127,6 +127,9 @@ importers:
       '@forcome/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@forcome/fixtures':
+        specifier: workspace:*
+        version: link:../../packages/fixtures
       '@playwright/test':
         specifier: ^1.63.0
         version: 1.63.0

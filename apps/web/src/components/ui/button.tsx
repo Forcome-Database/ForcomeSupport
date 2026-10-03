@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
  * variant 对应原型 btn() 的 primary → default、secondary → outline、ghost、link；
  * size：sm 28 / default 32 / lg 36，字号 12 / 13 / 14；圆角 8；焦点环 ring-2 + offset-2；
  * 禁用时浅灰底、占位色字（必须另给悬停说明原因，原型 btn(reason=)）。
- * 危险、警示、浅色强调等变体等第一次用到的待办按原型补上，不留未核对过的默认样式。
+ * 危险、警示、浅色强调等变体与图标按钮（原型 icon_btn）等第一次用到的待办按原型补上，不留未核对过的默认样式。
  */
 const buttonVariants = cva(
   "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border whitespace-nowrap transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:pointer-events-none disabled:border-secondary disabled:bg-secondary disabled:text-placeholder disabled:shadow-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
@@ -27,7 +27,6 @@ const buttonVariants = cva(
         sm: 'h-7 px-2.5 text-12',
         default: 'h-8 px-3 text-13',
         lg: "h-9 px-4 text-14 [&_svg:not([class*='size-'])]:size-4",
-        icon: 'size-8',
       },
     },
     defaultVariants: {

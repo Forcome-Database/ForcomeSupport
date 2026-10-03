@@ -91,7 +91,7 @@ apps/server              后端：一个镜像，三个入口（ADR 0005、0006�
 ├── src/api.ts           入口：HTTP 服务（app.ts 组装接口）
 ├── src/worker.ts        入口：后台任务（jobs.ts 汇总各模块的任务定义与处理器）
 ├── src/migrate.ts       入口：只向前执行迁移（一次性，先于 api 与 worker）
-├── src/seed.ts          入口：灌示例数据（只用于非生产环境；fixtures.ts 汇总各模块的加载步骤）
+├── src/seed.ts          入口：灌示例数据（只用于非生产环境；fixture-steps.ts 汇总各模块的加载步骤）
 ├── src/deps.ts          组装根：接口与任务共用的依赖（运行时、日志、配置、外部客户端）
 ├── src/modules/<模块>/  12 个模块；index.ts 是唯一对外入口，schema.ts 放本模块的表（一个模块一个 schema）
 ├── drizzle/             drizzle-kit 生成的 SQL 迁移（提交进仓库，不手改；自定义 SQL 用 drizzle-kit generate --custom）

@@ -92,7 +92,14 @@ export function createApp(deps: ServerDeps) {
       return c.json({ error: 'optimistic_lock', message: '数据已被他人修改' }, 409);
     }
     if (error instanceof HTTPException) {
-      return error.getResponse();
+      // 自带响应的照原样返回；Hono 自己抛的（请求体不是合法 JSON、Content-Type 不对等）按 contracts 的错误形状返回
+      if (error.res) return error.getResponse();
+      return error.status === 400
+        ? c.json(
+            { error: 'invalid_request', message: '请求参数不对：请求体必须是合法的 JSON' },
+            400,
+          )
+        : c.json({ error: 'http_error', message: '请求失败' }, error.status);
     }
     logger.error({ err: error, path: c.req.path }, '未处理的接口错误');
     return c.json({ error: 'internal', message: '服务器内部错误' }, 500);

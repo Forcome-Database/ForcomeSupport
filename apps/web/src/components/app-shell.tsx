@@ -1,7 +1,7 @@
 import type { CurrentMember } from '@forcome/contracts';
 import type { ReactNode } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { avatarText } from '@/lib/session';
+import { avatarText } from '@/lib/avatar';
 import { Brand } from './brand';
 
 /**

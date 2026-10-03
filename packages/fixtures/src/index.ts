@@ -15,8 +15,16 @@ export {
   type FixtureTicket,
 } from './schema';
 
-/** 第一期示例数据（加载时按模式校验；生成脚本改了结构而这里没跟上，会在导入时报错） */
-export const demoFixture: DemoFixture = demoFixtureSchema.parse(demoJson);
+let parsed: DemoFixture | undefined;
+
+/**
+ * 第一期示例数据。第一次取用时按模式校验（生成脚本改了结构而这里没跟上，会在这时报错），
+ * 之后复用同一份；只是导入本包不会解析，生产环境的 api 不受夹具影响。
+ */
+export function getDemoFixture(): DemoFixture {
+  parsed ??= demoFixtureSchema.parse(demoJson);
+  return parsed;
+}
 
 /** 按分累加美元金额（未填的费用项为 null，跳过），返回两位小数字符串 */
 export function sumUsd(fees: readonly ({ usd: string } | null)[]): string {

@@ -104,14 +104,12 @@ export function clientIp(c: Context): string | null {
   }
 }
 
-/** 当前会话的操作人，供业务写操作记审计（ADR 0010） */
+/** 成员作为审计的操作人（ADR 0010） */
+export function memberActor(member: CurrentMember, ip: string | null): Actor {
+  return { kind: 'member', memberId: member.id, name: member.name, roles: member.roles, ip };
+}
+
+/** 当前会话的操作人，供业务写操作记审计 */
 export function sessionActor(c: Context<{ Variables: SessionVariables }>): Actor {
-  const { member } = c.get('session');
-  return {
-    kind: 'member',
-    memberId: member.id,
-    name: member.name,
-    roles: member.roles,
-    ip: clientIp(c),
-  };
+  return memberActor(c.get('session').member, clientIp(c));
 }
