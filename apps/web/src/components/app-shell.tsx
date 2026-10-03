@@ -51,7 +51,10 @@ export function AppShell({ member, children }: { member: CurrentMember; children
   );
 }
 
-/** 分段导航（原型 _segnav）：浅灰轨道，当前项白底、描边、主色字 */
+/**
+ * 分段导航（原型 _segnav）：浅灰轨道，当前项白底、描边、主色字。设计规范的组件对照写的是 Tabs / ToggleGroup，
+ * 这里有意用 <nav> + 链接：顶栏入口是页面跳转，Tabs / ToggleGroup 会给读屏器错误的 tab / radio 角色（ADR 0007 修订）
+ */
 function SegmentedNav({ member }: { member: CurrentMember }) {
   const items = navSections.filter((section) => member.nav.includes(section.key));
   return (

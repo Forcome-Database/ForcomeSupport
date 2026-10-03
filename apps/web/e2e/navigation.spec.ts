@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 /*
  * 外壳（待办 04）：按角色的导航与默认首页（PRD 4.1 第一阶段表）、无权限页面 G2（AC-ST-03）、
- * 密度切换并保存在服务端（AC-ST-04、G9）、退出登录、只有生产厂对接人角色的成员登录被拒（AC-P1-21、G12）。
+ * 密度切换并保存在服务端（AC-ST-04、G9）与保存失败的浮层（G5）、退出登录、
+ * 只有生产厂对接人角色的成员登录被拒（AC-P1-21、G12）。
  * 开发测试环境长期运行、数据会累积：改了密度的用例最后改回舒适，开头也不假定当前是哪一档。
  */
 
@@ -140,4 +141,45 @@ test('只有生产厂对接人角色的成员登录被拒，显示无法进入�
   await expect(page.getByRole('heading', { name: '开发登录' })).toBeVisible();
   await page.goto('/');
   await expect(page).toHaveURL(/\/dev-login$/);
+});
+
+test('密度保存失败：弹出不自动消失的失败浮层，点「立即重试」成功后浮层消失、密度保持（G5）', async ({
+  page,
+}) => {
+  await loginAs(page, '周敏');
+  await chooseDensity(page, '舒适');
+  await expect.poll(() => density(page)).toBe('comfortable');
+
+  let fail = true;
+  await page.route('**/api/me/preferences', (route) =>
+    fail
+      ? route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'internal', message: '服务器内部错误' }),
+        })
+      : route.continue(),
+  );
+  await page.getByRole('button', { name: /^密度：舒适/ }).click();
+
+  const toast = page.getByRole('alert').filter({ hasText: '保存失败：服务器内部错误' });
+  await expect(toast).toBeVisible();
+  await expect(toast).toContainText('密度已恢复为「舒适」，重试成功后改为「紧凑」。');
+  expect(await density(page)).toBe('comfortable');
+  // 失败浮层不自动消失（成功与信息才 3 秒消失）
+  await page.waitForTimeout(3500);
+  await expect(toast).toBeVisible();
+
+  fail = false;
+  await toast.getByRole('button', { name: '立即重试' }).click();
+  await expect(toast).toHaveCount(0);
+  await expect.poll(() => density(page)).toBe('compact');
+
+  // 重试保存到了服务端：刷新后仍是紧凑；最后改回舒适
+  await page.unroute('**/api/me/preferences');
+  await page.reload();
+  await expect(page.getByRole('banner').getByText('周敏')).toBeVisible();
+  expect(await density(page)).toBe('compact');
+  await chooseDensity(page, '舒适');
+  await expect.poll(() => density(page)).toBe('comfortable');
 });

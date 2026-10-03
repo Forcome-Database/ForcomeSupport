@@ -1,4 +1,9 @@
-import type { CurrentMember, Density, DevMember } from '@forcome/contracts';
+import {
+  densityLabels,
+  type CurrentMember,
+  type Density,
+  type DevMember,
+} from '@forcome/contracts';
 import {
   MutationCache,
   QueryCache,
@@ -9,6 +14,7 @@ import {
 } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { api, ApiRequestError } from './api';
+import { failureReason, showError } from './notify';
 
 /**
  * 当前成员；未登录或会话过期（401）为 null（不当作错误）。一分钟后过期：切回窗口时重新取，
@@ -87,22 +93,33 @@ export function applyDensity(density: Density | null): void {
 
 /**
  * 切换密度：先改缓存里的当前成员（外壳据此改 <html data-density>，页面立即变化），同时保存到服务端
- * （刷新、重新登录后保持，AC-ST-04）；保存失败退回原来的密度
+ * （刷新、重新登录后保持，AC-ST-04）。保存失败退回原来的密度，并弹出不自动消失的失败浮层（G5），
+ * 「立即重试」保存成功后改为新的密度、浮层消失；会话已结束（401）时不弹，外壳会换成登录入口。
  */
 export function useSaveDensity() {
   const queryClient = useQueryClient();
+  const setDensity = (density: Density) => {
+    const current = queryClient.getQueryData(currentMemberQuery.queryKey);
+    if (current) {
+      const updated: CurrentMember = { ...current, density };
+      queryClient.setQueryData(currentMemberQuery.queryKey, updated);
+    }
+    return current;
+  };
   return useMutation({
     mutationFn: (density: Density) => api.savePreferences({ density }),
-    onMutate: (density) => {
-      const previous = queryClient.getQueryData(currentMemberQuery.queryKey);
-      if (previous) {
-        const updated: CurrentMember = { ...previous, density };
-        queryClient.setQueryData(currentMemberQuery.queryKey, updated);
-      }
-      return previous;
-    },
-    onError: (_error, _density, previous) => {
-      if (previous) queryClient.setQueryData(currentMemberQuery.queryKey, previous);
+    onMutate: (density) => setDensity(density)?.density,
+    onError: (error, density, previous) => {
+      if (!previous) return;
+      setDensity(previous);
+      if (error instanceof ApiRequestError && error.status === 401) return;
+      showError(`保存失败：${failureReason(error)}`, {
+        description: `密度已恢复为「${densityLabels[previous]}」，重试成功后改为「${densityLabels[density]}」。`,
+        retry: async () => {
+          await api.savePreferences({ density });
+          setDensity(density);
+        },
+      });
     },
   });
 }

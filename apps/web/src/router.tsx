@@ -11,6 +11,7 @@ import {
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { AppShell } from '@/components/app-shell';
 import { Forbidden } from '@/components/forbidden';
+import { Toaster } from '@/components/ui/sonner';
 import { LoadError } from '@/components/load-error';
 import { pages, sectionPaths, type PageDefinition } from '@/lib/pages';
 import { applyDensity, currentMemberQuery, devMembersQuery } from '@/lib/session';
@@ -28,7 +29,13 @@ interface RouterContext {
 }
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
-  component: Outlet,
+  // 浮层提示（G5）的容器挂在根上，登录页与外壳里的页面都能用
+  component: () => (
+    <>
+      <Outlet />
+      <Toaster />
+    </>
+  ),
   errorComponent: ({ reset }) => (
     <div className="flex min-h-screen items-center justify-center bg-background">
       <LoadError onRetry={reset} />
