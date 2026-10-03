@@ -8,13 +8,14 @@ import type { Tx } from './runtime';
  */
 export class OptimisticLockError extends Error {
   override name = 'OptimisticLockError';
-  readonly objectType: string;
-  readonly objectId: string;
+  /** 冲突所在的表与行，只用于日志，不返回给前端 */
+  readonly table: string;
+  readonly rowId: string;
 
-  constructor(objectType: string, objectId: string) {
-    super(`${objectType} ${objectId} 已被他人修改`);
-    this.objectType = objectType;
-    this.objectId = objectId;
+  constructor(table: string, rowId: string) {
+    super(`${table} ${rowId} 已被他人修改`);
+    this.table = table;
+    this.rowId = rowId;
   }
 }
 
@@ -24,6 +25,7 @@ type VersionedTable = PgTable & { id: PgColumn; version: PgColumn };
 /**
  * 带乐观锁的更新：只在 version 等于调用方读到的版本时更新，并把 version 加 1，返回更新后的行；
  * 没命中抛 OptimisticLockError。数据不做物理删除（作废、取消用状态），所以没命中就是版本冲突。
+ * 按 id 更新：调用方先在店铺范围内取到对象（拿到 version）再调用（ADR 0010）。
  */
 export async function updateWithVersion<T extends VersionedTable>(
   tx: Tx,

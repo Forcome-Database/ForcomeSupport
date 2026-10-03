@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { fromDrizzle, type JobOptions, type PgBoss } from 'pg-boss';
 import { systemClock, type Clock } from './clock';
 import { closeDatabase, createDatabase, type Database, type DbTransaction } from './db';
-import { createJobQueue, type JobDefinition, type JobQueueRole } from './jobs';
+import { createJobQueue, mayBeDeduplicated, type JobDefinition, type JobQueueRole } from './jobs';
 import type { Logger } from './logger';
 
 /** 进程级依赖：数据库、任务队列与时钟。由入口组装，测试里换成测试库与手动时钟 */
@@ -40,11 +40,7 @@ export async function transaction<T>(runtime: Runtime, fn: (tx: Tx) => Promise<T
           ...options,
           db: fromDrizzle(db, sql),
         });
-        const deduplicates =
-          options?.singletonKey !== undefined ||
-          options?.singletonSeconds !== undefined ||
-          (job.queue?.policy ?? 'standard') !== 'standard';
-        if (id === null && !deduplicates) {
+        if (id === null && !mayBeDeduplicated(job, options)) {
           throw new Error(`任务未插入：${job.name}`);
         }
         return id;
@@ -75,7 +71,7 @@ export async function startRuntime(
   options: RuntimeOptions,
 ): Promise<RunningRuntime> {
   const db = createDatabase(databaseUrl, {
-    max: options.poolMax ?? 10,
+    max: options.poolMax,
     applicationName: `forcome-${options.role}`,
   });
   const boss = createJobQueue(databaseUrl, { role: options.role, logger: options.logger });

@@ -111,6 +111,7 @@ scripts/                 仓库级检查脚本
 | `pnpm --filter @forcome/server dev:api` / `dev:worker` | 本机运行 api（默认端口 3000）/ worker，需要 `DATABASE_URL` |
 | `pnpm --filter @forcome/web dev` | 本机运行前端，`/api` 转给本机 api |
 | `pnpm typecheck` · `pnpm lint` · `pnpm build` | 类型检查 · lint（含模块边界）与格式 · 构建 |
+| `pnpm lint:workflows` | 用 actionlint（Docker）校验 CI 工作流语法 |
 | `pnpm test:unit` · `pnpm test:integration` | 单元测试 · 集成测试（需要 `pnpm db:up`；CI 经 `TEST_DATABASE_URL` 指向服务容器） |
 | `pnpm ci:local` | 本机跑一遍与 CI 相同的检查（先 `pnpm db:up`，并且需要 Docker 构建镜像） |
 

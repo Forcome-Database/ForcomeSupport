@@ -30,10 +30,8 @@ describe('HTTP 应用', () => {
     });
     const res = await app.request('/api/__conflict');
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({
-      error: 'optimistic_lock',
-      message: 'aftersales S-20260911-0018 已被他人修改',
-    });
+    // 只给前端错误码与通用提示，不带表名与行 ID（G7 的文案由前端按错误码显示）
+    expect(await res.json()).toEqual({ error: 'optimistic_lock', message: '数据已被他人修改' });
   });
 
   it('未预期的错误返回 500，不把内部信息带给前端', async () => {

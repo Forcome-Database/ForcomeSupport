@@ -1,4 +1,4 @@
-import { PgBoss, type Queue } from 'pg-boss';
+import { PgBoss, type JobOptions, type Queue } from 'pg-boss';
 import type { z } from 'zod';
 import type { Logger } from './logger';
 import type { Runtime } from './runtime';
@@ -48,6 +48,18 @@ export function handleJob<T extends object>(
   handle: (payload: T, context: JobContext) => Promise<void>,
 ): JobHandler<T> {
   return { job, handle };
+}
+
+/**
+ * 这次发送是否按 pg-boss 的去重规则可能不插入：带 singletonKey、singletonSeconds，
+ * 或队列策略不是 standard（singleton、stately 等）。只有这时 send 返回 null 才是正常的。
+ */
+export function mayBeDeduplicated(job: AnyJobDefinition, options: JobOptions | undefined): boolean {
+  return (
+    options?.singletonKey !== undefined ||
+    options?.singletonSeconds !== undefined ||
+    (job.queue?.policy ?? 'standard') !== 'standard'
+  );
 }
 
 // 处理器集合里各任务的载荷类型不同，这里只关心任务名与队列设置

@@ -29,7 +29,7 @@ describe('可注入时钟', () => {
     expect(clock.now().toISOString()).toBe('2026-09-11T02:20:00.000Z');
   });
 
-  it('不接受无效时间，也不能倒退', () => {
+  it('不接受无效时间；advance 不能倒推', () => {
     expect(() => new ManualClock('not a date')).toThrow(RangeError);
     const clock = new ManualClock('2026-09-11T02:20:00Z');
     expect(() => clock.advance({ minutes: -1 })).toThrow(RangeError);

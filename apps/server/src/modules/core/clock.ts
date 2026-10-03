@@ -36,7 +36,7 @@ function toEpoch(at: Date | string): number {
   return epoch;
 }
 
-/** 停在给定时刻的时钟，只在被设定或推进时变化；时间只能向前 */
+/** 停在给定时刻的时钟，只在被设定或推进时变化：set 可设到任意时刻（如回放从历史时间开始），advance 只能向前 */
 export class ManualClock implements Clock {
   #epoch: number;
 

@@ -212,7 +212,13 @@ describe('数据约定（规格「数据约定」、ADR 0006）', () => {
     const columns = await moduleColumns();
     const tablesWithMoney = new Set(
       columns
-        .filter((c) => c.type === 'numeric' && c.precision === 12 && c.scale === 2)
+        .filter(
+          (c) =>
+            c.type === 'numeric' &&
+            c.precision === 12 &&
+            c.scale === 2 &&
+            !NUMERIC_COLUMNS_NOT_MONEY.has(`${c.schema}.${c.table}.${c.column}`),
+        )
         .map((c) => `${c.schema}.${c.table}`),
     );
     const offenders = [...tablesWithMoney].filter(

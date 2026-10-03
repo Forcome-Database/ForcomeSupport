@@ -6,9 +6,9 @@ import { ensureQueues, startRuntime, type AnyJobDefinition, type Logger } from '
 export const MIGRATIONS_FOLDER = fileURLToPath(new URL('../drizzle', import.meta.url));
 
 /**
- * 只向前执行迁移（ADR 0013）：执行 drizzle-kit 生成的 SQL（执行记录在 drizzle-kit 的默认位置
- * drizzle.__drizzle_migrations）；启动 migrate 角色的 pg-boss 时安装或升级它自己的表；
- * 最后确保各任务的队列存在。重复执行是空操作。
+ * 只向前执行迁移（ADR 0013），依次：启动 migrate 角色的 pg-boss，同时安装或升级它自己的表；
+ * 执行 drizzle-kit 生成的 SQL（执行记录在 drizzle-kit 的默认位置 drizzle.__drizzle_migrations）；
+ * 确保各任务的队列存在。两类表互不依赖；重复执行是空操作。
  */
 export async function runMigrations(
   databaseUrl: string,

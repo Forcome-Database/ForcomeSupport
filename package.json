@@ -10,6 +10,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint --max-warnings 0 . && prettier --check .",
+    "lint:workflows": "node scripts/lint-workflows.mjs",
     "format": "prettier --write .",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
@@ -20,7 +21,7 @@
     "db:check": "pnpm --filter @forcome/server db:check",
     "db:migrate": "pnpm --filter @forcome/server db:migrate",
     "db:verify": "pnpm --filter @forcome/server db:check && node scripts/check-migrations.mjs",
-    "ci:local": "pnpm typecheck && pnpm lint && pnpm db:verify && pnpm build && pnpm test:unit && pnpm test:integration && docker build -f apps/server/Dockerfile -t forcome-server:ci ."
+    "ci:local": "pnpm typecheck && pnpm lint && pnpm lint:workflows && pnpm db:verify && pnpm build && pnpm test:unit && pnpm test:integration && docker build -f apps/server/Dockerfile -t forcome-server:ci ."
   },
   "devDependencies": {
     "@forcome/config": "workspace:*",

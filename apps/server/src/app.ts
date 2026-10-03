@@ -73,7 +73,8 @@ export function createApp({ runtime, logger }: AppDeps) {
 
   app.onError((error, c) => {
     if (error instanceof OptimisticLockError) {
-      return c.json({ error: 'optimistic_lock', message: error.message }, 409);
+      logger.info({ table: error.table, rowId: error.rowId }, '乐观锁冲突');
+      return c.json({ error: 'optimistic_lock', message: '数据已被他人修改' }, 409);
     }
     if (error instanceof HTTPException) {
       return error.getResponse();

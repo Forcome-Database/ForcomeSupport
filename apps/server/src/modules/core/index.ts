@@ -4,17 +4,9 @@ export { recordAudit, systemActor, type Actor, type AuditEntry } from './audit';
 export { ManualClock, systemClock, type Clock, type Duration } from './clock';
 export { amount, currency, primaryId, timestamptz, version } from './columns';
 export { ConfigError, loadConfig, type AppConfig, type AppEnv } from './config';
-export {
-  closeDatabase,
-  createDatabase,
-  type Database,
-  type DatabaseOptions,
-  type DbExecutor,
-  type DbTransaction,
-} from './db';
+export { type Database, type DbExecutor, type DbTransaction } from './db';
 export { OptimisticLockError, updateWithVersion } from './optimistic-lock';
 export {
-  createJobQueue,
   defineJob,
   ensureQueues,
   handleJob,

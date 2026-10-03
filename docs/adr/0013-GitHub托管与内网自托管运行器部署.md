@@ -38,6 +38,6 @@ status: accepted
 ## 修订（2026-10-04，待办 01 落地）
 
 - **CI 工作流**（`.github/workflows/ci.yml`）：static（类型检查、lint 含模块边界与格式、迁移一致性、构建）、unit、integration（`postgres:18` 服务容器）、image（后端镜像可构建）四个作业，外加汇总作业「CI 通过」。分支保护只需把「CI 通过」设为 main 的必需检查，再要求至少 1 个批准（设置步骤见 README「开发」）。
-- **暂不上 GitHub 期间**（2026-10-04 用户口径）：工作流照写，语法用 actionlint 校验；同样的检查用 `pnpm ci:local` 在本机执行。仓库推到 GitHub 时补设分支保护。
+- **暂不上 GitHub 期间**（2026-10-04 用户口径）：工作流照写；同样的检查用 `pnpm ci:local` 在本机执行，其中 `pnpm lint:workflows` 用 actionlint（Docker 镜像 `rhysd/actionlint:1.7.12`）校验工作流语法。仓库推到 GitHub 时补设分支保护。
 - **迁移只向前**：migrate 执行 drizzle-kit 生成的迁移，并安装或升级 pg-boss 的表（ADR 0008 修订）；迁移目录不放回滚脚本，测试核对迁移目录只有 drizzle-kit 日志登记过的 SQL。
 - **本机开发**：`docker-compose.dev.yml` 只起 PostgreSQL 18，端口 4520（本期本机可用 4510–4520，其余留给开发测试与生产两套 Compose）；集成测试每次运行先建模板库并迁移，各测试文件复制出独立的库。
