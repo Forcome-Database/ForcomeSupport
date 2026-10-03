@@ -5,6 +5,7 @@
 ## 产出物
 - `spec/prd_a.md–prd_d.md` → `build_prd.py` 生成 `forcome-blueprint-guide.html`（当前 PRD v2.12 定稿评审稿）
 - `spec/data.py` 统一示例数据（所有原型只从这里取数）
+- `spec/shot_phase1.py` → `spec/phase1/*.dc.html` 与 `spec/shots/phase1/*.png`：第一期 7 个页面的全尺寸参照图（前端严格照做，见仓库根目录 CLAUDE.md）
 - `spec/ui.py` 组件库（所有高保真页面只用这里的组件）
 - 画布：设计规范、页面地图、高保真页面 P01–P27、状态板、流程图、邮件流转、视觉方向归档
 - 决策记录增补本轮决策

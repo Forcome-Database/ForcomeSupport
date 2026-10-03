@@ -6,7 +6,7 @@
 - **原文**：要逐字核对文案、数字或结构时，读同名的 `design/<画板>.dc.html`；口径以 PRD（`design/spec/prd_a.md`–`prd_d.md`）为准。
 - **截图过时**：画板改过而截图没更新时，在 `design/spec` 下运行 `python check.py --shots <画板>.dc.html` 重新生成。
 
-原型画的是完整产品（第三阶段形态）。第一、二阶段的差异由 PRD 各页「第一阶段」「第二阶段」小节与下表的状态板表达，被裁掉的部分不用做。标「当期」的列，每期开工时替换。
+原型画的是完整产品（第三阶段形态）。第一、二阶段的差异由 PRD 各页「第一阶段」「第二阶段」小节与下表的状态板表达，被裁掉的部分不用做。状态板里的阶段画面是缩小的，当期页面另有全尺寸参照图（见下方「当期参照图」）。标「当期」的列与「当期参照图」一节，每期开工时替换。
 
 ## 页面编号 → 画板
 
@@ -17,8 +17,8 @@
 | P01 收件箱 · 亚马逊工单 | `Main` | 二起 | 第二阶段为人工处理界面 I19–I21，完整版随第三阶段 | 只参考顶栏外壳 |
 | P02 收件箱 · 邮件工单 | `TicketEmail` | 二起 | 同 P01 | |
 | P03 收件箱 · 转人工工单 | `TicketEscalated` | 二起 | 同 P01 | |
-| P04 工单列表 | `Tickets` | 一起 | 第一阶段 I16、I17；第二阶段见 P04「第二阶段」 | ✓ I16、I17 |
-| P05 工单详情 · 全程记录 | `TicketDetail` | 一起 | 第一阶段 I18；第二阶段见 P05「第二阶段」 | ✓ I18 |
+| P04 工单列表 | `Tickets` | 一起 | 第一阶段 I16、I17；第二阶段见 P04「第二阶段」 | ✓ `P04_Tickets`、`P04_Tickets_drill` |
+| P05 工单详情 · 全程记录 | `TicketDetail` | 一起 | 第一阶段 I18；第二阶段见 P05「第二阶段」 | ✓ `P05_TicketDetail` |
 | P06 客户档案 | `Customer` | 二起 | | |
 | P07 售后单列表 | `AfterSalesList` | 二起 | 第一阶段遗留的手工登记单 S16 | |
 | P08 确认责任与处理方式 | `AfterSalesConfirm` | 二起 | 第二阶段见 P08「第二阶段」 | |
@@ -26,23 +26,27 @@
 | P10 售后单详情 · 易仓有货 | `AfterSalesInStock` | 二起 | | |
 | P11 售后单详情 · 部分补偿 | `AfterSalesRefund` | 二起 | | |
 | P12 承担比例协商 | `AfterSalesNegotiation` | 二起 | | |
-| P13 登记台账 | `AfterSalesLog` | 一起 | 第一阶段 S13–S15 | ✓ S13–S15 |
+| P13 登记台账 | `AfterSalesLog` | 一起 | 第一阶段 S13–S15 | ✓ `P13_AfterSalesLog`、`P13_AfterSalesLog_agent`；抽屉与弹窗看 S14、S15 |
 | P14 内部结算 | `AfterSalesSettlement` | 二起 | | |
 | P15 审批 | `Actions` | 二起 | A1–A11 | |
 | P16 知识库 | `KnowledgeBase` | 三 | | |
-| P17 报表 | `Reports` | 一起 | 第一阶段 K19；第二阶段见 P17「第二阶段」 | ✓ K19 |
-| P18 设置 · 渠道与店铺 | `Settings` | 一起 | 第一阶段 K20 | ✓ K20 |
+| P17 报表 | `Reports` | 一起 | 第一阶段 K19；第二阶段见 P17「第二阶段」 | ✓ `P17_Reports` |
+| P18 设置 · 渠道与店铺 | `Settings` | 一起 | 第一阶段 K20 | ✓ `P18_Settings`；店铺抽屉看 K8 |
 | P19 设置 · 处理规则 | `SettingsRules` | 三 | K15、K16、K21 | |
-| P20 设置 · 团队与权限 | `SettingsTeam` | 一起 | 第一阶段见 P20「第一阶段」、K10 与 K17 的第一阶段小图 | ✓ |
+| P20 设置 · 团队与权限 | `SettingsTeam` | 一起 | 第一阶段见 P20「第一阶段」、K10 与 K17 的第一阶段小图 | ✓ `P20_SettingsTeam`；角色权限页签看 K17 |
 | P21 工厂工作台 | `FactoryPortal` | 二起 | F1–F9 | |
 | P22 设置 · 动作映射 | `SettingsActions` | 二起 | | |
 | P23 设置 · 售后规则 | `SettingsAfterSales` | 二起 | | |
 | P24 设置 · 工厂账号 | `SettingsFactory` | 二起 | | |
 | P25 设置 · 模型 | `SettingsModels` | 二起 | | |
 | P26 设置 · 系统状态 | `SettingsHealth` | 二起 | | |
-| P27 审计日志 | `AuditLog` | 一起 | K18；第一阶段对象类型见 P27「第一阶段」 | ✓ K18 |
+| P27 审计日志 | `AuditLog` | 一起 | K18；第一阶段对象类型见 P27「第一阶段」 | ✓ `P27_AuditLog`；可见范围看 K18 |
 | 设置 · SLA、标签库、模板 | `StatesAdmin` 的 K22–K24 | 二起 | | |
 | 登录、登录被拒、站内通知 | `GlobalStates` 的 G11、G12、G10 | 一起 | | ✓ |
+
+## 当期参照图（第一期）
+
+`design/spec/shots/phase1/<名称>.png`，1440 × 900 整页，示例数据与演示时刻同原型（2026-09-11 10:20）；逐字核对读 `design/spec/phase1/<名称>.dc.html`。画面与状态板同源，改了页面脚本或示例数据后在 `design/spec` 下运行 `python shot_phase1.py` 重新生成。上表「当期」列的名称即文件名。
 
 ## 规范与状态
 

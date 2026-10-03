@@ -120,22 +120,24 @@ def audit_filters(who=None, period='今天', obj_q=None, who_locked=False, compa
     return between(left, '' if compact else row(icon('link', 13, T['ink4']) + nowrap('筛选条件写在地址栏', 12, T['ink4']), 4))
 
 
-def p27():
-    r0 = AUDIT_LOG[0]
+def p27(phase1=False):
+    """P27；phase1=True 为第一阶段版：第一阶段外壳，只列第一阶段会出现的对象类型（没有审批单、生产厂对接人与 ✦ 建议，prd_c P27「第一阶段」）。"""
+    log = [r for r in AUDIT_LOG if not (phase1 and (r[3] == '审批单' or r[2] == '生产厂对接人' or r[5].startswith('✦')))]
+    r0 = log[0]
     meta = '%s · %s · %s · 来源 IP %s' % ('09-11 ' + r0[0], r0[1], r0[2], r0[7])
     exp = audit_expand(AUDIT_P27_EXPAND, meta=meta)
-    denied = sum(1 for r in AUDIT_LOG if r[8])
+    denied = sum(1 for r in log if r[8])
     legend = row(row(chip('越权访问被拒', 'danger', 11, 'lock') + nowrap('E-24，红色标出', 12, T['ink3']), 6) + divider(True, 12) +
-                 row(ai_badge('AI', 10) + nowrap('AI 产出的建议', 12, T['ink3']), 6) + divider(True, 12) +
+                 ('' if phase1 else row(ai_badge('AI', 10) + nowrap('AI 产出的建议', 12, T['ink3']), 6) + divider(True, 12)) +
                  row(icon('money', 13, T['ink4']) + nowrap('财务字段：无财务权限的角色看到「已隐藏」', 12, T['ink3']), 6), 12)
     head = '<div style="padding: 16px 24px 2px 24px; flex-shrink: 0;">%s</div>' % audit_page_head()
-    tbl_head = between(row(label('09-11 今天') + nowrap('共 %d 条 · 越权访问 %d 条 · 点行展开完整前后值' % (len(AUDIT_LOG), denied), 12, T['ink3']), 8), legend)
+    tbl_head = between(row(label('09-11 今天') + nowrap('共 %d 条 · 越权访问 %d 条 · 点行展开完整前后值' % (len(log), denied), 12, T['ink3']), 8), legend)
     per = 10  # 每页 10 条，演示第 1 页
-    pages_n = (len(AUDIT_LOG) + per - 1) // per
-    foot = between(muted('共 %d 条 · 每页 %d 条' % (len(AUDIT_LOG), per)), row(btn('上一页', 'secondary', 'sm', disabled=True, reason='已是第一页') + nowrap('1 / %d' % pages_n, 12, T['ink2']) +
+    pages_n = (len(log) + per - 1) // per
+    foot = between(muted('共 %d 条 · 每页 %d 条' % (len(log), per)), row(btn('上一页', 'secondary', 'sm', disabled=True, reason='已是第一页') + nowrap('1 / %d' % pages_n, 12, T['ink2']) +
                                                           btn('下一页', 'secondary', 'sm', disabled=pages_n == 1, reason='已是最后一页'), 8))
-    body = head + content(audit_filters() + col(tbl_head + audit_table(AUDIT_LOG[:per], 0, exp, len(AUDIT_P27_EXPAND)), 10) + foot, '14px 24px', 12)
-    return app('zhoumin', '', ['审计日志'], body)
+    body = head + content(audit_filters() + col(tbl_head + audit_table(log[:per], 0, exp, len(AUDIT_P27_EXPAND)), 10) + foot, '14px 24px', 12)
+    return app('zhoumin', '', ['审计日志'], body, phase1=phase1)
 
 
 if __name__ == '__main__':

@@ -523,23 +523,29 @@ def role_cell(s):
     return row(''.join(cat(r) for r in (s.get('roles') or [s['role']])), 4, wrap=True, extra='row-gap: 4px;')
 
 
-def member_table(sel=None):
-    cols = [('成员', 'left'), ('钉钉部门', 'left'), ('角色', 'left'), ('数据范围', 'left'), ('语言', 'left'), ('状态', 'left'), ('最近登录', 'left'), ('', 'right')]
+def member_table(sel=None, lang=True):
+    """成员表；lang=False 为第一阶段（不显示「语言」列，prd_c P20「第一阶段」）。"""
+    cols = [('成员', 'left'), ('钉钉部门', 'left'), ('角色', 'left'), ('数据范围', 'left')] + ([('语言', 'left')] if lang else []) + [('状态', 'left'), ('最近登录', 'left'), ('', 'right')]
     rows = []
     for k, mail, last in MEMBERS:
         s = STAFF[k]
         who_ = row(avatar(s['avatar'], AV_TONE.get(s['role'], 'green'), 28) + col(nowrap(s['name'] + ('（我）' if k == 'liuyang' else ''), 13, T['ink'], 700) + nowrap(mail, 12, T['ink4']), 1), 10)
-        rows.append([who_, nowrap(s['dept'], 13, T['ink2']), role_cell(s), nowrap(s['stores'], 13, T['ink2']), nowrap(s.get('lang', '—'), 13, T['ink2'] if s.get('lang') else T['ink4']),
-                     state('已启用'), nowrap(last, 13, T['ink2']), icon_btn('more', size=24)])
-    return table(cols, rows, 'minmax(0, 1fr) 150px 190px 110px 90px 90px 110px 28px', sel=sel, py=11)
+        lang_ = [nowrap(s.get('lang', '—'), 13, T['ink2'] if s.get('lang') else T['ink4'])] if lang else []
+        rows.append([who_, nowrap(s['dept'], 13, T['ink2']), role_cell(s), nowrap(s['stores'], 13, T['ink2'])] + lang_ +
+                    [state('已启用'), nowrap(last, 13, T['ink2']), icon_btn('more', size=24)])
+    return table(cols, rows, 'minmax(0, 1fr) 150px 190px 110px %s90px 110px 28px' % ('90px ' if lang else ''), sel=sel, py=11)
 
 
-def p20_body(sel=None):
+def p20_body(sel=None, lang=True):
     head = between(row(label('成员') + nowrap('%d 人 · 来自钉钉通讯录，%s 同步' % (len(MEMBERS), CHANNEL_SYNC['钉钉']), 12, T['ink3']), 8), btn('从钉钉添加', 'primary', 'sm', 'plus'))
-    return col(head + member_table(sel), 10)
+    return col(head + member_table(sel, lang), 10)
 
 
-def p20(h=900):
+def p20(h=900, phase1=False):
+    """P20；phase1=True 为第一阶段版：页头没有备用审批人，成员表没有「语言」列（prd_c P20「第一阶段」）。"""
+    if phase1:
+        return spage('liuyang', '团队与权限', '团队与权限', '成员与部门来自钉钉通讯录；在这里分配角色与店铺数据范围。钉钉离职的成员自动停用。', '', p20_body(lang=False),
+                     save_bar(0, '角色与数据范围的修改在这里统一保存'), team_tabs('成员'), h=h, phase1=True)
     backup = row(col(nowrap('备用审批人', 12, T['ink2'], 600) + nowrap('唯一有权审批的人是发起人时转给此人（R-AP-02）', 11, T['ink4']), 1) + select_box('王磊 · 售后负责人', width='168px', h=32), 10)
     return spage('liuyang', '团队与权限', '团队与权限', '成员与部门来自钉钉通讯录；在这里分配角色、店铺数据范围与备用审批人。钉钉离职的成员自动停用。', backup, p20_body(),
                  save_bar(0, '角色、数据范围与备用审批人的修改在这里统一保存'), team_tabs('成员'), h=h)
