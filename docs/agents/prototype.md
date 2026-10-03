@@ -1,6 +1,6 @@
 # 原型
 
-原型在 `design/`，由 `design/spec` 下的脚本生成（示例数据唯一来源 `design/spec/data.py`）。它是生产系统的界面规格和验收依据，不进入生产代码。
+原型在 `design/`，由 `design/spec` 下的脚本生成（示例数据唯一来源 `design/spec/data.py`）。它是生产系统的界面规格和验收依据，前端严格照做（规则见 `CLAUDE.md`「界面严格按原型」），不进入生产代码。
 
 - **截图**：`design/spec/shots/<画板>.png`。页面是 1440 × 900 的整页截图，状态板是长图。做界面时先看它。
 - **原文**：要逐字核对文案、数字或结构时，读同名的 `design/<画板>.dc.html`；口径以 PRD（`design/spec/prd_a.md`–`prd_d.md`）为准。
