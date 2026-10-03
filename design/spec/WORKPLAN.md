@@ -44,6 +44,6 @@
 - [x] 第二轮四方对照（10-03，D-27、决策 34）：两个独立审查代理分别对照第一期与第二、三期，共 49 条全部属实并处理，另 5 条待确认按已有口径定下；PRD v2.12，原型新增 S16、I21 底图换为第二阶段收件箱、P01/P02 草稿卡加回复类型、P24 加来信邮箱；第一期待办 02、03、05、07、09、11、12、15、18、19、21、22、24、28、29、30 同步，第二期规格与第三期概要同步
 
 ## 已发布
-- 设计画布：https://claude.ai/artifact/UNVKrFXP8ZfwDJrMhyW2Jp（v37，10-02）
-- PRD：https://claude.ai/artifact/QLXPhPrUdpN6afrV3waad5（v23，PRD v2.11，10-02；v2.12 待发布）
-- 决策记录：https://claude.ai/artifact/2FawWgvB1Nvy4GjrdbjSmT（v16，决策 1–33，10-02；决策 34 待发布）
+- 设计画布：https://claude.ai/artifact/UNVKrFXP8ZfwDJrMhyW2Jp（v38，10-03）
+- PRD：https://claude.ai/artifact/QLXPhPrUdpN6afrV3waad5（v24，PRD v2.12，10-03）
+- 决策记录：https://claude.ai/artifact/2FawWgvB1Nvy4GjrdbjSmT（v17，决策 1–34，10-03）
