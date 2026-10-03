@@ -99,7 +99,8 @@ export const boundariesConfig = [
   },
   {
     // 店铺数据范围（ADR 0010 修订）：成员的范围只由 org 按会话构造，其他模块从访问上下文取（c.get('access').stores），
-    // 不能自己造一个「全部店铺」绕过范围；系统操作用 SYSTEM_STORE_SCOPE，由评审检查调用方。
+    // 不能自己造一个「全部店铺」绕过范围；后台任务等系统操作用 SYSTEM_STORE_SCOPE（接口里经 access.findOwned），
+    // 由评审检查调用方。
     files: [`${MODULES_DIR}/*/**/*.ts`],
     ignores: [`${MODULES_DIR}/org/**`, `${MODULES_DIR}/core/**`],
     rules: {

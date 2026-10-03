@@ -1,7 +1,7 @@
 import type { CurrentMember } from '@forcome/contracts';
 import { describe, expect, it } from 'vitest';
 import { ApiRequestError } from './api';
-import { createQueryClient, currentMemberQuery, rememberMember } from './session';
+import { createQueryClient, currentMemberQuery, resetCacheForMember } from './session';
 
 const member: CurrentMember = {
   id: '39550bdf-7cae-59d1-bece-97afd552daa0',
@@ -17,7 +17,7 @@ const member: CurrentMember = {
 describe('会话在使用中结束', () => {
   it('任何接口返回 401：当前成员置空，外壳换成登录入口', async () => {
     const client = createQueryClient();
-    rememberMember(client, member);
+    resetCacheForMember(client, member);
 
     await client
       .fetchQuery({
@@ -33,7 +33,7 @@ describe('会话在使用中结束', () => {
   it('其他错误不影响登录状态；登录时换掉上一位成员留下的缓存', async () => {
     const client = createQueryClient();
     client.setQueryData(['tickets'], ['上一位成员能看到的数据']);
-    rememberMember(client, member);
+    resetCacheForMember(client, member);
     expect(client.getQueryData(['tickets'])).toBeUndefined();
 
     await client

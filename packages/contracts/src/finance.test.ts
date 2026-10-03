@@ -119,6 +119,24 @@ describe('财务字段过滤（PRD 10.3：成本、承担比例、结算金额�
     ).toEqual({ no: 'S-1' });
   });
 
+  it('懒加载的结构（如自引用的树）展开后照常过滤', () => {
+    interface Node {
+      no: string;
+      cost?: string;
+      children: Node[];
+    }
+    const node: z.ZodType<Node> = z.lazy(() =>
+      z.object({ no: z.string(), cost: financeField(z.string()), children: z.array(node) }),
+    );
+    expect(
+      stripFinanceFields(
+        node,
+        { no: 'S-1', cost: '1.00', children: [{ no: 'S-2', cost: '2.00', children: [] }] },
+        false,
+      ),
+    ).toEqual({ no: 'S-1', children: [{ no: 'S-2', children: [] }] });
+  });
+
   it('财务字段放进联合类型等认不出分支的结构里：过滤时直接报错，不放行', () => {
     const union = z.object({
       fee: z.union([

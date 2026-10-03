@@ -116,17 +116,17 @@ function UserMenu({ member }: { member: CurrentMember }) {
           </span>
         </button>
       </DropdownMenuTrigger>
-      {/* 原型：菜单顶边在顶栏下方 6px（top 62）、右边距视口 12px */}
+      {/* 原型：菜单顶边在顶栏下方 6px（top 62）、右边距视口 12px。菜单随密度（姓名与菜单项用正文字号），顶栏本身固定 */}
       <DropdownMenuContent className="w-62" sideOffset={19} alignOffset={-4}>
         <div className="flex items-center gap-2.5 px-2.5 pt-2 pb-2.5">
           <Avatar size="lg">
             <AvatarFallback>{avatarText(member.name)}</AvatarFallback>
           </Avatar>
           <div className="flex min-w-0 flex-col gap-px">
-            <div className="text-13 font-semibold whitespace-nowrap text-foreground">
+            <div className="text-body font-semibold whitespace-nowrap text-foreground">
               {member.name}
             </div>
-            <div className="truncate text-11 text-subtle-foreground">
+            <div className="truncate text-badge text-subtle-foreground">
               {roles} · {member.dept}
             </div>
           </div>

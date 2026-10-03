@@ -68,7 +68,7 @@ export function createQueryClient(): QueryClient {
 }
 
 /** 登录成功后换掉上一位成员留下的缓存，记下当前成员（不必再请求一次 /api/me） */
-export function rememberMember(queryClient: QueryClient, member: CurrentMember): void {
+export function resetCacheForMember(queryClient: QueryClient, member: CurrentMember): void {
   queryClient.clear();
   queryClient.setQueryData(currentMemberQuery.queryKey, member);
 }

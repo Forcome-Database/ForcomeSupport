@@ -14,6 +14,7 @@ import type { Context, MiddlewareHandler } from 'hono';
 import {
   AccessDeniedError,
   memberStoreScope,
+  SYSTEM_STORE_SCOPE,
   recordAudit,
   storeScopeValue,
   storesOutsideScope,
@@ -70,13 +71,24 @@ export interface Access extends MemberAccess {
   readonly financeVisible: boolean;
   /** 审计的操作人（成员、角色快照、来源 IP） */
   readonly actor: Actor;
-  /** 是否有这项能力（PRD 10.1，多角色取并集；「○」的归属由业务模块再校验） */
+  /**
+   * 是否有这项能力（PRD 10.1，多角色取并集；「○」的归属由业务模块再校验）。
+   * finance.view 与 financeVisible 一致（只认完整权限，见 contracts 的 canViewFinance）。
+   */
   can(capability: Capability): boolean;
   /**
-   * 要访问这些店铺的数据：都在店铺范围内则通过；否则记一条审计「越权访问被拒」（E-24），
+   * 列表的店铺筛选等：要访问这些店铺的数据，都在店铺范围内则通过；否则记一条审计「越权访问被拒」（E-24），
    * 再抛 AccessDeniedError（接口返回 403）。审计单独提交，不随业务事务回滚。
    */
   requireStores(target: StoreAccessTarget): Promise<void>;
+  /**
+   * 详情接口：按编号或 ID 取出对象（load 拿到的是不受限的范围，只为判断归属），对象的店铺不在范围内时
+   * 同 requireStores 记审计并 403；对象不存在返回 null。处理器不直接用 SYSTEM_STORE_SCOPE。
+   */
+  findOwned<T>(
+    load: (scope: StoreScope) => Promise<T | null>,
+    target: (found: T) => StoreAccessTarget,
+  ): Promise<T | null>;
 }
 
 /** Hono 上下文变量：requireSession 之后的处理器用 c.get('access') 取访问上下文 */
@@ -105,28 +117,37 @@ function buildAccess(runtime: Runtime, c: Context, sessionId: string, row: Membe
     stores,
     financeVisible: canViewFinance(member.roles),
     actor,
-    can: (capability) => can(member.roles, capability),
-    async requireStores(target) {
-      const outside = storesOutsideScope(stores, target.storeIds);
-      if (outside.length === 0) return;
-      await transaction(runtime, (tx) =>
-        recordAudit(tx, actor, {
-          action: 'access.denied',
-          objectType: target.objectType,
-          objectId: target.objectId,
-          objectLabel: target.objectLabel ?? null,
-          storeId: outside[0],
-          after: {
-            reason: 'store_scope',
-            storeIds: outside,
-            method: c.req.method,
-            path: c.req.path,
-          },
-        }),
-      );
-      throw new AccessDeniedError('这条数据不在你的店铺范围内');
+    can: (capability) =>
+      capability === 'finance.view' ? canViewFinance(member.roles) : can(member.roles, capability),
+    requireStores,
+    async findOwned(load, target) {
+      const found = await load(SYSTEM_STORE_SCOPE);
+      if (found === null) return null;
+      await requireStores(target(found));
+      return found;
     },
   };
+
+  async function requireStores(target: StoreAccessTarget): Promise<void> {
+    const outside = storesOutsideScope(stores, target.storeIds);
+    if (outside.length === 0) return;
+    await transaction(runtime, (tx) =>
+      recordAudit(tx, actor, {
+        action: 'access.denied',
+        objectType: target.objectType,
+        objectId: target.objectId,
+        objectLabel: target.objectLabel ?? null,
+        storeId: outside[0],
+        after: {
+          reason: 'store_scope',
+          storeIds: outside,
+          method: c.req.method,
+          path: c.req.path,
+        },
+      }),
+    );
+    throw new AccessDeniedError('这条数据不在你的店铺范围内');
+  }
 }
 
 /**

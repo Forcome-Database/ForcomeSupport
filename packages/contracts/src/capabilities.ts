@@ -321,7 +321,10 @@ export function grantsFor(
   });
 }
 
-/** 这些角色是否有这项能力（任一角色有即可；能力未上线时谁都没有） */
+/**
+ * 这些角色是否有这项能力（任一角色有即可，「○」与文字的部分权限也算有；能力未上线时谁都没有）。
+ * 财务字段的可见性不要用它判断：生产厂对接人的「本厂部分」也算有 finance.view，客服系统里要用 canViewFinance。
+ */
 export function can(
   memberRoles: readonly Role[],
   capability: Capability,

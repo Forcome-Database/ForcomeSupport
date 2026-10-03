@@ -6,12 +6,7 @@ import { integer, pgSchema, text, uuid } from 'drizzle-orm/pg-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { ServerDeps } from '../src/deps';
-import {
-  storeScopeCondition,
-  SYSTEM_STORE_SCOPE,
-  type DbExecutor,
-  type StoreScope,
-} from '../src/modules/core';
+import { storeScopeCondition, type DbExecutor, type StoreScope } from '../src/modules/core';
 import { requireCapability, requireSession, type AccessVariables } from '../src/modules/org';
 import { startTestHarness, TEST_CLIENT_IP, type TestHarness } from './harness';
 
@@ -21,7 +16,7 @@ import { startTestHarness, TEST_CLIENT_IP, type TestHarness } from './harness';
  * 经主接缝验证它们——真实会话、真实数据库与审计。写法就是后续各模块的样板：
  * - 列表：requireSession → requireCapability → 页面的店铺筛选先 access.requireStores（越权即审计并 403）
  *   → 仓储查询带 access.stores（storeScopeCondition）→ 输出前 stripFinanceFields(结构, 值, access.financeVisible)；
- * - 详情：先按编号取出对象（只为判断归属，用 SYSTEM_STORE_SCOPE）→ access.requireStores(对象的店铺) → 输出。
+ * - 详情：access.findOwned(按编号取对象的仓储查询, 对象 → 审计目标)，范围外记审计并 403 → 输出。
  */
 
 const stores = getDemoFixture().stores;
@@ -107,17 +102,19 @@ function demoRoutes({ runtime, config }: ServerDeps) {
     );
   });
 
-  // 示范详情：先取出对象判断归属，范围外的记审计并 403
+  // 示范详情：取出对象判断归属，范围外的记审计并 403
   routes.get('/api/test/ledger/:no', requireCapability('aftersales.view'), async (c) => {
     const access = c.get('access');
-    const row = await findLedger(runtime.db, SYSTEM_STORE_SCOPE, c.req.param('no'));
+    const row = await access.findOwned(
+      (scope) => findLedger(runtime.db, scope, c.req.param('no')),
+      (found) => ({
+        storeIds: [found.storeId],
+        objectType: 'aftersales',
+        objectId: found.id,
+        objectLabel: found.no,
+      }),
+    );
     if (!row) return c.json({ error: 'not_found', message: '售后单不存在' }, 404);
-    await access.requireStores({
-      storeIds: [row.storeId],
-      objectType: 'aftersales',
-      objectId: row.id,
-      objectLabel: row.no,
-    });
     return c.json(stripFinanceFields(ledgerRowSchema, toOutput(row), access.financeVisible));
   });
 

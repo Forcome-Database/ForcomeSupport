@@ -9,7 +9,8 @@ declare const storeScopeBrand: unique symbol;
  *
  * 带品牌的类型，不能用对象字面量冒充，只有两个来源，评审时检查它们的调用方：
  * - 请求里的范围由 org 按当前成员构造（接口里取 c.get('access').stores）；
- * - 后台任务、同步等系统操作不受店铺范围限制，用 SYSTEM_STORE_SCOPE。
+ * - 后台任务、同步等系统操作不受店铺范围限制，用 SYSTEM_STORE_SCOPE；接口里不直接用它——
+ *   详情接口要先取出对象才知道它属于哪个店铺，用 org 的 access.findOwned（取对象并校验归属，越权记审计）。
  * 报表（report）直接读各模块的表，绕过了仓储层，每个视图查询也要用 storeScopeCondition 显式过滤。
  */
 export type StoreScope = { readonly [storeScopeBrand]: true } & (
@@ -26,7 +27,7 @@ export function memberStoreScope(member: {
   ) as StoreScope;
 }
 
-/** 系统操作（后台任务、同步、扫描）的范围：全部店铺 */
+/** 系统操作（后台任务、同步、扫描）的范围：全部店铺；接口里只经 org 的 access.findOwned 间接使用 */
 export const SYSTEM_STORE_SCOPE = { all: true } as StoreScope;
 
 /** 这个店铺是否在范围内 */

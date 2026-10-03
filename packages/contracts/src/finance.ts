@@ -12,7 +12,7 @@ import type { Role } from './roles';
  * 后端从请求的访问上下文取权限（org 的 access.financeVisible）。
  *
  * 不认识的一律不放行：过滤时结构里没声明的键也去掉；标记过的字段外面再包可选、可空、默认值、只读，
- * 或再加 describe / meta / openapi 说明，都认得出。联合、交叉、记录、元组等结构里放了财务字段时直接报错
+ * 或再加 describe / meta / openapi 说明，都认得出；懒加载（z.lazy）的结构展开后照常过滤。联合、交叉、记录、元组等结构里放了财务字段时直接报错
  * （认不出值属于哪个分支，宁可让开发时失败），财务字段只放在对象与列表里。
  */
 
@@ -62,6 +62,7 @@ interface SchemaDef {
   readonly rest?: z.ZodType | null;
   readonly in?: z.ZodType;
   readonly out?: z.ZodType;
+  readonly getter?: () => z.ZodType;
 }
 
 function defOf(schema: z.ZodType): SchemaDef {
@@ -88,8 +89,10 @@ function innermost(schema: z.ZodType): z.ZodType {
   return current;
 }
 
-/** 结构里任何位置有没有财务字段（懒加载的结构不展开） */
-function containsFinanceField(schema: z.ZodType): boolean {
+/** 结构里任何位置有没有财务字段（懒加载的结构展开一次，自引用的不重复展开） */
+function containsFinanceField(schema: z.ZodType, seen = new Set<z.ZodType>()): boolean {
+  if (seen.has(schema)) return false;
+  seen.add(schema);
   if (isFinanceField(schema)) return true;
   const def = defOf(innermost(schema));
   const children: (z.ZodType | null | undefined)[] = [
@@ -103,8 +106,9 @@ function containsFinanceField(schema: z.ZodType): boolean {
     def.rest,
     def.in,
     def.out,
+    def.getter?.(),
   ];
-  return children.some((child) => child != null && containsFinanceField(child));
+  return children.some((child) => child != null && containsFinanceField(child, seen));
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -134,6 +138,7 @@ function redact(schema: z.ZodType, value: unknown, mode: 'strip' | 'mask'): unkn
     return Array.isArray(value) ? value.map((item) => redact(def.element!, item, mode)) : value;
   }
   if (def.type === 'pipe' && def.out) return redact(def.out, value, mode);
+  if (def.type === 'lazy' && def.getter) return redact(def.getter(), value, mode);
   if (containsFinanceField(inner)) {
     throw new Error(`财务字段只能放在对象与列表里，「${def.type}」结构里的财务字段过滤不了`);
   }
