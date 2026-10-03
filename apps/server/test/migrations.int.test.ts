@@ -174,12 +174,14 @@ describe('数据约定（规格「数据约定」、ADR 0006）', () => {
     precision: number | null;
     scale: number | null;
     default: string | null;
+    nullable: 'YES' | 'NO';
   };
 
   async function moduleColumns(): Promise<Column[]> {
     return rows<Column>(sql`
       SELECT table_schema AS schema, table_name AS table, column_name AS column, data_type AS type,
-             numeric_precision AS precision, numeric_scale AS scale, column_default AS default
+             numeric_precision AS precision, numeric_scale AS scale, column_default AS default,
+             is_nullable AS nullable
       FROM information_schema.columns
       WHERE table_schema IN (${sql.join(
         MODULES.map((m) => sql`${m}`),
@@ -204,6 +206,31 @@ describe('数据约定（规格「数据约定」、ADR 0006）', () => {
         (c.precision !== 12 || c.scale !== 2),
     );
     expect(offenders.map((c) => `${c.schema}.${c.table}.${c.column}`)).toEqual([]);
+  });
+
+  it('有金额列的表必须有币种列（currency 或 *_currency）', async () => {
+    const columns = await moduleColumns();
+    const tablesWithMoney = new Set(
+      columns
+        .filter((c) => c.type === 'numeric' && c.precision === 12 && c.scale === 2)
+        .map((c) => `${c.schema}.${c.table}`),
+    );
+    const offenders = [...tablesWithMoney].filter(
+      (table) =>
+        !columns.some(
+          (c) =>
+            `${c.schema}.${c.table}` === table &&
+            (c.column === 'currency' || c.column.endsWith('_currency')),
+        ),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('乐观锁的 version 列是非空整数、从 1 开始', async () => {
+    const offenders = (await moduleColumns())
+      .filter((c) => c.column === 'version')
+      .filter((c) => c.type !== 'integer' || c.nullable !== 'NO' || c.default !== '1');
+    expect(offenders.map((c) => `${c.schema}.${c.table}.version`)).toEqual([]);
   });
 
   it('主键是 UUIDv7 的 id 列（登记过的例外除外）', async () => {

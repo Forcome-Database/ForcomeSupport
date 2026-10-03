@@ -19,7 +19,7 @@ async function boundaryErrors(module: string, code: string): Promise<string[]> {
     filePath: `${repoRoot}/apps/server/src/modules/${module}/index.ts`,
   });
   return (result?.messages ?? [])
-    .filter((m) => m.ruleId === 'boundaries/dependencies')
+    .filter((m) => m.ruleId === 'boundaries/dependencies' || m.ruleId === 'no-restricted-syntax')
     .map((m) => m.message);
 }
 
@@ -85,6 +85,23 @@ describe('模块边界 lint', () => {
         `import { transaction } from '../core';\nexport const t = transaction;\n`,
       ),
     ).toEqual([]);
+  });
+
+  it('index.ts 不能用 export * 或直接转出本模块的表', async () => {
+    expect(
+      await boundaryErrors(
+        'channel',
+        `export * from './schema';
+`,
+      ),
+    ).toEqual(['模块边界（ADR 0005）：index.ts 要逐个列出对外导出的服务与类型，不能 export *']);
+    expect(
+      await boundaryErrors(
+        'channel',
+        `export { channelSchema } from './schema';
+`,
+      ),
+    ).toEqual(['模块边界（ADR 0005）：index.ts 不能转出本模块的表，别的模块要经本模块的服务读写']);
   });
 
   it('模块不能引用后端入口与组装代码', async () => {

@@ -1,5 +1,5 @@
 # 质量门槛（ADR 0013）：每个 PR 与 main 的推送都在云端运行器上跑类型检查、lint（含模块边界）、
-# 单元测试、集成测试（真实 PostgreSQL 18 服务容器 + Fake）。
+# 单元测试、集成测试（真实 PostgreSQL 18 服务容器 + Fake），并确认后端镜像可构建。
 # 分支保护把「CI 通过」设为必需检查：任一作业失败，它就失败，PR 不能合并（设置方法见 README「开发」）。
 name: CI
 
@@ -78,10 +78,18 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:integration
 
+  image:
+    name: 后端镜像可构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: 构建镜像（不推送；部署由运行器另行构建，ADR 0013）
+        run: docker build -f apps/server/Dockerfile -t forcome-server:ci .
+
   ci-ok:
     name: CI 通过
     if: always()
-    needs: [static, unit, integration]
+    needs: [static, unit, integration, image]
     runs-on: ubuntu-latest
     steps:
       - name: 汇总

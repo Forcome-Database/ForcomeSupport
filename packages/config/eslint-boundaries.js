@@ -97,4 +97,23 @@ export const boundariesConfig = [
       ],
     },
   },
+  {
+    // 堵住「经 index.ts 转手把表交出去」的口子：入口要逐个列出导出项，且不能直接转出 schema.ts。
+    // 先 import 表再按名字导出的写法 lint 查不到，靠评审把关（ADR 0005 修订）。
+    files: [`${MODULES_DIR}/*/index.ts`],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ExportAllDeclaration',
+          message: '模块边界（ADR 0005）：index.ts 要逐个列出对外导出的服务与类型，不能 export *',
+        },
+        {
+          selector: 'ExportNamedDeclaration[source.value=/(^|\\/)schema$/]',
+          message:
+            '模块边界（ADR 0005）：index.ts 不能转出本模块的表，别的模块要经本模块的服务读写',
+        },
+      ],
+    },
+  },
 ];

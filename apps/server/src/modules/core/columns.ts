@@ -3,13 +3,15 @@ import { sql } from 'drizzle-orm';
 import { integer, numeric, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 /*
- * 数据约定（规格「数据约定」、ADR 0006）。各模块建表一律用这些列助手，
- * 迁移测试会逐表核对：
+ * 数据约定（规格「数据约定」、ADR 0006）。各模块建表一律用这些列助手：
  * - 主键 UUIDv7，由数据库生成（PostgreSQL 18 内置 uuidv7()）；业务编号另设一列；
  * - 时间一律 timestamptz（UTC 存储），日界按 Asia/Shanghai 在应用层计算；
- * - 金额 numeric(12,2) + 币种；
- * - 主表带 version 列做乐观锁，冲突时抛 OptimisticLockError（接口返回 409）；
+ * - 金额 numeric(12,2) + 币种。币种、汇率、汇率日期与来源、美元冻结值属于整条记录
+ *   （R-AS-08：一张售后单一个币种，各费用项共用），由各模块在自己的表上定义，不按单项金额打包；
+ * - 主表带 version 列，更新经 updateWithVersion，冲突抛 OptimisticLockError（接口返回 409）；
  * - 不做软删除，作废、取消用状态表示。
+ * 迁移测试（apps/server/test/migrations.int.test.ts）逐表核对：时间列、JSON 列、numeric 精度、
+ * UUIDv7 主键，以及 version 列的类型与默认值。
  */
 
 /** UUIDv7 主键 `id` */

@@ -37,13 +37,19 @@ export interface AuditEntry {
 
 /** 在业务事务内写一条审计；时间取事务的「当前时间」（ADR 0006：应用层同事务写入，不用触发器） */
 export async function recordAudit(tx: Tx, actor: Actor, entry: AuditEntry): Promise<void> {
+  const operator =
+    actor.kind === 'member'
+      ? {
+          actorId: actor.memberId,
+          actorName: actor.name,
+          actorRoles: [...actor.roles],
+          ip: actor.ip,
+        }
+      : { actorId: null, actorName: SYSTEM_ACTOR_NAME, actorRoles: [], ip: null };
   await tx.db.insert(auditLog).values({
     occurredAt: tx.now,
     actorType: actor.kind,
-    actorId: actor.kind === 'member' ? actor.memberId : null,
-    actorName: actor.kind === 'member' ? actor.name : SYSTEM_ACTOR_NAME,
-    actorRoles: actor.kind === 'member' ? [...actor.roles] : [],
-    ip: actor.kind === 'member' ? actor.ip : null,
+    ...operator,
     action: entry.action,
     objectType: entry.objectType,
     objectId: entry.objectId,
@@ -63,8 +69,8 @@ export interface AuditQuery {
 }
 
 /**
- * 按对象或动作取审计记录，按时间先后排序。不做可见范围与财务字段过滤，
- * 只供服务内部与测试核对；P27 的查询（PRD 10.2 过滤）由 30 号待办提供。
+ * 按对象或动作取审计记录，按时间先后排序。不带店铺范围与财务字段过滤（ADR 0010），
+ * 所以不从 index.ts 导出，只供 core 内部与测试核对；P27 的查询（PRD 10.2 过滤）由 30 号待办提供。
  */
 export async function findAuditRecords(
   db: DbExecutor,

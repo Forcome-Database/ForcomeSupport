@@ -5,7 +5,8 @@ import {
   type TestDatabase,
   type TestRuntime,
 } from '../../../test/database';
-import { findAuditRecords, recordAudit, systemActor, transaction, type Actor } from './index';
+import { findAuditRecords } from './audit';
+import { recordAudit, systemActor, transaction, type Actor } from './index';
 
 let database: TestDatabase;
 let t: TestRuntime;

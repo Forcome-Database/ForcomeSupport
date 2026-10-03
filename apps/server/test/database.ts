@@ -2,12 +2,9 @@ import { randomBytes } from 'node:crypto';
 import pg from 'pg';
 import { inject } from 'vitest';
 import {
-  closeDatabase,
-  createDatabase,
-  createJobQueue,
   ManualClock,
   silentLogger,
-  type Clock,
+  startRuntime,
   type JobQueueRole,
   type Runtime,
 } from '../src/modules/core';
@@ -55,16 +52,11 @@ export async function createTestRuntime(
   options: { role?: JobQueueRole; clock?: ManualClock } = {},
 ): Promise<TestRuntime> {
   const clock = options.clock ?? new ManualClock('2026-09-11T02:20:00Z');
-  const db = createDatabase(url, { max: 5, applicationName: 'forcome-test' });
-  const boss = createJobQueue(url, { role: options.role ?? 'api', logger: silentLogger });
-  await boss.start();
-  const runtime: Runtime = { db, boss, clock: clock satisfies Clock };
-  return {
-    runtime,
+  const { runtime, stop } = await startRuntime(url, {
+    role: options.role ?? 'api',
+    logger: silentLogger,
     clock,
-    async close() {
-      await boss.stop({ graceful: false, close: true });
-      await closeDatabase(db);
-    },
-  };
+    poolMax: 5,
+  });
+  return { runtime, clock, close: () => stop({ graceful: false }) };
 }

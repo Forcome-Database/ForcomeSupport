@@ -27,14 +27,20 @@ const healthRoute = createRoute({
   },
 });
 
-async function databaseIsUp(runtime: Runtime): Promise<boolean> {
+async function databaseIsUp(runtime: Runtime, logger: Logger): Promise<boolean> {
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<false>((resolve) => {
-    timer = setTimeout(() => resolve(false), DATABASE_CHECK_TIMEOUT_MS);
+    timer = setTimeout(() => {
+      logger.warn({ timeoutMs: DATABASE_CHECK_TIMEOUT_MS }, '健康检查：数据库超时未响应');
+      resolve(false);
+    }, DATABASE_CHECK_TIMEOUT_MS);
   });
   const check = runtime.db.execute(sql`SELECT 1`).then(
     () => true,
-    () => false,
+    (error: unknown) => {
+      logger.warn({ err: error }, '健康检查：数据库不可用');
+      return false;
+    },
   );
   try {
     return await Promise.race([check, timeout]);
@@ -51,7 +57,7 @@ export function createApp({ runtime, logger }: AppDeps) {
   const app = new OpenAPIHono();
 
   app.openapi(healthRoute, async (c) => {
-    const up = await databaseIsUp(runtime);
+    const up = await databaseIsUp(runtime, logger);
     const body: HealthResponse = {
       status: up ? 'ok' : 'unavailable',
       checks: { database: up ? 'ok' : 'unavailable' },

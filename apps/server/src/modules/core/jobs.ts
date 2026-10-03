@@ -1,4 +1,4 @@
-import { PgBoss, type QueueOptions } from 'pg-boss';
+import { PgBoss, type Queue } from 'pg-boss';
 import type { z } from 'zod';
 import type { Logger } from './logger';
 import type { Runtime } from './runtime';
@@ -13,8 +13,8 @@ import type { Runtime } from './runtime';
 export interface JobDefinition<T extends object> {
   readonly name: string;
   readonly payload: z.ZodType<T>;
-  /** 队列级的重试、过期与保留设置；不填用 pg-boss 默认值 */
-  readonly queue?: QueueOptions;
+  /** 队列策略与重试、过期、保留设置；不填用 pg-boss 默认值（standard 策略） */
+  readonly queue?: Omit<Queue, 'name'>;
 }
 
 const JOB_NAME = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
@@ -22,7 +22,7 @@ const JOB_NAME = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
 export function defineJob<T extends object>(
   name: string,
   payload: z.ZodType<T>,
-  queue?: QueueOptions,
+  queue?: Omit<Queue, 'name'>,
 ): JobDefinition<T> {
   if (!JOB_NAME.test(name)) {
     throw new Error(`任务名必须是「模块.任务」形式的小写 snake_case：${name}`);

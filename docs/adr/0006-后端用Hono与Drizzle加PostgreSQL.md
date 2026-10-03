@@ -35,3 +35,15 @@ status: accepted
 - **锁的活动时间**：租约行的「最后活动时间」是最后一次**用户操作**的时间（编辑、点击、输入），不是心跳时间。前端心跳只证明连接仍在，并携带最后一次用户操作时间；服务端按它判断 5 分钟（R-TK-06）或 10 分钟（R-AP-03）无操作后释放。验收须覆盖「页面开着但不操作」的场景。
 - **收信并发**：消息表对「邮箱 + Gmail 消息 ID」加唯一约束，冲突即视为重复；归并在事务内按「店铺 + 订单号」或「店铺 + 客户渠道身份」取 `pg_advisory_xact_lock` 后再查再写；归并任务幂等。
 - Compose 服务中「是否加 Redis 由后台任务讨论决定」已由 ADR 0008 定为不加。
+
+## 修订（2026-10-04，待办 01 落地）
+
+- **工具链**：TypeScript 6.0（typescript-eslint 尚不支持 TypeScript 7 的原生编译器）；后端用 tsdown 打包成 `dist/api.mjs`、`dist/worker.mjs`、`dist/migrate.mjs`，工作区包打进包里，其余依赖留在 `node_modules`；本机开发用 tsx 直接运行源码。三个入口共用 `core` 的 `startRuntime(数据库地址, { role })` 组装数据库连接池与 pg-boss。
+- **schema 与迁移**：schema 名就是模块名（`order` 是 SQL 保留字，drizzle 自动加引号，手写 SQL 必须写成 `"order"`）。drizzle-kit 读 `apps/server/src/modules/*/schema.ts`，迁移在 `apps/server/drizzle/`，执行记录在 drizzle-kit 默认的 `drizzle.__drizzle_migrations`；手写 SQL（角色、授权等）用 `drizzle-kit generate --custom` 生成空迁移再填写。CI 的 `pnpm db:verify` 重新生成一次，迁移目录有变化即失败（改了表却没生成迁移）。
+- **执行迁移的数据库用户**需要 CREATEROLE（或为超级用户），因为迁移要创建 `report_reader` 角色并授予自己；生产库开通时由运维按此授权。
+- **数据约定的落地**：主键默认值用 PostgreSQL 18 内置的 `uuidv7()`；列助手 `primaryId`、`timestamptz`、`amount`、`currency`、`version` 由 `core` 导出，各模块建表一律使用。币种、汇率、汇率日期与来源、美元冻结值属于整条记录（R-AS-08：一张售后单一个币种），由各模块在自己的表上定义，不按单项金额打包。集成测试逐表核对：时间列都是 timestamptz、JSON 列都是 jsonb、numeric 都是 (12,2)、有金额列的表必须有币种列、`version` 是非空整数且默认 1、主键是 UUIDv7 的 `id`；例外登记在测试里并写明原因。
+- **乐观锁**：主表更新经 `core` 的 `updateWithVersion(tx, 表, { id, version }, 新值)`，只在版本一致时更新并把版本加 1；没命中抛 `OptimisticLockError`，接口统一返回 409。数据不做物理删除，没命中即视为版本冲突。
+- **report 只读角色**：迁移创建 `report_reader`（NOLOGIN），授予应用自己的数据库用户；对各模块 schema 有 USAGE、全部表的 SELECT 以及以后新表的默认 SELECT，读不到 `pgboss` 与 `drizzle`。`report` 模块经 `runReportQuery` 在只读事务里 `SET LOCAL ROLE report_reader` 后查询，不另设登录账号与口令。
+- **审计表** `core.audit_log`：操作人姓名与角色在写入时快照；带对象所属店铺 `store_id`，供 PRD 10.2 的店铺范围过滤；动作写成「对象.动词」（如 `store.create`、`member.disable`、`auth.login`），对象类型取 `contracts` 的 `auditObjectTypeLabels`（与 P27 筛选一致）。`core` 只对外提供写入 `recordAudit`；不带店铺范围的读取函数只供 `core` 内部与测试，不从 `index.ts` 导出（ADR 0010），P27 的查询由 30 号待办按 10.2 实现。
+- **事务的当前时间**：`core` 的 `transaction(runtime, fn)` 在事务开始时从可注入时钟取一次时间（`tx.now`），事务内的审计与业务写入共用；回放与测试换成手动时钟即可。
+- **业务编号**：`core.business_number_counter` 按（编号种类，计数周期）upsert 加 1，并发事务在同一行上排队，事务回滚则号不被占用。
