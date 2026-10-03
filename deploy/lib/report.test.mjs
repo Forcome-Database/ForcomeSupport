@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { formatReport, playwrightVersion, summarizePlaywright } from './report.mjs';
+import { formatReport, summarizePlaywright } from './report.mjs';
 
 const base = {
   environment: 'staging',
+  title: '开发测试环境',
   project: 'forcome-staging',
   release: '0a1b2c3d4e5f',
   url: 'https://support-dev.forcome.internal:4510/',
@@ -52,19 +53,5 @@ describe('Playwright 结果汇总', () => {
     expect(
       summarizePlaywright({ stats: { expected: 2, unexpected: 1, flaky: 1, skipped: 3 } }),
     ).toEqual({ passed: 2, failed: 1, flaky: 1, skipped: 3 });
-  });
-});
-
-describe('冒烟镜像的 Playwright 版本与锁文件一致', () => {
-  it('从 pnpm-lock.yaml 取 @playwright/test 的版本', () => {
-    const lock = "  '@playwright/test@1.63.0':\n    resolution: {integrity: sha512-x}\n";
-    expect(playwrightVersion(lock)).toBe('1.63.0');
-  });
-
-  it('锁文件里没有或有多个版本时报错（镜像与测试包版本不一致时浏览器起不来）', () => {
-    expect(() => playwrightVersion('lockfileVersion: 9.0\n')).toThrow(/@playwright\/test/);
-    expect(() =>
-      playwrightVersion("  '@playwright/test@1.63.0':\n  '@playwright/test@1.62.1':\n"),
-    ).toThrow(/多个版本/);
   });
 });

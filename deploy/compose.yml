@@ -107,6 +107,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/web/Dockerfile
+      target: web
     image: forcome-web:${RELEASE:?由部署脚本给出}
     pull_policy: never
     environment:
@@ -132,7 +133,8 @@ services:
   smoke:
     build:
       context: ..
-      dockerfile: deploy/smoke/Dockerfile
+      dockerfile: deploy/web/Dockerfile
+      target: smoke
       args:
         PLAYWRIGHT_VERSION: ${PLAYWRIGHT_VERSION:-}
     image: forcome-smoke:${RELEASE:?由部署脚本给出}

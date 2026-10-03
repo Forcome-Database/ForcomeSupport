@@ -109,9 +109,9 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 ├── compose.yml          开发测试与生产共用的 Compose（caddy、api、worker、migrate、seed、postgres、smoke）
 ├── .env.example         环境变量模板（本机的 deploy/.env.staging 由部署脚本生成，不进 git）
 ├── deploy.mjs           部署脚本；lib/ 为它的纯逻辑与测试，verify.mjs 为 CI 用的配置检查
-├── web/                 前端镜像：caddy（Caddyfile）+ 前端静态文件
+├── web/                 前端的两个镜像（Dockerfile 的两个目标）：web = caddy（Caddyfile）+ 前端静态文件，smoke = 部署后冒烟
 ├── postgres/            自建 PostgreSQL 镜像
-└── smoke/               部署后冒烟的 Playwright 镜像
+└── smoke/               冒烟容器的入口脚本（信任 caddy 根证书后跑 Playwright）
 .github/workflows/       CI（ci.yml）；部署到开发测试环境（deploy-staging.yml，上 GitHub 后启用）
 ```
 
@@ -137,7 +137,7 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 | `pnpm test:e2e` | Playwright 端到端（需要 `pnpm db:up`；自己起 4518、4519 两个服务，用 e2e 专用库 `forcome_e2e`） |
 | `pnpm ci:local` | 本机跑一遍与 CI 相同的检查（先 `pnpm db:up`，并且需要 Docker 构建镜像） |
 | `pnpm deploy:staging` | 部署到开发测试环境（本机 Docker）：构建镜像 → migrate → 示例数据 → 起服务 → 用根证书核对 HTTPS → Playwright 冒烟，报告在 `deploy/.state/staging/`（`docs/部署说明.md`） |
-| `pnpm staging smoke` · `cert` · `compose …` · `down` | 对开发测试环境：只重跑冒烟 · 导出根证书 · 执行 docker compose · 停止（保留数据） |
+| `pnpm staging smoke` · `cert` · `compose …` · `down` | 对开发测试环境：重跑 HTTPS 核对与冒烟 · 导出根证书 · 执行 docker compose · 停止（保留数据） |
 | `pnpm deploy:verify` | 部署配置检查：Compose 文件、前端镜像、Caddyfile（CI 与 `ci:local` 执行） |
 
 **测试**：`*.test.ts` 是单元测试；`*.int.test.ts` 是集成测试，用真实 PostgreSQL 18——每次运行先建模板库并迁移，各测试文件再复制出自己的库，互不干扰。集成测试只经主接缝（规格「测试接缝」）：用 `apps/server/test/harness.ts` 的 `startTestHarness()` 在测试进程内调用 HTTP 接口，`t.loginAs('坐席')` 以某个角色登录，`t.clients.fake(…)` 往 Fake 里放数据、注入故障，`t.clock` 推进时钟，`t.runJobs()` 把后台任务跑到空闲，`t.auditRecords()` 核对审计；样板见 `apps/server/test/dev-login.int.test.ts`。外部客户端的「接口 + 真实现 + Fake」写法见 `apps/server/src/modules/integration/fake-framework.test.ts`。
@@ -152,7 +152,7 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 
 ## 约定
 
-- 文件编码 UTF-8 无 BOM；新建文档用 CRLF。代码与配置（`apps/`、`packages/`、`.github/`、`scripts/` 与根目录的配置文件）一律 LF，由 `.gitattributes` 与 prettier 保证。已有的 LF 文件（部分 ADR、各期规格与第一期待办、`build_canvas.py`、`build_prd.py`、`check.py` 等）保持原换行，改动时不要改变换行符（提交前用 `git ls-files --eol` 核对）。
+- 文件编码 UTF-8 无 BOM；新建文档用 CRLF。代码与配置（`apps/`、`packages/`、`.github/`、`scripts/`、`deploy/` 与根目录的配置文件）一律 LF，由 `.gitattributes` 与 prettier 保证。已有的 LF 文件（部分 ADR、各期规格与第一期待办、`build_canvas.py`、`build_prd.py`、`check.py` 等）保持原换行，改动时不要改变换行符（提交前用 `git ls-files --eol` 核对）。
 - 所有原型数据从 `data.py` 取，页面脚本里不写死业务数字。
 - 固定尺寸页面为 1440 × 900，`check.py` 报溢出或裁切必须修到 OK。
 - 已发布页面（画布、PRD、决策记录）的链接与当前版本记在 `spec/WORKPLAN.md`。

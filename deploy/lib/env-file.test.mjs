@@ -25,8 +25,29 @@ describe('读取并校验部署环境文件', () => {
       httpsBind: '127.0.0.1',
       httpsPort: 4510,
       pgPort: 4511,
+      siteUrl: 'https://support-dev.forcome.internal:4510/',
+      connectHost: '127.0.0.1',
       problems: [],
     });
+  });
+
+  it('访问地址在 443 端口时不带端口；监听 0.0.0.0 时本机从 127.0.0.1 连接核对', () => {
+    const onServer = readDeployEnv(
+      VALID.replace('HTTPS_PORT=4510', 'HTTPS_PORT=443').replace(
+        'HTTPS_BIND=127.0.0.1',
+        'HTTPS_BIND=0.0.0.0',
+      ),
+      staging,
+    );
+    expect(onServer).toMatchObject({
+      siteUrl: 'https://support-dev.forcome.internal/',
+      connectHost: '127.0.0.1',
+    });
+    const onInterface = readDeployEnv(
+      VALID.replace('HTTPS_BIND=127.0.0.1', 'HTTPS_BIND=10.0.8.21'),
+      staging,
+    );
+    expect(onInterface.connectHost).toBe('10.0.8.21');
   });
 
   it('环境文件写的 APP_ENV 与要部署的环境不符时报错，防止拿生产的文件部署开发测试环境', () => {

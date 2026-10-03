@@ -62,7 +62,18 @@ export function readDeployEnv(text, environment) {
     );
   }
 
-  return { vars, siteHost: vars.SITE_HOST, httpsBind, httpsPort, pgPort, problems };
+  return {
+    vars,
+    siteHost: vars.SITE_HOST,
+    httpsBind,
+    httpsPort,
+    pgPort,
+    /** 员工访问的地址（443 端口时不带端口） */
+    siteUrl: `https://${vars.SITE_HOST}${httpsPort === 443 ? '' : `:${httpsPort}`}/`,
+    /** 部署脚本在服务器本机核对 HTTPS 时连接的地址：监听全部网卡时从回环地址连 */
+    connectHost: httpsBind === '0.0.0.0' ? '127.0.0.1' : httpsBind,
+    problems,
+  };
 }
 
 /**

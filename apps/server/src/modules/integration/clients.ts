@@ -1,6 +1,12 @@
 import type { AdapterMode } from '@forcome/contracts';
 import { getDemoFixture, type DemoFixture } from '@forcome/fixtures';
-import { clientModeVariable, type AppConfig, type AppEnv, type MailSendPolicy } from '../core';
+import {
+  clientModeVariable,
+  defaultMailSendPolicy,
+  type AppConfig,
+  type AppEnv,
+  type MailSendPolicy,
+} from '../core';
 import { MailRecipientGuard } from './mail-recipient-guard';
 import { clientDefinitions } from './registry';
 
@@ -73,7 +79,7 @@ export interface IntegrationClientsOptions {
   readonly clientModes?: Readonly<Record<string, AdapterMode>>;
   /** 登记的客户端；默认 registry.ts 的清单，测试可以换成自己的 */
   readonly definitions?: readonly AnyClientDefinition[];
-  /** 发信白名单（AppConfig.mailSend）；不传时按环境取默认：非生产只向白名单发信且白名单为空，生产不限制 */
+  /** 发信白名单（AppConfig.mailSend）；不传时取 core 的 defaultMailSendPolicy（与没配置环境变量时一致） */
   readonly mailSend?: MailSendPolicy;
 }
 
@@ -88,7 +94,7 @@ export class IntegrationClients {
   constructor(options: IntegrationClientsOptions) {
     this.#production = options.appEnv === 'production';
     this.mailRecipientGuard = new MailRecipientGuard(
-      options.mailSend ?? { allowlistOnly: !this.#production, allowlist: [] },
+      options.mailSend ?? defaultMailSendPolicy(options.appEnv),
     );
     this.#definitions = new Set(options.definitions ?? clientDefinitions);
     this.#modes = options.clientModes ?? {};

@@ -1,8 +1,6 @@
 // 部署报告：部署脚本在终端输出、写进 deploy/.state/<环境>/report.md，
 // 仓库上 GitHub 后同一份内容写入 Actions 的作业摘要（GITHUB_STEP_SUMMARY）。
 
-const ENVIRONMENT_TITLES = { staging: '开发测试环境', production: '生产环境' };
-
 /**
  * @typedef {object} StepResult
  * @property {string} name
@@ -25,15 +23,14 @@ function duration(step) {
 
 /**
  * @param {{
- *   environment: string, project: string, release: string, url: string,
+ *   environment: string, title: string, project: string, release: string, url: string,
  *   rootCertFingerprint: string | null, steps: StepResult[], smoke: SmokeSummary | null,
  * }} result
  */
 export function formatReport(result) {
   const succeeded = result.steps.every((step) => step.status === 'passed');
-  const title = ENVIRONMENT_TITLES[result.environment] ?? result.environment;
   const lines = [
-    `## 部署到${title}（${result.environment}）：${succeeded ? '成功' : '失败'}`,
+    `## 部署到${result.title}（${result.environment}）：${succeeded ? '成功' : '失败'}`,
     '',
     `- 版本：\`${result.release}\``,
     `- 地址：${result.url}`,
@@ -61,22 +58,4 @@ export function formatReport(result) {
 export function summarizePlaywright(report) {
   const { expected, unexpected, flaky, skipped } = report.stats;
   return { passed: expected, failed: unexpected, flaky, skipped };
-}
-
-/**
- * 锁文件里 @playwright/test 的版本。冒烟镜像以同版本的官方 Playwright 镜像为底（浏览器版本随之一致），
- * 升级 Playwright 时镜像自动跟上。
- * @param {string} lockText pnpm-lock.yaml 的内容
- */
-export function playwrightVersion(lockText) {
-  const versions = new Set(
-    [...lockText.matchAll(/^ {2}'@playwright\/test@(\d+\.\d+\.\d+)':$/gm)].map((m) => m[1]),
-  );
-  if (versions.size === 0) {
-    throw new Error('pnpm-lock.yaml 里找不到 @playwright/test');
-  }
-  if (versions.size > 1) {
-    throw new Error(`pnpm-lock.yaml 里 @playwright/test 有多个版本：${[...versions].join('、')}`);
-  }
-  return [...versions][0];
 }

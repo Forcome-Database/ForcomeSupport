@@ -7,6 +7,7 @@ export { amount, currency, primaryId, timestamptz, version } from './columns';
 export {
   clientModeVariable,
   ConfigError,
+  defaultMailSendPolicy,
   loadConfig,
   type AppConfig,
   type AppEnv,

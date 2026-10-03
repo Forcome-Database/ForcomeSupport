@@ -11,7 +11,7 @@ import { z } from 'zod';
  *   店铺级客户端（Gmail、订单）按店铺配置选择，不在这里。
  * - `MAIL_SEND_ALLOWLIST_ONLY` / `MAIL_SEND_ALLOWLIST`：只向白名单发信（ADR 0013 修订）。不设时非生产环境
  *   打开、生产环境关闭；白名单为逗号分隔的完整地址或 `@域名`，空白名单表示一封也不发。
- * - `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`：出站代理（ADR 0003），只校验格式。
+ * - `HTTPS_PROXY` / `HTTP_PROXY`（大小写两种写法）：出站代理（ADR 0003），只校验是不是代理地址；`NO_PROXY` 不校验。
  * 空值视同未设置。
  */
 const envSchema = z.object({
@@ -74,6 +74,11 @@ export interface MailSendPolicy {
   readonly allowlistOnly: boolean;
   /** 小写的完整地址或 `@域名` */
   readonly allowlist: readonly string[];
+}
+
+/** 没有显式配置时的发信策略：非生产环境只向白名单发信且白名单为空（一封也不发），生产环境不限制 */
+export function defaultMailSendPolicy(appEnv: AppEnv): MailSendPolicy {
+  return { allowlistOnly: appEnv !== 'production', allowlist: [] };
 }
 
 export class ConfigError extends Error {
@@ -146,7 +151,7 @@ export function loadConfig(rawEnv: Record<string, string | undefined> = process.
     devLoginEnabled: DEV_LOGIN_ENABLED,
     clientModes,
     mailSend: {
-      allowlistOnly: MAIL_SEND_ALLOWLIST_ONLY ?? APP_ENV !== 'production',
+      allowlistOnly: MAIL_SEND_ALLOWLIST_ONLY ?? defaultMailSendPolicy(APP_ENV).allowlistOnly,
       allowlist,
     },
   };
