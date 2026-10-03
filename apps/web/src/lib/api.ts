@@ -31,12 +31,13 @@ export class ApiRequestError extends Error {
   }
 }
 
-/** 连不上服务器（断网、服务未启动）：fetch 本身失败，没有拿到响应 */
+/** 连不上服务器（断网、服务未启动）：fetch 本身失败，没有拿到响应；原始错误在 cause 里 */
 export class NetworkError extends ApiRequestError {
   override name = 'NetworkError';
 
-  constructor() {
+  constructor(cause: unknown) {
     super(0, 'network', '网络不可用');
+    this.cause = cause;
   }
 }
 
@@ -60,8 +61,10 @@ async function send(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(path, {
     ...init,
     headers: { accept: 'application/json', ...init?.headers },
-  }).catch(() => {
-    throw new NetworkError();
+  }).catch((error: unknown) => {
+    // 主动中止的请求（页面离开、查询取消）不是断网，原样抛出
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new NetworkError(error);
   });
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);

@@ -130,7 +130,7 @@ export function useSaveDensity() {
       showDensity(previous);
       if (endSessionIfUnauthenticated(queryClient, error)) return;
       showError({
-        key: DENSITY_TOAST,
+        id: DENSITY_TOAST,
         action: '保存',
         error,
         description: `密度已恢复为「${densityLabels[previous]}」，重试成功后改为「${densityLabels[density]}」。`,

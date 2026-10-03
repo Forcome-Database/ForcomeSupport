@@ -11,6 +11,14 @@ describe('接口错误与失败原因（G5 浮层标题「<动作>失败：原�
     const error = await api.adminContacts().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(NetworkError);
     expect(failureReason(error)).toBe('网络不可用');
+    expect((error as NetworkError).cause).toBeInstanceOf(TypeError);
+  });
+
+  it('主动中止的请求不当作断网', async () => {
+    vi.stubGlobal('fetch', () => Promise.reject(new DOMException('aborted', 'AbortError')));
+    const error = await api.adminContacts().catch((e: unknown) => e);
+    expect(error).not.toBeInstanceOf(NetworkError);
+    expect((error as DOMException).name).toBe('AbortError');
   });
 
   it('接口返回错误：原因取后端的中文说明', async () => {

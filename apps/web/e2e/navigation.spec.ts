@@ -169,7 +169,8 @@ test('密度保存失败：弹出不自动消失的失败浮层，点「立即�
   await loginAs(page, '周敏');
   await chooseDensity(page, '舒适');
   await expect.poll(() => density(page)).toBe('comfortable');
-  const { release } = await scriptPreferences(page, ['500', '500', 'slow500', 'ok']);
+  const { release } = await scriptPreferences(page, ['500', 'slow500', '500', 'ok']);
+  const saved = () => page.waitForResponse('**/api/me/preferences');
 
   await page.getByRole('button', { name: /^密度：舒适/ }).click();
   const toast = toasts(page);
@@ -179,9 +180,6 @@ test('密度保存失败：弹出不自动消失的失败浮层，点「立即�
   // 失败浮层不自动消失（成功与信息才 3 秒消失）
   await page.waitForTimeout(3500);
   await expect(toast).toBeVisible();
-  // 同一件事再失败：替换旧浮层，不再叠一条
-  await page.getByRole('button', { name: /^密度：舒适/ }).click();
-  await expect(toast).toHaveCount(1);
 
   // 重试中：处理中、不能重复点；再失败：标题换成「保存仍失败」，浮层留着
   const retry = toast.getByRole('button', { name: '立即重试' });
@@ -191,8 +189,16 @@ test('密度保存失败：弹出不自动消失的失败浮层，点「立即�
   await expect(toast).toContainText('保存仍失败：服务器内部错误');
   await expect(retry).not.toHaveAttribute('aria-busy');
 
+  // 同一件事再失败：替换旧浮层（不叠一条），也不沿用上一条的「仍失败」
+  const failedAgain = saved();
+  await page.getByRole('button', { name: /^密度：舒适/ }).click();
+  await failedAgain;
+  await expect(toast).toHaveCount(1);
+  await expect(toast).toContainText('保存失败：服务器内部错误');
+  await expect(toast).not.toContainText('仍失败');
+
   // 再重试成功：浮层消失，改为紧凑
-  await retry.click();
+  await toast.getByRole('button', { name: '立即重试' }).click();
   await expect(toast).toHaveCount(0);
   await expect.poll(() => density(page)).toBe('compact');
 

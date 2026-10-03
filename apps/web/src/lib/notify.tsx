@@ -6,13 +6,13 @@ import { failureReason } from './api';
 
 /*
  * 浮层提示（全局状态 G5，原型 toast()）的统一入口；页面不直接调 sonner（lint 限定，ADR 0007 修订）。
- * 失败浮层不自动消失，必须给出重试或下一步；同一件事只留一条（key），成功后用 dismissToast(key) 撤掉。
+ * 失败浮层不自动消失，必须给出重试或下一步；同一件事只留一条（id），成功后用 dismissToast(id) 撤掉。
  * 成功、撤销等浮层第一次用到的待办在这里补上，同样照 G5。
  */
 
 type ErrorToastOptions = {
-  /** 同一件事的标识：再失败替换旧浮层而不是再叠一条，成功后用它撤掉 */
-  readonly key: string;
+  /** 同一件事的标识（即浮层 id）：再失败替换旧浮层而不是再叠一条，成功后用它撤掉 */
+  readonly id: string;
   /** 失败的动作，标题写成「<动作>失败：原因」（原型例「保存失败：网络不可用」「发送失败：Gmail 接口超时」） */
   readonly action: string;
   readonly error: unknown;
@@ -33,17 +33,21 @@ type ErrorToastOptions = {
     }
 );
 
+/** 每次弹出都换一个 React key：同一个 id 的浮层被 Sonner 原地替换时，上一次的重试状态不能沿用 */
+let shown = 0;
+
 /** 失败浮层（G5）：不自动消失 */
 export function showError(options: ErrorToastOptions): void {
-  toast.custom((id) => <ErrorToast id={id} {...options} />, {
-    id: options.key,
+  const instance = ++shown;
+  toast.custom(() => <ErrorToast key={instance} {...options} />, {
+    id: options.id,
     duration: Infinity,
   });
 }
 
 /** 撤掉某件事的浮层（例如之后保存成功了） */
-export function dismissToast(key: string): void {
-  toast.dismiss(key);
+export function dismissToast(id: string): void {
+  toast.dismiss(id);
 }
 
 /** 撤掉全部浮层（退出登录、会话结束时，不把上一位成员的提示留在登录页上） */
@@ -51,13 +55,7 @@ export function dismissAllToasts(): void {
   toast.dismiss();
 }
 
-function ErrorToast({
-  id,
-  action,
-  error,
-  description,
-  retry,
-}: ErrorToastOptions & { id: string | number }) {
+function ErrorToast({ id, action, error, description, retry }: ErrorToastOptions) {
   const [pending, setPending] = useState(false);
   const [retryError, setRetryError] = useState<unknown>(null);
   const title = retryError
@@ -88,7 +86,7 @@ function ErrorToast({
           <div className="pt-0.5">
             <Button
               variant="link"
-              className="h-auto px-0 text-12 font-medium"
+              className="h-auto border-0 px-0 text-12 font-medium"
               loading={pending}
               onClick={() => void onRetry()}
             >
