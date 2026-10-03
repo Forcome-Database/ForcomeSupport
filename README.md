@@ -5,8 +5,9 @@
 ## 目录
 
 ```
-CLAUDE.md                            AI 工程技能的仓库配置（问题跟踪、分诊标签、领域文档）
-docs/agents/                         上述配置的细则
+CLAUDE.md                            AI 代理规则：工程技能配置（问题跟踪、分诊标签、领域文档）与实现依据
+AGENTS.md                            其他代理（Codex 等）的入口，指向 CLAUDE.md
+docs/agents/                         上述配置的细则，含原型对照（prototype.md）
 .scratch/                            本地问题跟踪：一个功能一个目录（按需创建）
 design/
 ├── *.dc.html                        画板（生成物，不要手改；5 张流程图例外，见下）
