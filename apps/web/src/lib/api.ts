@@ -1,9 +1,15 @@
 import {
+  adminContactsSchema,
   apiErrorSchema,
   currentMemberSchema,
   devMembersResponseSchema,
+  loginDeniedSchema,
+  preferencesSchema,
+  type AdminContacts,
   type CurrentMember,
   type DevMember,
+  type LoginDenialReason,
+  type Preferences,
 } from '@forcome/contracts';
 import type { z } from 'zod';
 
@@ -25,13 +31,26 @@ export class ApiRequestError extends Error {
   }
 }
 
-async function call<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
+/** 登录被拒（G12）：reason 决定显示哪一种被拒画面 */
+export class LoginDeniedError extends ApiRequestError {
+  override name = 'LoginDeniedError';
+  readonly reason: LoginDenialReason;
+
+  constructor(reason: LoginDenialReason, message: string) {
+    super(403, 'login_denied', message);
+    this.reason = reason;
+  }
+}
+
+async function send(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(path, {
     ...init,
     headers: { accept: 'application/json', ...init?.headers },
   });
-  const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
+    const denied = loginDeniedSchema.safeParse(body);
+    if (denied.success) throw new LoginDeniedError(denied.data.reason, denied.data.message);
     const error = apiErrorSchema.safeParse(body);
     throw new ApiRequestError(
       response.status,
@@ -39,21 +58,37 @@ async function call<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): 
       error.success ? error.data.message : `请求失败（${response.status}）`,
     );
   }
-  return schema.parse(body);
+  return response;
+}
+
+async function call<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
+  const response = await send(path, init);
+  return schema.parse(await response.json());
+}
+
+function jsonBody(method: string, body: unknown): RequestInit {
+  return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
 }
 
 export const api = {
-  /** 当前登录的成员；未登录时抛 401 */
+  /** 当前登录的成员（含导航、默认首页与密度）；未登录或会话过期时抛 401 */
   me: (): Promise<CurrentMember> => call('/api/me', currentMemberSchema),
 
   /** 开发登录可选的成员；没开启开发登录（含生产环境）时抛 404 */
   devMembers: async (): Promise<DevMember[]> =>
     (await call('/api/dev/members', devMembersResponseSchema)).members,
 
+  /** 开发登录；被拒时抛 LoginDeniedError（G12） */
   devLogin: (memberId: string): Promise<CurrentMember> =>
-    call('/api/dev/login', currentMemberSchema, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ memberId }),
-    }),
+    call('/api/dev/login', currentMemberSchema, jsonBody('POST', { memberId })),
+
+  logout: async (): Promise<void> => {
+    await send('/api/logout', { method: 'POST' });
+  },
+
+  savePreferences: (preferences: Preferences): Promise<Preferences> =>
+    call('/api/me/preferences', preferencesSchema, jsonBody('PUT', preferences)),
+
+  /** 在职的管理员（G2「如需开通请联系管理员刘洋」） */
+  adminContacts: (): Promise<AdminContacts> => call('/api/org/admin-contacts', adminContactsSchema),
 };

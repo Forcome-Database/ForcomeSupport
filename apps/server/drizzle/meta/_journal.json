@@ -22,6 +22,20 @@
       "when": 1791050842499,
       "tag": "0002_org_session",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791058405516,
+      "tag": "0003_clear_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791058413370,
+      "tag": "0004_org_member",
+      "breakpoints": true
     }
   ]
 }

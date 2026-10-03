@@ -1,4 +1,4 @@
-import { SYSTEM_ACTOR_NAME, type AuditObjectType } from '@forcome/contracts';
+import { SYSTEM_ACTOR_NAME, type AuditObjectType, type Role } from '@forcome/contracts';
 import { and, asc, eq, type SQL } from 'drizzle-orm';
 import type { DbExecutor } from './db';
 import type { Tx } from './runtime';
@@ -6,14 +6,14 @@ import { auditLog } from './schema';
 
 /**
  * 操作人（ADR 0010）：成员操作带角色与来源 IP；系统操作（定时任务、同步、自动推进）记为「系统」。
- * 角色在 04 号待办由 contracts 的角色枚举收紧类型，这里先存字符串快照。
+ * 角色存 contracts 的角色标识（如 supervisor）作快照，P27 显示时换成中文名。
  */
 export type Actor =
   | {
       readonly kind: 'member';
       readonly memberId: string;
       readonly name: string;
-      readonly roles: readonly string[];
+      readonly roles: readonly Role[];
       readonly ip: string | null;
     }
   | { readonly kind: 'system' };

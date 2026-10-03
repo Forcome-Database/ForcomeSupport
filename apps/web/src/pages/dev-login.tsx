@@ -1,16 +1,20 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import { ChevronLeft } from 'lucide-react';
 import { Brand } from '@/components/brand';
+import { LoginDenied } from '@/components/login-denied';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { api } from '@/lib/api';
+import { api, LoginDeniedError } from '@/lib/api';
 import { avatarText } from '@/lib/avatar';
 import { devMembersQuery, rememberMember } from '@/lib/session';
+import { roleNames } from '@forcome/contracts';
 
 /**
  * 开发登录页（只在非生产环境、开启开发登录时出现；原型没有这个画面，见 prototype.md「当期没有原型的界面」）：
  * 照登录卡片（G11）的布局——居中卡片、品牌标、标题与说明、分隔线下的注释——把二维码换成成员列表。
+ * 登录被拒（第一期的生产厂对接人等）时卡片换成 G12 的被拒说明（宽 410），「返回登录页」回到成员列表。
  */
 export function DevLoginPage() {
   const { data: members } = useSuspenseQuery(devMembersQuery);
@@ -23,6 +27,29 @@ export function DevLoginPage() {
       await navigate({ to: '/' });
     },
   });
+
+  const denied = login.error instanceof LoginDeniedError ? login.error : null;
+  if (denied) {
+    const member = members?.find((m) => m.id === login.variables);
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background p-6">
+        <Card className="w-102.5 items-center gap-3.5 rounded-xl px-6 pt-6 pb-5 shadow-card">
+          <Brand />
+          <LoginDenied
+            reason={denied.reason}
+            message={denied.message}
+            member={member}
+            action={
+              <Button variant="outline" onClick={() => login.reset()}>
+                <ChevronLeft />
+                返回登录页
+              </Button>
+            }
+          />
+        </Card>
+      </main>
+    );
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-6">
@@ -48,13 +75,16 @@ export function DevLoginPage() {
                   }}
                 >
                   {!loading && (
-                    <Avatar size="sm">
+                    <Avatar
+                      size="sm"
+                      tone={member.roles.includes('factory_contact') ? 'amber' : 'member'}
+                    >
                       <AvatarFallback>{avatarText(member.name)}</AvatarFallback>
                     </Avatar>
                   )}
                   <span className="text-13 font-semibold text-foreground">{member.name}</span>
                   <span className="ml-auto text-12 font-normal text-subtle-foreground">
-                    {member.roles.join('、')} · {member.dept}
+                    {roleNames(member.roles)} · {member.dept}
                   </span>
                 </Button>
               </li>

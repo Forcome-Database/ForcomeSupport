@@ -1,0 +1,103 @@
+import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import {
+  financeField,
+  FINANCE_HIDDEN,
+  isFinanceField,
+  maskFinanceFields,
+  stripFinanceFields,
+} from './finance';
+
+// 示范用的售后单输出结构（真正的结构随 19 号待办）：成本、承担比例、承担金额标为财务字段
+const ratio = z.object({ fsh: z.int(), factory: z.int() });
+const ledgerRow = z.object({
+  no: z.string(),
+  status: z.string(),
+  productCost: financeField(z.string()),
+  ratios: financeField(z.object({ product: ratio, freight: ratio })),
+  fshShare: financeField(z.string().nullable()),
+  tracking: z.string().nullable(),
+});
+const ledgerPage = z.object({
+  rows: z.array(ledgerRow),
+  total: z.object({ count: z.int(), fees: financeField(z.string()) }),
+  owner: ledgerRow.nullable().optional(),
+});
+
+const row: z.output<typeof ledgerRow> = {
+  no: 'S-20260909-0016',
+  status: '已完成',
+  productCost: '2.60',
+  ratios: { product: { fsh: 100, factory: 0 }, freight: { fsh: 100, factory: 0 } },
+  fshShare: '9.40',
+  tracking: null,
+};
+
+describe('财务字段过滤（PRD 10.3：成本、承担比例、结算金额只对客服主管、售后负责人返回）', () => {
+  it('标记过的字段是财务字段，包在可选、可空里也认得出', () => {
+    expect(isFinanceField(ledgerRow.shape.productCost)).toBe(true);
+    expect(isFinanceField(ledgerRow.shape.productCost.optional())).toBe(true);
+    expect(isFinanceField(ledgerRow.partial().shape.ratios)).toBe(true);
+    expect(isFinanceField(ledgerRow.shape.tracking)).toBe(false);
+  });
+
+  it('财务字段在输出结构里是可选的，去掉后仍符合结构', () => {
+    const stripped = stripFinanceFields(ledgerRow, row, false);
+    expect(ledgerRow.parse(stripped)).toEqual(stripped);
+  });
+
+  it('没有财务权限：去掉财务字段，其余原样', () => {
+    expect(stripFinanceFields(ledgerRow, row, false)).toEqual({
+      no: 'S-20260909-0016',
+      status: '已完成',
+      tracking: null,
+    });
+  });
+
+  it('有财务权限：原样返回', () => {
+    expect(stripFinanceFields(ledgerRow, row, true)).toEqual(row);
+  });
+
+  it('嵌套的对象与列表里的财务字段也去掉（列表行、合计行）', () => {
+    const page = {
+      rows: [row, { ...row, no: 'S-20260910-0017' }],
+      total: { count: 2, fees: '20.30' },
+    };
+    expect(stripFinanceFields(ledgerPage, page, false)).toEqual({
+      rows: [
+        { no: 'S-20260909-0016', status: '已完成', tracking: null },
+        { no: 'S-20260910-0017', status: '已完成', tracking: null },
+      ],
+      total: { count: 2 },
+    });
+    expect(stripFinanceFields(ledgerPage, { ...page, owner: null }, false)).toMatchObject({
+      owner: null,
+    });
+  });
+
+  it('审计前后值：财务字段换成「已隐藏」标记，不去掉，其他字段照常（K18）', () => {
+    expect(maskFinanceFields(ledgerRow, row, false)).toEqual({
+      no: 'S-20260909-0016',
+      status: '已完成',
+      productCost: FINANCE_HIDDEN,
+      ratios: FINANCE_HIDDEN,
+      fshShare: FINANCE_HIDDEN,
+      tracking: null,
+    });
+    // 前值里没有的字段不凭空出现；有财务权限时原样
+    expect(maskFinanceFields(ledgerRow, { no: 'S-1', tracking: '1Z' }, false)).toEqual({
+      no: 'S-1',
+      tracking: '1Z',
+    });
+    expect(maskFinanceFields(ledgerRow, row, true)).toEqual(row);
+  });
+
+  it('结构里没有的键原样保留，不是对象的值原样返回', () => {
+    expect(stripFinanceFields(ledgerRow, { ...row, extra: 1 } as typeof row, false)).toHaveProperty(
+      'extra',
+      1,
+    );
+    expect(maskFinanceFields(ledgerRow, null, false)).toBeNull();
+    expect(maskFinanceFields(ledgerRow, 'S-1', false)).toBe('S-1');
+  });
+});

@@ -90,24 +90,6 @@ describe('生产环境没有开发登录（ADR 0010 修订）', () => {
     expect((await login(app)).status).toBe(404);
   });
 
-  it('非生产环境开启后列出示例数据里可登录的成员', async () => {
-    const app = createApp(deps({ appEnv: 'staging', devLoginEnabled: true }));
-    const res = await app.request('/api/dev/members');
-    expect(res.status).toBe(200);
-    const { members } = (await res.json()) as { members: { name: string; roles: string[] }[] };
-    expect(new Set(members.map((m) => m.roles[0]))).toEqual(
-      new Set(['坐席', '客服主管', '售后负责人', '知识库负责人', '管理员']),
-    );
-  });
-
-  it('不列出生产厂对接人：第一期不分配这个角色，登录被拒（PRD 4.1、G12，随 04 号待办）', async () => {
-    const app = createApp(deps({ appEnv: 'staging', devLoginEnabled: true }));
-    const { members } = (await (await app.request('/api/dev/members')).json()) as {
-      members: { roles: string[] }[];
-    };
-    expect(members.flatMap((m) => m.roles)).not.toContain('生产厂对接人');
-  });
-
   it('请求参数不符合模式时返回 400 并写明哪里不对', async () => {
     const app = createApp(deps({ appEnv: 'test', devLoginEnabled: true }));
     const res = await app.request('/api/dev/login', {

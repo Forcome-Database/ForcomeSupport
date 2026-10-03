@@ -7,10 +7,10 @@ import { cn } from '@/lib/utils';
 /*
  * 按钮（shadcn Button，按设计规范板第 4、12 节改过默认样式）：
  * variant 对应原型 btn() 的 primary → default、secondary → outline、ghost、link；
- * size：sm 28 / default 32 / lg 36，字号 12 / 13 / 14；圆角 8；焦点环 ring-2 + offset-2；
+ * size：sm 28 / default 32 / lg 36，字号 12 / 13 / 14；icon 为 32 见方的图标按钮；圆角 8；焦点环 ring-2 + offset-2；
  * 禁用时浅灰底、占位色字（必须另给悬停说明原因，原型 btn(reason=)）；
  * 处理中（loading）时前面的图标换成转圈、透明度 0.85，并且不再响应点击，防止重复提交（设计规范第 4 节）。
- * 危险、警示、浅色强调等变体与图标按钮（原型 icon_btn）等第一次用到的待办按原型补上，不留未核对过的默认样式。
+ * 危险、警示、浅色强调等变体第一次用到的待办按原型补上，不留未核对过的默认样式。
  */
 const buttonVariants = cva(
   "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border whitespace-nowrap transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:pointer-events-none disabled:border-secondary disabled:bg-secondary disabled:text-placeholder disabled:shadow-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
@@ -29,6 +29,8 @@ const buttonVariants = cva(
         sm: 'h-7 px-2.5 text-12',
         default: 'h-8 px-3 text-13',
         lg: "h-9 px-4 text-14 [&_svg:not([class*='size-'])]:size-4",
+        /** 图标按钮（原型 icon_btn）：32 见方、图标 16，配 ghost 用于顶栏 */
+        icon: "size-8 p-0 [&_svg:not([class*='size-'])]:size-4",
       },
     },
     defaultVariants: {

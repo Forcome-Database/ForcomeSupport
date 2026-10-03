@@ -1,5 +1,6 @@
-import { devMembersResponseSchema } from '@forcome/contracts';
+import { devMembersResponseSchema, roleByLabel, roles, type Role } from '@forcome/contracts';
 import { getDemoFixture } from '@forcome/fixtures';
+import type { Hono } from 'hono';
 import type { JobOptions } from 'pg-boss';
 import { createApp } from '../src/app';
 import type { ServerDeps } from '../src/deps';
@@ -20,6 +21,12 @@ import {
   type Runtime,
 } from '../src/modules/core';
 import { IntegrationClients, type AnyClientDefinition } from '../src/modules/integration';
+import {
+  createMember,
+  orgMembersFixtureStep,
+  type AccessVariables,
+  type NewMember,
+} from '../src/modules/org';
 import { createApiClient, type ApiClient } from './api-client';
 import { createTestDatabase } from './database';
 import { runQueuedJobs, type JobRunReport, type RunJobsOptions } from './run-jobs';
@@ -45,10 +52,18 @@ export interface StartTestHarnessOptions {
   readonly jobHandlers?: (deps: ServerDeps) => readonly AnyJobHandler[];
   /** 外部客户端清单，默认 integration 登记的全部客户端 */
   readonly clientDefinitions?: readonly AnyClientDefinition[];
+  /**
+   * 测试自己定义的示范接口（挂在应用上，与正式接口同一套会话与错误处理）：用来以「第一个使用者」的身份
+   * 验证还没有业务接口使用的公共工具，例如店铺范围与财务字段过滤（access-tools.int.test.ts）
+   */
+  readonly routes?: (deps: ServerDeps) => Hono<{ Variables: AccessVariables }>;
 }
 
-/** 以谁登录：角色名（取示例数据里第一位有该角色的成员）或成员 key（如 liting） */
-export type LoginTarget = string | { readonly member: string };
+/**
+ * 以谁登录：角色（中文名如「客服主管」或标识如 supervisor，取示例数据里第一位有该角色的成员）、
+ * 示例成员 key（如 { member: 'liting' }）或成员 id（如 t.addMember 返回的 { memberId }）
+ */
+export type LoginTarget = string | { readonly member: string } | { readonly memberId: string };
 
 export interface TestHarness {
   /** 手动时钟：set 设到任意时刻，advance 向前推进；接口与任务里的「当前时间」都取它 */
@@ -61,6 +76,11 @@ export interface TestHarness {
   readonly runtime: Runtime;
   /** 经开发登录以某个角色或成员登录，返回带会话的客户端；每次调用都是一个新会话 */
   loginAs(target: LoginTarget, options?: { ip?: string }): Promise<ApiClient>;
+  /**
+   * 新增一位成员（多角色、店铺范围受限等示例数据里没有的情形），返回成员 id。
+   * 钉钉通讯录同步与 P20 成员管理（05、06 号待办）上线前，测试经 org 的 createMember 建成员。
+   */
+  addMember(member: Omit<NewMember, 'id'>): Promise<string>;
   /** 同步把已排队的后台任务跑到空闲（见 run-jobs.ts）；有任务失败默认抛错 */
   runJobs(options?: RunJobsOptions): Promise<JobRunReport>;
   /** 直接排一个任务（例如模拟每分钟扫描的定时触发），随后用 runJobs 跑 */
@@ -114,6 +134,13 @@ export async function startTestHarness(
   let handlers: readonly AnyJobHandler[];
   try {
     app = createApp(deps);
+    if (options.routes) app.route('/', options.routes(deps));
+    // 开发登录从成员表选人：每个测试库先灌示例成员（与 pnpm db:seed 同一个加载步骤）
+    await loadFixtures(runtime, {
+      appEnv,
+      fixture: getDemoFixture(),
+      steps: [orgMembersFixtureStep],
+    });
     handlers = (options.jobHandlers ?? createJobHandlers)(deps);
     // 模板库只建了 jobs.ts 登记的队列；测试自己的处理器在这里补建
     await ensureQueues(
@@ -126,12 +153,25 @@ export async function startTestHarness(
   }
   const api = createApiClient(app, { ip: TEST_CLIENT_IP });
 
-  /** 两种写法都以开发登录接口列出的成员为准（第一期不能进入的成员不在里面） */
+  function roleOf(name: string): Role {
+    const role = roleByLabel(name) ?? roles.find((r) => r === name);
+    if (!role) throw new Error(`没有角色「${name}」`);
+    return role;
+  }
+
+  /** 都以开发登录接口列出的成员（成员表里的在职成员）为准 */
   async function memberId(target: LoginTarget): Promise<string> {
+    if (typeof target === 'object' && 'memberId' in target) return target.memberId;
     const res = await api.get('/api/dev/members');
     const { members } = devMembersResponseSchema.parse(await res.json());
     if (typeof target === 'string') {
-      const member = members.find((m) => m.roles.includes(target));
+      // 优先取示例数据里第一位有该角色的成员（坐席是李婷），其次是测试里新增的成员
+      const role = roleOf(target);
+      const candidates = members.filter((m) => m.roles.includes(role));
+      const fixtureOrder = getDemoFixture().members.map((m) => m.id);
+      const rank = (id: string) =>
+        fixtureOrder.includes(id) ? fixtureOrder.indexOf(id) : fixtureOrder.length;
+      const member = candidates.sort((a, b) => rank(a.id) - rank(b.id))[0];
       if (!member) throw new Error(`没有角色为「${target}」的成员可以登录`);
       return member.id;
     }
@@ -158,6 +198,8 @@ export async function startTestHarness(
       }
       return client;
     },
+
+    addMember: (member) => transaction(runtime, (tx) => createMember(tx, member)),
 
     runJobs: (runOptions) => runQueuedJobs(runtime, handlers, silentLogger, runOptions),
 

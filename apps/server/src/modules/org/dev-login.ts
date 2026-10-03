@@ -3,30 +3,21 @@ import {
   currentMemberSchema,
   devLoginRequestSchema,
   devMembersResponseSchema,
-  type DevMember,
+  loginDeniedSchema,
 } from '@forcome/contracts';
-import { getDemoFixture } from '@forcome/fixtures';
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
-import { recordAudit, transaction, type AppEnv, type Runtime } from '../core';
-import { clientIp, memberActor, openSession, setSessionCookie } from './session';
+import { memberStoreScope, recordAudit, transaction, type AppEnv, type Runtime } from '../core';
+import { currentMember, memberActor, sessionMemberOf } from './access';
+import { loginDenial, loginDenialMessage } from './login';
+import { findMember, listActiveMembers, listAdmins } from './members';
+import { clientIp, openSession, setSessionCookie } from './session';
 
 /*
  * 开发登录（ADR 0010 修订）：本机、CI 与 Playwright 绕过钉钉扫码，选一位成员直接登录，
- * 换出与扫码登录（05）同一种会话，并像正式登录一样记审计。
+ * 换出与扫码登录（05）同一种会话，并像正式登录一样记审计；能不能进入与正式登录同一套判断（G12）。
  * 只在非生产环境由 DEV_LOGIN_ENABLED=true 开启：生产环境配置了就拒绝启动（core 的 loadConfig），
- * 接口层再判断一次，生产环境不挂这组路由。
- * 可选的成员来自示例数据夹具（id 是确定的）；04 号待办有了成员表后改为从成员表取。
+ * 接口层再判断一次，生产环境不挂这组路由。可选的成员是成员表里的在职成员（示例数据夹具灌入）。
  */
-
-/**
- * 第一期能进入客服系统的示例成员（04 号待办改为成员表）。生产厂对接人第一期不分配、登录被拒（PRD 4.1、G12），
- * 不列出；04 号待办实现登录被拒时，连同被拒的场景一起加回来。
- */
-function devMembers(): DevMember[] {
-  return getDemoFixture()
-    .members.filter((m) => m.role !== '生产厂对接人')
-    .map((m) => ({ id: m.id, name: m.name, roles: [m.role], dept: m.dept }));
-}
 
 const membersRoute = createRoute({
   method: 'get',
@@ -34,7 +25,7 @@ const membersRoute = createRoute({
   summary: '开发登录可选的成员（只在非生产环境开启时存在）',
   responses: {
     200: {
-      description: '成员列表',
+      description: '在职成员，含第一期会被拒绝的生产厂对接人',
       content: { 'application/json': { schema: devMembersResponseSchema } },
     },
   },
@@ -52,6 +43,10 @@ const loginRoute = createRoute({
       description: '已登录，会话 Cookie 在响应头里',
       content: { 'application/json': { schema: currentMemberSchema } },
     },
+    403: {
+      description: '登录被拒（G12：未分配角色、已停用；第一期只有生产厂对接人角色）',
+      content: { 'application/json': { schema: loginDeniedSchema } },
+    },
     404: {
       description: '没有这位成员',
       content: { 'application/json': { schema: apiErrorSchema } },
@@ -65,25 +60,41 @@ export function devLoginAvailable(config: { appEnv: AppEnv; devLoginEnabled: boo
 }
 
 export function createDevLoginRoutes(deps: { runtime: Runtime; appEnv: AppEnv }) {
-  if (deps.appEnv === 'production') {
+  const { runtime, appEnv } = deps;
+  if (appEnv === 'production') {
     throw new Error('生产环境不能开启开发登录');
   }
-  // 只在开启开发登录时才取用示例数据，生产环境的 api 不解析夹具
-  const members = devMembers();
   const routes = new OpenAPIHono();
 
-  routes.openapi(membersRoute, (c) => c.json({ members }, 200));
+  routes.openapi(membersRoute, async (c) => {
+    const members = await listActiveMembers(runtime.db);
+    return c.json(
+      {
+        members: members.map((m) => ({ id: m.id, name: m.name, dept: m.dept, roles: m.roles })),
+      },
+      200,
+    );
+  });
 
   routes.openapi(loginRoute, async (c) => {
     const { memberId } = c.req.valid('json');
-    const found = members.find((m) => m.id === memberId);
+    const found = await findMember(runtime.db, memberId);
     if (!found) {
       return c.json({ error: 'not_found', message: '没有这位成员' }, 404);
     }
-    const member = { id: found.id, name: found.name, roles: found.roles };
-    const { token } = await transaction(deps.runtime, async (tx) => {
-      const opened = await openSession(tx, member);
-      await recordAudit(tx, memberActor(member, clientIp(c)), {
+    const denied = loginDenial(found);
+    if (denied) {
+      const admins = await listAdmins(runtime.db);
+      const message = loginDenialMessage(
+        denied,
+        admins.map((a) => a.name),
+      );
+      return c.json({ error: 'login_denied' as const, reason: denied, message }, 403);
+    }
+    const sessionMember = sessionMemberOf(found);
+    const { token } = await transaction(runtime, async (tx) => {
+      const opened = await openSession(tx, found.id);
+      await recordAudit(tx, memberActor(sessionMember, clientIp(c)), {
         action: 'auth.login',
         objectType: 'login',
         objectId: opened.id,
@@ -92,8 +103,8 @@ export function createDevLoginRoutes(deps: { runtime: Runtime; appEnv: AppEnv })
       });
       return opened;
     });
-    setSessionCookie(c, token, deps.appEnv);
-    return c.json(member, 200);
+    setSessionCookie(c, token, appEnv);
+    return c.json(currentMember(sessionMember, memberStoreScope(found)), 200);
   });
 
   return routes;

@@ -1,6 +1,6 @@
 import { desc, sql } from 'drizzle-orm';
 import { index, inet, integer, jsonb, pgSchema, primaryKey, text, uuid } from 'drizzle-orm/pg-core';
-import type { AuditObjectType } from '@forcome/contracts';
+import type { AuditObjectType, Role } from '@forcome/contracts';
 import { primaryId, timestamptz } from './columns';
 
 export const coreSchema = pgSchema('core');
@@ -19,9 +19,10 @@ export const auditLog = coreSchema.table(
     actorId: uuid('actor_id'),
     /** 操作人姓名快照；系统操作为「系统」 */
     actorName: text('actor_name').notNull(),
-    /** 操作时的角色快照（可多角色） */
+    /** 操作时的角色快照（可多角色，contracts 的角色标识） */
     actorRoles: text('actor_roles')
       .array()
+      .$type<Role[]>()
       .notNull()
       .default(sql`'{}'::text[]`),
     /** 来源 IP；系统操作为空 */

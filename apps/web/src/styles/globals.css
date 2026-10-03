@@ -2,7 +2,7 @@
  * 设计令牌（ADR 0007）：由原型 design/spec/ui.py 的 T、阴影、圆角、字号刻度与设计规范板第 12 节
  * 「研发映射」一次性转来，此后以本文件为准；原型改令牌时两边同步改。
  * 设计规范板列出的变量照抄；ui.T 里其余的键按同样的命名规则补齐（*-soft 浅底、*-line 描边、*-text 文字色）。
- * 第一期只做浅色；舒适 / 紧凑两档密度随 04 号待办加在 <html data-density> 上。
+ * 第一期只做浅色；舒适 / 紧凑两档密度是下面两套变量，由 <html data-density> 切换（待办 04）。
  */
 @import 'tailwindcss';
 @import 'tw-animate-css';
@@ -67,6 +67,34 @@
   --channel-mail: #5a6376;
 
   --radius: 12px;
+}
+
+/*
+ * 密度（G9、设计规范第 12 节「密度」表）：舒适（默认）与紧凑两套变量，<html data-density> 切换，按成员保存在服务端。
+ * 只改字号、行距与内边距，不改布局和信息量。页面用下面 @theme 里的 text-body、text-minor、text-badge、
+ * h-table-row、py-queue-row、gap-queue、px-panel、py-panel 等工具类取值；顶栏、品牌标等固定尺寸不随密度变化。
+ */
+:root,
+[data-density='comfortable'] {
+  --density-text-body: 13px; /* 正文 */
+  --density-text-minor: 12px; /* 次要 */
+  --density-text-badge: 11px; /* 徽标 */
+  --density-queue-row: 9px; /* 队列行内边距 */
+  --density-queue-gap: 4px; /* 队列行距 */
+  --density-table-row: 40px; /* 表格行高 */
+  --density-panel-x: 16px; /* 面板内边距 14–16 */
+  --density-panel-y: 14px;
+}
+
+[data-density='compact'] {
+  --density-text-body: 12px;
+  --density-text-minor: 11px; /* 中文最小 11 */
+  --density-text-badge: 11px;
+  --density-queue-row: 6px;
+  --density-queue-gap: 2px;
+  --density-table-row: 32px;
+  --density-panel-x: 12px;
+  --density-panel-y: 12px;
 }
 
 @theme inline {
@@ -144,6 +172,16 @@
   --text-20: 20px;
   --text-24: 24px;
 
+  /* 随密度变化的字号与间距（见上方 data-density 两套变量） */
+  --text-body: var(--density-text-body);
+  --text-minor: var(--density-text-minor);
+  --text-badge: var(--density-text-badge);
+  --spacing-queue-row: var(--density-queue-row);
+  --spacing-queue: var(--density-queue-gap);
+  --spacing-table-row: var(--density-table-row);
+  --spacing-panel-x: var(--density-panel-x);
+  --spacing-panel-y: var(--density-panel-y);
+
   /* 字体：Inter 与 Noto Sans SC 随应用打包（@fontsource-variable），不依赖外网 */
   --font-sans:
     'Inter Variable', 'Inter', 'PingFang SC', 'HarmonyOS Sans SC', 'Noto Sans SC Variable',
@@ -160,7 +198,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground font-sans text-body;
     margin: 0;
     -webkit-font-smoothing: antialiased;
     font-feature-settings: 'cv11', 'ss01';

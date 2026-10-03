@@ -1,25 +1,22 @@
 import { createHash, randomBytes } from 'node:crypto';
-import type { CurrentMember } from '@forcome/contracts';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { eq } from 'drizzle-orm';
-import type { Context, MiddlewareHandler } from 'hono';
-import { getCookie, setCookie } from 'hono/cookie';
-import type { Actor, AppEnv, DbExecutor, Runtime, Tx } from '../core';
-import { session } from './schema';
+import type { Context } from 'hono';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
+import type { AppEnv, DbExecutor, Tx } from '../core';
+import { member, session } from './schema';
 
 /** 会话 Cookie 名；主应用与工厂工作台（第二期）各用各的 Cookie（ADR 0010） */
 export const SESSION_COOKIE = 'forcome_session';
 
-/** 已登录的会话（放在请求上下文里） */
-export interface CurrentSession {
-  readonly id: string;
-  readonly member: CurrentMember;
-}
+/** 无操作多久过期（ADR 0010、G12「7 天未操作，已退出登录」） */
+export const SESSION_IDLE_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Hono 上下文变量：requireSession 之后的处理器用 c.get('session') 取当前会话 */
-export interface SessionVariables {
-  session: CurrentSession;
-}
+/**
+ * 续期的最小间隔：每次请求都算「有操作」，但距上次续期不到 1 分钟时不再写库，
+ * 免得每个请求都更新会话行；过期判断因此最多早 1 分钟，可以忽略。
+ */
+const RENEW_INTERVAL_MS = 60 * 1000;
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -31,19 +28,12 @@ function hashToken(token: string): string {
  */
 export async function openSession(
   tx: Tx,
-  member: CurrentMember,
+  memberId: string,
 ): Promise<{ id: string; token: string }> {
   const token = randomBytes(32).toString('base64url');
   const [row] = await tx.db
     .insert(session)
-    .values({
-      tokenHash: hashToken(token),
-      memberId: member.id,
-      memberName: member.name,
-      memberRoles: [...member.roles],
-      createdAt: tx.now,
-      lastActiveAt: tx.now,
-    })
+    .values({ tokenHash: hashToken(token), memberId, createdAt: tx.now, lastActiveAt: tx.now })
     .returning({ id: session.id });
   if (!row) {
     throw new Error('会话创建失败');
@@ -51,19 +41,60 @@ export async function openSession(
   return { id: row.id, token };
 }
 
-async function findSession(db: DbExecutor, token: string): Promise<CurrentSession | null> {
+export type MemberRow = typeof member.$inferSelect;
+
+export type SessionLookup =
+  | { readonly status: 'missing' }
+  | { readonly status: 'expired' }
+  | {
+      readonly status: 'active';
+      readonly sessionId: string;
+      readonly member: MemberRow;
+      /** 这次请求是否续期了（续期后要重发 Cookie，让浏览器端的有效期也往后顺延） */
+      readonly renewed: boolean;
+    };
+
+/**
+ * 按令牌找会话：找不到为 missing；7 天无操作为 expired（同时删掉这行）；否则视这次请求为一次操作并续期。
+ * 成员一并读出——角色、店铺范围与状态每次请求都以成员表为准（ADR 0010）。
+ */
+export async function lookupSession(
+  db: DbExecutor,
+  token: string,
+  now: Date,
+): Promise<SessionLookup> {
   const [row] = await db
-    .select()
+    .select({ session, member })
     .from(session)
+    .innerJoin(member, eq(member.id, session.memberId))
     .where(eq(session.tokenHash, hashToken(token)))
     .limit(1);
-  if (!row) return null;
-  return { id: row.id, member: { id: row.memberId, name: row.memberName, roles: row.memberRoles } };
+  if (!row) return { status: 'missing' };
+  const idle = now.getTime() - row.session.lastActiveAt.getTime();
+  if (idle >= SESSION_IDLE_TIMEOUT_MS) {
+    await db.delete(session).where(eq(session.id, row.session.id));
+    return { status: 'expired' };
+  }
+  const renewed = idle >= RENEW_INTERVAL_MS;
+  if (renewed) {
+    await db.update(session).set({ lastActiveAt: now }).where(eq(session.id, row.session.id));
+  }
+  return { status: 'active', sessionId: row.session.id, member: row.member, renewed };
+}
+
+/** 结束会话（退出登录、成员不能再进入时） */
+export async function closeSession(db: DbExecutor, sessionId: string): Promise<void> {
+  await db.delete(session).where(eq(session.id, sessionId));
+}
+
+export function sessionToken(c: Context): string | undefined {
+  return getCookie(c, SESSION_COOKIE);
 }
 
 /**
- * 会话 Cookie：httpOnly、SameSite=Lax、整站有效。生产与开发测试环境走 HTTPS（待办 03），Cookie 带 Secure；
- * 本机开发与自动化测试是 http，不带 Secure。有效期（无操作 7 天）随 04 号待办。
+ * 会话 Cookie：httpOnly、SameSite=Lax、整站有效，有效期与服务端一致（7 天，续期时随之顺延）——
+ * 关掉浏览器不会退出登录，7 天无操作才需要重新登录。生产与开发测试环境走 HTTPS（待办 03），Cookie 带 Secure；
+ * 本机开发与自动化测试是 http，不带 Secure。
  */
 export function setSessionCookie(c: Context, token: string, appEnv: AppEnv): void {
   setCookie(c, SESSION_COOKIE, token, {
@@ -71,22 +102,15 @@ export function setSessionCookie(c: Context, token: string, appEnv: AppEnv): voi
     sameSite: 'Lax',
     path: '/',
     secure: appEnv === 'production' || appEnv === 'staging',
+    maxAge: SESSION_IDLE_TIMEOUT_MS / 1000,
   });
 }
 
-/** 受保护的接口：没有有效会话返回 401，有则把会话放进上下文 */
-export function requireSession(
-  runtime: Runtime,
-): MiddlewareHandler<{ Variables: SessionVariables }> {
-  return async (c, next) => {
-    const token = getCookie(c, SESSION_COOKIE);
-    const current = token ? await findSession(runtime.db, token) : null;
-    if (!current) {
-      return c.json({ error: 'unauthenticated', message: '未登录或会话已失效，请重新登录' }, 401);
-    }
-    c.set('session', current);
-    await next();
-  };
+export function clearSessionCookie(c: Context, appEnv: AppEnv): void {
+  deleteCookie(c, SESSION_COOKIE, {
+    path: '/',
+    secure: appEnv === 'production' || appEnv === 'staging',
+  });
 }
 
 /**
@@ -102,14 +126,4 @@ export function clientIp(c: Context): string | null {
     // 测试进程内的请求没有网络连接
     return null;
   }
-}
-
-/** 成员作为审计的操作人（ADR 0010） */
-export function memberActor(member: CurrentMember, ip: string | null): Actor {
-  return { kind: 'member', memberId: member.id, name: member.name, roles: member.roles, ip };
-}
-
-/** 当前会话的操作人，供业务写操作记审计 */
-export function sessionActor(c: Context<{ Variables: SessionVariables }>): Actor {
-  return memberActor(c.get('session').member, clientIp(c));
 }

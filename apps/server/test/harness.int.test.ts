@@ -188,8 +188,14 @@ describe('注入与重置 Fake', () => {
 
 describe('按角色建会话', () => {
   it('每个第一期角色都能登录，审计里记下各自的来源 IP', async () => {
-    for (const role of ['坐席', '客服主管', '售后负责人', '知识库负责人', '管理员']) {
-      const client = await t.loginAs(role, { ip: '10.20.9.9' });
+    for (const [label, role] of [
+      ['坐席', 'agent'],
+      ['客服主管', 'supervisor'],
+      ['售后负责人', 'aftersales_owner'],
+      ['知识库负责人', 'knowledge_owner'],
+      ['管理员', 'admin'],
+    ]) {
+      const client = await t.loginAs(label!, { ip: '10.20.9.9' });
       const me = (await (await client.get('/api/me')).json()) as { roles: string[] };
       expect(me.roles).toEqual([role]);
     }
@@ -198,18 +204,19 @@ describe('按角色建会话', () => {
   });
 
   it('示例数据里没有的角色或成员给出明确的错误', async () => {
-    await expect(t.loginAs('仓库管理员')).rejects.toThrow(/没有角色为「仓库管理员」的成员/);
+    await expect(t.loginAs('仓库管理员')).rejects.toThrow(/没有角色「仓库管理员」/);
     await expect(t.loginAs({ member: 'nobody' })).rejects.toThrow(/没有成员 nobody/);
-    // 生产厂对接人第一期不能进入（PRD 4.1），开发登录不列出
+    // 生产厂对接人第一期不能进入（PRD 4.1、AC-P1-21）：开发登录列出了，登录被拒
     await expect(t.loginAs({ member: 'chengong' })).rejects.toThrow(
-      /chengong（生产厂对接人）不在开发登录的可选成员里/,
+      /开发登录失败（403）.*工厂工作台第二阶段上线/,
     );
   });
 });
 
 describe('灌示例数据', () => {
-  it('按各模块登记的加载步骤灌库；目前没有登记步骤，空库上运行不报错', async () => {
-    await expect(t.loadFixtures()).resolves.toEqual({ steps: [] });
+  it('按各模块登记的加载步骤灌库，重复加载不报错（测试工具启动时已灌过示例成员）', async () => {
+    await expect(t.loadFixtures()).resolves.toEqual({ steps: ['org.members'] });
+    await expect(t.loadFixtures()).resolves.toEqual({ steps: ['org.members'] });
   });
 });
 

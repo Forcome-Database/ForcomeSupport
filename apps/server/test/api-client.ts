@@ -9,6 +9,8 @@ export interface ApiClient {
   put(path: string, body?: unknown): Promise<Response>;
   patch(path: string, body?: unknown): Promise<Response>;
   delete(path: string): Promise<Response>;
+  /** 当前保存的 Cookie 值（例如会话令牌）；没有为 undefined */
+  cookie(name: string): string | undefined;
 }
 
 /** 能处理请求的应用（Hono 的 app.request） */
@@ -73,5 +75,6 @@ export function createApiClient(app: RequestHandler, options: ApiClientOptions):
     put: withBody('PUT'),
     patch: withBody('PATCH'),
     delete: (path) => request(path, { method: 'DELETE' }),
+    cookie: (name) => jar.get(name),
   };
 }

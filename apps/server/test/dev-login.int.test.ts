@@ -28,13 +28,13 @@ describe('开发登录（ADR 0010 修订：只在非生产环境由环境变量�
     const me = await supervisor.get('/api/me');
 
     expect(me.status).toBe(200);
-    expect(await me.json()).toMatchObject({ name: '周敏', roles: ['客服主管'] });
+    expect(await me.json()).toMatchObject({ name: '周敏', roles: ['supervisor'] });
     expect(await t.auditRecords({ action: 'auth.login' })).toEqual([
       expect.objectContaining({
         occurredAt: new Date('2026-09-11T02:20:00Z'),
         actorType: 'member',
         actorName: '周敏',
-        actorRoles: ['客服主管'],
+        actorRoles: ['supervisor'],
         ip: TEST_CLIENT_IP,
         objectType: 'login',
         objectLabel: '开发登录',
@@ -81,6 +81,8 @@ describe('开发登录（ADR 0010 修订：只在非生产环境由环境变量�
     expect(cookie).toContain('HttpOnly');
     expect(cookie).toContain('SameSite=Lax');
     expect(cookie).toContain('Path=/');
+    // 有效期与服务端一致（7 天无操作过期），关掉浏览器不会退出登录
+    expect(cookie).toContain('Max-Age=604800');
     expect(cookie).not.toContain('Secure');
   });
 });

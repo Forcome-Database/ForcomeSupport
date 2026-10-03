@@ -3,7 +3,7 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import type { ServerDeps } from './deps';
-import { OptimisticLockError, type Logger, type Runtime } from './modules/core';
+import { AccessDeniedError, OptimisticLockError, type Logger, type Runtime } from './modules/core';
 import { createDevLoginRoutes, createOrgRoutes, devLoginAvailable } from './modules/org';
 
 const DATABASE_CHECK_TIMEOUT_MS = 3_000;
@@ -74,7 +74,7 @@ export function createApp(deps: ServerDeps) {
     return up ? c.json(body, 200) : c.json(body, 503);
   });
 
-  app.route('/', createOrgRoutes({ runtime }));
+  app.route('/', createOrgRoutes({ runtime, appEnv: config.appEnv }));
   if (devLoginAvailable(config)) {
     app.route('/', createDevLoginRoutes({ runtime, appEnv: config.appEnv }));
   }
@@ -87,6 +87,9 @@ export function createApp(deps: ServerDeps) {
   app.notFound((c) => c.json({ error: 'not_found', message: '接口不存在' }, 404));
 
   app.onError((error, c) => {
+    if (error instanceof AccessDeniedError) {
+      return c.json({ error: 'forbidden', message: error.message }, 403);
+    }
     if (error instanceof OptimisticLockError) {
       logger.info({ table: error.table, rowId: error.rowId }, '乐观锁冲突');
       return c.json({ error: 'optimistic_lock', message: '数据已被他人修改' }, 409);
