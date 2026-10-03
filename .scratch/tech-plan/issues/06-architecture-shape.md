@@ -21,3 +21,7 @@ Map: ../map.md
 - **仓库**：pnpm workspace，包括 `apps/web`、`apps/server`、`packages/contracts`、`packages/config`；暂不引入 Turborepo 或 Nx。
 - **命名**：沿用 PRD 11.1 的英文对象名；状态、表、列用 snake_case；注释写中文并标注规则编号。
 - **留给后续**：发件箱实现归「讨论：后台任务与流程引擎」；工厂工作台是否与主应用同一个前端应用，归「讨论：前端框架与工程」；适配器是否拆成独立的 MCP 服务，归「讨论：集成层设计与「MCP 形式」的含义」。
+
+## Comments
+
+2026-10-03（文档漂移审查）：业务模块已增至 10 个（新增 `order`，ADR 0005 修订、技术方案第 3 节）；工作日历归 `core`，不另建 `packages/calendar`。

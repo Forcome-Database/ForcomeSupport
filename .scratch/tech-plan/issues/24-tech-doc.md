@@ -25,3 +25,7 @@ AFK：代理起草，用户审阅。完成即到达本地图的目的地。
 经两轮交叉审查（GPT-6-Astra、Claude Opus 5.5），第一轮 38 条、第二轮 27 条全部采纳，记录见 `reviews/复核结论.md`。原型画板仍有未同步项，记在 `design/spec/WORKPLAN.md`「原型待补」。
 
 下一步：以 11.1 为输入进入第一期 `/to-spec` → `/to-tickets` → `/implement`；「事务：申请积加开放接口与 SP-API 开发者资质」由用户并行办理。
+
+## Comments
+
+2026-10-03（文档漂移审查）：「以 11.1 为输入进入第一期 /to-spec」已完成，11.1 随后被第一期规格取代；现行以 `.scratch/phase1-reporting/spec.md` 为准。

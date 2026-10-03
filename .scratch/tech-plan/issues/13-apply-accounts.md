@@ -1,6 +1,6 @@
 Title: 事务：申请积加开放接口与 SP-API 开发者资质
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01, 02
 Map: ../map.md
 
@@ -32,3 +32,5 @@ Map: ../map.md
 - 运维：第一期就需要内网 HTTPS 域名与证书（Secure Cookie、钉钉扫码与免登都要求）；提供 `NO_PROXY` 境内域名清单；NAS 用于 WAL 归档。
 - 开发测试环境：独立的 Pub/Sub 订阅、SQS 队列与一个 Gmail 测试邮箱。
 - FSH：上线前抽样验证海帆发出的回信是否出现在店铺邮箱「已发送」并带回复邮件头（PRD Q-26）；提供 SKU 与生产厂归属表（第一期台账种子数据）。
+
+2026-10-03（文档漂移审查）：跟踪职责已移交第一期待办 32「外部资质与先决条件跟踪」，本待办关闭；O-6、O-7 已追加为积加问题清单第 15、16 条。

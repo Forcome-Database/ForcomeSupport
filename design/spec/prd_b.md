@@ -85,7 +85,7 @@
 | 全局状态 | GlobalStates | G1 整页加载 · G2 无权限 · G3 找不到 · G4 断网与集成中断 · G5 浮层提示 · G6 二次确认 · G7 并发与数据范围 · G8 未保存离开 · G9 密度切换 · G10 站内通知 · G11 登录 · G12 登录被拒 |
 | 收件箱与工单状态 | StatesInbox | I1–I21（I16–I18 为第一阶段界面，I19 为第二阶段收件箱） |
 | 审批状态 | StatesApproval | A1–A11 |
-| 售后状态 | StatesAfterSales | S1–S15（S13–S15 为第一阶段台账） |
+| 售后状态 | StatesAfterSales | S1–S16（S13–S15 为第一阶段台账，S16 为第二阶段的手工登记单） |
 | 工厂工作台状态 | StatesFactory | F1–F9 |
 | 知识库、报表、设置状态 | StatesAdmin | K1–K24（K19、K20 为第一阶段报表与渠道卡） |
 | 页面地图 | PageMap | 按角色分泳道的页面入口、跳转关系与关键路径 SC-01～SC-08 |

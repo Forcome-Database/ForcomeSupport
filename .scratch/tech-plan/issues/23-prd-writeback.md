@@ -31,3 +31,7 @@ Map: ../map.md
 - **PRD 四个源文件共 42 处替换**：术语（积加、SP-API、物流查询）、系统边界图、F-CH-04、F-AP-02、第一阶段交付与页面、设置菜单 11 项与页面清单新增 P25 模型、P26 系统状态、5.1 ① 订单关联、R-IN 订单查询、R-RS 新增「疑似提示注入」及关键词与模型并行、紧急度、R-SD-05 置信度、R-SD-06 回归门槛、R-AP-04 与 R-AP-05 的 Feeds 异步、R-AS-02 物流问题判定、P17、P18、P19「处理说明」页签、P22 查订单与查物流、改地址悬停说明、E-33、10.3、12 合规、11.1 紧急度、11.3 集成表（新增 17TRACK 行）、Q-01、Q-23、Q-25。
 - **原型同步 5 处**：`data.py` 改地址说明、`build_aftersales.py`、`inbox_parts.py`（停滞「或」）、`build_approval_kb_reports.py`、`build_states_admin.py`（报表数据来源）。重新生成页面、PRD（`forcome-blueprint-guide.html`）与画布合集（`forcome-support-blueprint.html`），渲染检查全部通过。
 - **未完成，记入 WORKPLAN**：P19「处理说明」页签、P25、P26 三个画板未出图；决策记录未加 D-21 条目；画布与 PRD 未重新发布。
+
+## Comments
+
+2026-10-03（文档漂移审查）：「未完成」一条已全部完成：P19「处理说明」、P25、P26 于 10-02 出图，决策记录已加，画布与 PRD 已重新发布（见 WORKPLAN）。

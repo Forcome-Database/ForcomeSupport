@@ -1,6 +1,7 @@
 Title: 讨论：AI 处理的编排与治理
 Type: grilling
 Status: resolved
+Blocked by: 17, 21
 Map: ../map.md
 
 # 讨论：AI 处理的编排与治理
