@@ -1,4 +1,4 @@
-// 子进程的公共调用（部署脚本执行 docker、git 用）。
+// 子进程的公共调用：deploy.mjs 与 verify.mjs 执行 docker、git 时用。
 import { spawnSync } from 'node:child_process';
 
 /** 运行一个程序，输出直接打到终端，返回退出码 */
