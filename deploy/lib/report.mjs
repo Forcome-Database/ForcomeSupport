@@ -23,18 +23,19 @@ function duration(step) {
 
 /**
  * @param {{
- *   environment: string, title: string, project: string, release: string, url: string,
+ *   environment: import('./environments.mjs').DeployEnvironment, release: string, url: string,
  *   rootCertFingerprint: string | null, steps: StepResult[], smoke: SmokeSummary | null,
  * }} result
  */
 export function formatReport(result) {
   const succeeded = result.steps.every((step) => step.status === 'passed');
+  const { name, title, project } = result.environment;
   const lines = [
-    `## 部署到${result.title}（${result.environment}）：${succeeded ? '成功' : '失败'}`,
+    `## 部署到${title}（${name}）：${succeeded ? '成功' : '失败'}`,
     '',
     `- 版本：\`${result.release}\``,
     `- 地址：${result.url}`,
-    `- Compose 项目：${result.project}`,
+    `- Compose 项目：${project}`,
     `- 根证书 SHA-256：${result.rootCertFingerprint ?? '（未取到）'}`,
     '',
     '| 步骤 | 结果 | 用时 |',

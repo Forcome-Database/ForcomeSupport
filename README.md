@@ -108,7 +108,7 @@ scripts/                 仓库级脚本：迁移一致性、工作流语法、�
 deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 ├── compose.yml          开发测试与生产共用的 Compose（caddy、api、worker、migrate、seed、postgres、smoke）
 ├── .env.example         环境变量模板（本机的 deploy/.env.staging 由部署脚本生成，不进 git）
-├── deploy.mjs           部署脚本；lib/ 为它的纯逻辑与测试，verify.mjs 为 CI 用的配置检查
+├── deploy.mjs           部署脚本；lib/ 为它的模块与单元测试，verify.mjs 为 CI 用的配置检查
 ├── web/                 前端的两个镜像（Dockerfile 的两个目标）：web = caddy（Caddyfile）+ 前端静态文件，smoke = 部署后冒烟
 ├── postgres/            自建 PostgreSQL 镜像
 └── smoke/               冒烟容器的入口脚本（信任 caddy 根证书后跑 Playwright）

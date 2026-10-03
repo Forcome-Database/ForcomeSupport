@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { ENVIRONMENTS } from './environments.mjs';
 import { formatReport, summarizePlaywright } from './report.mjs';
 
 const base = {
-  environment: 'staging',
-  title: '开发测试环境',
-  project: 'forcome-staging',
+  environment: ENVIRONMENTS.staging,
   release: '0a1b2c3d4e5f',
   url: 'https://support-dev.forcome.internal:4510/',
   rootCertFingerprint: '3A:7F:00:11',

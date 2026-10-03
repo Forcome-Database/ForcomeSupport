@@ -4,7 +4,8 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseEnv } from 'node:util';
-import { composeEnvironment, mustRun } from './lib/docker.mjs';
+import { composeEnvironment } from './lib/compose.mjs';
+import { mustRun } from './lib/process.mjs';
 
 process.chdir(path.resolve(import.meta.dirname, '..'));
 

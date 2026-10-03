@@ -1,30 +1,5 @@
-// 调用 Docker 与 Compose 的公共部分：部署脚本 deploy.mjs 与配置检查 verify.mjs 共用。
-import { spawnSync } from 'node:child_process';
-
-/** 运行一个程序，输出直接打到终端，返回退出码 */
-export function run(program, args, options = {}) {
-  const result = spawnSync(program, args, { stdio: 'inherit', ...options });
-  if (result.error) throw result.error;
-  return result.status;
-}
-
-/** 同 run，退出码不为 0 时抛错 */
-export function mustRun(program, args, options = {}) {
-  const status = run(program, args, options);
-  if (status !== 0) {
-    throw new Error(`${program} ${args.join(' ')} 退出码 ${status}`);
-  }
-}
-
-/** 运行并取回标准输出；失败时抛错，带上标准错误 */
-export function capture(program, args, options = {}) {
-  const result = spawnSync(program, args, { encoding: 'utf8', ...options });
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    throw new Error(`${program} ${args.join(' ')} 失败：${result.stderr.trim()}`);
-  }
-  return result.stdout.trim();
-}
+// 调用 docker compose 的子进程环境（deploy.mjs 与 verify.mjs 共用）：环境文件是变量的唯一来源，
+// 镜像版本 RELEASE 与冒烟镜像的 PLAYWRIGHT_VERSION 由这里给出。
 
 /**
  * 锁文件里 @playwright/test 的版本。冒烟镜像以同版本的官方 Playwright 镜像为底（浏览器版本随之一致），

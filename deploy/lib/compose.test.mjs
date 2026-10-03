@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { composeEnvironment, playwrightVersion } from './docker.mjs';
+import { composeEnvironment, playwrightVersion } from './compose.mjs';
 
 const LOCK = "  '@playwright/test@1.63.0':\n    resolution: {integrity: sha512-x}\n";
 

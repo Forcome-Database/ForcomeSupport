@@ -20,10 +20,11 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { capture, composeEnvironment, mustRun, run } from './lib/docker.mjs';
+import { composeEnvironment } from './lib/compose.mjs';
 import { createEnvFile, readDeployEnv } from './lib/env-file.mjs';
 import { ENVIRONMENTS } from './lib/environments.mjs';
 import { httpsGet, verifyCertificate } from './lib/https-check.mjs';
+import { capture, mustRun, run } from './lib/process.mjs';
 import { formatReport, summarizePlaywright } from './lib/report.mjs';
 
 const ROOT_CERT_IN_CADDY = '/data/caddy/pki/authorities/local/root.crt';
@@ -262,9 +263,7 @@ async function deploy({ smokeOnly }) {
 
   publishReport(
     formatReport({
-      environment: environment.name,
-      title: environment.title,
-      project: environment.project,
+      environment,
       release: release ?? '（未知）',
       url: deployEnv?.siteUrl ?? '（未知）',
       rootCertFingerprint: rootCert?.fingerprint ?? null,
