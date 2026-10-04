@@ -49,7 +49,7 @@ export const fixtureStoreSchema = z.object({
   sites: z.array(z.enum(['US', 'CA', 'MX'])),
   defaultSite: z.enum(['US', 'CA', 'MX']),
   mailbox: z.string(),
-  /** 平台标识原文（卖家 ID 或 myshopify 域名） */
+  /** 平台标识（亚马逊卖家 ID 或 Shopify 店铺域名），不带「卖家 ID」之类的字段名 */
   platformId: z.string(),
 });
 

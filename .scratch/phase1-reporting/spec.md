@@ -226,7 +226,7 @@ P04、P05 第一期版本的列、筛选、排序、取值与隐藏项见 PRD P0
 - 开发登录：只在非生产环境由环境变量开启，生产环境禁用。后端镜像只有一个，「禁用」按运行环境落实：生产环境配置了开发登录就拒绝启动，接口层也不挂开发登录的路由（ADR 0010 修订）。
 
 **`channel`**
-- 店铺（Store）与进线邮箱配置（P18、K8）：店铺名唯一、平台标识必填、邮箱格式校验；站点多选、默认站点、进线邮箱可填多个（含别名）；第一期不提供签名与覆盖项；「真实 / Fake」适配器选择只在非生产环境可设。新增店铺或为现有店铺增加进线邮箱后，对未归属队列中收件地址匹配的来信重新识别并归并（E-13、R-ST-02、AC-P1-16）。
+- 店铺（Store）与进线邮箱配置（P18、K8）：店铺名唯一（不分大小写）、平台标识必填、邮箱格式校验；站点多选、默认站点、进线邮箱可填多个（含别名，不分大小写、不能与其他店铺重复）；第一期不提供签名与覆盖项；「真实 / Fake」适配器选择只在非生产环境可设（非生产环境新建默认 Fake，生产环境提交 Fake 被拒）。新增店铺或为现有店铺增加进线邮箱后，对未归属队列中收件地址匹配的来信重新识别并归并（E-13、R-ST-02、AC-P1-16）：保存时在同一事务里发出「店铺已变更」事件（`channel.store_changed`，载荷带这次新登记的进线邮箱），15 号待办据此归位。P18 店铺表列出全部店铺（店铺配置是管理功能，不按管理员自己的数据范围过滤，ADR 0010 修订）。
 - Gmail 客户端：服务账号 + 全域委派，4 个邮箱；Pub/Sub pull 常驻 + 每 5 分钟 `history.list` 兜底；「已发送」也同步；每天续订 `watch`（不按标签过滤）；游标过期按 `internalDate` 区间全量补拉，补拉完成前「最近同步成功时间」不前移；水位只在持久化成功后推进。常驻连接用 advisory lock 选主。
 - 去重（R-TK-07）：消息表对「邮箱 + Gmail 消息 ID」唯一约束，冲突即视为重复（E-15）；另按 RFC `Message-ID` 跨邮箱判重：已在其他店铺邮箱入库的同一封邮件只记「同时发送到」，不再识别店铺与归并。
 - 渠道识别（R-TK-08）：亚马逊店铺邮箱的亚马逊中转来信为「亚马逊」；Shopify 店铺邮箱收到的 Shopify 联系表单通知为「Shopify」，客户渠道身份取表单里的回复邮箱；其余为「邮件」。
@@ -369,7 +369,8 @@ P04、P05 第一期版本的列、筛选、排序、取值与隐藏项见 PRD P0
 - Playwright `apps/web/e2e/dev-login.spec.ts`（开发登录 → 首页顶栏）；
 - 部署（待办 03）：`deploy/`（Compose、镜像、部署脚本 `deploy.mjs`）与 `docs/部署说明.md`；开发测试环境的外部客户端默认 Fake，进程启动时 Fake 从示例数据夹具回放（`FakeClient.replay`）；发信的真实现发出前经 `MailRecipientGuard` 检查发信白名单。
 - 角色、店铺范围与导航（待办 04）：能力矩阵、导航与默认首页、财务字段标记在 `packages/contracts`（`capabilities.ts`、`navigation.ts`、`finance.ts`）；接口挂 `org` 的 `requireSession`、`requireCapability`，处理器用 `c.get('access')` 取店铺范围（交给仓储查询的 `storeScopeCondition`）、越权审计（列表的店铺筛选用 `access.requireStores`，详情用 `access.findOwned` 取对象并校验归属）与财务可见（`stripFinanceFields` / `maskFinanceFields`），写法样板见 `apps/server/test/access-tools.int.test.ts`；测试工具 `t.addMember` 建示例数据里没有的成员。
-做法与取舍见 ADR 0005–0010、0013 的「待办 02 落地」修订，ADR 0003、0009、0013 的「待办 03 落地」修订，以及 ADR 0005、0007、0010 的「待办 04 落地」修订。
+- 店铺与 P18（待办 07）：店铺表 `channel.store` 与进线邮箱 `channel.store_mailbox`（地址小写、全表唯一），加载步骤 `channel.stores` 灌示例数据的 4 个店铺；接口 `GET /api/channel/settings`（P18）、`POST /api/channel/stores`、`PUT /api/channel/stores/{id}`（带版本号）、`GET /api/channel/store-options`（店铺范围内的店铺，各页面的店铺筛选、指定店铺与授权选择都用它）；店铺输入、校验纯函数与连接状态在 `packages/contracts/src/channel.ts`。表单字段级错误的约定（400 `invalid_request` + `fields`、`core` 的 `FieldValidationError`）与前端表单写法（保存交给接口一次报全、G7 冲突横幅、G8 未保存离开）是后续表单的样板（`apps/web/src/pages/settings/store-drawer.tsx`）。「店铺已变更」事件 `channel.store_changed { storeId, addedMailboxes }` 供 15 号待办自动归位。测试工具 `startTestHarness({ appEnv: 'production' })` 验证生产环境的限制。
+做法与取舍见 ADR 0005–0010、0013 的「待办 02 落地」修订，ADR 0003、0009、0013 的「待办 03 落地」修订，ADR 0005、0007、0010 的「待办 04 落地」修订，以及 ADR 0005、0006、0007、0009、0010 的「待办 07 落地」修订。
 
 ## Out of Scope
 

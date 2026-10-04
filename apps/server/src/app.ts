@@ -3,7 +3,14 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import type { ServerDeps } from './deps';
-import { AccessDeniedError, OptimisticLockError, type Logger, type Runtime } from './modules/core';
+import { createChannelRoutes } from './modules/channel';
+import {
+  AccessDeniedError,
+  FieldValidationError,
+  OptimisticLockError,
+  type Logger,
+  type Runtime,
+} from './modules/core';
 import { createDevLoginRoutes, createOrgRoutes, devLoginAvailable } from './modules/org';
 
 const DATABASE_CHECK_TIMEOUT_MS = 3_000;
@@ -51,7 +58,7 @@ async function databaseIsUp(runtime: Runtime, logger: Logger): Promise<boolean> 
  * index.ts 取来挂上。入口 api.ts 用它起服务；测试在进程内直接调用 app.request（规格「测试接缝」主接缝）。
  */
 export function createApp(deps: ServerDeps) {
-  const { runtime, logger, config } = deps;
+  const { runtime, logger, config, clients } = deps;
   const app = new OpenAPIHono({
     // 请求参数不符合 contracts 的模式：400，写明哪里不对
     defaultHook: (result, c) => {
@@ -75,6 +82,7 @@ export function createApp(deps: ServerDeps) {
   });
 
   app.route('/', createOrgRoutes({ runtime, appEnv: config.appEnv }));
+  app.route('/', createChannelRoutes({ runtime, appEnv: config.appEnv, clients }));
   if (devLoginAvailable(config)) {
     app.route('/', createDevLoginRoutes({ runtime, appEnv: config.appEnv }));
   }
@@ -89,6 +97,12 @@ export function createApp(deps: ServerDeps) {
   app.onError((error, c) => {
     if (error instanceof AccessDeniedError) {
       return c.json({ error: 'forbidden', message: error.message }, 403);
+    }
+    if (error instanceof FieldValidationError) {
+      return c.json(
+        { error: 'invalid_request', message: error.message, fields: error.fields },
+        400,
+      );
     }
     if (error instanceof OptimisticLockError) {
       logger.info({ table: error.table, rowId: error.rowId }, '乐观锁冲突');

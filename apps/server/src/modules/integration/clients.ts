@@ -140,10 +140,17 @@ export class IntegrationClients {
     if (definition.scope !== 'global') {
       throw new Error(`${definition.system} 是店铺级客户端，用 forStore() 按店铺取`);
     }
-    const mode = this.#modes[definition.system] ?? (this.#production ? 'real' : 'fake');
-    return mode === 'fake'
+    return this.globalMode(definition.system) === 'fake'
       ? this.fake(definition).client()
       : definition.createReal({ mailRecipientGuard: this.mailRecipientGuard });
+  }
+
+  /**
+   * 全局客户端按 CLIENT_MODE_<系统> 选择的实现（不设时非生产为 Fake、生产为真实现）。P18 的钉钉卡据此标「模拟数据」；
+   * 只读配置、不建客户端，所以不要求已登记（钉钉客户端随 05 号待办登记）。
+   */
+  globalMode(system: string): AdapterMode {
+    return this.#modes[system] ?? (this.#production ? 'real' : 'fake');
   }
 
   /** 本进程里该客户端的 Fake 实例（测试与开发环境往里放数据、注入故障）；生产环境拒绝 */

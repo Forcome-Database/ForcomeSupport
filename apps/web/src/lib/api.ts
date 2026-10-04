@@ -1,15 +1,24 @@
 import {
   adminContactsSchema,
   apiErrorSchema,
+  channelSettingsSchema,
   currentMemberSchema,
   devMembersResponseSchema,
   loginDeniedSchema,
   preferencesSchema,
+  storeOptionsSchema,
+  storeSchema,
   type AdminContacts,
+  type ChannelSettings,
   type CurrentMember,
   type DevMember,
+  type FieldErrors,
   type LoginDenialReason,
   type Preferences,
+  type Store,
+  type StoreInput,
+  type StoreOption,
+  type StoreUpdate,
 } from '@forcome/contracts';
 import type { z } from 'zod';
 
@@ -23,11 +32,14 @@ export class ApiRequestError extends Error {
   override name = 'ApiRequestError';
   readonly status: number;
   readonly code: string;
+  /** 表单字段填错时（400 invalid_request）每个字段的错误，键为字段路径（如 mailboxes.2） */
+  readonly fields: FieldErrors | undefined;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, fields?: FieldErrors) {
     super(message);
     this.status = status;
     this.code = code;
+    this.fields = fields;
   }
 }
 
@@ -75,6 +87,7 @@ async function send(path: string, init?: RequestInit): Promise<Response> {
       response.status,
       error.success ? error.data.error : 'http_error',
       error.success ? error.data.message : `请求失败（${response.status}）`,
+      error.success ? error.data.fields : undefined,
     );
   }
   return response;
@@ -110,4 +123,20 @@ export const api = {
 
   /** 在职的管理员（G2「如需开通请联系管理员刘洋」） */
   adminContacts: (): Promise<AdminContacts> => call('/api/org/admin-contacts', adminContactsSchema),
+
+  /** P18 渠道与店铺：渠道卡、店铺表，以及是否显示「数据来源」 */
+  channelSettings: (): Promise<ChannelSettings> =>
+    call('/api/channel/settings', channelSettingsSchema),
+
+  /** 新增店铺；字段填错时抛 ApiRequestError（fields 为各字段的错误） */
+  createStore: (input: StoreInput): Promise<Store> =>
+    call('/api/channel/stores', storeSchema, jsonBody('POST', input)),
+
+  /** 编辑店铺（带打开时的版本号）；别人先保存了抛 409 optimistic_lock（G7） */
+  updateStore: (id: string, input: StoreUpdate): Promise<Store> =>
+    call(`/api/channel/stores/${id}`, storeSchema, jsonBody('PUT', input)),
+
+  /** 当前成员店铺范围内的店铺（店铺筛选、指定店铺、授权选择） */
+  storeOptions: async (): Promise<StoreOption[]> =>
+    (await call('/api/channel/store-options', storeOptionsSchema)).stores,
 };

@@ -16,3 +16,5 @@ Blocked by: 07, 09, 31
 - [ ] 订单同步的连接状态与最近同步时间可在 P18 看到
 
 ## Comments
+
+- 2026-10-05（待办 07）：P18 的 Shopify 卡已有骨架（`channel-cards.tsx`），状态由 `channel/connections.ts` 的 `statusOf` 按数据来源给出、没有最近同步时间；本待办按订单同步记录替换，并加上「测试连接」与回补窗口行（例「订单回补 60 天 · 未开通 read_all_orders」，与 13 号待办分工）。店铺的数据来源在 `channel.store.adapter_mode`，`forStore(定义, { id, adapterMode })` 取客户端；店铺表「状态」列的订单一项写作「Admin API」。

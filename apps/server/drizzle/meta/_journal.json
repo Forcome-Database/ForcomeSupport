@@ -36,6 +36,13 @@
       "when": 1791058413370,
       "tag": "0004_org_member",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791065667426,
+      "tag": "0005_channel_store",
+      "breakpoints": true
     }
   ]
 }

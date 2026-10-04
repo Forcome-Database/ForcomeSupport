@@ -27,7 +27,7 @@ import {
   type AccessVariables,
   type NewMember,
 } from '../src/modules/org';
-import { createApiClient, type ApiClient } from './api-client';
+import { createApiClient, type ApiClient, type RequestHandler } from './api-client';
 import { createTestDatabase } from './database';
 import { runQueuedJobs, type JobRunReport, type RunJobsOptions } from './run-jobs';
 
@@ -44,8 +44,12 @@ export const TEST_CLIENT_IP = '10.20.3.27';
 export const DEMO_NOW = getDemoFixture().meta.now;
 
 export interface StartTestHarnessOptions {
-  /** 运行环境，默认 test；验证「生产不允许」之类的行为时可改 */
-  readonly appEnv?: Exclude<AppEnv, 'production'>;
+  /**
+   * 运行环境，默认 test。设为 production 时应用按生产环境组装（不挂开发登录、外部客户端不给 Fake），
+   * 用来验证「生产环境不允许」之类的行为；测试工具另用一个非生产的应用实例（同一个库）只为开发登录建会话，
+   * 示例数据也按测试环境灌入——这些都是测试准备，被测的接口仍是生产配置的那一个。
+   */
+  readonly appEnv?: AppEnv;
   /** 时钟起点，默认演示时刻 */
   readonly now?: string;
   /** 后台任务处理器，默认 jobs.ts 组装的全部处理器；测试工具自己的测试会换成示范处理器 */
@@ -103,6 +107,8 @@ export async function startTestHarness(
   options: StartTestHarnessOptions = {},
 ): Promise<TestHarness> {
   const appEnv = options.appEnv ?? 'test';
+  // 测试准备（灌示例数据、开发登录建会话）用的环境：生产配置下也按测试环境做
+  const setupEnv: AppEnv = appEnv === 'production' ? 'test' : appEnv;
   const database = await createTestDatabase();
   const clock = new ManualClock(options.now ?? DEMO_NOW);
   const started = await startRuntime(database.url, {
@@ -127,17 +133,26 @@ export async function startTestHarness(
   const deps: ServerDeps = {
     runtime,
     logger: silentLogger,
-    config: { appEnv, devLoginEnabled: true },
+    config: { appEnv, devLoginEnabled: appEnv !== 'production' },
     clients,
   };
-  let app: ReturnType<typeof createApp>;
+  let app: RequestHandler;
   let handlers: readonly AnyJobHandler[];
   try {
-    app = createApp(deps);
-    if (options.routes) app.route('/', options.routes(deps));
+    const main = createApp(deps);
+    if (options.routes) main.route('/', options.routes(deps));
+    app = main;
+    if (appEnv === 'production') {
+      // 生产配置的应用没有开发登录：/api/dev/* 交给同一个库上的非生产实例，换出的会话两边通用
+      const login = createApp({ ...deps, config: { appEnv: setupEnv, devLoginEnabled: true } });
+      app = {
+        request: (input, init) =>
+          input.startsWith('/api/dev/') ? login.request(input, init) : main.request(input, init),
+      };
+    }
     // 开发登录从成员表选人：每个测试库先灌示例成员（与 pnpm db:seed 同一个加载步骤）
     await loadFixtures(runtime, {
-      appEnv,
+      appEnv: setupEnv,
       fixture: getDemoFixture(),
       steps: [orgMembersFixtureStep],
     });
@@ -209,7 +224,7 @@ export async function startTestHarness(
     resetFakes: () => clients.resetFakes(),
 
     loadFixtures: () =>
-      loadFixtures(runtime, { appEnv, fixture: getDemoFixture(), steps: fixtureSteps }),
+      loadFixtures(runtime, { appEnv: setupEnv, fixture: getDemoFixture(), steps: fixtureSteps }),
 
     auditRecords: (query) => findAuditRecords(runtime.db, query),
 

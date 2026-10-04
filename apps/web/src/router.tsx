@@ -8,20 +8,23 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router';
-import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, type ComponentType, type ReactNode } from 'react';
 import { AppShell } from '@/components/app-shell';
 import { Forbidden } from '@/components/forbidden';
 import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { LoadError } from '@/components/load-error';
 import { pages, sectionPaths, type PageDefinition } from '@/lib/pages';
 import { applyDensity, currentMemberQuery, devMembersQuery } from '@/lib/session';
 import { DevLoginPage } from '@/pages/dev-login';
+import { ChannelsPage } from '@/pages/settings/channels-page';
+import { TeamPage } from '@/pages/settings/team-page';
 
 /*
  * 路由（ADR 0007：TanStack Router，代码定义）。登录后的页面都挂在 app 布局下：
  * 没登录（含会话 7 天无操作过期）时，开启了开发登录就去开发登录页；钉钉扫码登录页（G11）随 05 号待办。
  * 「/」按角色进入默认首页（PRD 4.1）；各页面按能力把关，没有权限时在原地址显示 G2。
- * 第一期各页面的内容随各自的待办加进来（P04 18、P05 17、P13 19、P17 24、P18 07、P20 06、P27 30），在那之前内容区为空。
+ * 第一期各页面的内容随各自的待办加进来（P04 18、P05 17、P13 19、P17 24、P20 06、P27 30），在那之前内容区为空；P18 已有（07）。
  */
 
 interface RouterContext {
@@ -29,12 +32,12 @@ interface RouterContext {
 }
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
-  // 浮层提示（G5）的容器挂在根上，登录页与外壳里的页面都能用
+  // 浮层提示（G5）的容器与悬停说明的 Provider 挂在根上，登录页与外壳里的页面都能用
   component: () => (
-    <>
+    <TooltipProvider>
       <Outlet />
       <Toaster />
-    </>
+    </TooltipProvider>
   ),
   errorComponent: ({ reset }) => (
     <div className="flex min-h-screen items-center justify-center bg-background">
@@ -120,11 +123,14 @@ function PageGate({ page, children }: { page: PageDefinition; children?: ReactNo
   return children ?? null;
 }
 
-function pageRoute<TPath extends string>(page: PageDefinition & { readonly path: TPath }) {
+function pageRoute<TPath extends string>(
+  page: PageDefinition & { readonly path: TPath },
+  Content?: ComponentType,
+) {
   return createRoute({
     getParentRoute: () => appRoute,
     path: page.path,
-    component: () => <PageGate page={page} />,
+    component: () => <PageGate page={page}>{Content && <Content />}</PageGate>,
   });
 }
 
@@ -153,8 +159,8 @@ const routeTree = rootRoute.addChildren([
     pageRoute(pages.aftersalesLedger),
     pageRoute(pages.reports),
     settingsRoute,
-    pageRoute(pages.settingsChannels),
-    pageRoute(pages.settingsTeam),
+    pageRoute(pages.settingsChannels, ChannelsPage),
+    pageRoute(pages.settingsTeam, TeamPage),
     pageRoute(pages.audit),
   ]),
 ]);

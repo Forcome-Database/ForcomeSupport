@@ -53,3 +53,10 @@ status: accepted
 - **前端调接口**不用 `hono/client`，改为 `fetch` + `contracts` 的 zod 模式解析，原因见 ADR 0007 修订（前端不能引用后端代码）；接口仍用 `@hono/zod-openapi` 以 `contracts` 的模式声明。
 - **接口约定**：请求参数不符合模式返回 400（`{ error: 'invalid_request', message: '请求参数不对：…' }`），不存在的接口返回 404 的 JSON（`{ error: 'not_found', message: '接口不存在' }`），请求体不是合法 JSON 返回 400 `invalid_request`，框架抛出的其他 HTTP 错误为 `http_error`，错误码与说明的形状是 `contracts` 的 `apiErrorSchema`。
 - **会话表** `org.session`（ADR 0010 修订）：令牌只存 SHA-256，`member_id` 有索引供停用时失效会话。
+
+## 修订（2026-10-05，待办 07 落地）
+
+- **表单字段级错误**：保存类接口判断出字段填错时，模块抛 `core` 的 `FieldValidationError(fields)`，接口统一返回 400 `{ error: 'invalid_request', message: '请按提示修改后再保存', fields }`；`fields` 的键是字段路径（如 `name`、`mailboxes.2`），值是写在字段下方的中文说明（「哪里错 + 怎么改」），形状见 `contracts` 的 `FieldErrors` 与 `apiErrorSchema.fields`。要查库的错误（店铺名、邮箱重复等）与表单本身能判断的错误在同一次响应里列全（K8：保存后定位到第一个错误）。请求体形状不符（类型不对）仍是不带 `fields` 的 400。
+- **先查后写的唯一性**：「不能重复」要给出字段级错误，所以先查后写，并在事务级咨询锁下串行（店铺配置用 `pg_advisory_xact_lock(hashtext('channel.store_config'))`），表上另有唯一约束兜底（`lower(name)`、进线邮箱地址）。
+- **编辑与乐观锁**：编辑接口先判断表单本身的错误，再比版本号（不是最新的返回 409，不拿别人改过的数据判断重复），最后查重复；更新经 `updateWithVersion`。
+- 迁移 `0005_channel_store`：`channel.store`（店铺）、`channel.store_mailbox`（进线邮箱，地址小写、全表唯一）。

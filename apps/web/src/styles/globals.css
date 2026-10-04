@@ -24,6 +24,7 @@
   --border: #e7e9f1; /* line */
   --border-soft: #eff1f7; /* line2 */
   --input: #d8dce7; /* line_strong */
+  --input-hover: #b9bfcd; /* 输入框悬停的边框（ui.input_box st=hover） */
   --ink-2: #3b4356; /* ink2 */
   --subtle-foreground: #656e82; /* ink4 */
   --placeholder: #9099ab; /* ink5：只用于占位符与禁用 */
@@ -52,6 +53,13 @@
   --destructive-text: #c8313b;
   --destructive-soft: #fcedee;
   --destructive-line: #f4c8cb;
+  --destructive-active: #b1252f; /* 危险按钮按下（ui.BTN_HOVER danger） */
+  --destructive-soft-active: #f9dadd; /* 危险描边按钮按下（ui.BTN_HOVER danger_outline） */
+  --warning-banner: #fcf5eb; /* 警示横幅底色（ui.banner warning） */
+  --warning-banner-icon: #f6e3c6; /* 警示横幅图标圆底（ui.banner warning） */
+  --success-card: #f4fbf7; /* 成功色调卡片底（ui.card tone=success） */
+  --warning-card: #fdf8f0; /* 警示色调卡片底（ui.card tone=warning） */
+  --destructive-card: #fdf5f6; /* 危险色调卡片底（ui.card tone=danger） */
   --flow: #6d28d9;
   --flow-soft: #f4f1fe;
   --flow-line: #ddd6fe;
@@ -65,6 +73,8 @@
   --channel-amazon-line: #f6d9b5;
   --channel-shopify: #0b7a4d;
   --channel-mail: #5a6376;
+
+  --scrim: rgba(16, 24, 40, 0.45); /* 抽屉与弹窗的遮罩（ui.drawer_over、ui.scrim） */
 
   --radius: 12px;
 }
@@ -114,6 +124,7 @@
   --color-border: var(--border);
   --color-border-soft: var(--border-soft);
   --color-input: var(--input);
+  --color-input-hover: var(--input-hover);
   --color-ink-2: var(--ink-2);
   --color-subtle-foreground: var(--subtle-foreground);
   --color-placeholder: var(--placeholder);
@@ -138,6 +149,14 @@
   --color-destructive-text: var(--destructive-text);
   --color-destructive-soft: var(--destructive-soft);
   --color-destructive-line: var(--destructive-line);
+  --color-destructive-active: var(--destructive-active);
+  --color-destructive-soft-active: var(--destructive-soft-active);
+  --color-warning-banner: var(--warning-banner);
+  --color-warning-banner-icon: var(--warning-banner-icon);
+  --color-success-card: var(--success-card);
+  --color-warning-card: var(--warning-card);
+  --color-destructive-card: var(--destructive-card);
+  --color-scrim: var(--scrim);
   --color-flow: var(--flow);
   --color-flow-soft: var(--flow-soft);
   --color-flow-line: var(--flow-line);

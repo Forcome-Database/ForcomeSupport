@@ -105,7 +105,8 @@ def stores():
         'sites': list(s['sites']),
         'defaultSite': s['default_site'],
         'mailbox': s['mailbox'],
-        'platformId': s['sid'],
+        # 原型的 sid 是显示写法（亚马逊带「卖家 ID 」前缀），夹具只取标识本身；字段名由店铺表按平台另写
+        'platformId': s['sid'].rsplit(' ', 1)[-1],
     } for s in d.STORES]
 
 

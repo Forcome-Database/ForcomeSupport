@@ -2,10 +2,11 @@
 // 把处理器加到 createJobHandlers（worker 据此订阅，测试据此「跑完任务」）。两边必须一一对应，
 // test/jobs.test.ts 核对。处理器要用外部客户端时从 deps 取，测试里拿到的就是 Fake。
 import type { ServerDeps } from './deps';
+import { createChannelJobHandlers, storeChangedJob } from './modules/channel';
 import type { AnyJobDefinition, AnyJobHandler } from './modules/core';
 
-export const jobDefinitions: readonly AnyJobDefinition[] = [];
+export const jobDefinitions: readonly AnyJobDefinition[] = [storeChangedJob];
 
 export function createJobHandlers(_deps: ServerDeps): readonly AnyJobHandler[] {
-  return [];
+  return [...createChannelJobHandlers()];
 }

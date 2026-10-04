@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 /*
  * 下拉菜单（shadcn DropdownMenu，按原型 avatar_menu() 与设计规范第 12 节「头像菜单（G10）」改过默认样式）：
  * 白底、1px 边线、12 圆角、md 阴影、内边距 5；菜单项正文字号（13，紧凑 12）、次要深色字、内边距 7 / 10、6 圆角、图标 15，
- * 键盘或悬停聚焦时浅灰底；分隔线为浅线色、上下 4。只保留用到的部件（菜单项、分隔线、单选子菜单），
- * 勾选项、快捷键等第一次用到的待办按原型补上。
+ * 键盘或悬停聚焦时浅灰底；分隔线为浅线色、上下 4。只保留用到的部件（菜单项、分隔线、单选子菜单、多选勾选项），
+ * 快捷键等第一次用到的待办按原型补上。
  */
 
 function DropdownMenu(props: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
@@ -141,8 +141,39 @@ function DropdownMenuRadioItem({
   );
 }
 
+/**
+ * 多选勾选项（P18 站点多选）：左侧 16 的方框（原型 checkbox()：6 圆角、1.5px 深一档边线；选中为主色底白勾）。
+ * 选中后菜单不关，便于连选（onSelect 里阻止默认的关闭）。
+ */
+function DropdownMenuCheckboxItem({
+  className,
+  children,
+  onSelect,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuPrimitive.CheckboxItem>) {
+  return (
+    <DropdownMenuPrimitive.CheckboxItem
+      data-slot="dropdown-menu-checkbox-item"
+      className={cn(itemClass, 'group', className)}
+      onSelect={(event) => {
+        event.preventDefault();
+        onSelect?.(event);
+      }}
+      {...props}
+    >
+      <span className="flex size-4 shrink-0 items-center justify-center rounded-sm border-[1.5px] border-input bg-card group-data-[state=checked]:border-primary group-data-[state=checked]:bg-primary">
+        <DropdownMenuPrimitive.ItemIndicator>
+          <Check className="size-3 text-primary-foreground" strokeWidth={2.5} />
+        </DropdownMenuPrimitive.ItemIndicator>
+      </span>
+      {children}
+    </DropdownMenuPrimitive.CheckboxItem>
+  );
+}
+
 export {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuHint,
   DropdownMenuItem,

@@ -15,3 +15,5 @@ Blocked by: 05, 08, 31
 - [ ] P18 Gmail 卡与钉钉卡展示状态与最近同步时间；两张卡都有「测试连接」（K20）
 
 ## Comments
+
+- 2026-10-05（待办 07）：P18 的 Gmail 卡与钉钉卡已有骨架（`apps/web/src/pages/settings/channel-cards.tsx`，后端 `GET /api/channel/settings` 的 `channels`）。状态目前只由数据来源决定（`apps/server/src/modules/channel/connections.ts` 的 `statusOf`：模拟数据为已连接、真实接口为未连接，`lastSyncAt` 恒为 null），本待办按同步记录替换它，补上同步延迟、连接异常、最近同步时间与「列出异常的邮箱」；「测试连接」在 07 先隐藏，由本待办加上（K20）；连接异常的卡片底色已按状态写好（`statusCard`）。店铺表「状态」列取 `Store.connections` 的 gmail 一项。
