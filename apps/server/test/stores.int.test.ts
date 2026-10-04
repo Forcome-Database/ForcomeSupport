@@ -362,17 +362,22 @@ describe('P18 店铺表（非生产环境）', () => {
       expect(fields).toEqual({ platformId: '请填写店铺域名' });
     });
 
-    it('编辑时店铺名可以保持不变；改成其他店铺的名字、或用其他店铺的邮箱同样报错', async () => {
+    it('编辑时店铺名可以保持不变；改成其他店铺的名字、用其他店铺的邮箱同样报错，与表单本身的错误一次列全', async () => {
       const current = (await settings(admin)).stores.find((s) => s.id === created.id)!;
       const fields = await fieldErrors(
         await admin.put(`/api/channel/stores/${created.id}`, {
-          ...newStore({ name: 'Forcome Auto', mailboxes: ['amz-auto@forcome.com'] }),
+          ...newStore({
+            name: 'Forcome Auto',
+            mailboxes: ['amz-auto@forcome.com'],
+            platformId: '',
+          }),
           version: current.version,
         }),
       );
       expect(fields).toEqual({
         name: '店铺名已存在，请换一个',
         'mailboxes.0': 'amz-auto@forcome.com 已是 Forcome Auto 的进线邮箱',
+        platformId: '请填写店铺域名',
       });
     });
 

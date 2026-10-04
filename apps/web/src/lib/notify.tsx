@@ -138,12 +138,7 @@ function ErrorToast({ id, action, error, description, retry }: ErrorToastOptions
       )}
       {retry && (
         <div className="pt-0.5">
-          <Button
-            variant="link"
-            className="h-auto border-0 px-0 text-12 font-medium"
-            loading={pending}
-            onClick={() => void onRetry()}
-          >
+          <Button variant="text-link" size="text" loading={pending} onClick={() => void onRetry()}>
             立即重试
           </Button>
         </div>

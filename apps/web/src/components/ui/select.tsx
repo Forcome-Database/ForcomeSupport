@@ -1,6 +1,7 @@
 import { Check, ChevronDown } from 'lucide-react';
 import { Select as SelectPrimitive } from 'radix-ui';
 import type * as React from 'react';
+import { controlClass } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 /*
@@ -26,7 +27,8 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        'flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-card px-2.5 text-body whitespace-nowrap text-foreground transition-colors outline-none select-none hover:border-input-hover focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-primary/14 data-[state=open]:border-primary data-[state=open]:ring-3 data-[state=open]:ring-primary/14 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/12 disabled:pointer-events-none disabled:border-border disabled:bg-muted disabled:text-placeholder data-placeholder:text-placeholder *:data-[slot=select-value]:truncate',
+        controlClass,
+        'flex items-center justify-between gap-2 px-2.5 whitespace-nowrap select-none data-placeholder:text-placeholder *:data-[slot=select-value]:truncate',
         className,
       )}
       {...props}

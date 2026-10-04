@@ -83,21 +83,37 @@ export type FieldErrors = Record<string, string>;
 const emailSchema = z.email();
 const INVALID_EMAIL = '邮箱格式不正确，例如 info@forcome.mx';
 
-/** 规范化：去掉首尾空白，进线邮箱转小写（同一地址不分大小写），站点按 US · CA · MX 排序去重 */
+/** 进线邮箱的规范写法：去掉首尾空白、转小写（同一地址不分大小写） */
+export function normalizeMailbox(mailbox: string): string {
+  return mailbox.trim().toLowerCase();
+}
+
+/** 规范化：去掉首尾空白，进线邮箱转小写，站点按 US · CA · MX 排序去重 */
 export function normalizeStoreInput(input: StoreInput): StoreInput {
   return {
     ...input,
     name: input.name.trim(),
     sites: sites.filter((site) => input.sites.includes(site)),
-    mailboxes: input.mailboxes.map((mailbox) => mailbox.trim().toLowerCase()),
+    mailboxes: input.mailboxes.map(normalizeMailbox),
     platformId: input.platformId.trim(),
   };
 }
 
 /**
+ * 单个进线邮箱的错误：格式不对，或与前面已填的重复（不分大小写）；没问题返回 null。
+ * 保存时逐个检查用它，抽屉里按回车加入一个邮箱前也用它就地检查。
+ */
+export function mailboxError(mailbox: string, earlier: readonly string[]): string | null {
+  const normalized = normalizeMailbox(mailbox);
+  if (!emailSchema.safeParse(normalized).success) return INVALID_EMAIL;
+  if (earlier.map(normalizeMailbox).includes(normalized)) return `${normalized} 已经填过`;
+  return null;
+}
+
+/**
  * 表单本身能判断的错误（PRD P18「校验」、K8）：必填项、平台标识为空、邮箱格式、同一店铺内重复的邮箱、
  * 默认站点不在所选站点里。店铺名重复与邮箱被其他店铺占用要查库，由 channel 模块保存时补上，与这里的结果一起返回，
- * 所以抽屉点「保存」后各类错误同时报出（K8）；前端加入单个进线邮箱时用 isValidMailbox 就地检查。
+ * 所以抽屉点「保存」后各类错误同时报出（K8）；前端加入单个进线邮箱时用 mailboxError 就地检查。
  */
 export function storeInputErrors(raw: StoreInput): FieldErrors {
   const input = normalizeStoreInput(raw);
@@ -110,11 +126,8 @@ export function storeInputErrors(raw: StoreInput): FieldErrors {
   }
   if (input.mailboxes.length === 0) errors.mailboxes = '至少填写一个进线邮箱';
   input.mailboxes.forEach((mailbox, index) => {
-    if (!emailSchema.safeParse(mailbox).success) {
-      errors[`mailboxes.${index}`] = INVALID_EMAIL;
-    } else if (input.mailboxes.indexOf(mailbox) < index) {
-      errors[`mailboxes.${index}`] = `${mailbox} 已经填过`;
-    }
+    const error = mailboxError(mailbox, input.mailboxes.slice(0, index));
+    if (error) errors[`mailboxes.${index}`] = error;
   });
   if (!input.platformId) {
     errors.platformId = input.platform
@@ -122,11 +135,6 @@ export function storeInputErrors(raw: StoreInput): FieldErrors {
       : '请填写平台标识';
   }
   return errors;
-}
-
-/** 单个进线邮箱的格式（抽屉里输入后按回车加入前先检查，与 storeInputErrors 同一条规则） */
-export function isValidMailbox(mailbox: string): boolean {
-  return emailSchema.safeParse(mailbox.trim().toLowerCase()).success;
 }
 
 /**

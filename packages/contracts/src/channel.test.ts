@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  mailboxError,
   normalizeStoreInput,
   storeInputErrors,
   worstConnectionStatus,
@@ -71,6 +72,16 @@ describe('店铺输入的字段级校验（K8）', () => {
     expect(storeInputErrors({ ...valid, sites: ['US'], defaultSite: 'MX' })).toEqual({
       defaultSite: '请选择默认站点',
     });
+  });
+});
+
+describe('单个进线邮箱的就地检查（抽屉按回车加入前）', () => {
+  it('格式不对、或与前面已填的重复（不分大小写）时给出错误，没问题为 null', () => {
+    expect(mailboxError('info@forcome', [])).toBe('邮箱格式不正确，例如 info@forcome.mx');
+    expect(mailboxError(' Ventas@Forcome.MX ', ['ventas@forcome.mx'])).toBe(
+      'ventas@forcome.mx 已经填过',
+    );
+    expect(mailboxError('help+mx@forcome.mx', ['ventas@forcome.mx'])).toBeNull();
   });
 });
 

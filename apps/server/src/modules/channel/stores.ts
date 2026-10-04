@@ -103,16 +103,13 @@ export function toStore(record: StoreRecord): Store {
   };
 }
 
-/** 审计里的前后值：抽屉里能改的全部字段 */
-function snapshot(record: {
-  name: string;
-  platform: StoreRow['platform'];
-  sites: readonly StoreRow['sites'][number][];
-  defaultSite: StoreRow['defaultSite'];
-  mailboxes: readonly string[];
-  platformId: string;
-  adapterMode: AdapterMode;
-}) {
+/** 抽屉里能改的全部字段（审计的前后值） */
+type StoreContent = Pick<
+  StoreRecord,
+  'name' | 'platform' | 'sites' | 'defaultSite' | 'mailboxes' | 'platformId' | 'adapterMode'
+>;
+
+function snapshot(record: StoreContent) {
   return {
     name: record.name,
     platform: record.platform,
@@ -239,8 +236,9 @@ export async function createStore(ctx: StoreSaveContext, raw: StoreInput): Promi
 }
 
 /**
- * 编辑店铺（K8）。店铺不存在返回 null；填错抛 FieldValidationError；版本号不是最新的（别人先保存了）
- * 抛 OptimisticLockError（接口 409，G7）。进线邮箱按新的列表整体替换，新登记的地址随「店铺已变更」发出。
+ * 编辑店铺（K8）。店铺不存在返回 null；版本号不是最新的（别人先保存了）抛 OptimisticLockError（接口 409，G7）；
+ * 填错抛 FieldValidationError（表单本身的错误与查库的重复一次列全）。进线邮箱按新的列表整体替换，
+ * 新登记的地址随「店铺已变更」发出。
  */
 export async function updateStore(
   ctx: StoreSaveContext,
@@ -256,17 +254,16 @@ export async function updateStore(
     const [current] = await withMailboxes(tx.db, [row]);
     if (!current) return null;
 
+    // 表单是照旧版本填的：先报冲突（G7「查看最新」后再改），不拿别人改过的数据判断对错
+    if (current.version !== version) throw new OptimisticLockError('channel.store', id);
     const adapter = resolveAdapterMode(ctx.appEnv, input.adapterMode, current.adapterMode);
-    const formErrors: FieldErrors = {
+    const errors: FieldErrors = {
+      ...(await conflictErrors(tx.db, input, id)),
       ...storeInputErrors(input),
       ...(adapter.error ? { adapterMode: adapter.error } : {}),
     };
-    if (Object.keys(formErrors).length > 0) throw new FieldValidationError(formErrors);
-    // 表单是照旧版本填的：先报冲突（G7「查看最新」后再改），不拿别人改过的数据判断重复
-    if (current.version !== version) throw new OptimisticLockError('channel.store', id);
-    const conflicts = await conflictErrors(tx.db, input, id);
-    if (Object.keys(conflicts).length > 0 || !input.platform || !input.defaultSite) {
-      throw new FieldValidationError(conflicts);
+    if (Object.keys(errors).length > 0 || !input.platform || !input.defaultSite) {
+      throw new FieldValidationError(errors);
     }
 
     const updatedRow = await updateWithVersion(

@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 /*
  * P18 渠道与店铺（待办 07；PRD P18「第一阶段」、K8、K20，AC-ST-01）：新增店铺抽屉的校验与保存、关闭抽屉前的未保存提示（G8）。
- * 开发测试环境长期运行、数据会累积：新增的店铺用这次运行的时间戳取名与邮箱，用例可以重复执行（每次多一个测试店铺）。
+ * 开发测试环境长期运行、数据会累积，而店铺没有删除：测试店铺固定为「E2E 冒烟店铺」，只在还没有时新增；
+ * 已经有了（之前部署的冒烟建过）就改为验证它的店铺名与邮箱重复报错，再编辑它保存——环境里最多多出这一个测试店铺。
  */
 
 async function loginAs(page: Page, name: string): Promise<void> {
@@ -12,6 +13,9 @@ async function loginAs(page: Page, name: string): Promise<void> {
 }
 
 const drawer = (page: Page) => page.getByRole('dialog');
+
+const E2E_STORE = 'E2E 冒烟店铺';
+const E2E_MAILBOX = 'e2e-smoke@forcome.test';
 
 async function chooseOption(page: Page, label: string, option: string): Promise<void> {
   await drawer(page).getByRole('combobox', { name: label }).click();
@@ -48,10 +52,13 @@ test('新增店铺：字段下方逐项报错、定位到第一个错误；改�
   page,
 }) => {
   const stamp = Date.now();
-  const name = `E2E 店铺 ${stamp}`;
-  const mailbox = `e2e-${stamp}@forcome.test`;
   await loginAs(page, '刘洋');
   await page.goto('/settings/channels');
+  const rows = page.getByTestId('store-row');
+  await expect(rows.filter({ hasText: 'Forcome Direct' })).toBeVisible();
+  const e2eRow = rows.filter({ hasText: E2E_MAILBOX });
+  const alreadyCreated = (await e2eRow.count()) > 0;
+
   await page.getByRole('button', { name: '新增店铺' }).click();
   await expect(drawer(page).getByRole('heading', { name: '新增店铺' })).toBeVisible();
   // 非生产环境另有「数据来源」，新店铺默认模拟数据
@@ -87,33 +94,50 @@ test('新增店铺：字段下方逐项报错、定位到第一个错误；改�
   await expect(drawer(page).getByText('请填写店铺域名')).toBeVisible();
   await expect(drawer(page).getByRole('textbox', { name: '店铺名' })).toBeFocused();
 
-  // 改正后保存：抽屉关闭，成功浮层，店铺表多一行
-  await drawer(page).getByRole('textbox', { name: '店铺名' }).fill(name);
-  await mailboxes.fill(mailbox);
+  // 改正后填测试店铺
+  await drawer(page).getByRole('textbox', { name: '店铺名' }).fill(E2E_STORE);
+  await mailboxes.fill(E2E_MAILBOX);
   await mailboxes.press('Enter');
-  await expect(drawer(page).getByTestId('mailbox-chip')).toHaveText([mailbox]);
-  await drawer(page)
-    .getByRole('textbox', { name: '平台标识 · Shopify 店铺域名' })
-    .fill(`e2e-${stamp}.myshopify.com`);
+  await expect(drawer(page).getByTestId('mailbox-chip')).toHaveText([E2E_MAILBOX]);
+  const platformId = drawer(page).getByRole('textbox', { name: '平台标识 · Shopify 店铺域名' });
+  await platformId.fill(`e2e-${stamp}.myshopify.com`);
   await drawer(page).getByRole('button', { name: '保存', exact: true }).click();
 
+  if (alreadyCreated) {
+    // 之前的部署已经建过：同名、同邮箱各自报错，不保存；放弃后改为编辑它
+    await expect(drawer(page).getByText('店铺名已存在，请换一个')).toBeVisible();
+    await expect(
+      drawer(page).getByText(`${E2E_MAILBOX} 已是 ${E2E_STORE} 的进线邮箱`),
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.getByRole('alertdialog').getByRole('button', { name: '放弃修改' }).click();
+    await page.getByRole('button', { name: `编辑 ${E2E_STORE}` }).click();
+    await drawer(page)
+      .getByRole('textbox', { name: '平台标识 · Shopify 店铺域名' })
+      .fill(`e2e-${stamp}.myshopify.com`);
+    await drawer(page).getByRole('button', { name: '保存', exact: true }).click();
+  }
+
+  // 保存成功：抽屉关闭，成功浮层，店铺表里有测试店铺
   await expect(drawer(page)).toHaveCount(0);
   await expect(page.getByText('店铺已保存')).toBeVisible();
-  const row = page.getByTestId('store-row').filter({ hasText: name });
-  await expect(row).toContainText(mailbox);
-  await expect(row).toContainText('MX');
-  await expect(row).toContainText(`e2e-${stamp}.myshopify.com`);
-  await expect(row).toContainText('已连接');
+  await expect(e2eRow).toContainText(E2E_STORE);
+  await expect(e2eRow).toContainText('MX');
+  await expect(e2eRow).toContainText(`e2e-${stamp}.myshopify.com`);
+  await expect(e2eRow).toContainText('已连接');
 
   // 编辑时有未保存的修改，按 Esc 先确认（G8）；放弃后不保存
-  await page.getByRole('button', { name: `编辑 ${name}` }).click();
+  await page.getByRole('button', { name: `编辑 ${E2E_STORE}` }).click();
   await expect(drawer(page).getByRole('heading', { name: '编辑店铺' })).toBeVisible();
-  await drawer(page).getByRole('textbox', { name: '店铺名' }).fill(`${name} 改`);
+  await drawer(page).getByRole('textbox', { name: '店铺名' }).fill(`${E2E_STORE} 改`);
   await page.keyboard.press('Escape');
   const leave = page.getByRole('alertdialog');
   await expect(leave.getByRole('heading', { name: '离开前保存修改？' })).toBeVisible();
+  await expect(
+    leave.getByText('「编辑店铺」有 1 项未保存的修改。放弃后恢复为上次保存的值。'),
+  ).toBeVisible();
   await expect(leave.getByRole('button', { name: '继续编辑' })).toBeFocused();
   await leave.getByRole('button', { name: '放弃修改' }).click();
   await expect(drawer(page)).toHaveCount(0);
-  await expect(page.getByTestId('store-row').filter({ hasText: `${name} 改` })).toHaveCount(0);
+  await expect(rows.filter({ hasText: `${E2E_STORE} 改` })).toHaveCount(0);
 });

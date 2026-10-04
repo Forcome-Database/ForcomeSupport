@@ -34,12 +34,12 @@ const RULE_CARD_STATE =
   '钉钉例外：异常只在钉钉卡显示、只提醒管理员，不出全站横幅（6.9）。';
 
 /** 连接状态 → 徽标色调（原型 STATE_TONE 的渠道连接一组） */
-export const connectionTones: Record<ConnectionStatus, BadgeTone> = {
+export const connectionTones = {
   connected: 'success',
   delayed: 'warning',
   error: 'danger',
   not_connected: 'muted',
-};
+} as const satisfies Record<ConnectionStatus, BadgeTone>;
 
 export function ConnectionBadge({ status, prefix }: { status: ConnectionStatus; prefix?: string }) {
   return (
@@ -49,16 +49,17 @@ export function ConnectionBadge({ status, prefix }: { status: ConnectionStatus; 
   );
 }
 
-type TileTone = 'success' | 'warning' | 'danger' | 'muted';
+type TileTone = (typeof connectionTones)[ConnectionStatus];
 
+/** 图标块的色调（原型 tile()：ok / warn / bad 为浅底配文字色，muted 为浅线色底配次要色） */
 const tileTones: Record<TileTone, string> = {
   success: 'bg-success-soft text-success-text',
   warning: 'bg-warning-soft text-warning-text',
   danger: 'bg-destructive-soft text-destructive-text',
-  muted: 'bg-border-soft text-subtle-foreground',
+  muted: 'bg-border-soft text-muted-foreground',
 };
 
-/** 卡头左侧 32 的图标块（原型 tile()），色调跟连接状态 */
+/** 卡头左侧 32 的图标块（原型 tile()），色调跟连接状态（与状态徽标同一张映射） */
 function Tile({ icon: Icon, tone }: { icon: LucideIcon; tone: TileTone }) {
   return (
     <div
@@ -68,13 +69,6 @@ function Tile({ icon: Icon, tone }: { icon: LucideIcon; tone: TileTone }) {
     </div>
   );
 }
-
-const statusTile: Record<ConnectionStatus, TileTone> = {
-  connected: 'success',
-  delayed: 'warning',
-  error: 'danger',
-  not_connected: 'muted',
-};
 
 /** 卡片底色跟最差的状态（原型 card(tone)）：同步延迟浅黄、连接异常浅红 */
 const statusCard: Record<ConnectionStatus, string> = {
@@ -171,7 +165,7 @@ function ConnectedCard({ card, stores }: { card: ChannelCard; stores: readonly S
     >
       <CardHead
         icon={meta.icon}
-        tone={statusTile[card.status]}
+        tone={connectionTones[card.status]}
         name={meta.name}
         sub={subtitle(card)}
         right={

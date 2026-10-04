@@ -81,38 +81,55 @@ export function storeInputOf(values: StoreFormValues, dataSourceEditable: boolea
   };
 }
 
+/** 表单上的一个错误：落在哪个字段（已加入的进线邮箱按序号，如 mailboxes.0），写什么 */
+export interface FormError {
+  readonly field: FormField | `mailboxes.${number}`;
+  readonly message: string;
+}
+
+function isFormField(key: string): key is FormField {
+  return (FORM_FIELDS as readonly string[]).includes(key);
+}
+
 /**
- * 把接口或 storeInputErrors 给出的字段错误（键如 name、mailboxes.2）换成表单的字段：
+ * 把接口给出的字段错误（键如 name、mailboxes.2）换成表单上的错误：
  * 「至少填写一个进线邮箱」与输入框里那一个邮箱的错误落在输入框（mailboxDraft）上，已加入的邮箱的错误按序号落在小标签上。
  */
-export function formErrorsOf(
-  errors: FieldErrors,
-  mailboxCount: number,
-): Partial<Record<FormField | `mailboxes.${number}`, string>> {
-  const result: Partial<Record<FormField | `mailboxes.${number}`, string>> = {};
+export function formErrorsOf(errors: FieldErrors, mailboxCount: number): FormError[] {
+  const result: FormError[] = [];
   for (const [key, message] of Object.entries(errors)) {
     const match = /^mailboxes\.(\d+)$/.exec(key);
     if (key === 'mailboxes' || (match && Number(match[1]) >= mailboxCount)) {
-      result.mailboxDraft ??= message;
+      if (!result.some((e) => e.field === 'mailboxDraft')) {
+        result.push({ field: 'mailboxDraft', message });
+      }
     } else if (match) {
-      result[`mailboxes.${Number(match[1])}`] = message;
-    } else if ((FORM_FIELDS as readonly string[]).includes(key)) {
-      result[key as FormField] = message;
+      result.push({ field: `mailboxes.${Number(match[1])}`, message });
+    } else if (isFormField(key)) {
+      result.push({ field: key, message });
     }
   }
   return result;
 }
 
 /** 有错误的字段里最靠上的一个（保存后定位到它） */
-export function firstErrorField(errors: Partial<Record<string, string>>): FormField | null {
+export function firstErrorField(errors: readonly FormError[]): FormField | null {
   for (const field of FORM_FIELDS) {
-    if (field === 'mailboxes') {
-      if (Object.keys(errors).some((key) => key.startsWith('mailboxes.'))) return 'mailboxes';
-    } else if (errors[field]) {
-      return field;
-    }
+    const hit =
+      field === 'mailboxes'
+        ? errors.some((e) => e.field.startsWith('mailboxes.'))
+        : errors.some((e) => e.field === field);
+    if (hit) return field;
   }
   return null;
+}
+
+/** G8 里写的「有 N 项未保存的修改」：进线邮箱的小标签与输入框算一项 */
+export function unsavedFieldCount(dirtyFields: Partial<Record<FormField, unknown>>): number {
+  const fields = Object.entries(dirtyFields)
+    .filter(([, dirty]) => Boolean(dirty))
+    .map(([field]) => (field === 'mailboxDraft' ? 'mailboxes' : field));
+  return new Set(fields).size;
 }
 
 /** 站点改了以后的默认站点：只选一个站点时自动带入；原来的默认站点不在所选站点里时清空 */

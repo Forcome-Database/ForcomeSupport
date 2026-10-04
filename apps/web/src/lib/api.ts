@@ -6,7 +6,6 @@ import {
   devMembersResponseSchema,
   loginDeniedSchema,
   preferencesSchema,
-  storeOptionsSchema,
   storeSchema,
   type AdminContacts,
   type ChannelSettings,
@@ -17,7 +16,6 @@ import {
   type Preferences,
   type Store,
   type StoreInput,
-  type StoreOption,
   type StoreUpdate,
 } from '@forcome/contracts';
 import type { z } from 'zod';
@@ -135,8 +133,4 @@ export const api = {
   /** 编辑店铺（带打开时的版本号）；别人先保存了抛 409 optimistic_lock（G7） */
   updateStore: (id: string, input: StoreUpdate): Promise<Store> =>
     call(`/api/channel/stores/${id}`, storeSchema, jsonBody('PUT', input)),
-
-  /** 当前成员店铺范围内的店铺（店铺筛选、指定店铺、授权选择） */
-  storeOptions: async (): Promise<StoreOption[]> =>
-    (await call('/api/channel/store-options', storeOptionsSchema)).stores,
 };

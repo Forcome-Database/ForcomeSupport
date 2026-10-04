@@ -8,6 +8,7 @@ import {
   formErrorsOf,
   storeFormOf,
   storeInputOf,
+  unsavedFieldCount,
 } from './store-form';
 
 const store: Store = {
@@ -64,22 +65,29 @@ describe('字段错误落到表单上', () => {
         },
         2,
       ),
-    ).toEqual({
-      name: '店铺名已存在，请换一个',
-      'mailboxes.0': 'support@forcome.mx 已是 forcome.mx 的进线邮箱',
-      mailboxDraft: '邮箱格式不正确，例如 info@forcome.mx',
-      platformId: '请填写店铺域名',
-    });
-    expect(formErrorsOf({ mailboxes: '至少填写一个进线邮箱' }, 0)).toEqual({
-      mailboxDraft: '至少填写一个进线邮箱',
-    });
+    ).toEqual([
+      { field: 'name', message: '店铺名已存在，请换一个' },
+      { field: 'mailboxes.0', message: 'support@forcome.mx 已是 forcome.mx 的进线邮箱' },
+      { field: 'mailboxDraft', message: '邮箱格式不正确，例如 info@forcome.mx' },
+      { field: 'platformId', message: '请填写店铺域名' },
+    ]);
+    expect(formErrorsOf({ mailboxes: '至少填写一个进线邮箱' }, 0)).toEqual([
+      { field: 'mailboxDraft', message: '至少填写一个进线邮箱' },
+    ]);
   });
 
   it('保存后定位到最靠上的错误：平台 → 店铺名 → 站点 → 默认站点 → 进线邮箱 → 平台标识 → 数据来源', () => {
-    expect(firstErrorField({ platformId: 'x', name: 'y' })).toBe('name');
-    expect(firstErrorField({ platformId: 'x', 'mailboxes.1': 'y' })).toBe('mailboxes');
-    expect(firstErrorField({ adapterMode: 'x', mailboxDraft: 'y' })).toBe('mailboxDraft');
-    expect(firstErrorField({})).toBeNull();
+    const at = (...fields: string[]) =>
+      formErrorsOf(Object.fromEntries(fields.map((f) => [f, 'x'])), 2);
+    expect(firstErrorField(at('platformId', 'name'))).toBe('name');
+    expect(firstErrorField(at('platformId', 'mailboxes.1'))).toBe('mailboxes');
+    expect(firstErrorField(at('adapterMode', 'mailboxes'))).toBe('mailboxDraft');
+    expect(firstErrorField([])).toBeNull();
+  });
+
+  it('G8 的未保存项数：进线邮箱的小标签与输入框算一项', () => {
+    expect(unsavedFieldCount({ name: true, mailboxes: [false, true], mailboxDraft: true })).toBe(2);
+    expect(unsavedFieldCount({ platformId: false })).toBe(0);
   });
 });
 

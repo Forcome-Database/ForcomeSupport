@@ -90,6 +90,9 @@ importers:
       '@fontsource-variable/noto-sans-sc':
         specifier: ^5.3.0
         version: 5.3.0
+      '@forcome/calendar':
+        specifier: workspace:*
+        version: link:../../packages/calendar
       '@forcome/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

@@ -150,8 +150,8 @@ function StoreRow({ store, onEdit }: { store: Store; onEdit: (store: Store) => v
       </TableCell>
       <TableCell className="py-3 text-right">
         <Button
-          variant="link"
-          className="h-auto border-0 px-0 text-12 font-medium"
+          variant="text-link"
+          size="text"
           aria-label={`编辑 ${store.name}`}
           onClick={() => onEdit(store)}
         >

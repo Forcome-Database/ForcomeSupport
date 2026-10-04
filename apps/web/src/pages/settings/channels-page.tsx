@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { LoadError } from '@/components/load-error';
+import { Skeleton } from '@/components/ui/skeleton';
 import { channelSettingsQuery } from '@/lib/channel';
 import { ChannelCards } from './channel-cards';
 import { SettingsHeader, SettingsLayout } from './settings-layout';
@@ -12,10 +13,6 @@ import { StoreTable } from './store-table';
  * 页头说明、渠道连接卡、店铺表；新增与编辑店铺用右侧抽屉（K8），在抽屉里保存，没有吸底保存栏。
  * 页头右上「查看审计日志」（进入 P27）随 30 号待办加上，在那之前不显示。
  */
-
-function Skeleton({ className }: { className: string }) {
-  return <div className={`animate-pulse rounded-md bg-secondary ${className}`} />;
-}
 
 /** 加载中：渠道卡与店铺表的骨架（设计规范第 9 节） */
 function ChannelsSkeleton() {

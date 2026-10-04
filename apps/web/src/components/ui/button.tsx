@@ -7,7 +7,8 @@ import { cn } from '@/lib/utils';
 /*
  * 按钮（shadcn Button，按设计规范板第 4、12 节改过默认样式）：
  * variant 对应原型 btn() 的 primary → default、secondary → outline、ghost、link、danger → destructive、
- * danger_outline → destructive-outline（G7「覆盖保存」、G8「放弃修改」）；
+ * danger_outline → destructive-outline（G7「覆盖保存」、G8「放弃修改」）；原型的文字链接 link()（12 / 500 主色、悬停下划线，
+ * 如店铺表行尾「编辑」、浮层里的「立即重试」）用 variant="text-link" 配 size="text"；
  * size：sm 28 / default 32 / lg 36，字号 12 / 13 / 14；icon 为 32 见方的图标按钮；圆角 8；焦点环 ring-2 + offset-2；
  * 禁用时浅灰底、占位色字（必须另给悬停说明原因，原型 btn(reason=)）；
  * 处理中（loading）时前面的图标换成转圈、透明度 0.85，并且不再响应点击，防止重复提交（设计规范第 4 节）。
@@ -27,6 +28,8 @@ const buttonVariants = cva(
         link: 'border-transparent bg-transparent px-0.5 font-semibold text-primary underline-offset-3 hover:underline',
         destructive:
           'border-destructive bg-destructive font-semibold text-primary-foreground active:border-destructive-active active:bg-destructive-active active:shadow-press',
+        'text-link':
+          'border-0 bg-transparent font-medium text-primary underline-offset-3 hover:underline',
         'destructive-outline':
           'border-destructive-line bg-card font-medium text-destructive-text shadow-xs hover:bg-destructive-soft active:bg-destructive-soft-active active:shadow-press',
       },
@@ -34,6 +37,8 @@ const buttonVariants = cva(
         sm: 'h-7 px-2.5 text-12',
         default: 'h-8 px-3 text-13',
         lg: "h-9 px-4 text-14 [&_svg:not([class*='size-'])]:size-4",
+        /** 文字链接（配 text-link）：不占按钮的高度与内边距，12 号字 */
+        text: 'h-auto px-0 text-12',
         /** 图标按钮（原型 icon_btn）：32 见方、图标 16，配 ghost 用于顶栏 */
         icon: "size-8 p-0 [&_svg:not([class*='size-'])]:size-4",
       },
