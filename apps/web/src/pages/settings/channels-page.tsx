@@ -20,12 +20,12 @@ function ChannelsSkeleton() {
     <div aria-busy className="flex flex-col gap-4">
       <div className="grid grid-cols-3 gap-2.5">
         {Array.from({ length: 6 }, (_, i) => (
-          <Skeleton key={i} className="h-24 rounded-lg" />
+          <Skeleton key={i} className="h-24 rounded-md" />
         ))}
       </div>
       <div className="flex flex-col gap-2">
         {Array.from({ length: 4 }, (_, i) => (
-          <Skeleton key={i} className="h-14 rounded-lg" />
+          <Skeleton key={i} className="h-14 rounded-md" />
         ))}
       </div>
     </div>

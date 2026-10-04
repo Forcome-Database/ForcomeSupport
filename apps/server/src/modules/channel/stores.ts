@@ -70,7 +70,7 @@ export async function listAllStores(db: DbExecutor): Promise<StoreRecord[]> {
   return withMailboxes(db, rows);
 }
 
-/** 店铺范围内的店铺（各页面的店铺筛选、指定店铺、授权选择）；新增的店铺对「全部店铺」的成员立即可见 */
+/** 店铺范围内的店铺（各页面的店铺筛选、指定店铺）；新增的店铺对「全部店铺」的成员立即可见 */
 export async function listStoreOptions(db: DbExecutor, scope: StoreScope): Promise<StoreOption[]> {
   return db
     .select({

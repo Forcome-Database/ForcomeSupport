@@ -216,7 +216,7 @@ export const channelSettingsSchema = z.object({
 });
 export type ChannelSettings = z.infer<typeof channelSettingsSchema>;
 
-/** 店铺选项（GET /api/channel/store-options）：当前成员店铺范围内的店铺，供各页面的店铺筛选、指定店铺与授权选择 */
+/** 店铺选项（GET /api/channel/store-options）：当前成员店铺范围内的店铺，供各页面的店铺筛选与指定店铺（P20 授权选择要列全部店铺，由 06 号待办定） */
 export const storeOptionSchema = z.object({
   id: z.uuid(),
   name: z.string(),

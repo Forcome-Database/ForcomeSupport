@@ -72,7 +72,7 @@ const updateStoreRoute = createRoute({
 const storeOptionsRoute = createRoute({
   method: 'get',
   path: '/api/channel/store-options',
-  summary: '当前成员店铺范围内的店铺（店铺筛选、指定店铺、授权选择用）',
+  summary: '当前成员店铺范围内的店铺（店铺筛选、指定店铺用）',
   responses: {
     200: json(storeOptionsSchema, '店铺范围内的店铺，按建立先后'),
     401: unauthenticated,
