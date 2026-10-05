@@ -2,6 +2,7 @@ import { emptyRegistrationInput } from '@forcome/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   amountText,
+  conversionOf,
   emptyRegistrationForm,
   factoryPercents,
   feeTotalCents,
@@ -18,6 +19,11 @@ import {
 } from './registration-form';
 
 const usd = (amount: string): FeeForm => ({ amount, currency: 'USD' });
+/** 费用发生日 09-11 可用的演示汇率（当天还没公布，取 09-10） */
+const DEMO_RATES = {
+  MXN: { rate: '18.000000', date: '2026-09-10', source: 'ecb' as const },
+  CAD: { rate: '1.360000', date: '2026-09-10', source: 'ecb' as const },
+};
 
 describe('新建登记的表单（S14）', () => {
   it('空表单交上去是空白的登记，只多了默认的费用发生日与数量', () => {
@@ -99,18 +105,48 @@ describe('新建登记的表单（S14）', () => {
     for (const field of FORM_ORDER) expect(fieldLabel(field), field).toBeTruthy();
   });
 
-  it('比例表的金额：三组按费用项归组（其他费用 = 额外赔偿 + 其他），没填按 0；有非美元的组暂不计算', () => {
+  it('比例表的金额：三组按费用项归组（其他费用 = 额外赔偿 + 其他），没填按 0', () => {
     const fees = {
       productCost: usd('3.20'),
       freight: usd('6.80'),
       compensation: usd(''),
       otherCost: usd('0'),
     };
-    expect(groupCents(fees)).toEqual({ product: 320, freight: 680, other: 0 });
-    expect(feeTotalCents(fees)).toBe(1000);
-    const peso = { ...fees, compensation: { amount: '889.00', currency: 'MXN' as const } };
-    expect(groupCents(peso)).toEqual({ product: 320, freight: 680, other: null });
-    expect(feeTotalCents(peso)).toBeNull();
+    expect(groupCents(fees, undefined)).toEqual({ product: 320, freight: 680, other: 0 });
+    expect(feeTotalCents(fees, undefined)).toBe(1000);
+  });
+
+  it('非美元按费用发生日的汇率折算成美元再算（R-FL-06）；汇率还没取到或没有时，这一组与合计写「—」', () => {
+    const fees = {
+      productCost: { amount: '12', currency: 'CAD' as const },
+      freight: usd('6.80'),
+      compensation: { amount: '889.00', currency: 'MXN' as const },
+      otherCost: usd('0'),
+    };
+    // 889 ÷ 18 = 49.39，12 ÷ 1.36 = 8.82（四舍五入到分，与保存时冻结的美元值一致）
+    expect(groupCents(fees, DEMO_RATES)).toEqual({ product: 882, freight: 680, other: 4939 });
+    expect(feeTotalCents(fees, DEMO_RATES)).toBe(882 + 680 + 4939);
+    expect(groupCents(fees, undefined)).toEqual({ product: null, freight: 680, other: null });
+    expect(feeTotalCents(fees, { ...DEMO_RATES, MXN: null })).toBeNull();
+    // 非美元的 0 不用汇率
+    const zero = { ...fees, productCost: { amount: '0', currency: 'CAD' as const } };
+    expect(groupCents(zero, undefined).product).toBe(0);
+  });
+
+  it('金额框下的折算：非美元且填了金额才有；汇率取不到时说明原因', () => {
+    expect(conversionOf({ amount: '889.00', currency: 'MXN' }, DEMO_RATES)).toEqual({
+      kind: 'converted',
+      usd: '49.39',
+      rate: DEMO_RATES.MXN,
+    });
+    expect(
+      conversionOf({ amount: '889.00', currency: 'MXN' }, { ...DEMO_RATES, MXN: null }),
+    ).toEqual({ kind: 'no_rate' });
+    // 汇率还在取（undefined）、美元、没填、填错：不显示
+    expect(conversionOf({ amount: '889.00', currency: 'MXN' }, undefined)).toBeNull();
+    expect(conversionOf(usd('3.20'), DEMO_RATES)).toBeNull();
+    expect(conversionOf({ amount: '', currency: 'MXN' }, DEMO_RATES)).toBeNull();
+    expect(conversionOf({ amount: '1.234', currency: 'MXN' }, DEMO_RATES)).toBeNull();
   });
 
   it('两方承担：工厂按比例四舍五入到分，FSH = 金额 − 工厂', () => {

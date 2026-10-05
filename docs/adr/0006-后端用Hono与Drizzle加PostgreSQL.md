@@ -74,3 +74,11 @@ status: accepted
 - **参考数据**（续 10 号待办的约定）：迁移 0012 写入集团内两家生产厂（FQD、FZJ）与 R-AS-02 的四类默认比例，所有环境相同；SKU 与生产厂的归属表要等业务提供（32 号待办），在那之前只在非生产环境随示例数据灌入（加载步骤 `factory.parts`），拿到后另写迁移。
 - **带着既有编号写入的对象**：示例数据、历史导入沿用原编号写入后，用 `core` 的 `reserveBusinessNumbers(tx, 'aftersales', 序号)` 把全局递增的计数推到至少这个值（只用于不按日重置的编号），之后新发的号接在后面；`businessNumberSequence` 从编号里取序号。示例台账预留到原型用过的最大序号（含第一期丢弃的待确认单 S-20260911-0022，夹具字段 `aftersalesLastSequence`），以后补回那张单不会撞号。
 - 迁移 `0011_aftersales_ledger`（售后单、默认比例、生产厂、配件）、`0012_aftersales_reference_data`（上面的参考数据）。
+
+## 修订（2026-10-05，待办 20 落地）
+
+- **费用项的汇率与冻结美元值**：`core` 的 `feeColumns` 补齐一个费用项的整组列——原币金额与币种、冻结美元值 `*_usd`（numeric(12,2)）、汇率 `*_rate`、汇率日期 `*_rate_date`（`date`）、来源 `*_rate_source`（欧洲央行 / Frankfurter / 手工修改）。汇率是「1 USD = 汇率 原币」，numeric(12,6)，不是金额（迁移测试的 `NUMERIC_COLUMNS_NOT_MONEY` 登记）。美元金额不折算：汇率三列为空、美元值等于原值；非美元按费用发生日取汇率，冻结美元值四舍五入到分。约束由 `feeChecks` 一次给出（`*_currency_check` 沿用原名、新增 `*_conversion_check`：美元值只跟着金额，汇率三列同有同无、只用于非美元且大于 0，美元金额的美元值等于原值，非美元有美元值就有汇率）。
+- **「有金额就有美元值」由应用把关**：`aftersales/fees.ts` 的 `feesOf` 读出时缺美元值直接报错，不写进数据库约束——加列时开发与开发测试库里已有非美元的示例单（S-20260911-0020），迁移取不到它当时的汇率。加列分三步（续待办 10 的约定）：0013 按可空加列与约束（旧行全空能通过），0014 自定义迁移给美元金额补美元值，非美元的示例单由加载步骤 `aftersales.ledger` 按夹具补齐（只补缺美元值的行、只动汇率与美元值的列）；生产库此时没有台账数据。
+- **汇率表** `core.exchange_rate`：日期 + 币种唯一，`rate` numeric(12,6)、来源（欧洲央行 / Frankfurter），只增不改（每日同步遇到已有的日期跳过），已保存的金额冻结了自己的汇率，后来的同步不回改（E-20）。「按日期取汇率」`exchangeRateOn` 取当天、缺失时取此前最近一个有汇率的日期，不取之后的。
+- **十进制运算用 big.js**：EUR 交叉计算（6 位小数）、折算美元（到分）都四舍五入（ROUND_HALF_UP，不是银行家舍入），不经浮点；算法在 `contracts/exchange-rate.ts`（`crossRate`、`usdOf`、`normalizeRate`），前端抽屉的即时折算与后端冻结的值一致。`contracts` 以源码被打进后端产物，产物里对 big.js 的引用留在 `node_modules`，所以后端也直接依赖 big.js（同 zod）。
+- 迁移 `0013_exchange_rates`（汇率表、费用项的汇率与美元值列与约束）、`0014_aftersales_fee_usd_backfill`（美元金额补美元值）。

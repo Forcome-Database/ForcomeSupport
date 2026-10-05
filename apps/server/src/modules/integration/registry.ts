@@ -1,4 +1,5 @@
 import type { AnyClientDefinition } from './definition';
+import { exchangeRateClient } from './exchange-rate';
 import { gmailClient, gmailPushClient } from './gmail';
 
 /**
@@ -6,4 +7,8 @@ import { gmailClient, gmailPushClient } from './gmail';
  * Gmail（08、09）、钉钉（05）、SP-API 订单与 SQS（12）、Shopify 订单（11）、汇率（20）。
  * 没登记的客户端取不到，CLIENT_MODE_<系统> 写了没登记的系统名会拒绝启动。
  */
-export const clientDefinitions: readonly AnyClientDefinition[] = [gmailPushClient, gmailClient];
+export const clientDefinitions: readonly AnyClientDefinition[] = [
+  gmailPushClient,
+  gmailClient,
+  exchangeRateClient,
+];

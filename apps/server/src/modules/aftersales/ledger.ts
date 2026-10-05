@@ -1,13 +1,13 @@
 import { ratioPairsOf, type LedgerItem, type Ratios } from '@forcome/contracts';
-import { asc } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { storeNamesById } from '../channel';
 import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
 import { feesOf } from './fees';
 import { aftersales } from './schema';
 
 /*
- * 登记台账 P13 的查询（店铺范围内，ADR 0010）。待办 19 是最简列表：售后单号、客户、店铺与站点、处理方式、责任、状态、
- * 快递单号、费用列（原币）；筛选、合计行、列设置与导出随 22，汇率与美元折算随 20，完整率与「缺 N 项」随 21。
+ * 登记台账 P13 的查询（店铺范围内，ADR 0010）。最简列表：售后单号、客户、店铺与站点、处理方式、责任、状态、
+ * 快递单号、费用列（原币、汇率与冻结美元值，待办 20）；筛选、合计行、列设置与导出随 22，完整率与「缺 N 项」随 21。
  */
 
 export type AftersalesRow = typeof aftersales.$inferSelect;
@@ -35,6 +35,7 @@ export function toLedgerItem(
     method: row.method,
     responsibility: row.responsibility,
     trackingNumber: row.trackingNumber,
+    version: row.version,
     fees: feesOf(row),
     ratios: ratiosOf(row),
   };
@@ -52,4 +53,17 @@ export async function listLedger(db: DbExecutor, scope: StoreScope): Promise<Led
     rows.map((row) => row.storeId),
   );
   return rows.map((row) => toLedgerItem(row, names));
+}
+
+/** 按售后单号取一张（店铺范围内；不在范围内或没有为 null） */
+export async function findAftersales(
+  db: DbExecutor,
+  scope: StoreScope,
+  number: string,
+): Promise<AftersalesRow | null> {
+  const [row] = await db
+    .select()
+    .from(aftersales)
+    .where(and(eq(aftersales.number, number), storeScopeCondition(scope, aftersales.storeId)));
+  return row ?? null;
 }

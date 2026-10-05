@@ -45,6 +45,8 @@ export {
   ratiosSchema,
   ratiosInputSchema,
   ratioSideInputSchema,
+  rateChangeInputSchema,
+  rateChangeMessages,
   registrationErrors,
   registrationFieldLabels,
   registrationFields,
@@ -80,6 +82,7 @@ export {
   type Ratios,
   type RatioSideInput,
   type RatiosInput,
+  type RateChangeInput,
   type RegistrationField,
   type RegistrationInput,
   type RegistrationOptions,
@@ -191,6 +194,25 @@ export {
   maskFinanceFields,
   stripFinanceFields,
 } from './finance';
+export {
+  crossRate,
+  exchangeRateSchema,
+  exchangeRatesOnSchema,
+  foreignCurrencies,
+  formatRate,
+  formatRateDate,
+  isValidRate,
+  normalizeRate,
+  RATE_DECIMALS,
+  rateSourceLabels,
+  rateSources,
+  rateSourceSchema,
+  usdOf,
+  type ExchangeRate,
+  type ExchangeRatesOn,
+  type ForeignCurrency,
+  type RateSource,
+} from './exchange-rate';
 export { healthResponseSchema, type HealthResponse } from './health';
 export { adapterModeSchema, adapterModes, type AdapterMode } from './integration';
 export { currencies, currencySchema, formatMoney, type Currency } from './money';

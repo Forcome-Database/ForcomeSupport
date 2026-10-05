@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { storeScopeSchema } from './auth';
 import { siteSchema, type FieldErrors } from './channel';
+import { exchangeRateSchema } from './exchange-rate';
 import { financeField } from './finance';
 import { currencySchema } from './money';
 
@@ -232,8 +233,8 @@ export type FeeInput = z.infer<typeof feeInputSchema>;
 
 /**
  * 新建登记提交的内容（S14 抽屉的字段）。形状宽松（下拉可以没选、文字可以空），是否填对由 registrationErrors 逐项判断，
- * 加上要查库的（负责人是否合格、来源工单、生产厂与配件是否存在）一次列全（同 K8：保存后定位到第一个错误）。
- * 不适用的字段由 normalizeRegistration 清空后再保存。金额先按原币保存，汇率与美元折算随待办 20。
+ * 加上要查库的（负责人是否合格、来源工单、生产厂与配件是否存在、非美元金额有没有汇率）一次列全（同 K8：保存后定位到
+ * 第一个错误）。不适用的字段由 normalizeRegistration 清空后再保存。金额按原币填，保存时按费用发生日取汇率冻结美元值。
  */
 export const registrationInputSchema = z.object({
   method: handlingMethodSchema.nullable(),
@@ -323,6 +324,8 @@ export const registrationMessages = {
   sourceTicketNotFound: '没有这张工单，或不在你的店铺范围内',
   sourceTicketStore: (storeName: string) => `来源工单属于 ${storeName}，与所选店铺不一致`,
   reasonTooLong: '理由最多 200 字',
+  /** 非美元金额在费用发生日及之前都没有汇率（E-20 的极端情形：系统刚部署、首次同步还没完成） */
+  noRate: '费用发生日及之前没有汇率，暂时不能折算美元',
 } as const;
 
 /** 责任理由最多 200 字（S14 计数「0 / 200」） */
@@ -559,8 +562,16 @@ export function defaultOwnerId(
 
 // ---------------------------------------------------------------- 接口输出
 
-/** 一个已登记的费用项：原币金额与币种（汇率、汇率日期与来源、冻结美元值随待办 20） */
-export const feeSchema = z.object({ amount: z.string(), currency: currencySchema });
+/**
+ * 一个已登记的费用项（PRD 11.1「每项保存原币、汇率、汇率日期与来源、冻结美元值」、R-FL-06）：原币金额与币种、
+ * 冻结的美元值（四舍五入到分；美元金额就是原值）、折算用的汇率（1 USD = rate 原币，带实际日期与来源；美元为 null）
+ */
+export const feeSchema = z.object({
+  amount: z.string(),
+  currency: currencySchema,
+  usd: z.string(),
+  rate: exchangeRateSchema.nullable(),
+});
 export type Fee = z.infer<typeof feeSchema>;
 export const feesSchema = z.object({
   productCost: feeSchema.nullable(),
@@ -607,12 +618,40 @@ export const ledgerItemSchema = z.object({
   responsibility: responsibilitySchema.nullable(),
   /** 快递单号（寄配件寄出后填写；没有为 null） */
   trackingNumber: z.string().nullable(),
+  /** 乐观锁版本（修改汇率与编辑登记时带上，G7） */
+  version: z.int(),
   fees: financeField(feesSchema),
   ratios: financeField(ratiosSchema.nullable()),
 });
 export type LedgerItem = z.infer<typeof ledgerItemSchema>;
 export const ledgerSchema = z.object({ items: z.array(ledgerItemSchema) });
 export type Ledger = z.infer<typeof ledgerSchema>;
+
+// ---------------------------------------------------------------- 修改汇率
+
+/**
+ * 修改汇率（PRD 10.1「补登与修改汇率」，只有售后负责人；S14 编辑登记的「修改汇率」）：给某几个非美元费用项填新的汇率
+ * （1 USD = 汇率 原币），冻结美元值按它重算，汇率日期为费用发生日、来源「手工修改」，记审计。version 是读到的版本（G7）。
+ */
+export const rateChangeInputSchema = z.object({
+  version: z.int(),
+  rates: z.object({
+    productCost: z.string().optional(),
+    freight: z.string().optional(),
+    compensation: z.string().optional(),
+    otherCost: z.string().optional(),
+  }),
+});
+export type RateChangeInput = z.infer<typeof rateChangeInputSchema>;
+
+/** 修改汇率的报错（写在该金额的汇率下方；字段路径 `rates.<费用项>`） */
+export const rateChangeMessages = {
+  rateFormat: '汇率须大于 0，最多 6 位整数与 6 位小数',
+  usdNoRate: '美元金额不用汇率',
+  feeMissing: '这项费用还没登记，没有汇率可改',
+  nothing: '没有要修改的汇率',
+  cancelled: '已取消的单只读，不能修改汇率',
+} as const;
 
 /** 新建登记抽屉要用的选项：可选的负责人、责任类型的默认比例（种子数据）、生产厂、配件与所属生产厂 */
 export const registrationOptionsSchema = z.object({

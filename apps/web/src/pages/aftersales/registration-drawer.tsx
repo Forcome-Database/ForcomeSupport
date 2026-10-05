@@ -8,6 +8,9 @@ import {
   defaultOwnerId,
   feeItemLabels,
   feeItems,
+  formatMoney,
+  formatRate,
+  formatRateDate,
   handlingMethodLabels,
   handlingMethods,
   ownerNote,
@@ -19,6 +22,7 @@ import {
   RESPONSIBILITY_REASON_MAX,
   shipperLabels,
   shippers,
+  type Currency,
   type CurrentMember,
   type LedgerItem,
   type RatioGroup,
@@ -28,7 +32,7 @@ import {
 } from '@forcome/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   Controller,
   get,
@@ -58,15 +62,27 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { UnsavedChangesDialog } from '@/components/unsaved-changes-dialog';
-import { AFTERSALES_QUERY_KEY, registrationOptionsQuery } from '@/lib/aftersales';
+import {
+  AFTERSALES_QUERY_KEY,
+  exchangeRatesQuery,
+  registrationOptionsQuery,
+} from '@/lib/aftersales';
 import { api, ApiRequestError } from '@/lib/api';
 import { storeOptionsQuery } from '@/lib/channel';
 import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { endSessionIfUnauthenticated } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { DRAWER, EMPTY_VALUE, LEAVE, SAVE_RESULT, SOURCE_TICKET_LOOKUP } from './p13-copy';
+import {
+  DRAWER,
+  EMPTY_VALUE,
+  LEAVE,
+  RATE_LOOKUP,
+  SAVE_RESULT,
+  SOURCE_TICKET_LOOKUP,
+} from './p13-copy';
 import { FormSection, MoneyInput, RatioTable } from './registration-parts';
 import {
+  conversionOf,
   emptyRegistrationForm,
   factoryPercents,
   feeTotalCents,
@@ -79,6 +95,7 @@ import {
   ratioFormOf,
   registrationInputOf,
   withRatioSide,
+  type Conversion,
   type FormError,
   type RegistrationFormPath,
   type RegistrationFormValues,
@@ -91,6 +108,8 @@ import {
  * 按 R-AS-08 只列适用字段（contracts 的 applicableFields），不适用的不显示，保存时也不交（接口同样清空）。
  * 预填：选店铺带出默认站点与默认负责人；填来源工单（离开输入框时查）带入店铺、站点、订单号、客户；选责任类型按种子数据
  * 预填三组比例；寄配件选配件预填生产厂；改一侧比例另一侧自动补足 100。
+ * 非美元金额按费用发生日的汇率即时折算（R-FL-06）：金额框下写「≈ 美元 · 汇率 日期（1 USD = 汇率 币种）」，比例表与
+ * 费用合计按折算后的美元算；汇率取当天、缺失时取此前最近一个有汇率的日期，与保存时冻结的值一致（以接口为准）。
  * 点「保存登记」一律交给接口校验（同 P18 的约定，ADR 0007 修订）：接口一次返回全部字段错误，放到对应字段下方，
  * 抽屉顶部给危险横幅「有 N 项需要修改 · 已滚动到第一个错误「…」」并定位到最靠上的错误；改了哪个字段就先撤掉它的错误。
  * 有未保存的输入时关闭抽屉先确认（G8）。成功后浮层提示并刷新台账。
@@ -98,6 +117,19 @@ import {
 
 const SAVE_TOAST = 'aftersales-register';
 const LOOKUP_TOAST = 'aftersales-source-ticket';
+const RATES_TOAST = 'aftersales-exchange-rates';
+
+/** 金额框下的折算说明（S14 编辑登记小图）；不用显示时为 undefined */
+function conversionHint(conversion: Conversion | null, currency: Currency): string | undefined {
+  if (!conversion) return undefined;
+  if (conversion.kind === 'no_rate') return DRAWER.feeNoRate;
+  return DRAWER.feeConversion(
+    formatMoney(conversion.usd, 'USD'),
+    formatRateDate(conversion.rate.date),
+    formatRate(conversion.rate.rate),
+    currency,
+  );
+}
 
 /** 已经报出的字段错误（按表单顺序） */
 function presentErrors(errors: FieldErrors<RegistrationFormValues>): FormError[] {
@@ -272,20 +304,22 @@ function RegistrationForm({
     form;
   // formState 是按读取订阅的代理：要在渲染时读
   const { isDirty, errors, submitCount } = formState;
-  const [method, storeId, responsibility, ratios, fees, partSku, factory, site, reason] = useWatch({
-    control,
-    name: [
-      'method',
-      'storeId',
-      'responsibility',
-      'ratios',
-      'fees',
-      'partSku',
-      'factory',
-      'site',
-      'responsibilityReason',
-    ],
-  });
+  const [method, storeId, responsibility, ratios, fees, partSku, factory, site, reason, feeDate] =
+    useWatch({
+      control,
+      name: [
+        'method',
+        'storeId',
+        'responsibility',
+        'ratios',
+        'fees',
+        'partSku',
+        'factory',
+        'site',
+        'responsibilityReason',
+        'feeDate',
+      ],
+    });
   const percents = factoryPercents(ratios);
   const applicable = new Set(
     applicableFields({
@@ -301,7 +335,31 @@ function RegistrationForm({
   const note = ownerNote(owners, storeId || null, registrar.id);
   const part = options.parts.find((p) => p.sku === partSku);
   const shown = presentErrors(errors);
-  const total = feeTotalCents(fees);
+  // 费用发生日的汇率：有非美元的费用项才取；还在取或不用取时为 undefined（比例表与合计里非美元的写「—」）
+  const needsRates = feeItems.some((item) => fees[item].currency !== 'USD');
+  const rates = useQuery({
+    ...exchangeRatesQuery(feeDate),
+    enabled: Boolean(feeDate) && needsRates,
+  });
+  const ratesOn = needsRates ? rates.data?.rates : undefined;
+  const total = feeTotalCents(fees, ratesOn);
+
+  // 汇率查询失败：G5 失败浮层「查询失败：原因」+「立即重试」（会话失效由全局处理，不弹）；恢复或关闭抽屉时撤掉
+  const { isError: ratesFailed, error: ratesError, refetch: refetchRates } = rates;
+  useEffect(() => {
+    if (!ratesFailed) return;
+    if (ratesError instanceof ApiRequestError && ratesError.status === 401) return;
+    showError({
+      id: RATES_TOAST,
+      action: RATE_LOOKUP.failedAction,
+      error: ratesError,
+      retry: async () => {
+        const result = await refetchRates();
+        if (result.isError) throw result.error;
+      },
+    });
+    return () => dismissToast(RATES_TOAST);
+  }, [ratesFailed, ratesError, refetchRates]);
 
   const save = useMutation({
     mutationFn: (values: RegistrationFormValues) => api.register(registrationInputOf(values)),
@@ -779,7 +837,7 @@ function RegistrationForm({
                 <RatioTable
                   idOf={(group, side) => fieldId(`ratios.${group}.${side}`)}
                   ratios={ratios}
-                  groupAmounts={groupCents(fees)}
+                  groupAmounts={groupCents(fees, ratesOn)}
                   errors={Object.fromEntries(
                     ratioGroups.map((group) => [
                       group,
@@ -921,6 +979,7 @@ function RegistrationForm({
                       label={feeItemLabels[item]}
                       htmlFor={fieldId(path)}
                       required
+                      hint={conversionHint(conversionOf(fees[item], ratesOn), fees[item].currency)}
                       error={errorOf(path)}
                     >
                       <Controller

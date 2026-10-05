@@ -24,15 +24,15 @@ import {
 import { listFactories, listParts } from '../factory';
 import { listAftersalesOwners, type Access } from '../org';
 import { findTicketReference, type TicketReference } from '../ticket';
-import { feeColumnValues, feesOf } from './fees';
+import { convertFees, feeColumnValues, feesOf } from './fees';
 import { ratiosOf, type AftersalesRow } from './ledger';
 import { aftersales, responsibilityRatio } from './schema';
 
 /*
  * 新建登记（P13「第一阶段」、S14、R-AS-08；6.5「第一阶段台账状态」、D-24）：客服主管与售后负责人手工登记一张售后单，
- * 状态「进行中」、创建路径「手工登记」，金额先以原币保存（汇率随待办 20）。表单本身的错误（contracts 的
- * registrationErrors）与要查库的错误（店铺、来源工单、负责人是否合格、生产厂与配件是否存在）一次列全；
- * 保存记审计（完整后值）。
+ * 状态「进行中」、创建路径「手工登记」；每个金额按费用发生日取汇率，保存原币、汇率、汇率日期与来源、冻结美元值
+ * （R-FL-06，待办 20）。表单本身的错误（contracts 的 registrationErrors）与要查库的错误（店铺、来源工单、负责人是否
+ * 合格、生产厂与配件是否存在、非美元金额有没有汇率）一次列全；保存记审计（完整后值）。
  */
 
 /**
@@ -113,8 +113,8 @@ export interface Registered {
   readonly storeName: string;
 }
 
-/** 审计里的完整后值：抽屉能填的全部字段与系统定下的编号、状态、创建路径、登记人 */
-function snapshot(row: AftersalesRow, ownerName: string | null) {
+/** 审计里的完整前后值：抽屉能填的全部字段（金额含汇率与冻结美元值）与系统定下的编号、状态、创建路径、登记人 */
+export function auditSnapshot(row: AftersalesRow, ownerName: string | null) {
   return {
     number: row.number,
     status: row.status,
@@ -199,8 +199,14 @@ export async function createRegistration(
       errors.partSku = m.partMissing;
     }
 
+    // 按费用发生日取汇率（R-FL-06）；没有汇率的金额与其他错误一起列出
+    const converted = input.feeDate ? await convertFees(tx.db, input.fees, input.feeDate) : null;
+    for (const [field, message] of Object.entries(converted?.errors ?? {})) {
+      errors[field] ??= message;
+    }
+
     const ratios = resolveRatios(input.ratios).ratios;
-    if (Object.keys(errors).length > 0 || !store || !ratios) {
+    if (Object.keys(errors).length > 0 || !store || !ratios || !converted) {
       throw new FieldValidationError(errors);
     }
 
@@ -235,7 +241,7 @@ export async function createRegistration(
         trackingNumber: input.trackingNumber || null,
         claimTarget: input.claimTarget,
         claimStatus: input.claimStatus,
-        ...feeColumnValues(input.fees),
+        ...feeColumnValues(converted.values),
         productFactoryPct: ratios.product,
         freightFactoryPct: ratios.freight,
         otherFactoryPct: ratios.other,
@@ -250,7 +256,7 @@ export async function createRegistration(
       objectId: row.id,
       objectLabel: row.number,
       storeId: row.storeId,
-      after: snapshot(row, owner?.name ?? null),
+      after: auditSnapshot(row, owner?.name ?? null),
     });
     return { row, storeName: store.name };
   });

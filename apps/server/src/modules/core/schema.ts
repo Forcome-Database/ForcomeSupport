@@ -1,7 +1,19 @@
 import { desc, sql } from 'drizzle-orm';
-import { index, inet, integer, jsonb, pgSchema, primaryKey, text, uuid } from 'drizzle-orm/pg-core';
-import type { AuditObjectType, Role } from '@forcome/contracts';
-import { primaryId, timestamptz } from './columns';
+import {
+  check,
+  date,
+  index,
+  inet,
+  integer,
+  jsonb,
+  pgSchema,
+  primaryKey,
+  text,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import { foreignCurrencies, type AuditObjectType, type Role } from '@forcome/contracts';
+import { exchangeRate as rateColumn, exchangeRateSource, primaryId, timestamptz } from './columns';
 
 export const coreSchema = pgSchema('core');
 
@@ -61,4 +73,27 @@ export const businessNumberCounter = coreSchema.table(
     lastValue: integer('last_value').notNull(),
   },
   (t) => [primaryKey({ columns: [t.kind, t.period] })],
+);
+
+/**
+ * 汇率（PRD 11.1 ExchangeRate、R-FL-06）：每个工作日、每个币种一行，1 USD = rate 原币，由欧洲央行的
+ * 1 EUR 兑 USD、MXN、CAD 交叉计算；每日任务写入（exchange-rates.ts），只增不改。
+ */
+export const exchangeRate = coreSchema.table(
+  'exchange_rate',
+  {
+    id: primaryId(),
+    /** 汇率所属的日期（欧洲央行参考汇率的日期） */
+    date: date('date', { mode: 'string' }).notNull(),
+    currency: text('currency', { enum: foreignCurrencies }).notNull(),
+    rate: rateColumn('rate').notNull(),
+    /** 欧洲央行（主源）或 Frankfurter（备用源） */
+    source: exchangeRateSource('source').notNull(),
+    createdAt: timestamptz('created_at').notNull(),
+  },
+  (t) => [
+    unique('exchange_rate_date_currency_key').on(t.date, t.currency),
+    check('exchange_rate_rate_check', sql`${t.rate} > 0`),
+    check('exchange_rate_source_check', sql`${t.source} IN ('ecb', 'frankfurter')`),
+  ],
 );

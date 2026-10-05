@@ -1,4 +1,4 @@
-import type { OwnerNote } from '@forcome/contracts';
+import { registrationMessages, type OwnerNote } from '@forcome/contracts';
 
 /*
  * P13 登记台账与新建登记抽屉的界面文案（逐字照原型；p13-copy.test.ts 直接读原型生成物核对）：第一期参照页
@@ -20,8 +20,8 @@ export const PAGE_DESCRIPTION = {
 export const NEW_REGISTRATION = '新建登记';
 
 /**
- * 台账的列（待办 19 的最简列表；费用合计、FSH / 工厂承担、行尾「更多」随 20–22 加在原型的位置上，快递单号的「待回填」与补登随 21）。
- * 金额三列只给有财务权限的角色（坐席看不到）。
+ * 台账的列（最简列表；费用合计、FSH / 工厂承担、行尾「更多」随 21、22 加在原型的位置上，快递单号的「待回填」与补登随 21）。
+ * 金额三列只给有财务权限的角色（坐席看不到），写冻结的美元值，非美元另起一行写原币与汇率日期（待办 20）。
  */
 export const COLUMNS = {
   number: '售后单号',
@@ -36,6 +36,18 @@ export const FINANCE_COLUMNS = {
   productCost: '产品成本',
   freight: '运费',
   compensation: '额外赔偿',
+} as const;
+
+/**
+ * 非美元金额（原型 p1_comp()、S13、R-FL-06）：美元值下方一行写原币与汇率日期（例「MX$889.00 · 汇率 09-10」），
+ * 悬停说明汇率怎么来的
+ */
+export const FOREIGN_AMOUNT = {
+  /** 原币与汇率日期之间（窄的金额列里在这里换行） */
+  separator: ' · ',
+  rateDate: (date: string) => `汇率 ${date}`,
+  line: (original: string, date: string) => `${original} · 汇率 ${date}`,
+  title: '汇率取费用发生日的欧洲央行日汇率；售后负责人可修改并记审计',
 } as const;
 
 /** 店铺与站点（原型 store_site()：「Forcome Direct · US」） */
@@ -124,6 +136,11 @@ export const DRAWER = {
   ratioTotalError: '有比例错误，合计暂不计算',
   feesHint:
     '没有发生的填 0。每项可选 USD / CAD / MXN，非美元时下方即时显示折算美元与汇率日期（R-FL-06）',
+  /** 非美元金额框下的折算（S14 编辑登记小图「≈ $49.39 · 汇率 09-10（1 USD = 18.00 MXN）」） */
+  feeConversion: (usd: string, rateDate: string, rate: string, currency: string) =>
+    `≈ ${usd} · 汇率 ${rateDate}（1 USD = ${rate} ${currency}）`,
+  /** 费用发生日及之前没有汇率（同保存时的报错，contracts 的 registrationMessages.noRate） */
+  feeNoRate: registrationMessages.noRate,
   footerNote: '保存后状态为「进行中」，记入审计日志',
   footerNoteWithErrors: '保存按钮保持可点，点击后定位到第一个错误',
   cancel: '取消',
@@ -143,6 +160,9 @@ export const SAVE_RESULT = {
 
 /** 来源工单查询失败（不是没有这张工单，而是接口出错）：G5 失败浮层「查询失败：原因」+「立即重试」 */
 export const SOURCE_TICKET_LOOKUP = { failedAction: '查询' } as const;
+
+/** 费用发生日的汇率查询失败：同来源工单的写法（G5「查询失败：原因」+「立即重试」） */
+export const RATE_LOOKUP = { failedAction: '查询' } as const;
 
 /** 关闭抽屉时还有未保存的输入（G8，新建的写法同 P18） */
 export const LEAVE = '「新建登记」填写的内容还没保存，放弃后不保留。';

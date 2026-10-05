@@ -14,7 +14,8 @@ import {
 } from '@forcome/contracts';
 import { getDemoFixture } from '@forcome/fixtures';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { gmailClient } from '../src/modules/integration';
+import { syncExchangeRatesJob } from '../src/modules/core';
+import { exchangeRateClient, gmailClient } from '../src/modules/integration';
 import type { ApiClient } from './api-client';
 import { startTestHarness, TEST_CLIENT_IP, type TestHarness } from './harness';
 
@@ -102,6 +103,9 @@ describe('新建登记（待办 19）', () => {
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 欧洲央行公布了 09-10 的汇率（演示汇率，待办 20），比索、加元金额按它折算
+    t.clients.fake(exchangeRateClient).publish('2026-09-10', fixture.exchangeRates.quotes);
+    await t.enqueue(syncExchangeRatesJob, {});
     // 系统开始监听店铺邮箱（来源工单的用例要先收一封来信建工单）
     await t.runJobs();
     supervisor = await t.loginAs('客服主管');
@@ -113,7 +117,7 @@ describe('新建登记（待办 19）', () => {
     await t.close();
   });
 
-  it('示例数据：P13 列出原型的 12 张台账单（不含待确认的单），金额按原币', async () => {
+  it('示例数据：P13 列出原型的 12 张台账单（不含待确认的单），金额带原币与冻结美元值', async () => {
     const items = await ledger(owner);
     const samples = items.filter((item) => item.number <= 'S-20260911-0021');
     expect(samples.map((item) => item.number)).toEqual(fixture.ledger.map((r) => r.no));
@@ -124,7 +128,7 @@ describe('新建登记（待办 19）', () => {
       site: 'MX',
       method: 'refund_or_compensation',
       responsibility: 'product_quality',
-      fees: { compensation: { amount: '889.00', currency: 'MXN' } },
+      fees: { compensation: { amount: '889.00', currency: 'MXN', usd: '49.39' } },
     });
   });
 
@@ -141,10 +145,10 @@ describe('新建登记（待办 19）', () => {
       responsibility: 'product_quality',
       trackingNumber: null,
       fees: {
-        productCost: { amount: '3.20', currency: 'USD' },
-        freight: { amount: '6.80', currency: 'USD' },
-        compensation: { amount: '0.00', currency: 'USD' },
-        otherCost: { amount: '0.00', currency: 'USD' },
+        productCost: { amount: '3.20', currency: 'USD', usd: '3.20', rate: null },
+        freight: { amount: '6.80', currency: 'USD', usd: '6.80', rate: null },
+        compensation: { amount: '0.00', currency: 'USD', usd: '0.00', rate: null },
+        otherCost: { amount: '0.00', currency: 'USD', usd: '0.00', rate: null },
       },
       ratios: ratioPairsOf({ product: 100, freight: 100, other: 100 }),
     });
@@ -188,6 +192,7 @@ describe('新建登记（待办 19）', () => {
           'status',
           'store',
           'trackingNumber',
+          'version',
         ].sort(),
       );
     }
@@ -271,7 +276,12 @@ describe('新建登记（待办 19）', () => {
       ...refund,
       fees: { ...refund.fees, compensation: { amount: '889', currency: 'MXN' } },
     });
-    expect(saved.fees?.compensation).toEqual({ amount: '889.00', currency: 'MXN' });
+    expect(saved.fees?.compensation).toEqual({
+      amount: '889.00',
+      currency: 'MXN',
+      usd: '49.39',
+      rate: { rate: '18.000000', date: '2026-09-10', source: 'ecb' },
+    });
     const [audit] = await t.auditRecords({ action: 'aftersales.create', objectId: saved.id });
     expect(audit?.after).toMatchObject({ part: null, shipper: null, carrier: null });
   });
@@ -401,10 +411,10 @@ describe('新建登记（待办 19）', () => {
       claimTarget: null,
       claimStatus: null,
       fees: {
-        productCost: { amount: '3.20', currency: 'USD' },
-        freight: { amount: '6.80', currency: 'USD' },
-        compensation: { amount: '0.00', currency: 'USD' },
-        otherCost: { amount: '0.00', currency: 'USD' },
+        productCost: { amount: '3.20', currency: 'USD', usd: '3.20', rate: null },
+        freight: { amount: '6.80', currency: 'USD', usd: '6.80', rate: null },
+        compensation: { amount: '0.00', currency: 'USD', usd: '0.00', rate: null },
+        otherCost: { amount: '0.00', currency: 'USD', usd: '0.00', rate: null },
       },
       ratios: ratioPairsOf({ product: 100, freight: 100, other: 100 }),
     });

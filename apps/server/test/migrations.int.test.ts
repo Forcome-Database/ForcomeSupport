@@ -26,7 +26,12 @@ const TABLES_WITHOUT_UUID_ID = new Set([
   'core.business_number_counter',
 ]);
 const NUMERIC_COLUMNS_NOT_MONEY = new Set<string>([
-  // 汇率等非金额的 numeric 列在这里登记，例如 'core.exchange_rate.rate'
+  // 汇率 numeric(12,6)：1 USD = 汇率 原币（R-FL-06），不是金额
+  'core.exchange_rate.rate',
+  'aftersales.aftersales.product_cost_rate',
+  'aftersales.aftersales.freight_rate',
+  'aftersales.aftersales.compensation_rate',
+  'aftersales.aftersales.other_cost_rate',
 ]);
 
 let database: TestDatabase;

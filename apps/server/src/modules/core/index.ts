@@ -1,4 +1,4 @@
-// core：基础设施层（ADR 0005）——时钟、配置、日志、数据库与事务、后台任务（发件箱）与常驻拉取、审计、业务编号、数据约定、
+// core：基础设施层（ADR 0005）——时钟、配置、日志、数据库与事务、后台任务（发件箱、定时）与常驻拉取、审计、业务编号、数据约定、汇率、
 // 示例数据加载器（只用于非生产环境）、店铺数据范围与无权限错误。
 // 其他模块只能经本文件使用 core；core 不依赖任何业务模块。
 export { AccessDeniedError } from './access-denied';
@@ -8,8 +8,10 @@ export { ManualClock, systemClock, type Clock, type Duration } from './clock';
 export {
   amount,
   currency,
+  exchangeRate,
+  exchangeRateSource,
+  feeChecks,
   feeColumns,
-  feeCurrencyCheck,
   primaryId,
   timestamptz,
   version,
@@ -24,6 +26,18 @@ export {
   type MailSendPolicy,
 } from './config';
 export { type Database, type DbExecutor, type DbTransaction } from './db';
+export {
+  createCoreJobHandlers,
+  exchangeRateOn,
+  exchangeRatesOn,
+  RATE_HISTORY_START,
+  syncExchangeRates,
+  syncExchangeRatesJob,
+  type DateRange,
+  type EurReferenceRates,
+  type ExchangeRateSource,
+  type ExchangeRateSyncReport,
+} from './exchange-rates';
 export {
   defineFeed,
   startFeeds,
@@ -53,6 +67,7 @@ export {
   type JobDefinition,
   type JobHandler,
   type JobQueueRole,
+  type JobSchedule,
   type WorkerOptions,
 } from './jobs';
 export { createLogger, silentLogger, type Logger } from './logger';

@@ -15,3 +15,11 @@ export const registrationOptionsQuery = queryOptions({
   queryKey: [...AFTERSALES_QUERY_KEY, 'registration-options'],
   queryFn: api.registrationOptions,
 });
+
+/** 某个费用发生日可用的汇率（新建登记抽屉即时折算）；汇率每天才更新一次，取过的日期 10 分钟内不再取 */
+export const exchangeRatesQuery = (date: string) =>
+  queryOptions({
+    queryKey: [...AFTERSALES_QUERY_KEY, 'exchange-rates', date],
+    queryFn: () => api.exchangeRates(date),
+    staleTime: 10 * 60_000,
+  });

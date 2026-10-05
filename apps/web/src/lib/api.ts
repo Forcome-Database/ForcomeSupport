@@ -4,6 +4,7 @@ import {
   channelSettingsSchema,
   currentMemberSchema,
   devMembersResponseSchema,
+  exchangeRatesOnSchema,
   ledgerItemSchema,
   ledgerSchema,
   loginDeniedSchema,
@@ -17,6 +18,7 @@ import {
   type ChannelSettings,
   type CurrentMember,
   type DevMember,
+  type ExchangeRatesOn,
   type FieldErrors,
   type LedgerItem,
   type LoginDenialReason,
@@ -165,6 +167,10 @@ export const api = {
   /** 按工单号取来源工单；没有这张工单 404，在别的店铺 403 */
   sourceTicket: (number: string): Promise<SourceTicket> =>
     call(`/api/aftersales/source-tickets/${encodeURIComponent(number)}`, sourceTicketSchema),
+
+  /** 某个费用发生日可用的汇率（每个币种取当天，缺失时取此前最近一个有汇率的日期；一个都没有为 null） */
+  exchangeRates: (date: string): Promise<ExchangeRatesOn> =>
+    call(`/api/aftersales/exchange-rates?date=${encodeURIComponent(date)}`, exchangeRatesOnSchema),
 
   /** 新建登记；字段填错时抛 ApiRequestError（fields 为各字段的错误） */
   register: (input: RegistrationInput): Promise<LedgerItem> =>

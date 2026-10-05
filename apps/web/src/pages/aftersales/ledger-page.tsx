@@ -2,6 +2,7 @@ import {
   can,
   canViewFinance,
   formatMoney,
+  formatRateDate,
   handlingMethodLabels,
   responsibilityLabels,
   type Fee,
@@ -34,6 +35,7 @@ import {
   EMPTY_TITLE,
   EMPTY_VALUE,
   FINANCE_COLUMNS,
+  FOREIGN_AMOUNT,
   NEW_REGISTRATION,
   PAGE_DESCRIPTION,
   PAGE_TITLE,
@@ -43,11 +45,12 @@ import { RegistrationDrawer } from './registration-drawer';
 
 /*
  * P13 登记台账（第一阶段，PRD P13「第一阶段」、S13；参照图 design/spec/shots/phase1/P13_AfterSalesLog.png 与 _agent）。
- * 待办 19 是最简列表：页头（标题、说明、右上「新建登记」）+ 表格（售后单号 · 客户 · 店铺与站点 · 处理方式 · 责任 · 状态 ·
- * 快递单号 · 产品成本 · 运费 · 额外赔偿，金额为原币），按售后单号先后（后端排好）。坐席只读：没有「新建登记」与金额列，说明换成只读的写法。
- * 完整率（21）、列设置与导出 Excel（22）、筛选与「已隐藏 N 列」（22）、费用合计 / FSH 与工厂承担 / 行尾「更多」与合计行（20–22）、
- * 快递单号的「待回填」与补登（21）、点售后单号打开「编辑登记」（21）随后续待办加在原型的位置上；表下的说明写的是汇率折算与
- * 承担计算，随 20、22 一起加。表格照原型 table_span()：外框圆角 8、表头 11 / 700 次要色、行上下 8；列宽照第一阶段的两个模板
+ * 最简列表：页头（标题、说明、右上「新建登记」）+ 表格（售后单号 · 客户 · 店铺与站点 · 处理方式 · 责任 · 状态 ·
+ * 快递单号 · 产品成本 · 运费 · 额外赔偿；金额写冻结的美元值，非美元下方写原币与汇率日期，待办 20），按售后单号先后（后端排好）。
+ * 坐席只读：没有「新建登记」与金额列，说明换成只读的写法。
+ * 完整率（21）、列设置与导出 Excel（22）、筛选与「已隐藏 N 列」（22）、费用合计 / FSH 与工厂承担 / 行尾「更多」与合计行（21、22）、
+ * 快递单号的「待回填」与补登（21）、点售后单号打开「编辑登记」（21）随后续待办加在原型的位置上；表下的说明是一段话，
+ * 同时写汇率折算、承担计算、待回填与行尾「更多」，等这些都有了随 22 一起加。表格照原型 table_span()：外框圆角 8、表头 11 / 700 次要色、行上下 8；列宽照第一阶段的两个模板
  * （售后负责人：列间距 8；坐席：列间距 12）换算，含单元格内边距；快递单号这一列占剩余宽度（原型 minmax(0, 1fr)）。
  */
 
@@ -141,17 +144,34 @@ const BASE_COLUMNS: readonly Column[] = [
   },
 ];
 
+/**
+ * 金额（原型 p1_val()、p1_comp()，R-FL-06）：写冻结的美元值（13 正文色）；非美元在下方另起一行写原币与汇率日期
+ * （11 浅灰，例「MX$889.00 · 汇率 09-10」），悬停说明汇率怎么来的。列窄时这一行在「·」处换行（原型只在宽的「额外赔偿」
+ * 列画过一行写完的样子）。没登记写「—」。
+ */
 function feeCell(fee: Fee | null | undefined): ReactNode {
-  return fee ? (
+  if (!fee) return EMPTY;
+  const usd = (
     <span className="text-body whitespace-nowrap text-foreground tabular-nums">
-      {formatMoney(fee.amount, fee.currency)}
+      {formatMoney(fee.usd, 'USD')}
     </span>
-  ) : (
-    EMPTY
+  );
+  if (!fee.rate) return usd;
+  return (
+    <div className="flex flex-col items-end" title={FOREIGN_AMOUNT.title}>
+      {usd}
+      <span className="text-right text-11 text-subtle-foreground tabular-nums">
+        <span className="whitespace-nowrap">{formatMoney(fee.amount, fee.currency)}</span>
+        {FOREIGN_AMOUNT.separator}
+        <span className="whitespace-nowrap">
+          {FOREIGN_AMOUNT.rateDate(formatRateDate(fee.rate.date))}
+        </span>
+      </span>
+    </div>
   );
 }
 
-/** 金额列（原币；美元折算与汇率日期随 20） */
+/** 金额列（美元；非美元另写原币与汇率日期） */
 const feeColumn = (key: Extract<FeeItem, keyof typeof FINANCE_COLUMNS>, width: string): Column => ({
   key,
   title: FINANCE_COLUMNS[key],

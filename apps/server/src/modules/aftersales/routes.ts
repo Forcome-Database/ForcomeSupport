@@ -1,7 +1,9 @@
 import {
   apiErrorSchema,
+  exchangeRatesOnSchema,
   ledgerItemSchema,
   ledgerSchema,
+  rateChangeInputSchema,
   registrationInputSchema,
   registrationMessages,
   registrationOptionsSchema,
@@ -10,9 +12,10 @@ import {
 } from '@forcome/contracts';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { storeNamesById } from '../channel';
-import type { AppEnv, Runtime } from '../core';
+import { exchangeRatesOn, type AppEnv, type Runtime } from '../core';
 import { requireCapability, requireSession, type AccessVariables } from '../org';
 import { listLedger, toLedgerItem } from './ledger';
+import { changeFeeRates } from './rates';
 import { createRegistration, findSourceTicket, registrationOptions } from './registration';
 
 const json = <T extends z.ZodType>(schema: T, description: string) => ({
@@ -81,7 +84,46 @@ const sourceTicketRoute = createRoute({
   },
 });
 
-/** aftersales 的接口：P13 登记台账与新建登记（第一期） */
+const exchangeRatesRoute = createRoute({
+  method: 'get',
+  path: '/api/aftersales/exchange-rates',
+  summary:
+    '某个费用发生日可用的汇率（新建登记抽屉即时折算；每个币种取当天，缺失时取此前最近一个有汇率的日期，E-20）',
+  request: { query: z.object({ date: z.iso.date() }) },
+  responses: {
+    200: json(
+      exchangeRatesOnSchema,
+      '各币种的汇率（1 USD = rate 原币，带实际日期与来源；一个都没有为 null）',
+    ),
+    400: json(apiErrorSchema, '日期格式不对'),
+    401: unauthenticated,
+    403: cannotRegister,
+  },
+});
+
+const rateChangeRoute = createRoute({
+  method: 'put',
+  path: '/api/aftersales/{number}/rates',
+  summary:
+    '修改汇率（只有售后负责人，PRD 10.1；冻结美元值按新汇率重算，汇率日期为费用发生日、来源「手工修改」，记审计）',
+  request: {
+    params: z.object({ number: z.string().min(1).max(40) }),
+    body: { content: { 'application/json': { schema: rateChangeInputSchema } }, required: true },
+  },
+  responses: {
+    200: json(ledgerItemSchema, '已修改'),
+    400: json(
+      apiErrorSchema,
+      '填错（fields 的键为 rates.<费用项>：汇率格式、美元金额、没登记的费用；rates：已取消的单、没有要改的）',
+    ),
+    401: unauthenticated,
+    403: json(apiErrorSchema, '不是售后负责人，或这张单不在店铺范围内（E-24，记审计）'),
+    404: json(apiErrorSchema, '没有这张售后单'),
+    409: json(apiErrorSchema, '数据已被他人修改（G7）'),
+  },
+});
+
+/** aftersales 的接口：P13 登记台账、新建登记与汇率（第一期） */
 export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv }) {
   const { runtime, appEnv } = deps;
   const routes = new OpenAPIHono<{ Variables: AccessVariables }>();
@@ -91,9 +133,12 @@ export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv 
     '/api/aftersales/registrations',
     '/api/aftersales/registration-options',
     '/api/aftersales/source-tickets/*',
+    '/api/aftersales/exchange-rates',
   ]) {
     routes.use(path, requireCapability('aftersales.register'));
   }
+  // 修改汇率与补登同一项能力（10.1「登记台账补登（已完成的单）、修改汇率」，只有售后负责人）
+  routes.use('/api/aftersales/:number/rates', requireCapability('aftersales.backfill'));
 
   routes.openapi(ledgerRoute, async (c) => {
     const access = c.get('access');
@@ -131,6 +176,24 @@ export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv 
       },
       200,
     );
+  });
+
+  routes.openapi(exchangeRatesRoute, async (c) =>
+    c.json(await exchangeRatesOn(runtime.db, c.req.valid('query').date), 200),
+  );
+
+  routes.openapi(rateChangeRoute, async (c) => {
+    const access = c.get('access');
+    const row = await changeFeeRates(
+      runtime,
+      access,
+      c.req.valid('param').number,
+      c.req.valid('json'),
+    );
+    if (!row) return c.json({ error: 'not_found', message: '没有这张售后单' }, 404);
+    const names = await storeNamesById(runtime.db, [row.storeId]);
+    const item = toLedgerItem(row, names);
+    return c.json(stripFinanceFields(ledgerItemSchema, item, access.financeVisible), 200);
   });
 
   return routes;

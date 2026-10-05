@@ -9,9 +9,12 @@ import {
   ratioGroups,
   ratioPairsOf,
   registrationFields,
+  usdOf,
   type ClaimStatus,
   type ClaimTarget,
   type Currency,
+  type ExchangeRate,
+  type ExchangeRatesOn,
   type FeeItem,
   type FieldErrors,
   type HandlingMethod,
@@ -271,34 +274,58 @@ export function formatUsdCents(cents: number): string {
   return formatMoney(amountOfCents(cents), 'USD');
 }
 
+/** 费用发生日可用的各币种汇率（接口 exchange-rates 的 rates）；还没取到为 undefined */
+export type RatesOn = ExchangeRatesOn['rates'] | undefined;
+
+/** 一个费用项折算成美元（分）：没填按 0，美元原样，非美元按汇率折算（四舍五入到分，同保存时冻结的值）；不能算为 null */
+function usdCentsOf(fee: FeeForm, rates: RatesOn): number | null {
+  const cents = centsOf(fee.amount);
+  if (cents === null || cents === 0 || fee.currency === 'USD') return cents;
+  const rate = rates?.[fee.currency];
+  return rate ? centsOf(usdOf(fee.amount.trim(), rate.rate)) : null;
+}
+
 /**
- * 各组的金额（分，美元）：产品成本、快递物流、其他费用（额外赔偿 + 其他）。没填按 0；组里有非美元的费用时为 null——
- * 汇率与美元折算随待办 20，在那之前只能把美元加起来。
+ * 各组的金额（分，美元）：产品成本、快递物流、其他费用（额外赔偿 + 其他）。没填按 0；非美元按费用发生日的汇率折算
+ * （R-FL-06）；组里有金额填错、或非美元的汇率还没取到 / 没有时为 null（写「—」）。
  */
 export function groupCents(
   fees: Readonly<Record<FeeItem, FeeForm>>,
+  rates: RatesOn,
 ): Record<RatioGroup, number | null> {
   const out: Record<RatioGroup, number | null> = { product: 0, freight: 0, other: 0 };
   for (const item of feeItems) {
     const group = feeItemGroup[item];
-    const fee = fees[item];
-    const cents = centsOf(fee.amount);
+    const cents = usdCentsOf(fees[item], rates);
     const current = out[group];
-    out[group] =
-      current === null || cents === null || (fee.currency !== 'USD' && cents > 0)
-        ? null
-        : current + cents;
+    out[group] = current === null || cents === null ? null : current + cents;
   }
   return out;
 }
 
-/** 四项费用的合计（分，美元）；有非美元的费用时为 null */
-export function feeTotalCents(fees: Readonly<Record<FeeItem, FeeForm>>): number | null {
-  const groups = groupCents(fees);
+/** 四项费用的合计（分，美元）；有不能算的费用时为 null */
+export function feeTotalCents(
+  fees: Readonly<Record<FeeItem, FeeForm>>,
+  rates: RatesOn,
+): number | null {
+  const groups = groupCents(fees, rates);
   return ratioGroups.reduce<number | null>(
     (sum, group) => (sum === null || groups[group] === null ? null : sum + groups[group]),
     0,
   );
+}
+
+/** 金额框下的折算（S14「非美元时下方即时显示折算美元与汇率日期」） */
+export type Conversion =
+  | { readonly kind: 'converted'; readonly usd: string; readonly rate: ExchangeRate }
+  | { readonly kind: 'no_rate' };
+
+/** 非美元且填了合法金额时的折算；汇率还在取、美元、没填或填错时不显示（null） */
+export function conversionOf(fee: FeeForm, rates: RatesOn): Conversion | null {
+  const amount = fee.amount.trim();
+  if (fee.currency === 'USD' || amount === '' || !isValidAmount(amount) || !rates) return null;
+  const rate = rates[fee.currency];
+  return rate ? { kind: 'converted', usd: usdOf(amount, rate.rate), rate } : { kind: 'no_rate' };
 }
 
 /** 一组的两方承担（分）：工厂 = 金额 × 工厂比例（四舍五入到分），FSH = 金额 − 工厂（R-AS-08） */

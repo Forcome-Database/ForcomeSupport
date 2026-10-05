@@ -116,7 +116,7 @@ export function loadConfig(rawEnv: Record<string, string | undefined> = process.
     }
   }
 
-  // 出站代理由 HTTP 客户端工厂（undici EnvHttpProxyAgent，随第一个真实现加入）直接读环境变量，这里只把关格式
+  // 出站代理由 HTTP 客户端工厂（integration/http.ts 的 undici EnvHttpProxyAgent）直接读环境变量，这里只把关格式
   for (const variable of PROXY_VARIABLES) {
     const value = env[variable];
     if (value !== undefined && !isProxyUrl(value)) {

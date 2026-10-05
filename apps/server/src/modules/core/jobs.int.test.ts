@@ -19,6 +19,12 @@ import {
 
 // 只在本测试里用的示范任务：载荷带一个标记，处理器把收到的标记记下来
 const echoJob = defineJob('test.echo', z.object({ marker: z.string() }));
+// 示范定时任务：每天北京时间 06:00，worker 启动时也排一次
+const tickJob = defineJob('test.tick', z.object({}), undefined, {
+  cron: '0 6 * * *',
+  tz: 'Asia/Shanghai',
+  runAtStartup: true,
+});
 
 let database: TestDatabase;
 let t: TestRuntime;
@@ -33,6 +39,10 @@ beforeAll(async () => {
     [
       handleJob(echoJob, ({ marker }) => {
         received.push(marker);
+        return Promise.resolve();
+      }),
+      handleJob(tickJob, () => {
+        received.push('tick');
         return Promise.resolve();
       }),
     ],
@@ -89,6 +99,22 @@ describe('后台任务：任务表即发件箱（ADR 0008）', () => {
         tx.enqueue(echoJob, { marker: 42 }),
       ),
     ).rejects.toThrow();
+  });
+
+  it('定时任务：worker 启动时按 cron 与时区登记到 pg-boss，并立即排一次', async () => {
+    const schedules = await t.runtime.boss.getSchedules('test.tick');
+    expect(schedules).toHaveLength(1);
+    expect(schedules[0]).toMatchObject({ cron: '0 6 * * *', options: { tz: 'Asia/Shanghai' } });
+    await vi.waitFor(() => expect(received).toContain('tick'), { timeout: 10_000 });
+  });
+
+  it('定时任务的载荷要接受 {}（到点排的任务只带空载荷）', () => {
+    expect(() =>
+      defineJob('test.bad_tick', z.object({ marker: z.string() }), undefined, {
+        cron: '* * * * *',
+        tz: 'UTC',
+      }),
+    ).toThrow(/载荷要接受 \{\}/);
   });
 
   it('任务名必须是「模块.任务」形式', () => {

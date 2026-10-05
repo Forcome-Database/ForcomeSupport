@@ -92,6 +92,20 @@
       "when": 1791181898504,
       "tag": "0012_aftersales_reference_data",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791187078342,
+      "tag": "0013_exchange_rates",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791187085769,
+      "tag": "0014_aftersales_fee_usd_backfill",
+      "breakpoints": true
     }
   ]
 }

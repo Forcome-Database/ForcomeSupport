@@ -3,6 +3,8 @@ import {
   aftersalesStatusLabels,
   feeItemLabels,
   formatMoney,
+  formatRate,
+  formatRateDate,
   handlingMethodLabels,
   ratioGroupLabels,
   registrationMessages,
@@ -16,6 +18,7 @@ import {
   EMPTY_TITLE,
   EMPTY_VALUE,
   FINANCE_COLUMNS,
+  FOREIGN_AMOUNT,
   LEAVE,
   NEW_REGISTRATION,
   PAGE_DESCRIPTION,
@@ -94,9 +97,20 @@ describe('P13 第一期参照页', () => {
     expectIn(P13, aftersalesStatusLabels.completed);
     expectIn(P13, aftersalesStatusLabels.in_progress);
     expectText(P13, formatMoney('3.20', 'USD'));
-    expectIn(P13, formatMoney('889.00', 'MXN'));
     expectIn(P13_AGENT, '>1Z4R28830358229041<');
     expectText(P13, EMPTY_VALUE);
+  });
+
+  it('非美元金额（S-20260911-0020）：美元值下方写原币与汇率日期，悬停说明汇率的来源（R-FL-06）', () => {
+    expectText(P13, formatMoney('49.39', 'USD'));
+    expectText(
+      P13,
+      FOREIGN_AMOUNT.line(formatMoney('889.00', 'MXN'), formatRateDate('2026-09-10')),
+    );
+    expect(FOREIGN_AMOUNT.line('MX$889.00', '09-10')).toBe(
+      `MX$889.00${FOREIGN_AMOUNT.separator}${FOREIGN_AMOUNT.rateDate('09-10')}`,
+    );
+    expectIn(P13, `title="${FOREIGN_AMOUNT.title}"`);
   });
 });
 
@@ -158,6 +172,18 @@ describe('S10 列表为空、S14 新建登记抽屉', () => {
     expectIn(STATES, `${labels.ratios}<`);
     expectIn(STATES, `>${DRAWER.ratioNote}<`);
     expectText(STATES, DRAWER.feesHint);
+  });
+
+  it('非美元金额框下的折算（S14 编辑登记小图：S-20260911-0020 的 MX$889.00）', () => {
+    expectText(
+      STATES,
+      DRAWER.feeConversion(
+        formatMoney('49.39', 'USD'),
+        formatRateDate('2026-09-10'),
+        formatRate('18.000000'),
+        'MXN',
+      ),
+    );
   });
 
   it('比例表：表头、三组的叫法、合计与比例有误时的写法', () => {

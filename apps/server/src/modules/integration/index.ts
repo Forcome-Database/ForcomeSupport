@@ -17,6 +17,12 @@ export {
   type RealClientContext,
 } from './definition';
 export {
+  exchangeRateClient,
+  FakeExchangeRates,
+  type ExchangeRateClient,
+  type UsdQuotes,
+} from './exchange-rate';
+export {
   FakeGmail,
   FakeGmailPush,
   gmailClient,

@@ -10,11 +10,25 @@ import type { Runtime } from './runtime';
  * 任务名用「模块.任务」形式，如 ticket.merge_inbound；载荷用 zod 模式在发送与消费两端校验。
  */
 
+/**
+ * 定时任务（ADR 0008）：worker 启动时按 cron 登记到 pg-boss（只有 worker 跑定时），到点排一个载荷为 `{}` 的任务；
+ * 停机期间错过的时点在恢复后补排一次。测试不跑定时，用 t.enqueue 显式排。
+ */
+export interface JobSchedule {
+  /** cron 表达式，按 tz 解释 */
+  readonly cron: string;
+  readonly tz: string;
+  /** worker 启动时也排一次（首次部署、或停机后不用等到下一个时点） */
+  readonly runAtStartup?: boolean;
+}
+
 export interface JobDefinition<T extends object> {
   readonly name: string;
   readonly payload: z.ZodType<T>;
   /** 队列策略与重试、过期、保留设置；不填用 pg-boss 默认值（standard 策略） */
   readonly queue?: Omit<Queue, 'name'>;
+  /** 定时；载荷模式要接受 `{}` */
+  readonly schedule?: JobSchedule;
 }
 
 const JOB_NAME = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
@@ -23,11 +37,15 @@ export function defineJob<T extends object>(
   name: string,
   payload: z.ZodType<T>,
   queue?: Omit<Queue, 'name'>,
+  schedule?: JobSchedule,
 ): JobDefinition<T> {
   if (!JOB_NAME.test(name)) {
     throw new Error(`任务名必须是「模块.任务」形式的小写 snake_case：${name}`);
   }
-  return queue ? { name, payload, queue } : { name, payload };
+  if (schedule && !payload.safeParse({}).success) {
+    throw new Error(`定时任务的载荷要接受 {}：${name}`);
+  }
+  return { name, payload, ...(queue ? { queue } : {}), ...(schedule ? { schedule } : {}) };
 }
 
 export interface JobContext {
@@ -135,7 +153,10 @@ export async function runJob(
   await handler.handle(payload, { jobId: job.id, runtime, logger: log, signal: job.signal });
 }
 
-/** 启动 worker：为每个处理器订阅它的队列，逐个取任务、校验载荷后处理 */
+/**
+ * 启动 worker：为每个处理器订阅它的队列，逐个取任务、校验载荷后处理；定时任务按 cron 登记（重复登记即更新），
+ * 要求启动时就跑的再排一次（队列有去重策略时已在排队的不再重复）
+ */
 export async function startWorker(
   runtime: Runtime,
   handlers: readonly AnyJobHandler[],
@@ -155,5 +176,18 @@ export async function startWorker(
         }
       },
     );
+  }
+  for (const { job } of handlers) {
+    if (!job.schedule) continue;
+    await runtime.boss.schedule(
+      job.name,
+      job.schedule.cron,
+      {},
+      {
+        tz: job.schedule.tz,
+        missed: 'once',
+      },
+    );
+    if (job.schedule.runAtStartup) await runtime.boss.send(job.name, {});
   }
 }
