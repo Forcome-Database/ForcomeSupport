@@ -1,14 +1,19 @@
-import { CircleCheck, CircleX, X } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { CircleCheck, CircleX, History, X } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { failureReason } from './api';
 
 /*
  * 浮层提示（全局状态 G5，原型 toast()）的统一入口；页面不直接调 sonner（lint 限定，ADR 0007 修订）。
  * 失败浮层不自动消失，必须给出重试或下一步；同一件事只留一条（id），成功后用 dismissToast(id) 撤掉。
- * 成功浮层 3 秒消失（showSuccess，P18 保存店铺起用）；撤销等浮层第一次用到的待办在这里补上，同样照 G5。
+ * 成功浮层 3 秒消失（showSuccess，P18 保存店铺起用）；可逆操作的撤销浮层（showUndo，P13 设为已完成起用，待办 21）
+ * 固定在内容区右下的另一个容器（UNDO_TOASTER），带倒计时，倒计时结束前不消失（G5）。
  */
+
+/** 撤销浮层的容器 id（components/ui/sonner.tsx 的 UndoToaster） */
+export const UNDO_TOASTER = 'undo';
 
 type ErrorToastOptions = {
   /** 同一件事的标识（即浮层 id）：再失败替换旧浮层而不是再叠一条，成功后用它撤掉 */
@@ -48,6 +53,32 @@ export function showError(options: ErrorToastOptions): void {
 /** 成功浮层（G5、K6「设置已保存 · 已记入审计日志」）：绿色勾，3 秒后自动消失 */
 export function showSuccess(options: { readonly title: string; readonly description?: string }) {
   toast.custom((id) => <SuccessToast id={id} {...options} />);
+}
+
+type UndoToastOptions = {
+  /** 同一件事的标识（即浮层 id） */
+  readonly id: string;
+  readonly title: string;
+  readonly description?: string;
+  /** 撤销窗口的秒数（G5：5 秒） */
+  readonly seconds: number;
+  /**
+   * 点「撤销」：进入处理中、防重复点击；成功（resolve）后浮层消失；失败（reject）时浮层消失，由调用方给失败浮层
+   */
+  readonly onUndo: () => Promise<unknown>;
+};
+
+/**
+ * 可逆操作的撤销浮层（G5，原型 toast(..., undo=5)）：成功图标、标题与说明，右侧剩余秒数与「撤销」，底部主色倒计时条；
+ * 倒计时结束自动消失（之后不能再撤销），点「撤销」后消失
+ */
+export function showUndo(options: UndoToastOptions): void {
+  const instance = ++shown;
+  toast.custom((id) => <UndoToast key={instance} toastId={id} {...options} />, {
+    id: options.id,
+    toasterId: UNDO_TOASTER,
+    duration: Infinity,
+  });
 }
 
 /** 撤掉某件事的浮层（例如之后保存成功了） */
@@ -105,6 +136,64 @@ function SuccessToast({
         <div className="text-12 leading-normal text-muted-foreground">{description}</div>
       )}
     </ToastCard>
+  );
+}
+
+function UndoToast({
+  toastId,
+  title,
+  description,
+  seconds,
+  onUndo,
+}: UndoToastOptions & { toastId: string | number }) {
+  const [left, setLeft] = useState(seconds);
+  const [pending, setPending] = useState(false);
+  useEffect(() => {
+    if (pending) return;
+    if (left <= 0) {
+      toast.dismiss(toastId);
+      return;
+    }
+    const timer = setTimeout(() => setLeft((n) => n - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [left, pending, toastId]);
+
+  async function undo() {
+    setPending(true);
+    try {
+      await onUndo();
+    } finally {
+      toast.dismiss(toastId);
+    }
+  }
+
+  return (
+    <div
+      className={cn(
+        'relative flex w-90 gap-2.5 overflow-hidden rounded-lg border bg-card px-3.5 py-3 shadow-md',
+        description ? 'items-start' : 'items-center',
+      )}
+    >
+      <CircleCheck className="size-4.5 shrink-0 text-success" strokeWidth={2} />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="text-13 font-semibold text-foreground">{title}</div>
+        {description && (
+          <div className="text-12 leading-normal text-muted-foreground">{description}</div>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="text-12 text-subtle-foreground tabular-nums">{`${Math.max(left, 0)}s`}</span>
+        <Button variant="outline" size="sm" loading={pending} onClick={() => void undo()}>
+          {!pending && <History />}
+          撤销
+        </Button>
+      </div>
+      <div
+        aria-hidden
+        className="absolute bottom-0 left-0 h-0.75 bg-primary transition-[width] duration-1000 ease-linear"
+        style={{ width: `${(Math.max(left, 0) * 100) / seconds}%` }}
+      />
+    </div>
   );
 }
 

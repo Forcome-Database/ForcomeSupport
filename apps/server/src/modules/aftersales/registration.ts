@@ -5,10 +5,13 @@ import {
   registrationMessages,
   resolveRatios,
   responsibilities,
+  type FactoryRatios,
+  type FeeItem,
   type FieldErrors,
   type OwnerOption,
   type RegistrationInput,
   type RegistrationOptions,
+  type StoreOption,
 } from '@forcome/contracts';
 import { listStoreOptions } from '../channel';
 import {
@@ -25,7 +28,7 @@ import { listFactories, listParts } from '../factory';
 import { listAftersalesOwners, type Access } from '../org';
 import { findTicketReference, type TicketReference } from '../ticket';
 import { auditSnapshot } from './audit';
-import { convertFees, feeColumnValues } from './fees';
+import { convertFees, feeColumnValues, type FeeValue } from './fees';
 import { type AftersalesRow } from './ledger';
 import { aftersales, responsibilityRatio } from './schema';
 
@@ -34,6 +37,7 @@ import { aftersales, responsibilityRatio } from './schema';
  * 状态「进行中」、创建路径「手工登记」；每个金额按费用发生日取汇率，保存原币、汇率、汇率日期与来源、冻结美元值
  * （R-FL-06，待办 20）。表单本身的错误（contracts 的 registrationErrors）与要查库的错误（店铺、来源工单、负责人是否
  * 合格、生产厂与配件是否存在、非美元金额有没有汇率）一次列全；保存记审计（完整后值）。
+ * 查库的校验与登记内容到表列的换算，编辑登记与补登（edit.ts）共用。
  */
 
 /**
@@ -108,10 +112,126 @@ export function findSourceTicket(
   );
 }
 
+/** 要查库校验的字段 */
+type LookedUpField = 'storeId' | 'sourceTicket' | 'ownerId' | 'factory' | 'partSku';
+
+/** 查库校验的结果：错误、所选店铺、负责人姓名（审计用） */
+export interface RegistrationLookups {
+  readonly errors: FieldErrors;
+  readonly store: StoreOption | undefined;
+  readonly ownerName: string | null;
+}
+
+/**
+ * 要查库的错误（S14：与表单本身的错误一次列全）：店铺在不在范围内、来源工单（有没有、店铺一致不一致）、负责人是否
+ * 合格（有该店铺数据范围的售后负责人，D-24）、生产厂与配件是否存在。input 已规范化；ticket 是按来源工单号查到的工单
+ * （没查或没有为 null）。changed 判断某个字段是否这次改了：编辑时没改的负责人、来源工单、生产厂、配件不再校验
+ * （例如负责人后来失去了店铺范围，不妨碍改别的字段）；新建时都算改了。
+ */
+export async function registrationLookups(
+  db: DbExecutor,
+  access: Access,
+  input: RegistrationInput,
+  ticket: TicketReference | null,
+  changed: (field: LookedUpField) => boolean = () => true,
+): Promise<RegistrationLookups> {
+  const m = registrationMessages;
+  const errors: FieldErrors = {};
+  const [stores, owners, factories, parts] = await Promise.all([
+    listStoreOptions(db, access.stores),
+    listAftersalesOwners(db),
+    listFactories(db),
+    listParts(db),
+  ]);
+  const store = stores.find((s) => s.id === input.storeId);
+  if (input.storeId && !store) errors.storeId = m.storeMissing;
+  const ticketChecked = input.sourceTicket && (changed('sourceTicket') || changed('storeId'));
+  if (ticketChecked && !ticket) {
+    errors.sourceTicket = m.sourceTicketNotFound;
+  } else if (ticketChecked && ticket && store && ticket.storeId !== store.id) {
+    const ticketStore = stores.find((s) => s.id === ticket.storeId);
+    errors.sourceTicket = m.sourceTicketStore(ticketStore?.name ?? '');
+  }
+  if (
+    input.ownerId &&
+    store &&
+    (changed('ownerId') || changed('storeId')) &&
+    !ownersForStore(owners, store.id).some((o) => o.id === input.ownerId)
+  ) {
+    errors.ownerId = m.ownerNotEligible;
+  }
+  if (input.factory && changed('factory') && !factories.some((f) => f.code === input.factory)) {
+    errors.factory = m.factoryMissing;
+  }
+  if (input.partSku && changed('partSku') && !parts.some((p) => p.sku === input.partSku)) {
+    errors.partSku = m.partMissing;
+  }
+  const ownerName = owners.find((o) => o.id === input.ownerId)?.name ?? null;
+  return { errors, store, ownerName };
+}
+
+/** 来源工单在表上的三列：工单 ID、编号快照、客户（工单的客户） */
+export interface SourceTicketColumns {
+  readonly sourceTicketId: string | null;
+  readonly sourceTicketNumber: string | null;
+  readonly customerId: string | null;
+}
+
+export function sourceTicketColumns(ticket: TicketReference | null): SourceTicketColumns {
+  return {
+    sourceTicketId: ticket?.id ?? null,
+    sourceTicketNumber: ticket?.number ?? null,
+    customerId: ticket?.customerId ?? null,
+  };
+}
+
+/**
+ * 登记内容换成售后单表的列（新建与编辑共用；编号、状态、创建路径、登记人与时间由调用方给）。input 已规范化、校验过；
+ * ratios 是三组工厂比例（没登记为 null），fees 是折算好的四个费用项。
+ */
+export function registrationColumns(
+  input: RegistrationInput,
+  ratios: FactoryRatios | null,
+  fees: Readonly<Record<FeeItem, FeeValue>>,
+  ticket: SourceTicketColumns,
+) {
+  if (!input.storeId) throw new Error('登记缺店铺');
+  return {
+    storeId: input.storeId,
+    site: input.site,
+    ...ticket,
+    orderNumber: input.orderNumber || null,
+    customerName: input.customerName || null,
+    ownerId: input.ownerId,
+    feeDate: input.feeDate,
+    method: input.method,
+    responsibility: input.responsibility,
+    responsibilityReason: input.responsibilityReason || null,
+    factoryCode: input.factory,
+    partSku: input.partSku,
+    partQuantity: input.partQuantity,
+    shipper: input.shipper,
+    carrier: input.carrier || null,
+    shipDate: input.shipDate,
+    trackingNumber: input.trackingNumber || null,
+    claimTarget: input.claimTarget,
+    claimStatus: input.claimStatus,
+    ...feeColumnValues(fees),
+    productFactoryPct: ratios?.product ?? null,
+    freightFactoryPct: ratios?.freight ?? null,
+    otherFactoryPct: ratios?.other ?? null,
+  };
+}
+
 /** 新建的售后单与它的店铺名 */
 export interface Registered {
   readonly row: AftersalesRow;
   readonly storeName: string;
+}
+
+/** 审计与「最近保存的人」里的操作人姓名（系统写入为空） */
+export function actorName(access: Access): string | null {
+  return access.actor.kind === 'member' ? access.actor.name : null;
 }
 
 /**
@@ -125,7 +245,6 @@ export async function createRegistration(
 ): Promise<Registered> {
   const input = normalizeRegistration(raw);
   const errors: FieldErrors = registrationErrors(input);
-  const m = registrationMessages;
 
   // 越权在写事务之外判断：越权审计单独提交，不随业务事务回滚
   if (input.storeId) {
@@ -140,34 +259,8 @@ export async function createRegistration(
     : null;
 
   return transaction(runtime, async (tx) => {
-    const [stores, owners, factories, parts] = await Promise.all([
-      listStoreOptions(tx.db, access.stores),
-      listAftersalesOwners(tx.db),
-      listFactories(tx.db),
-      listParts(tx.db),
-    ]);
-    const store = stores.find((s) => s.id === input.storeId);
-    if (input.storeId && !store) errors.storeId = m.storeMissing;
-    if (input.sourceTicket && !ticket) {
-      errors.sourceTicket = m.sourceTicketNotFound;
-    } else if (ticket && store && ticket.storeId !== store.id) {
-      const ticketStore = stores.find((s) => s.id === ticket.storeId);
-      errors.sourceTicket = m.sourceTicketStore(ticketStore?.name ?? '');
-    }
-    const owner = owners.find((o) => o.id === input.ownerId);
-    if (
-      input.ownerId &&
-      store &&
-      !ownersForStore(owners, store.id).some((o) => o.id === input.ownerId)
-    ) {
-      errors.ownerId = m.ownerNotEligible;
-    }
-    if (input.factory && !factories.some((f) => f.code === input.factory)) {
-      errors.factory = m.factoryMissing;
-    }
-    if (input.partSku && !parts.some((p) => p.sku === input.partSku)) {
-      errors.partSku = m.partMissing;
-    }
+    const lookups = await registrationLookups(tx.db, access, input, ticket);
+    Object.assign(errors, lookups.errors);
 
     // 按费用发生日取汇率（R-FL-06）；没有汇率的金额与其他错误一起列出
     const converted = input.feeDate ? await convertFees(tx.db, input.fees, input.feeDate) : null;
@@ -176,6 +269,7 @@ export async function createRegistration(
     }
 
     const ratios = resolveRatios(input.ratios).ratios;
+    const { store } = lookups;
     if (Object.keys(errors).length > 0 || !store || !ratios || !converted) {
       throw new FieldValidationError(errors);
     }
@@ -188,35 +282,12 @@ export async function createRegistration(
         number: await nextBusinessNumber(tx, 'aftersales', tx.now),
         status: 'in_progress',
         origin: 'manual_registration',
-        storeId: store.id,
-        site: input.site,
-        sourceTicketId: ticket?.id ?? null,
-        sourceTicketNumber: ticket?.number ?? null,
-        orderNumber: input.orderNumber,
-        customerId: ticket?.customerId ?? null,
-        customerName: input.customerName,
+        ...registrationColumns(input, ratios, converted.values, sourceTicketColumns(ticket)),
         registeredById: registrar?.memberId ?? null,
         registeredByName: registrar?.name ?? null,
-        ownerId: input.ownerId,
-        feeDate: input.feeDate,
-        method: input.method,
-        responsibility: input.responsibility,
-        responsibilityReason: input.responsibilityReason || null,
-        factoryCode: input.factory,
-        partSku: input.partSku,
-        partQuantity: input.partQuantity,
-        shipper: input.shipper,
-        carrier: input.carrier || null,
-        shipDate: input.shipDate,
-        trackingNumber: input.trackingNumber || null,
-        claimTarget: input.claimTarget,
-        claimStatus: input.claimStatus,
-        ...feeColumnValues(converted.values),
-        productFactoryPct: ratios.product,
-        freightFactoryPct: ratios.freight,
-        otherFactoryPct: ratios.other,
         createdAt: tx.now,
         updatedAt: tx.now,
+        updatedByName: actorName(access),
       })
       .returning();
     if (!row) throw new Error('售后单创建失败');
@@ -226,7 +297,7 @@ export async function createRegistration(
       objectId: row.id,
       objectLabel: row.number,
       storeId: row.storeId,
-      after: auditSnapshot(row, owner?.name ?? null),
+      after: auditSnapshot(row, lookups.ownerName),
     });
     return { row, storeName: store.name };
   });

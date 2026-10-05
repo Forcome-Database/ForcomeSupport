@@ -13,6 +13,7 @@ describe('配置读取', () => {
       devLoginEnabled: false,
       clientModes: {},
       mailSend: { allowlistOnly: true, allowlist: [] },
+      clockStart: null,
     });
   });
 
@@ -159,6 +160,26 @@ describe('开发登录开关（只在非生产环境由环境变量开启）', (
     expect(() => loadConfig({ DATABASE_URL, DEV_LOGIN_ENABLED: 'yes' })).toThrow(
       /DEV_LOGIN_ENABLED/,
     );
+  });
+});
+
+describe('起始时刻 CLOCK_START（只在非生产环境：截图与演示对上原型的演示时刻）', () => {
+  it('默认不设：用系统时钟；非生产环境可设带时区的时刻', () => {
+    expect(loadConfig({ DATABASE_URL }).clockStart).toBeNull();
+    expect(
+      loadConfig({ DATABASE_URL, CLOCK_START: '2026-09-11T10:20:00+08:00' }).clockStart,
+    ).toEqual(new Date('2026-09-11T02:20:00Z'));
+  });
+
+  it('生产环境设了起始时刻拒绝启动；写错格式也拒绝', () => {
+    expect(() =>
+      loadConfig({
+        DATABASE_URL,
+        APP_ENV: 'production',
+        CLOCK_START: '2026-09-11T10:20:00+08:00',
+      }),
+    ).toThrow(/CLOCK_START：生产环境不能设定起始时刻/);
+    expect(() => loadConfig({ DATABASE_URL, CLOCK_START: '2026-09-11' })).toThrow(/CLOCK_START/);
   });
 });
 

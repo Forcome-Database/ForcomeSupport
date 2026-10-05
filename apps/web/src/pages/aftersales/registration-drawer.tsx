@@ -1,6 +1,9 @@
 import { businessDate } from '@forcome/calendar';
 import {
+  aftersalesActions,
   applicableFields,
+  can,
+  canViewFinance,
   claimStatuses,
   claimStatusLabels,
   claimTargets,
@@ -22,9 +25,12 @@ import {
   RESPONSIBILITY_REASON_MAX,
   shipperLabels,
   shippers,
+  SYSTEM_ACTOR_NAME,
+  type AftersalesDetail,
   type Currency,
   type CurrentMember,
-  type LedgerItem,
+  type FeeItem,
+  type FieldErrors as ApiFieldErrors,
   type RatioGroup,
   type RegistrationOptions,
   type SourceTicket,
@@ -42,7 +48,13 @@ import {
   type FieldErrors,
 } from 'react-hook-form';
 import { AffixInput } from '@/components/affix-input';
+import { AftersalesStatusBadge } from '@/components/aftersales-badges';
 import { DateField } from '@/components/date-field';
+import {
+  EditConflictAlert,
+  OverwriteDialog,
+  type EditConflictInfo,
+} from '@/components/edit-conflict';
 import { FieldError, FormField, useFocusField } from '@/components/form-field';
 import { LoadError } from '@/components/load-error';
 import { Alert } from '@/components/ui/alert';
@@ -64,17 +76,28 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { UnsavedChangesDialog } from '@/components/unsaved-changes-dialog';
 import {
   AFTERSALES_QUERY_KEY,
+  aftersalesQuery,
   exchangeRatesQuery,
   registrationOptionsQuery,
 } from '@/lib/aftersales';
 import { api, ApiRequestError } from '@/lib/api';
-import { storeOptionsQuery } from '@/lib/channel';
+import { formatClock, storeOptionsQuery } from '@/lib/channel';
 import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { endSessionIfUnauthenticated } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { DRAWER, EMPTY_VALUE, LEAVE, LOOKUP, SAVE_RESULT } from './p13-copy';
-import { FormSection, MoneyInput, RatioTable } from './registration-parts';
 import {
+  BACKFILL_RESULT,
+  DRAWER,
+  EDIT,
+  EMPTY_VALUE,
+  LEAVE,
+  LOOKUP,
+  SAVE_RESULT,
+  storeSite,
+} from './p13-copy';
+import { FormSection, MoneyInput, RateInput, RateLine, RatioTable } from './registration-parts';
+import {
+  changedFieldLabels,
   conversionOf,
   emptyRegistrationForm,
   factoryPercents,
@@ -83,19 +106,24 @@ import {
   formatUsdCents,
   FORM_ORDER,
   formErrorsOf,
+  formValuesOf,
   groupCents,
+  lockedFields,
   quantityText,
   ratioFormOf,
   registrationInputOf,
   withRatioSide,
   type Conversion,
+  type DrawerAccess,
+  type FeeOverrides,
   type FormError,
+  type FormItem,
   type RegistrationFormPath,
   type RegistrationFormValues,
 } from './registration-form';
 
 /*
- * 新建登记的右侧抽屉（PRD P13「第一阶段」、S14；原型 build_ledger.reg_drawer()，宽 640）：
+ * 新建登记与编辑登记的右侧抽屉（PRD P13「第一阶段」、S14 及补充小样；原型 build_ledger.reg_drawer()、edit_drawer()，宽 640）：
  * 1 处理方式（三张卡片）→ 2 基本信息（店铺、站点、订单号、客户、来源工单、费用发生日、负责人）→ 3 责任与承担比例
  * （责任类型、生产厂、物流问题的索赔对象与状态、「其他」的理由、三组比例）→ 4 寄件（只有寄配件）→ 费用（原币）。
  * 按 R-AS-08 只列适用字段（contracts 的 applicableFields），不适用的不显示，保存时也不交（接口同样清空）。
@@ -103,10 +131,24 @@ import {
  * 预填三组比例；寄配件选配件预填生产厂；改一侧比例另一侧自动补足 100。
  * 非美元金额按费用发生日的汇率即时折算（R-FL-06）：金额框下写「≈ 美元 · 汇率 日期（1 USD = 汇率 币种）」，比例表与
  * 费用合计按折算后的美元算；汇率取当天、缺失时取此前最近一个有汇率的日期，与保存时冻结的值一致（以接口为准）。
- * 点「保存登记」一律交给接口校验（同 P18 的约定，ADR 0007 修订）：接口一次返回全部字段错误，放到对应字段下方，
+ * 编辑登记（点售后单号，标题「编辑登记 · S-…」，顶部状态行）按状态与权限三种形态（S14 补充小样之三，aftersalesActions）：
+ * 进行中由登记人或负责人改全部字段；已完成由售后负责人补登空着的字段（已填的锁定）；其余只读，底部只有「关闭」，坐席不显示
+ * 比例表与费用。原币金额、币种与费用发生日都没改的项沿用原来冻结的汇率与美元值。售后负责人可「修改汇率」：每个非美元金额框下
+ * 变成「1 USD = [输入框] 币种」，随「保存修改」只交改动过的汇率。有人先保存了（409）时顶部给 G7 横幅（查看最新 / 覆盖保存）。
+ * 点保存一律交给接口校验（同 P18 的约定，ADR 0007 修订）：接口一次返回全部字段错误，放到对应字段下方，
  * 抽屉顶部给危险横幅「有 N 项需要修改 · 已滚动到第一个错误「…」」并定位到最靠上的错误；改了哪个字段就先撤掉它的错误。
  * 有未保存的输入时关闭抽屉先确认（G8）。成功后浮层提示并刷新台账。
  */
+
+/** 抽屉打开的是新建登记，还是某张单的编辑登记 */
+export type DrawerTarget =
+  { readonly mode: 'create' } | { readonly mode: 'edit'; readonly number: string };
+
+/** 编辑登记：打开时的这张单，与查看者能否看到财务字段（坐席看不到比例表与费用） */
+interface Editing {
+  readonly detail: AftersalesDetail;
+  readonly finance: boolean;
+}
 
 const SAVE_TOAST = 'aftersales-register';
 const LOOKUP_TOAST = 'aftersales-source-ticket';
@@ -132,26 +174,96 @@ function presentErrors(errors: FieldErrors<RegistrationFormValues>): FormError[]
   });
 }
 
+/** 判断权限要看的：状态、登记人与负责人（aftersalesActions） */
+function actionsOn(member: CurrentMember, detail: AftersalesDetail) {
+  return aftersalesActions(member, {
+    status: detail.status,
+    registeredById: detail.registeredBy?.id ?? null,
+    ownerId: detail.owner?.id ?? null,
+  });
+}
+
+/** 编辑登记的形态：进行中能编辑 → 编辑；已完成能补登 → 补登；其余只读 */
+function accessOf(member: CurrentMember, detail: AftersalesDetail): DrawerAccess {
+  const actions = actionsOn(member, detail);
+  if (actions.edit) return 'edit';
+  if (actions.backfill) return 'backfill';
+  return 'readonly';
+}
+
+/**
+ * 抽屉的选项：有新建、编辑或补登能力的人取接口的选项（负责人只露出查看者店铺范围内的部分）；这张单的负责人、配件、
+ * 生产厂不在里面时补上（例如负责人后来离职），只读时下拉才写得出名字。坐席没有选项接口，只用这张单自己的。
+ */
+function optionsFor(
+  options: RegistrationOptions | undefined,
+  detail: AftersalesDetail | undefined,
+): RegistrationOptions {
+  const base: RegistrationOptions = options ?? {
+    owners: [],
+    defaultRatios: [],
+    factories: [],
+    parts: [],
+  };
+  if (!detail) return base;
+  const owner = detail.owner;
+  const part = detail.part;
+  return {
+    ...base,
+    owners:
+      owner && !base.owners.some((o) => o.id === owner.id)
+        ? [...base.owners, { id: owner.id, name: owner.name, stores: { all: true } }]
+        : base.owners,
+    factories:
+      detail.factory && !base.factories.some((f) => f.code === detail.factory)
+        ? [...base.factories, { code: detail.factory }]
+        : base.factories,
+    parts:
+      part && !base.parts.some((p) => p.sku === part.sku)
+        ? [
+            ...base.parts,
+            { sku: part.sku, name: part.name ?? part.sku, factory: detail.factory ?? '' },
+          ]
+        : base.parts,
+  };
+}
+
 export function RegistrationDrawer({
   registrar,
+  target,
   onClose,
 }: {
   registrar: CurrentMember;
+  target: DrawerTarget;
   onClose: () => void;
 }) {
+  const editingNumber = target.mode === 'edit' ? target.number : null;
+  const usesOptions =
+    can(registrar.roles, 'aftersales.register') ||
+    can(registrar.roles, 'aftersales.edit_open') ||
+    can(registrar.roles, 'aftersales.backfill');
   const stores = useQuery(storeOptionsQuery);
-  const options = useQuery(registrationOptionsQuery);
-  if (stores.data && options.data) {
+  const options = useQuery({ ...registrationOptionsQuery, enabled: usesOptions });
+  const detail = useQuery({ ...aftersalesQuery(editingNumber ?? ''), enabled: !!editingNumber });
+  const failed = stores.isError || options.isError || detail.isError;
+  const ready = stores.data && (!usesOptions || options.data) && (!editingNumber || detail.data);
+  if (ready && !failed) {
+    const editing: Editing | undefined = detail.data
+      ? { detail: detail.data, finance: canViewFinance(registrar.roles) }
+      : undefined;
     return (
       <RegistrationForm
+        // 换一张单时整个表单重来；同一张单保存或「查看最新」后的新版本由表单自己接上
+        key={editing?.detail.id ?? 'create'}
         registrar={registrar}
         stores={stores.data}
-        options={options.data}
+        options={optionsFor(options.data, detail.data)}
+        editing={editing}
         onClose={onClose}
       />
     );
   }
-  // 选项还没加载好：抽屉先打开，加载失败时给「重试」；这时没有输入，关闭不用确认
+  // 还没加载好：抽屉先打开，加载失败时给「重试」；这时没有输入，关闭不用确认
   return (
     <Sheet
       open
@@ -160,13 +272,17 @@ export function RegistrationDrawer({
       }}
     >
       <SheetContent className="w-160">
-        <SheetHeader title={DRAWER.createTitle} description={DRAWER.description} />
-        <SheetBody aria-busy={!(stores.isError || options.isError)}>
-          {stores.isError || options.isError ? (
+        <SheetHeader
+          title={editingNumber ? EDIT.title(editingNumber) : DRAWER.createTitle}
+          description={editingNumber ? EDIT.description : DRAWER.description}
+        />
+        <SheetBody aria-busy={!failed}>
+          {failed ? (
             <LoadError
               onRetry={() => {
                 void stores.refetch();
-                void options.refetch();
+                if (usesOptions) void options.refetch();
+                if (editingNumber) void detail.refetch();
               }}
             />
           ) : (
@@ -272,29 +388,64 @@ function FormSelect<T extends string>({
   );
 }
 
+/** 编辑冲突（G7）：对方保存的最新一版 */
+interface Conflict extends EditConflictInfo {
+  readonly latest: AftersalesDetail;
+}
+
+/** 修改汇率的输入（按费用项）：初值与正在填的 */
+type RateDrafts = Partial<Record<FeeItem, string>>;
+
 function RegistrationForm({
   registrar,
   stores,
   options,
+  editing,
   onClose,
 }: {
   registrar: CurrentMember;
   stores: readonly StoreOption[];
   options: RegistrationOptions;
+  editing?: Editing;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
   const ids = useId();
   const fieldId = (name: string) => `${ids}-${name.replaceAll('.', '-')}`;
-  const [leaving, setLeaving] = useState(false);
-  const [lookedUpTicket, setLookedUpTicket] = useState('');
+  /** G8：要确认离开时弹窗（编辑时记下当时有几项未保存的修改） */
+  const [leaving, setLeaving] = useState<{ readonly count: number } | null>(null);
+  const [lookedUpTicket, setLookedUpTicket] = useState(editing?.detail.sourceTicket ?? '');
+  /** 编辑登记依据的那一版（「查看最新」后换成最新的） */
+  const [base, setBase] = useState<AftersalesDetail | null>(editing?.detail ?? null);
+  const baseValues = base ? formValuesOf(base) : null;
+  const [conflict, setConflict] = useState<Conflict | null>(null);
+  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
+  /** 修改汇率：没点开为 null；点开后每个非美元费用项一个输入（初值是点开时的汇率） */
+  const [rateDrafts, setRateDrafts] = useState<RateDrafts | null>(null);
+  const [rateStart, setRateStart] = useState<RateDrafts>({});
+  const [rateErrors, setRateErrors] = useState<ApiFieldErrors>({});
+  // 形态按依据的那一版算（「查看最新」后这张单可能已被别人设为已完成）
+  const access: DrawerAccess | 'create' = base ? accessOf(registrar, base) : 'create';
+  const changeRate = base ? actionsOn(registrar, base).changeRate : false;
+  const finance = editing?.finance ?? true;
+  const locked = baseValues && access !== 'create' ? lockedFields(access, baseValues) : () => false;
+  const isLocked = (item: FormItem) => locked(item);
 
   const form = useForm<RegistrationFormValues>({
-    defaultValues: emptyRegistrationForm(businessDate(new Date())),
+    defaultValues: baseValues ?? emptyRegistrationForm(businessDate(new Date())),
     shouldFocusError: false,
   });
-  const { control, register, handleSubmit, formState, setError, clearErrors, setValue, getValues } =
-    form;
+  const {
+    control,
+    register,
+    handleSubmit,
+    formState,
+    setError,
+    clearErrors,
+    setValue,
+    getValues,
+    reset,
+  } = form;
   // formState 是按读取订阅的代理：要在渲染时读
   const { isDirty, errors, submitCount } = formState;
   const [method, storeId, responsibility, ratios, fees, partSku, factory, site, reason, feeDate] =
@@ -322,6 +473,8 @@ function RegistrationForm({
     }),
   );
   const shipping = applicable.has('part');
+  // 生产厂按工厂比例判断是否适用；坐席看不到比例，有登记的生产厂就照样列出
+  const showFactory = applicable.has('factory') || (!finance && Boolean(factory));
   const store = stores.find((s) => s.id === storeId);
   const owners = options.owners;
   const ownerCandidates = ownersForStore(owners, storeId || null);
@@ -332,10 +485,25 @@ function RegistrationForm({
   const needsRates = feeItems.some((item) => fees[item].currency !== 'USD');
   const rates = useQuery({
     ...exchangeRatesQuery(feeDate),
-    enabled: Boolean(feeDate) && needsRates,
+    enabled: Boolean(feeDate) && needsRates && finance,
   });
   const ratesOn = needsRates ? rates.data?.rates : undefined;
-  const total = feeTotalCents(fees, ratesOn);
+  // 编辑登记：费用发生日没改时，原币金额与币种都没改的项沿用原来冻结的汇率与美元值；正在修改的汇率填对了就按它算
+  const overrides: FeeOverrides = {
+    frozen: base && baseValues?.feeDate === feeDate ? (base.fees ?? undefined) : undefined,
+    manual: rateDrafts ?? undefined,
+    feeDate,
+  };
+  const overrideFor = (item: FeeItem) => ({
+    frozen: overrides.frozen?.[item],
+    manual: overrides.manual?.[item],
+    feeDate,
+  });
+  const total = feeTotalCents(fees, ratesOn, overrides);
+  // 有非美元费用项的单才有「修改汇率」这一行（S14 补充小样之三）
+  const foreignItems = feeItems.filter(
+    (item) => fees[item].currency !== 'USD' && fees[item].amount.trim() !== '',
+  );
 
   // 汇率查询失败：G5 失败浮层「查询失败：原因」+「立即重试」（会话失效由全局处理，不弹）；恢复或关闭抽屉时撤掉
   const { isError: ratesFailed, error: ratesError, refetch: refetchRates } = rates;
@@ -354,39 +522,99 @@ function RegistrationForm({
     return () => dismissToast(RATES_TOAST);
   }, [ratesFailed, ratesError, refetchRates]);
 
+  /** 修改汇率里改动过的（随「保存修改」只交这些） */
+  const changedRates = Object.fromEntries(
+    feeItems.flatMap((item) => {
+      const typed = rateDrafts?.[item]?.trim();
+      return typed && typed !== rateStart[item]?.trim() ? [[item, typed]] : [];
+    }),
+  ) as RateDrafts;
+  const rateChangeCount = Object.keys(changedRates).length;
+
   const save = useMutation({
-    mutationFn: (values: RegistrationFormValues) => api.register(registrationInputOf(values)),
+    mutationFn: ({
+      values,
+      version,
+    }: {
+      values: RegistrationFormValues;
+      version?: number;
+    }): Promise<{ number: string; customerName: string | null }> => {
+      if (!base) return api.register(registrationInputOf(values));
+      return api.updateAftersales(base.number, {
+        version: version ?? base.version,
+        changes: access === 'readonly' ? undefined : registrationInputOf(values),
+        rates: rateChangeCount > 0 ? changedRates : undefined,
+      });
+    },
   });
 
-  async function saved(item: LedgerItem) {
+  async function saved(result: { number: string; customerName: string | null }) {
     dismissToast(SAVE_TOAST);
     await queryClient.invalidateQueries({ queryKey: AFTERSALES_QUERY_KEY });
-    showSuccess({
-      title: SAVE_RESULT.savedTitle,
-      description: SAVE_RESULT.savedDescription(item.number, item.customerName ?? ''),
-    });
+    if (!base) {
+      showSuccess({
+        title: SAVE_RESULT.savedTitle,
+        description: SAVE_RESULT.savedDescription(result.number, result.customerName ?? ''),
+      });
+    } else if (access === 'backfill' && baseValues) {
+      const filled = changedFieldLabels(baseValues, getValues());
+      showSuccess({
+        title: BACKFILL_RESULT.title,
+        description:
+          filled.length > 0
+            ? BACKFILL_RESULT.drawer(result.number, filled)
+            : EDIT.savedDescription(result.number, result.customerName ?? ''),
+      });
+    } else {
+      showSuccess({
+        title: EDIT.savedTitle,
+        description: EDIT.savedDescription(result.number, result.customerName ?? ''),
+      });
+    }
     onClose();
+  }
+
+  /** 编辑冲突：取最新的一版，比较对方改了哪些项（G7） */
+  async function showConflict() {
+    if (!base || !baseValues) return;
+    const latest = await queryClient.fetchQuery({ ...aftersalesQuery(base.number), staleTime: 0 });
+    setConflict({
+      latest,
+      who: latest.updatedBy ?? SYSTEM_ACTOR_NAME,
+      at: formatClock(latest.updatedAt),
+      fields: changedFieldLabels(baseValues, formValuesOf(latest)),
+    });
   }
 
   /** 定位到字段（字段都有 id）：等错误横幅与字段下方的报错渲染出来再滚动，处理方式落到第一张卡片 */
   const focusAfterRender = useFocusField();
-  const focusField = (field: RegistrationFormPath) => focusAfterRender(fieldId(field));
+  const focusField = (field: string) => focusAfterRender(fieldId(field));
 
-  /** 保存失败的处理；字段错误留在抽屉里显示，返回 true 表示已处理 */
+  /** 保存失败的处理；字段错误、汇率错误与冲突留在抽屉里显示，返回 true 表示已处理 */
   function handledInDrawer(error: unknown): boolean {
     if (endSessionIfUnauthenticated(queryClient, error)) return true;
-    if (!(error instanceof ApiRequestError) || error.status !== 400 || !error.fields) return false;
+    if (!(error instanceof ApiRequestError)) return false;
+    if (error.status === 409 && base) {
+      void showConflict();
+      return true;
+    }
+    if (error.status !== 400 || !error.fields) return false;
     const fieldErrors = formErrorsOf(error.fields);
     for (const { field, message } of fieldErrors) setError(field, { type: 'server', message });
-    const first = fieldErrors[0];
-    if (first) focusField(first.field);
+    const rateFieldErrors = Object.fromEntries(
+      Object.entries(error.fields).filter(([key]) => key.startsWith('rates.')),
+    );
+    setRateErrors(rateFieldErrors);
+    const first = fieldErrors[0]?.field ?? Object.keys(rateFieldErrors)[0];
+    if (first) focusField(first);
     return true;
   }
 
-  async function submit(values: RegistrationFormValues) {
+  async function submit(values: RegistrationFormValues, version?: number) {
     clearErrors();
+    setRateErrors({});
     try {
-      await saved(await save.mutateAsync(values));
+      await saved(await save.mutateAsync({ values, version }));
     } catch (error) {
       if (handledInDrawer(error)) return;
       showError({
@@ -396,7 +624,7 @@ function RegistrationForm({
         description: SAVE_RESULT.failedDescription,
         retry: async () => {
           try {
-            await saved(await save.mutateAsync(values));
+            await saved(await save.mutateAsync({ values, version }));
           } catch (retryError) {
             if (handledInDrawer(retryError)) return;
             throw retryError;
@@ -408,10 +636,25 @@ function RegistrationForm({
 
   const onSave = handleSubmit((values) => submit(values));
 
-  /** Esc、点遮罩、×、「取消」：有未保存的输入先确认（G8） */
+  /** Esc、点遮罩、×、「取消」：有未保存的输入先确认（G8；编辑时数一数有几项改了，新建看有没有输入） */
   function requestClose() {
-    if (isDirty) setLeaving(true);
+    const count = baseValues
+      ? changedFieldLabels(baseValues, getValues()).length + rateChangeCount
+      : 0;
+    if (baseValues ? count > 0 : isDirty) setLeaving({ count });
     else onClose();
+  }
+
+  /** 点开「修改汇率」：每个非美元费用项预填现在用的汇率（两位小数） */
+  function startRates() {
+    const drafts = Object.fromEntries(
+      foreignItems.flatMap((item) => {
+        const conversion = conversionOf(fees[item], ratesOn, overrideFor(item));
+        return [[item, conversion?.kind === 'converted' ? formatRate(conversion.rate.rate) : '']];
+      }),
+    ) as RateDrafts;
+    setRateStart(drafts);
+    setRateDrafts(drafts);
   }
 
   /** 换店铺：站点取店铺的默认站点；负责人不在新店铺的候选里时换成默认负责人（AC-P1-18） */
@@ -427,13 +670,17 @@ function RegistrationForm({
     clearErrors(['storeId', 'site', 'ownerId', 'sourceTicket']);
   }
 
-  /** 把查到的来源工单带入店铺、站点、订单号（工单有时）、客户 */
+  /** 把查到的来源工单带入店铺、站点、订单号（工单有时）、客户；补登时只带入原来空着的 */
   function applyTicket(ticket: SourceTicket) {
     const ticketStore = stores.find((s) => s.id === ticket.store.id);
-    if (ticketStore) chooseStore(ticketStore, ticket.site);
+    if (ticketStore && !isLocked('storeId')) chooseStore(ticketStore, ticket.site);
     setValue('sourceTicket', ticket.number, { shouldDirty: true });
-    if (ticket.orderNumber) setValue('orderNumber', ticket.orderNumber, { shouldDirty: true });
-    setValue('customerName', ticket.customerName, { shouldDirty: true });
+    if (ticket.orderNumber && !isLocked('orderNumber')) {
+      setValue('orderNumber', ticket.orderNumber, { shouldDirty: true });
+    }
+    if (!isLocked('customerName')) {
+      setValue('customerName', ticket.customerName, { shouldDirty: true });
+    }
     clearErrors(['orderNumber', 'customerName']);
   }
 
@@ -505,7 +752,7 @@ function RegistrationForm({
   const describedBy = (field: RegistrationFormPath) =>
     errorOf(field) ? `${fieldId(field)}-error` : undefined;
 
-  /** 抽屉里的下拉（同一套写法：错误写在下方，改了就撤掉这个字段的错误） */
+  /** 抽屉里的下拉（同一套写法：错误写在下方，改了就撤掉这个字段的错误；锁定的项禁用） */
   const select = <T extends string>(
     name: SelectField,
     values: readonly T[],
@@ -519,7 +766,7 @@ function RegistrationForm({
       values={values}
       labelOf={labelOf}
       invalid={Boolean(errorOf(name))}
-      disabled={extra.disabled}
+      disabled={extra.disabled || isLocked(name)}
       onPick={extra.onPick}
       onChanged={() => clearErrors(name)}
     />
@@ -533,6 +780,7 @@ function RegistrationForm({
       id={fieldId(field)}
       autoComplete="off"
       placeholder={extra.placeholder}
+      disabled={isLocked(field)}
       className={extra.mono ? 'tabular-nums' : undefined}
       aria-invalid={errorOf(field) ? true : undefined}
       aria-describedby={describedBy(field)}
@@ -551,12 +799,28 @@ function RegistrationForm({
     (id) => DRAWER.ownerOption(owners.find((o) => o.id === id)?.name ?? ''),
     { disabled: !storeId },
   );
+  // 负责人旁的灰字：新建时写怎么默认的；编辑登记不再默认，只在有几位可选时说明范围
+  const ownerHint = base
+    ? note === 'choose' || note === 'none'
+      ? DRAWER.ownerNotes[note]
+      : undefined
+    : DRAWER.ownerNotes[note] || undefined;
   const factoryNote =
     method === 'send_parts' && part && factory === part.factory
       ? DRAWER.factoryFromPart(part.sku)
       : DRAWER.factoryRequired;
   // 寄件一节只有寄配件才有，费用一节的序号随之是 5 或 4（原型 S14 的两种画面）
   const feesSection = shipping ? 5 : 4;
+  // 只读且没在改汇率：底部只有「关闭」（S14 补充小样之三）
+  const savable = access !== 'readonly' || rateDrafts !== null;
+  const errorCount = shown.length + Object.keys(rateErrors).length;
+  const firstRateError = Object.keys(rateErrors)[0]?.slice('rates.'.length) as FeeItem | undefined;
+  const firstError = shown[0]
+    ? fieldLabel(shown[0].field)
+    : firstRateError
+      ? feeItemLabels[firstRateError]
+      : '';
+  const rateLineState = rateDrafts ? 'editing' : changeRate ? 'idle' : 'denied';
 
   return (
     <Sheet
@@ -566,28 +830,64 @@ function RegistrationForm({
       }}
     >
       <SheetContent className="w-160">
-        <SheetHeader title={DRAWER.createTitle} description={DRAWER.description} />
+        <SheetHeader
+          title={base ? EDIT.title(base.number) : DRAWER.createTitle}
+          description={base ? EDIT.description : DRAWER.description}
+        />
         <form
           noValidate
           className="flex min-h-0 flex-1 flex-col"
           onSubmit={(event) => void onSave(event)}
         >
-          {shown.length > 0 && submitCount > 0 && (
+          {errorCount > 0 && submitCount > 0 && (
             <div className="shrink-0 px-5 pt-3.5">
               <Alert
                 tone="danger"
-                title={DRAWER.errorsTitle(shown.length)}
-                description={DRAWER.errorsDescription(fieldLabel(shown[0]!.field))}
+                title={DRAWER.errorsTitle(errorCount)}
+                description={
+                  base ? EDIT.errorsDescription(firstError) : DRAWER.errorsDescription(firstError)
+                }
               />
             </div>
           )}
           <SheetBody className="gap-3">
+            {conflict && (
+              <EditConflictAlert
+                conflict={conflict}
+                onReload={() => {
+                  setBase(conflict.latest);
+                  reset(formValuesOf(conflict.latest));
+                  setRateDrafts(null);
+                  setRateErrors({});
+                  setConflict(null);
+                }}
+                onOverwrite={() => setConfirmOverwrite(true)}
+              />
+            )}
+            {base && (
+              // 顶部状态行（原型 edit_drawer）：状态徽标 · 客户 · 店铺与站点 · 处理方式 · 负责人
+              <div className="flex items-center gap-2">
+                <AftersalesStatusBadge status={base.status} />
+                <span className="text-12 text-ink-2">
+                  {EDIT.summary(
+                    base.customerName ?? EMPTY_VALUE,
+                    storeSite(base.store.name, base.site),
+                    base.method ? handlingMethodLabels[base.method] : EMPTY_VALUE,
+                  )}
+                </span>
+                {base.owner && (
+                  <span className="text-12 text-subtle-foreground">
+                    {EDIT.owner(base.owner.name)}
+                  </span>
+                )}
+              </div>
+            )}
             <FormSection
               n={1}
               title={DRAWER.sections.method}
               required
               note={DRAWER.sections.methodNote}
-              first
+              first={!base}
             >
               <Controller
                 control={control}
@@ -601,6 +901,7 @@ function RegistrationForm({
                     aria-label={DRAWER.sections.method}
                     aria-invalid={fieldState.invalid || undefined}
                     aria-describedby={describedBy('method')}
+                    disabled={isLocked('method')}
                     value={field.value}
                     onValueChange={(value) => {
                       field.onChange(value);
@@ -678,6 +979,7 @@ function RegistrationForm({
                     id={fieldId('sourceTicket')}
                     autoComplete="off"
                     className="tabular-nums"
+                    disabled={isLocked('sourceTicket')}
                     aria-invalid={errorOf('sourceTicket') ? true : undefined}
                     aria-describedby={describedBy('sourceTicket')}
                     {...register('sourceTicket', {
@@ -701,6 +1003,7 @@ function RegistrationForm({
                         ref={field.ref}
                         value={field.value}
                         invalid={fieldState.invalid}
+                        disabled={isLocked('feeDate')}
                         onChange={(value) => {
                           field.onChange(value);
                           clearErrors('feeDate');
@@ -714,7 +1017,7 @@ function RegistrationForm({
                     label={DRAWER.labels.ownerId}
                     htmlFor={fieldId('ownerId')}
                     required
-                    note={DRAWER.ownerNotes[note] || undefined}
+                    note={ownerHint}
                     error={errorOf('ownerId')}
                   >
                     {storeId ? (
@@ -751,7 +1054,7 @@ function RegistrationForm({
                     })}
                   </FormField>
                 </div>
-                {applicable.has('factory') && (
+                {showFactory && (
                   <div className="col-span-2">
                     <FormField
                       label={DRAWER.labels.factory}
@@ -808,6 +1111,7 @@ function RegistrationForm({
                     maxLength={RESPONSIBILITY_REASON_MAX}
                     placeholder={DRAWER.reasonPlaceholder}
                     counter={DRAWER.reasonCounter(reason.length, RESPONSIBILITY_REASON_MAX)}
+                    disabled={isLocked('responsibilityReason')}
                     aria-invalid={errorOf('responsibilityReason') ? true : undefined}
                     aria-describedby={describedBy('responsibilityReason')}
                     {...register('responsibilityReason', {
@@ -816,26 +1120,29 @@ function RegistrationForm({
                   />
                 </FormField>
               )}
-              <div className="flex flex-col gap-1.5">
-                <Label required note={DRAWER.ratioNote}>
-                  {DRAWER.labels.ratios}
-                </Label>
-                <RatioTable
-                  idOf={(group, side) => fieldId(`ratios.${group}.${side}`)}
-                  ratios={ratios}
-                  groupAmounts={groupCents(fees, ratesOn)}
-                  errors={Object.fromEntries(
-                    ratioGroups.map((group) => [
-                      group,
-                      {
-                        fsh: errorOf(`ratios.${group}.fsh`),
-                        factory: errorOf(`ratios.${group}.factory`),
-                      },
-                    ]),
-                  )}
-                  onChange={changeRatio}
-                />
-              </div>
+              {finance && (
+                <div className="flex flex-col gap-1.5">
+                  <Label required note={DRAWER.ratioNote}>
+                    {DRAWER.labels.ratios}
+                  </Label>
+                  <RatioTable
+                    idOf={(group, side) => fieldId(`ratios.${group}.${side}`)}
+                    ratios={ratios}
+                    groupAmounts={groupCents(fees, ratesOn, overrides)}
+                    disabled={isLocked('ratios')}
+                    errors={Object.fromEntries(
+                      ratioGroups.map((group) => [
+                        group,
+                        {
+                          fsh: errorOf(`ratios.${group}.fsh`),
+                          factory: errorOf(`ratios.${group}.factory`),
+                        },
+                      ]),
+                    )}
+                    onChange={changeRatio}
+                  />
+                </div>
+              )}
             </FormSection>
 
             {shipping && (
@@ -864,7 +1171,9 @@ function RegistrationForm({
                           onPick: (sku) => {
                             setValue('partSku', sku, { shouldDirty: true });
                             const picked = options.parts.find((p) => p.sku === sku);
-                            if (picked) setValue('factory', picked.factory, { shouldDirty: true });
+                            if (picked && !isLocked('factory')) {
+                              setValue('factory', picked.factory, { shouldDirty: true });
+                            }
                             clearErrors('factory');
                           },
                         },
@@ -882,6 +1191,7 @@ function RegistrationForm({
                       inputMode="numeric"
                       autoComplete="off"
                       suffix={DRAWER.quantitySuffix}
+                      disabled={isLocked('partQuantity')}
                       aria-invalid={errorOf('partQuantity') ? true : undefined}
                       aria-describedby={describedBy('partQuantity')}
                       {...register('partQuantity', {
@@ -924,6 +1234,7 @@ function RegistrationForm({
                           value={field.value}
                           placeholder={DRAWER.afterShipping}
                           invalid={fieldState.invalid}
+                          disabled={isLocked('shipDate')}
                           onChange={(value) => {
                             field.onChange(value);
                             clearErrors('shipDate');
@@ -949,74 +1260,135 @@ function RegistrationForm({
               </FormSection>
             )}
 
-            <FormSection
-              n={feesSection}
-              title={DRAWER.sections.fees}
-              note={DRAWER.sections.feeTotal(total === null ? EMPTY_VALUE : formatUsdCents(total))}
-            >
-              <div
-                className={cn('grid items-start gap-2.5', shipping ? 'grid-cols-4' : 'grid-cols-2')}
+            {finance && (
+              <FormSection
+                n={feesSection}
+                title={DRAWER.sections.fees}
+                note={DRAWER.sections.feeTotal(
+                  total === null ? EMPTY_VALUE : formatUsdCents(total),
+                )}
               >
-                {feeItems.map((item) => {
-                  const path = `fees.${item}.amount` as const;
-                  return (
-                    <FormField
-                      key={item}
-                      label={feeItemLabels[item]}
-                      htmlFor={fieldId(path)}
-                      required
-                      hint={conversionHint(conversionOf(fees[item], ratesOn), fees[item].currency)}
-                      error={errorOf(path)}
-                    >
-                      <Controller
-                        control={control}
-                        name={`fees.${item}`}
-                        render={({ field }) => (
-                          <MoneyInput
-                            id={fieldId(path)}
+                <div
+                  className={cn(
+                    'grid items-start gap-2.5',
+                    shipping ? 'grid-cols-4' : 'grid-cols-2',
+                  )}
+                >
+                  {feeItems.map((item) => {
+                    const path = `fees.${item}.amount` as const;
+                    const editingRate = rateDrafts !== null && foreignItems.includes(item);
+                    return (
+                      <FormField
+                        key={item}
+                        label={feeItemLabels[item]}
+                        htmlFor={fieldId(path)}
+                        required
+                        hint={
+                          editingRate
+                            ? undefined
+                            : conversionHint(
+                                conversionOf(fees[item], ratesOn, overrideFor(item)),
+                                fees[item].currency,
+                              )
+                        }
+                        error={errorOf(path)}
+                      >
+                        <Controller
+                          control={control}
+                          name={`fees.${item}`}
+                          render={({ field }) => (
+                            <MoneyInput
+                              id={fieldId(path)}
+                              label={feeItemLabels[item]}
+                              value={field.value}
+                              invalid={Boolean(errorOf(path))}
+                              disabled={isLocked(`fees.${item}`)}
+                              onChange={(value) => {
+                                field.onChange(value);
+                                clearErrors(path);
+                              }}
+                            />
+                          )}
+                        />
+                        {editingRate && (
+                          <RateInput
+                            id={fieldId(`rates.${item}`)}
                             label={feeItemLabels[item]}
-                            value={field.value}
-                            invalid={Boolean(errorOf(path))}
+                            currency={fees[item].currency}
+                            value={rateDrafts[item] ?? ''}
+                            error={rateErrors[`rates.${item}`]}
                             onChange={(value) => {
-                              field.onChange(value);
-                              clearErrors(path);
+                              setRateDrafts({ ...rateDrafts, [item]: value });
+                              setRateErrors({});
                             }}
                           />
                         )}
-                      />
-                    </FormField>
-                  );
-                })}
-              </div>
-              <p className="text-12 leading-normal text-muted-foreground">{DRAWER.feesHint}</p>
-            </FormSection>
+                      </FormField>
+                    );
+                  })}
+                </div>
+                {base ? (
+                  foreignItems.length > 0 && <RateLine state={rateLineState} onStart={startRates} />
+                ) : (
+                  <p className="text-12 leading-normal text-muted-foreground">{DRAWER.feesHint}</p>
+                )}
+              </FormSection>
+            )}
           </SheetBody>
-          <SheetFooter className="items-center">
-            <span className="mr-auto text-12 text-subtle-foreground">
-              {shown.length > 0 ? DRAWER.footerNoteWithErrors : DRAWER.footerNote}
-            </span>
-            <Button type="button" variant="outline" onClick={requestClose}>
-              {DRAWER.cancel}
-            </Button>
-            <Button type="submit" loading={save.isPending}>
-              <Check />
-              {DRAWER.save}
-            </Button>
-          </SheetFooter>
+          {savable ? (
+            <SheetFooter className="items-center">
+              <span className="mr-auto text-12 text-subtle-foreground">
+                {errorCount > 0
+                  ? DRAWER.footerNoteWithErrors
+                  : base
+                    ? EDIT.footerNote
+                    : DRAWER.footerNote}
+              </span>
+              <Button type="button" variant="outline" onClick={requestClose}>
+                {DRAWER.cancel}
+              </Button>
+              <Button type="submit" loading={save.isPending}>
+                <Check />
+                {base ? EDIT.save : DRAWER.save}
+              </Button>
+            </SheetFooter>
+          ) : (
+            <SheetFooter>
+              <Button type="button" variant="outline" onClick={onClose}>
+                {EDIT.close}
+              </Button>
+            </SheetFooter>
+          )}
         </form>
       </SheetContent>
 
       <UnsavedChangesDialog
-        open={leaving}
-        onOpenChange={setLeaving}
-        description={LEAVE}
+        open={leaving !== null}
+        onOpenChange={(open) => {
+          if (!open) setLeaving(null);
+        }}
+        description={base ? EDIT.leave(leaving?.count ?? 0) : LEAVE}
         onDiscard={() => {
-          setLeaving(false);
+          setLeaving(null);
           onClose();
         }}
         onSaveAndLeave={() => {
-          setLeaving(false);
+          setLeaving(null);
           void onSave();
+        }}
+      />
+      <OverwriteDialog
+        conflict={conflict}
+        open={confirmOverwrite}
+        onOpenChange={setConfirmOverwrite}
+        pending={save.isPending}
+        onConfirm={() => {
+          const latest = conflict?.latest;
+          if (!latest) return;
+          setConfirmOverwrite(false);
+          setConflict(null);
+          setBase(latest);
+          void submit(getValues(), latest.version);
         }}
       />
     </Sheet>

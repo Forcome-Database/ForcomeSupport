@@ -1,13 +1,25 @@
 // 入口：worker（后台任务）。消费各模块注册的任务、运行常驻拉取（Gmail 推送等），做 pg-boss 维护与定时（ADR 0008）。
 import type { ServerDeps } from './deps';
 import { createFeeds, createJobHandlers } from './jobs';
-import { createLogger, loadConfig, startFeeds, startRuntime, startWorker } from './modules/core';
+import {
+  createLogger,
+  loadConfig,
+  startFeeds,
+  startingAt,
+  startRuntime,
+  startWorker,
+} from './modules/core';
 import { createIntegrationClients } from './modules/integration';
 import { onShutdown } from './shutdown';
 
 const config = loadConfig();
 const logger = createLogger({ level: config.logLevel, name: 'worker' });
-const { runtime, stop } = await startRuntime(config.databaseUrl, { role: 'worker', logger });
+const { runtime, stop } = await startRuntime(config.databaseUrl, {
+  role: 'worker',
+  logger,
+  // 非生产环境可设起始时刻（CLOCK_START），截图与演示对上原型的演示时刻
+  clock: config.clockStart ? startingAt(config.clockStart) : undefined,
+});
 
 const deps: ServerDeps = { runtime, logger, config, clients: createIntegrationClients(config) };
 const handlers = createJobHandlers(deps);

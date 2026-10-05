@@ -1,11 +1,15 @@
 import { readFileSync } from 'node:fs';
 import {
   aftersalesStatusLabels,
+  completionLabel,
   feeItemLabels,
   formatMoney,
   formatRate,
   formatRateDate,
   handlingMethodLabels,
+  ledgerActionMessages,
+  missingItemLabels,
+  rateChangeMessages,
   ratioGroupLabels,
   registrationMessages,
   responsibilityLabels,
@@ -13,18 +17,27 @@ import {
 import { describe, expect, it } from 'vitest';
 import { pages } from '@/lib/pages';
 import {
+  BACKFILL_RESULT,
+  CANCEL,
   COLUMNS,
+  COMPLETE_RESULT,
+  COMPLETION,
   DRAWER,
+  EDIT,
   EMPTY_TITLE,
   EMPTY_VALUE,
   FINANCE_COLUMNS,
   FOREIGN_AMOUNT,
   LEAVE,
+  MISSING,
+  MISSING_FILTER,
+  MORE,
   NEW_REGISTRATION,
   PAGE_DESCRIPTION,
   PAGE_TITLE,
   SAVE_RESULT,
   LOOKUP,
+  STALE,
   storeSite,
 } from './p13-copy';
 
@@ -258,5 +271,131 @@ describe('S14 补充小样（第一阶段实现时确认，10-05 用户确认）
     expectIn(STATES, SAVE_RESULT.failedDescription);
     expectIn(STATES, `>${LOOKUP.failedAction}失败：网络不可用<`);
     expectIn(STATES, LEAVE);
+  });
+});
+
+describe('S13 页头完整率、「缺 N 项」与「待回填」（第一期参照页，待办 21）', () => {
+  it('完整率：「9 月登记完整率 87.5% · 7 / 8 · 目标 ≥ 98% | 筛出缺字段的 1 单」，悬停说明口径；坐席照常显示', () => {
+    const completion = { month: '2026-09', completed: 8, complete: 7 };
+    for (const page of [P13, P13_AGENT]) {
+      expectText(page, COMPLETION.label(9));
+      expectText(page, completionLabel(completion) ?? '');
+      expectText(page, COMPLETION.ratio(7, 8));
+      expectText(page, COMPLETION.target);
+      expectIn(page, `>${COMPLETION.filter(1)}<`);
+      expectIn(page, `title="${COMPLETION.title}"`);
+    }
+  });
+
+  it('S-20260909-0016 缺快递单号：「缺 1 项」悬停列出缺的字段，单元格「待回填」，售后负责人旁边「补登」、坐席没有', () => {
+    for (const page of [P13, P13_AGENT]) {
+      expectText(page, MISSING.badge(1));
+      expectIn(page, `title="${MISSING.title(missingItemLabels(['trackingNumber']))}"`);
+      expectText(page, MISSING.pending);
+    }
+    expectText(P13, MISSING.backfill);
+    expect(P13_AGENT.includes(`>${MISSING.backfill}<`)).toBe(false);
+  });
+});
+
+describe('S15 设为已完成、取消与补登（待办 21）', () => {
+  it('行尾「更多」、设为已完成的撤销浮层（S-20260911-0018 缺寄出日期、快递单号）', () => {
+    expectIn(STATES, `>${MORE.complete}</div>`);
+    expectIn(STATES, `>${MORE.cancel}</div>`);
+    expectText(STATES, COMPLETE_RESULT.title('S-20260911-0018'));
+    expectText(
+      STATES,
+      COMPLETE_RESULT.missing(missingItemLabels(['shipDate', 'trackingNumber']).length),
+    );
+    expectText(STATES, COMPLETION.label(9));
+    expectText(STATES, '77.8%');
+  });
+
+  it('取消售后单的二次确认（S-20260911-0021）', () => {
+    expectText(STATES, CANCEL.title('S-20260911-0021'));
+    expectIn(STATES, `>${CANCEL.description('Marcus Lee', '寄配件', '物流问题')}`);
+    expectIn(STATES, `>${CANCEL.reason}<`);
+    expectIn(STATES, CANCEL.reasonPlaceholder);
+    expectText(STATES, CANCEL.fees);
+    expectText(STATES, CANCEL.feesDefault);
+    expectText(STATES, CANCEL.keptTotal('09-11'));
+    for (const note of CANCEL.notes) expectIn(STATES, `>${note}<`);
+    expectText(STATES, CANCEL.dismiss);
+    expectText(STATES, CANCEL.confirm);
+    for (const fee of ['productCost', 'freight', 'compensation', 'otherCost'] as const) {
+      expectIn(STATES, `>${feeItemLabels[fee]}</div>`);
+    }
+  });
+
+  it('行内补登（S-20260909-0016）：「保存」、补登浮层，补完后完整率「无缺字段的单」', () => {
+    expectText(STATES, MISSING.save);
+    expectText(STATES, BACKFILL_RESULT.title);
+    expectIn(STATES, BACKFILL_RESULT.inline('S-20260909-0016', '1Z4R28830358229088'));
+    expectText(STATES, COMPLETION.allComplete);
+  });
+});
+
+describe('S15 补充小样（第一阶段实现时确认，10-05 用户确认）', () => {
+  it('当月没有已完成的单：「—」与「0 / 0」，右侧不写筛出', () => {
+    expectText(STATES, COMPLETION.label(10));
+    expectText(STATES, COMPLETION.empty);
+    expectText(STATES, COMPLETION.ratio(0, 0));
+  });
+
+  it('筛出缺字段后的筛选芯片与「清除筛选」', () => {
+    expectIn(STATES, `${MISSING_FILTER.label}<span`);
+    expectIn(STATES, `>${MISSING_FILTER.month(9)}</span>`);
+    expectIn(STATES, `title="${MISSING_FILTER.remove}"`);
+    expectText(STATES, MISSING_FILTER.clear);
+  });
+
+  it('「缺 N 项」悬停、「更多」不可用的原因、行内补登为空时「保存」禁用的原因', () => {
+    expectIn(STATES, `>${MISSING.title(missingItemLabels(['shipDate', 'trackingNumber']))}<`);
+    const { cancelled, ...drawn } = MORE.reasons;
+    for (const reason of Object.values(drawn)) expectText(STATES, reason);
+    // 已取消的单两项都写「这张单已取消」：小样没单独画，写在这一组的图注里
+    expectIn(STATES, `「${cancelled}」`);
+    expectText(STATES, MISSING.saveNeedsValue);
+  });
+
+  it('设为已完成不缺字段时只写标题；撤销失败、数据已被他人修改的失败浮层；取消成功与原因必填', () => {
+    expectText(STATES, COMPLETE_RESULT.title('S-20260911-0020'));
+    // 失败浮层的标题由 notify 拼成「<动作>失败：原因」，原因是接口的说明
+    expectText(
+      STATES,
+      `${COMPLETE_RESULT.undoFailedAction}失败：${ledgerActionMessages.undoExpired}`,
+    );
+    expectText(STATES, `${COMPLETE_RESULT.failedAction}失败：数据已被他人修改`);
+    expectText(STATES, STALE);
+    expectText(STATES, CANCEL.doneTitle('S-20260911-0021'));
+    expectText(STATES, CANCEL.doneDescription);
+    expectIn(STATES, `${ledgerActionMessages.reasonMissing}<`);
+  });
+});
+
+describe('S14 编辑登记与补充小样之三（待办 21，10-05 用户确认）', () => {
+  it('编辑登记抽屉（S-20260911-0020）：标题、说明、顶部状态行、修改汇率、底部', () => {
+    expectText(STATES, EDIT.title('S-20260911-0020'));
+    expectText(STATES, EDIT.description);
+    expectText(
+      STATES,
+      EDIT.summary('Mateo Rivas', storeSite('Forcome Direct', 'MX'), '退款或部分补偿'),
+    );
+    expectText(STATES, EDIT.owner('王磊'));
+    expectIn(STATES, `>${EDIT.rateLink}<`);
+    expectText(STATES, EDIT.rateNote);
+    expectText(STATES, EDIT.footerNote);
+    expectIn(STATES, `>${EDIT.save}</div>`);
+  });
+
+  it('三种形态、修改汇率点开后、汇率报错、不是售后负责人、G8 与保存结果', () => {
+    expectIn(STATES, `>${EDIT.close}</div>`);
+    expectText(STATES, EDIT.ratePrefix);
+    expectText(STATES, rateChangeMessages.rateFormat);
+    expectText(STATES, EDIT.rateDenied);
+    expectIn(STATES, EDIT.leave(2));
+    expectText(STATES, EDIT.savedTitle);
+    expectIn(STATES, EDIT.savedDescription('S-20260911-0020', 'Mateo Rivas'));
+    expectIn(STATES, BACKFILL_RESULT.drawer('S-20260911-0018', ['寄出日期', '快递单号']));
   });
 });

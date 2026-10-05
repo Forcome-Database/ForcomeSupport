@@ -4,7 +4,7 @@
 export { AccessDeniedError } from './access-denied';
 export { FieldValidationError } from './field-validation';
 export { recordAudit, systemActor, type Actor, type AuditEntry } from './audit';
-export { ManualClock, systemClock, type Clock, type Duration } from './clock';
+export { ManualClock, startingAt, systemClock, type Clock, type Duration } from './clock';
 export {
   amount,
   currency,

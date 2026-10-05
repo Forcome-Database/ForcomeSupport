@@ -10,6 +10,7 @@ import {
 } from '@forcome/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   date,
   index,
@@ -64,8 +65,11 @@ export const aftersales = aftersalesSchema.table(
     ownerId: uuid('owner_id'),
     /** 费用发生日（北京时间的日期）：售后成本按它归期，汇率按它取（R-AS-08） */
     feeDate: date('fee_date', { mode: 'string' }),
-    /** 完成时间：设为已完成时记（21），完整率按它归月 */
+    /** 完成时间：设为已完成时记（待办 21；撤销时清空），完整率按它归月（北京时间） */
     completedAt: timestamptz('completed_at'),
+    /** 取消（已取消的单，AC-AS-16）：原因与时刻 */
+    cancelReason: text('cancel_reason'),
+    cancelledAt: timestamptz('cancelled_at'),
     method: text('method', { enum: handlingMethods }),
     responsibility: text('responsibility', { enum: responsibilities }),
     /** 责任理由（责任为「其他」时） */
@@ -90,17 +94,38 @@ export const aftersales = aftersalesSchema.table(
     productFactoryPct: pct('product_factory_pct'),
     freightFactoryPct: pct('freight_factory_pct'),
     otherFactoryPct: pct('other_factory_pct'),
+    // 取消时确认保留的已产生费用（一个费用项一列，键为 `${费用项}Kept`）：只在已取消的单上有值，没登记的项为空；
+    // 保留的照常计入售后成本，没保留的不计（R-AS-08，售后成本视图随 22），原登记额仍在费用列里（悬停显示）
+    productCostKept: boolean('product_cost_kept'),
+    freightKept: boolean('freight_kept'),
+    compensationKept: boolean('compensation_kept'),
+    otherCostKept: boolean('other_cost_kept'),
     createdAt: timestamptz('created_at').notNull(),
     updatedAt: timestamptz('updated_at').notNull(),
+    /** 最近一次保存的人（姓名快照；系统写入为空），G7「这条记录刚被某人修改」用 */
+    updatedByName: text('updated_by_name'),
     version: version(),
   },
   (t) => [
     unique('aftersales_number_key').on(t.number),
     index('aftersales_store_fee_date_idx').on(t.storeId, t.feeDate),
+    // 当月登记完整率按完成时间取已完成的单（R-AS-08）
+    index('aftersales_completed_at_idx').on(t.completedAt),
     pctCheck('aftersales_product_factory_pct_check', t.productFactoryPct),
     pctCheck('aftersales_freight_factory_pct_check', t.freightFactoryPct),
     pctCheck('aftersales_other_factory_pct_check', t.otherFactoryPct),
     check('aftersales_part_quantity_check', sql`${t.partQuantity} BETWEEN 1 AND 10`),
+    // 6.5「第一阶段台账状态」：只有已完成的单有完成时间，只有已取消的单有取消原因、时刻与保留的费用项
+    check(
+      'aftersales_completed_at_check',
+      sql`${t.status} = 'completed' OR ${t.completedAt} IS NULL`,
+    ),
+    check(
+      'aftersales_cancellation_check',
+      sql`${t.status} = 'cancelled' OR (${t.cancelReason} IS NULL AND ${t.cancelledAt} IS NULL
+        AND ${t.productCostKept} IS NULL AND ${t.freightKept} IS NULL
+        AND ${t.compensationKept} IS NULL AND ${t.otherCostKept} IS NULL)`,
+    ),
     ...feeChecks('aftersales_product_cost', t, 'productCost'),
     ...feeChecks('aftersales_freight', t, 'freight'),
     ...feeChecks('aftersales_compensation', t, 'compensation'),

@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { storeScopeSchema } from './auth';
-import { siteSchema, type FieldErrors } from './channel';
+import { can } from './capabilities';
+import { siteSchema, type FieldErrors, type Site } from './channel';
 import { exchangeRateSchema } from './exchange-rate';
 import { financeField } from './finance';
 import { currencySchema } from './money';
+import type { Role } from './roles';
 
 /*
  * 售后单与登记台账（PRD 11.1 AfterSales、6.5「第一阶段台账状态」、R-AS-01、R-AS-02、R-AS-08、P13「第一阶段」、S14）。
@@ -209,6 +211,99 @@ export function applicableFields(input: ApplicabilityInput): RegistrationField[]
   });
 }
 
+// ---------------------------------------------------------------- R-AS-08 缺失字段（「适用字段是否齐全」）
+
+/**
+ * 判断缺失字段要看的已登记内容（一张售后单；没填为 null）。后端从售后单表读出，前端不自己算（坐席拿不到费用与比例），
+ * 台账每行带着后端算好的结果（ledgerItemSchema 的 missing）。
+ */
+export interface RegistrationRecord {
+  readonly method: HandlingMethod | null;
+  readonly storeId: string | null;
+  readonly site: Site | null;
+  readonly orderNumber: string | null;
+  readonly customerName: string | null;
+  readonly feeDate: string | null;
+  readonly ownerId: string | null;
+  readonly responsibility: Responsibility | null;
+  readonly responsibilityReason: string | null;
+  readonly factory: string | null;
+  readonly claimTarget: ClaimTarget | null;
+  readonly claimStatus: ClaimStatus | null;
+  /** 配件 × 数量（「配件 × 数量」算一项：配件或数量没填都算缺） */
+  readonly part: { readonly sku: string; readonly quantity: number | null } | null;
+  readonly shipper: Shipper | null;
+  readonly carrier: string | null;
+  readonly shipDate: string | null;
+  readonly trackingNumber: string | null;
+  /** 三组工厂比例；没登记（历史导入）为 null */
+  readonly factoryRatios: FactoryRatios | null;
+  /** 四个费用项的原币金额（两位小数）；没登记为 null，0 也算登记了 */
+  readonly fees: Readonly<Record<FeeItem, string | null>>;
+}
+
+const filledText = (value: string | null) => value !== null && value.trim() !== '';
+
+/** 一个适用字段在这张单上是否已填（R-AS-08：费用项填 0 视为已填；「退款或部分补偿」的额外赔偿须大于 0） */
+function isFilled(record: RegistrationRecord, field: RegistrationField): boolean {
+  switch (field) {
+    case 'orderNumber':
+    case 'customerName':
+    case 'responsibilityReason':
+    case 'carrier':
+    case 'trackingNumber':
+      return filledText(record[field]);
+    case 'ratios':
+      return record.factoryRatios !== null;
+    case 'part':
+      return record.part !== null && record.part.quantity !== null;
+    case 'fees.productCost':
+    case 'fees.freight':
+    case 'fees.otherCost':
+      return record.fees[feeItemOf(field)] !== null;
+    case 'fees.compensation': {
+      const amount = record.fees.compensation;
+      if (amount === null) return false;
+      return record.method !== 'refund_or_compensation' || Number(amount) > 0;
+    }
+    default:
+      return record[field] !== null;
+  }
+}
+
+function feeItemOf(field: `fees.${FeeItem}`): FeeItem {
+  return field.slice('fees.'.length) as FeeItem;
+}
+
+/**
+ * 「适用字段是否齐全」（R-AS-08 必填矩阵，前后端共用）：这张单缺的适用字段，按抽屉顺序；齐全时为空。
+ * 适用与否看处理方式、责任类型与工厂比例（applicableFields）：不适用的字段空着不算缺。
+ * 台账「待回填」标黄与「缺 N 项」只对已完成的单生效，进行中的单缺字段显示「—」（AC-AS-22）；完整率按它判断齐全。
+ */
+export function missingFields(record: RegistrationRecord): RegistrationField[] {
+  return applicableFields({
+    method: record.method,
+    responsibility: record.responsibility,
+    factoryRatios: record.factoryRatios,
+  }).filter((field) => !isFilled(record, field));
+}
+
+/** 「缺 N 项」里索赔两项合算一项（原型 data.ledger_missing 的「索赔对象与状态」） */
+const CLAIM_ITEM = '索赔对象与状态';
+
+/**
+ * 「缺 N 项」的各项（悬停「缺：…」的字段名，项数即 N）：字段名同抽屉，「配件 × 数量」算一项，
+ * 索赔对象与索赔状态合算一项「索赔对象与状态」（原型 data.ledger_missing）
+ */
+export function missingItemLabels(fields: readonly RegistrationField[]): string[] {
+  const labels = fields.map((field) =>
+    field === 'claimTarget' || field === 'claimStatus'
+      ? CLAIM_ITEM
+      : registrationFieldLabels[field],
+  );
+  return [...new Set(labels)];
+}
+
 // ---------------------------------------------------------------- 新建登记的输入与校验
 
 /** 一侧的比例：抽屉里两侧都能填，改一侧另一侧自动补足 100；没填、或另一侧填错时为 null */
@@ -407,7 +502,12 @@ function isPositiveAmount(amount: string | null): boolean {
  * 理由只属于「其他」，索赔只属于物流问题，生产厂只在有工厂比例时）。不适用字段在抽屉里不显示，提交时也不保存。
  */
 export function normalizeRegistration(raw: RegistrationInput): RegistrationInput {
-  const input: RegistrationInput = {
+  return clearInapplicable(tidyRegistration(raw));
+}
+
+/** 只整理写法（去首尾空白、空金额为 null、金额两位小数、来源工单大写），不清空不适用的字段 */
+export function tidyRegistration(raw: RegistrationInput): RegistrationInput {
+  return {
     ...raw,
     orderNumber: raw.orderNumber.trim(),
     customerName: raw.customerName.trim(),
@@ -424,6 +524,10 @@ export function normalizeRegistration(raw: RegistrationInput): RegistrationInput
       otherCost: normalizeFee(raw.fees.otherCost),
     },
   };
+}
+
+/** 清空不适用的字段（R-AS-08，按处理方式、责任类型与工厂比例） */
+export function clearInapplicable(input: RegistrationInput): RegistrationInput {
   const applicable = new Set(
     applicableFields({
       method: input.method,
@@ -560,6 +664,89 @@ export function defaultOwnerId(
   return candidates.length === 1 ? (candidates[0]?.id ?? null) : null;
 }
 
+// ---------------------------------------------------------------- 状态与权限（6.5「第一阶段台账状态」、10.1）
+
+/** 设为已完成后可撤销的秒数（S15 ①、G5 撤销浮层；服务端另留网络延迟的余量） */
+export const COMPLETE_UNDO_SECONDS = 5;
+
+/** 一张单上能做的事：编辑（进行中）· 设为已完成 · 取消 · 补登（已完成）· 修改汇率 */
+export interface AftersalesActions {
+  readonly edit: boolean;
+  readonly complete: boolean;
+  readonly cancel: boolean;
+  readonly backfill: boolean;
+  readonly changeRate: boolean;
+}
+
+/** 判断权限要看的：单的状态、登记人与负责人 */
+export interface AftersalesActionTarget {
+  readonly status: AftersalesStatus;
+  readonly registeredById: string | null;
+  readonly ownerId: string | null;
+}
+
+/**
+ * 编辑进行中的单、设为已完成（10.1「○」）：客服主管只能对自己登记的，售后负责人对自己登记或负责的；多角色取并集
+ */
+function editsOpen(
+  viewer: { readonly id: string; readonly roles: readonly Role[] },
+  target: AftersalesActionTarget,
+): boolean {
+  if (!can(viewer.roles, 'aftersales.edit_open')) return false;
+  const registered = target.registeredById === viewer.id;
+  const owns = target.ownerId === viewer.id;
+  return (
+    (viewer.roles.includes('supervisor') && registered) ||
+    (viewer.roles.includes('aftersales_owner') && (registered || owns))
+  );
+}
+
+/**
+ * 这张单上查看者能做的事（PRD 10.1、6.5「第一阶段台账状态」；前端据此显示入口，后端据此强制）：
+ * 进行中——登记人或负责人可编辑、设为已完成；客服主管或售后负责人可取消。已完成——只有售后负责人补登缺失的字段。
+ * 已完成、已取消为终态：不能再设为已完成或取消。修改汇率只有售后负责人，进行中与已完成可改，已取消只读。
+ */
+export function aftersalesActions(
+  viewer: { readonly id: string; readonly roles: readonly Role[] },
+  target: AftersalesActionTarget,
+): AftersalesActions {
+  const open = target.status === 'in_progress';
+  const editor = open && editsOpen(viewer, target);
+  return {
+    edit: editor,
+    complete: editor,
+    cancel: open && can(viewer.roles, 'aftersales.cancel'),
+    backfill: target.status === 'completed' && can(viewer.roles, 'aftersales.backfill'),
+    changeRate: target.status !== 'cancelled' && can(viewer.roles, 'aftersales.backfill'),
+  };
+}
+
+// ---------------------------------------------------------------- 登记完整率（R-AS-08）
+
+/** 完整率的目标（PRD 3.2：上线后第一个完整自然月 ≥ 98%） */
+export const COMPLETION_TARGET = 98;
+
+/**
+ * 当月登记完整率（R-AS-08）：当月（按完成时间，北京时间）已完成的单里适用字段齐全的单数 ÷ 已完成单数，历史导入不计；
+ * 只随店铺数据范围与店铺筛选变化，不随日期筛选
+ */
+export const completionSchema = z.object({
+  /** 当月 YYYY-MM（北京时间） */
+  month: z.string().regex(/^\d{4}-\d{2}$/),
+  /** 当月已完成的单数（分母） */
+  completed: z.int().min(0),
+  /** 其中适用字段齐全的单数（分子） */
+  complete: z.int().min(0),
+});
+export type Completion = z.infer<typeof completionSchema>;
+
+/** 完整率的写法（原型「87.5%」：一位小数，整数不写「.0」）；当月没有已完成的单为 null（界面写「—」） */
+export function completionLabel(completion: Completion): string | null {
+  if (completion.completed === 0) return null;
+  const percent = ((completion.complete * 100) / completion.completed).toFixed(1);
+  return `${percent.replace(/\.0$/, '')}%`;
+}
+
 // ---------------------------------------------------------------- 接口输出
 
 /**
@@ -601,10 +788,13 @@ export function ratioPairsOf(factory: FactoryRatios): Ratios {
   };
 }
 
+export const registrationFieldSchema = z.enum(registrationFields);
+
 /**
- * P13 台账的一行（第一期最简列表：售后单号、客户、店铺与站点、处理方式、责任、状态、快递单号、费用列；
- * 完整的列、合计与列设置随待办 22）。费用与承担比例是财务字段，坐席看不到（PRD 10.1、P13「第一阶段」）；
- * 比例在台账里写在 FSH / 工厂承担的悬停说明（22），历史导入缺比例时为 null。
+ * P13 台账的一行（售后单号、客户、店铺与站点、处理方式、责任、状态、快递单号、费用列；完整的列、合计与列设置随待办 22）。
+ * 费用与承担比例是财务字段，坐席看不到（PRD 10.1、P13「第一阶段」）；比例在台账里写在 FSH / 工厂承担的悬停说明（22），
+ * 历史导入缺比例时为 null。missing 是后端按 R-AS-08 算好的缺失字段（坐席拿不到费用与比例，前端不自己算）：
+ * 已完成的单据此标黄「待回填」、售后单号下标「缺 N 项」，进行中的单不标（AC-AS-22）。
  */
 export const ledgerItemSchema = z.object({
   id: z.uuid(),
@@ -618,14 +808,94 @@ export const ledgerItemSchema = z.object({
   responsibility: responsibilitySchema.nullable(),
   /** 快递单号（寄配件寄出后填写；没有为 null） */
   trackingNumber: z.string().nullable(),
-  /** 乐观锁版本（修改汇率与编辑登记时带上，G7） */
+  /** 费用发生日（取消时保留的费用按它计入售后成本） */
+  feeDate: z.iso.date().nullable(),
+  /** 登记人与负责人（行尾「更多」与编辑登记按它们判断权限，aftersalesActions） */
+  registeredById: z.uuid().nullable(),
+  ownerId: z.uuid().nullable(),
+  /** 缺失的适用字段（R-AS-08，按抽屉顺序；齐全为空） */
+  missing: z.array(registrationFieldSchema),
+  /** 乐观锁版本（编辑登记、补登、设为已完成、取消、修改汇率时带上，G7） */
   version: z.int(),
   fees: financeField(feesSchema),
   ratios: financeField(ratiosSchema.nullable()),
 });
 export type LedgerItem = z.infer<typeof ledgerItemSchema>;
-export const ledgerSchema = z.object({ items: z.array(ledgerItemSchema) });
+/** P13 台账：列表与页头的当月登记完整率（完整率不随日期筛选与「缺字段」筛选变化） */
+export const ledgerSchema = z.object({
+  items: z.array(ledgerItemSchema),
+  completion: completionSchema,
+});
 export type Ledger = z.infer<typeof ledgerSchema>;
+
+/**
+ * P13 台账的查询条件（放在地址栏）。店铺与费用发生日是筛选行的前两项（筛选行的界面与其余条件随待办 22）；
+ * missing 是点页头完整率「筛出缺字段的 N 单」：只列当月（按完成时间）已完成、缺适用字段的单（与完整率同口径，历史导入不列）。
+ */
+export const ledgerQuerySchema = z.object({
+  /** 店铺（完整率随它变化） */
+  store: z.uuid().optional(),
+  /** 费用发生日起止（含两端；完整率不随它变化） */
+  from: z.iso.date().optional(),
+  to: z.iso.date().optional(),
+  missing: z.literal('1').optional(),
+});
+export type LedgerQuery = z.infer<typeof ledgerQuerySchema>;
+
+/** 一个人（登记人、负责人）：成员 ID 与姓名 */
+const personSchema = z.object({ id: z.uuid(), name: z.string() });
+
+/**
+ * 一张售后单的完整登记（编辑登记抽屉 S14：进行中可改、已完成补登、已取消只读；「查看最新」也取它）。
+ * 费用、比例与取消时保留的费用项是财务字段。
+ */
+export const aftersalesDetailSchema = z.object({
+  id: z.uuid(),
+  number: aftersalesNumberSchema,
+  status: aftersalesStatusSchema,
+  origin: aftersalesOriginSchema,
+  version: z.int(),
+  store: z.object({ id: z.uuid(), name: z.string() }),
+  site: siteSchema.nullable(),
+  /** 来源工单号（没填为 null） */
+  sourceTicket: z.string().nullable(),
+  orderNumber: z.string().nullable(),
+  customerName: z.string().nullable(),
+  registeredBy: personSchema.nullable(),
+  owner: personSchema.nullable(),
+  feeDate: z.iso.date().nullable(),
+  completedAt: z.iso.datetime({ offset: true }).nullable(),
+  method: handlingMethodSchema.nullable(),
+  responsibility: responsibilitySchema.nullable(),
+  responsibilityReason: z.string().nullable(),
+  /** 生产厂代码 */
+  factory: z.string().nullable(),
+  /** 配件 × 数量（配件名取配件表，表里没有时为 null） */
+  part: z
+    .object({ sku: z.string(), name: z.string().nullable(), quantity: z.int().nullable() })
+    .nullable(),
+  shipper: shipperSchema.nullable(),
+  carrier: z.string().nullable(),
+  shipDate: z.iso.date().nullable(),
+  trackingNumber: z.string().nullable(),
+  claimTarget: claimTargetSchema.nullable(),
+  claimStatus: claimStatusSchema.nullable(),
+  fees: financeField(feesSchema),
+  ratios: financeField(ratiosSchema.nullable()),
+  missing: z.array(registrationFieldSchema),
+  /** 取消（已取消的单）：原因、时刻与确认保留的已产生费用项（AC-AS-16） */
+  cancellation: z
+    .object({
+      reason: z.string(),
+      at: z.iso.datetime({ offset: true }),
+      keptFees: financeField(z.array(z.enum(feeItems))),
+    })
+    .nullable(),
+  /** 最近一次保存的人与时刻（G7「这条记录刚被某人修改」；系统写入为 null） */
+  updatedBy: z.string().nullable(),
+  updatedAt: z.iso.datetime({ offset: true }),
+});
+export type AftersalesDetail = z.infer<typeof aftersalesDetailSchema>;
 
 // ---------------------------------------------------------------- 修改汇率
 
@@ -648,6 +918,66 @@ export const rateChangeMessages = {
   nothing: '没有要修改的汇率',
   cancelled: '已取消的单只读，不能修改汇率',
   noFeeDate: '这张单还没有费用发生日，先补费用发生日再改汇率',
+} as const;
+
+// ---------------------------------------------------------------- 编辑登记、补登、设为已完成、取消
+
+/** 要保存的登记内容：同新建登记的字段，只交要改的部分（费用项也可以只交几项） */
+export const registrationChangesSchema = registrationInputSchema
+  .extend({ fees: registrationInputSchema.shape.fees.partial() })
+  .partial();
+export type RegistrationChanges = z.infer<typeof registrationChangesSchema>;
+
+/**
+ * 编辑登记与补登（S14「编辑登记 · S-…」、S15 ③）：changes 是要保存的登记内容（抽屉交整张表单，行内补登只交快递单号），
+ * rates 是同时修改的汇率（「修改汇率」随「保存修改」一起提交，只有售后负责人；同 rateChangeInputSchema 的 rates）。
+ * 进行中：登记人或负责人可改全部字段，按新建登记的规则校验；已完成：只有售后负责人补登原来空着的字段，已填的不能改；
+ * 已取消只读。version 是读到的版本（G7）。
+ */
+export const registrationUpdateSchema = z.object({
+  version: z.int(),
+  changes: registrationChangesSchema.optional(),
+  rates: rateChangeInputSchema.shape.rates.optional(),
+});
+export type RegistrationUpdate = z.infer<typeof registrationUpdateSchema>;
+
+/** 设为已完成与撤销（S15 ①）：读到的版本 */
+export const versionInputSchema = z.object({ version: z.int() });
+export type VersionInput = z.infer<typeof versionInputSchema>;
+
+/** 取消原因最多 200 字（S15 ②「0 / 200」） */
+export const CANCEL_REASON_MAX = 200;
+
+/**
+ * 取消售后单（S15 ②、AC-AS-16）：原因必填；keptFees 是勾选的「取消后保留的已产生部分」（已登记的费用项，默认全部保留），
+ * 保留的费用照常计入售后成本（R-AS-08），没勾的不计
+ */
+export const cancelInputSchema = z.object({
+  version: z.int(),
+  reason: z.string(),
+  keptFees: z.array(z.enum(feeItems)),
+});
+export type CancelInput = z.infer<typeof cancelInputSchema>;
+
+/** 编辑、补登、设为已完成、撤销、取消的报错（字段错误写在字段下方；status 是整张单的状态不对） */
+export const ledgerActionMessages = {
+  /** 已完成的单补登时改了已填的字段 */
+  backfillFilled: '已完成的单只能补登缺失的字段',
+  cancelled: '已取消的单只读',
+  completed: '这张单已完成',
+  notOpen: '只有进行中的单可以这样操作',
+  /** 撤销设为已完成：这张单不是刚设为已完成的 */
+  undoExpired: '已超过撤销时限，这张单保持已完成',
+  /** 撤销设为已完成：这张单现在不是已完成（只有直接调接口时会出现） */
+  undoNotCompleted: '这张单不是已完成的，没有可撤销的',
+  reasonMissing: '请填写取消原因',
+  reasonTooLong: '原因最多 200 字',
+  /** 勾选保留的费用项没有登记 */
+  keptNotRegistered: '只能保留已登记的费用',
+  /** 没有编辑权限（403） */
+  editDenied: '只有登记人或负责人可以修改进行中的单',
+  backfillDenied: '只有售后负责人可以补登已完成的单',
+  rateDenied: '只有售后负责人可以修改汇率',
 } as const;
 
 /** 新建登记抽屉要用的选项：可选的负责人、责任类型的默认比例（种子数据）、生产厂、配件与所属生产厂 */

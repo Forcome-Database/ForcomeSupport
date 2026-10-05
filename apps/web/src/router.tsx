@@ -11,13 +11,14 @@ import {
 import { useEffect, type ComponentType, type ReactNode } from 'react';
 import { AppShell } from '@/components/app-shell';
 import { Forbidden } from '@/components/forbidden';
-import { Toaster } from '@/components/ui/sonner';
+import { Toaster, UndoToaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { LoadError } from '@/components/load-error';
 import { CurrentMemberContext, useCurrentMember } from '@/lib/current-member';
 import { pages, sectionPaths, type PageDefinition } from '@/lib/pages';
 import { applyDensity, currentMemberQuery, devMembersQuery } from '@/lib/session';
 import { LedgerPage } from '@/pages/aftersales/ledger-page';
+import { ledgerSearchSchema } from '@/pages/aftersales/ledger-search';
 import { DevLoginPage } from '@/pages/dev-login';
 import { ChannelsPage } from '@/pages/settings/channels-page';
 import { TeamPage } from '@/pages/settings/team-page';
@@ -41,6 +42,7 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
     <TooltipProvider>
       <Outlet />
       <Toaster />
+      <UndoToaster />
     </TooltipProvider>
   ),
   errorComponent: ({ reset }) => (
@@ -129,6 +131,18 @@ function pageRoute<TPath extends string>(
   });
 }
 
+/** P13 登记台账：筛选条件在地址栏（点完整率筛出缺字段的已完成单，待办 21） */
+const ledgerRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: pages.aftersalesLedger.path,
+  validateSearch: ledgerSearchSchema,
+  component: () => (
+    <PageGate page={pages.aftersalesLedger}>
+      <LedgerPage />
+    </PageGate>
+  ),
+});
+
 /** 「/aftersales」「/settings」：第一期售后只有 P13，设置先落到 P18（各自再按能力把关） */
 const aftersalesRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -151,7 +165,7 @@ const routeTree = rootRoute.addChildren([
     homeRoute,
     pageRoute(pages.tickets, TicketsPage),
     aftersalesRoute,
-    pageRoute(pages.aftersalesLedger, LedgerPage),
+    ledgerRoute,
     pageRoute(pages.reports),
     settingsRoute,
     pageRoute(pages.settingsChannels, ChannelsPage),

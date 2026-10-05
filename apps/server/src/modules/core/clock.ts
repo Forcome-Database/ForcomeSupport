@@ -36,6 +36,15 @@ function toEpoch(at: Date | string): number {
   return epoch;
 }
 
+/**
+ * 从给定时刻起走的时钟：开始时停在 start，之后随底层时钟（默认系统时钟）同步前进。只给非生产环境的 CLOCK_START 用
+ * （本机与开发测试环境截图、演示时对上原型的演示时刻），生产环境配置了就拒绝启动（config.ts）
+ */
+export function startingAt(start: Date, base: Clock = systemClock): Clock {
+  const offset = start.getTime() - base.now().getTime();
+  return { now: () => new Date(base.now().getTime() + offset) };
+}
+
 /** 停在给定时刻的时钟，只在被设定或推进时变化：set 可设到任意时刻（如回放从历史时间开始），advance 只能向前 */
 export class ManualClock implements Clock {
   #epoch: number;

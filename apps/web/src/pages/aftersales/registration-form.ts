@@ -6,15 +6,19 @@ import {
   formatMoney,
   isPercent,
   isValidAmount,
+  isValidRate,
+  normalizeRate,
   ratioGroups,
   ratioPairsOf,
   registrationFields,
   usdOf,
+  type AftersalesDetail,
   type ClaimStatus,
   type ClaimTarget,
   type Currency,
   type ExchangeRate,
   type ExchangeRatesOn,
+  type Fee,
   type FeeItem,
   type FieldErrors,
   type HandlingMethod,
@@ -30,8 +34,9 @@ import type { FieldPath } from 'react-hook-form';
 import { DRAWER } from './p13-copy';
 
 /*
- * 新建登记抽屉的表单（S14）：表单值与接口输入的互换、两侧互补的比例、只收数字的输入、接口字段错误的落位与「第一个错误」、
- * 比例表里实时算出的两方金额。都是纯函数，单元测试见 registration-form.test.ts。
+ * 新建登记与编辑登记抽屉的表单（S14）：表单值与接口输入的互换、两侧互补的比例、只收数字的输入、接口字段错误的落位与「第一个错误」、
+ * 比例表里实时算出的两方金额；编辑登记的表单值、补登时锁定已填的项、改动了哪些项、原来冻结的汇率与正在修改的汇率参与折算。
+ * 都是纯函数，单元测试见 registration-form.test.ts。
  */
 
 /** 一侧的比例：输入框里的文字（只有数字）；另一侧填错时为空（显示「—」） */
@@ -167,6 +172,14 @@ export function amountText(raw: string): string {
   return `${whole.slice(0, 10)}.${rest.join('').slice(0, 2)}`;
 }
 
+/** 汇率输入框只收数字与一个小数点（最多 6 位整数、6 位小数，同接口的汇率格式） */
+export function rateText(raw: string): string {
+  const cleaned = raw.replace(/[^\d.]/g, '');
+  const [whole = '', ...rest] = cleaned.split('.');
+  if (rest.length === 0) return whole.slice(0, 6);
+  return `${whole.slice(0, 6)}.${rest.join('').slice(0, 6)}`;
+}
+
 /**
  * 改了一侧的比例（S14「改一侧另一侧自动补足 100」）：填的是 0–100 的整数时另一侧为 100 减去它，
  * 否则另一侧清空（显示「—」，保存时报错在填错的这一侧）
@@ -277,12 +290,37 @@ export function formatUsdCents(cents: number): string {
 /** 费用发生日可用的各币种汇率（接口 exchange-rates 的 rates）；还没取到为 undefined */
 export type RatesOn = ExchangeRatesOn['rates'] | undefined;
 
+/**
+ * 编辑登记时的折算依据（按费用项）：frozen 是原来冻结的费用（费用发生日没改时才传；原币金额与币种都没改的项沿用它的汇率与
+ * 美元值，含手工改过的汇率），manual 是「修改汇率」里正在填的汇率（填对了就按它折算，汇率日期为费用发生日、来源手工修改）
+ */
+export interface FeeOverrides {
+  readonly frozen?: Readonly<Partial<Record<FeeItem, Fee | null>>>;
+  readonly manual?: Readonly<Partial<Record<FeeItem, string>>>;
+  readonly feeDate?: string;
+}
+
+/** 一个费用项的折算依据（FeeOverrides 里属于这一项的部分） */
+export interface FeeOverride {
+  readonly frozen?: Fee | null;
+  readonly manual?: string;
+  readonly feeDate?: string;
+}
+
+function overrideOf(overrides: FeeOverrides | undefined, item: FeeItem): FeeOverride {
+  return {
+    frozen: overrides?.frozen?.[item],
+    manual: overrides?.manual?.[item],
+    feeDate: overrides?.feeDate,
+  };
+}
+
 /** 一个费用项折算成美元（分）：没填按 0，美元原样，非美元按汇率折算（四舍五入到分，同保存时冻结的值）；不能算为 null */
-function usdCentsOf(fee: FeeForm, rates: RatesOn): number | null {
+function usdCentsOf(fee: FeeForm, rates: RatesOn, override: FeeOverride = {}): number | null {
   const cents = centsOf(fee.amount);
   // 没填的不登记、不用汇率；填了的非美元金额（0 也是）同保存时一样要有汇率，没有就算不出（保存时报错）
   if (cents === null || fee.amount.trim() === '' || fee.currency === 'USD') return cents;
-  const conversion = conversionOf(fee, rates);
+  const conversion = conversionOf(fee, rates, override);
   return conversion?.kind === 'converted' ? centsOf(conversion.usd) : null;
 }
 
@@ -293,11 +331,12 @@ function usdCentsOf(fee: FeeForm, rates: RatesOn): number | null {
 export function groupCents(
   fees: Readonly<Record<FeeItem, FeeForm>>,
   rates: RatesOn,
+  overrides?: FeeOverrides,
 ): Record<RatioGroup, number | null> {
   const out: Record<RatioGroup, number | null> = { product: 0, freight: 0, other: 0 };
   for (const item of feeItems) {
     const group = feeItemGroup[item];
-    const cents = usdCentsOf(fees[item], rates);
+    const cents = usdCentsOf(fees[item], rates, overrideOf(overrides, item));
     const current = out[group];
     out[group] = current === null || cents === null ? null : current + cents;
   }
@@ -308,8 +347,9 @@ export function groupCents(
 export function feeTotalCents(
   fees: Readonly<Record<FeeItem, FeeForm>>,
   rates: RatesOn,
+  overrides?: FeeOverrides,
 ): number | null {
-  const groups = groupCents(fees, rates);
+  const groups = groupCents(fees, rates, overrides);
   return ratioGroups.reduce<number | null>(
     (sum, group) => (sum === null || groups[group] === null ? null : sum + groups[group]),
     0,
@@ -321,10 +361,35 @@ export type Conversion =
   | { readonly kind: 'converted'; readonly usd: string; readonly rate: ExchangeRate }
   | { readonly kind: 'no_rate' };
 
-/** 非美元且填了合法金额时的折算；汇率还在取、美元、没填或填错时不显示（null） */
-export function conversionOf(fee: FeeForm, rates: RatesOn): Conversion | null {
+/**
+ * 非美元且填了合法金额时的折算；汇率还在取、美元、没填或填错时不显示（null）。编辑登记时按 override：正在修改的汇率
+ * 填对了就用它，原币金额与币种都没改的项沿用原来冻结的值，其余按费用发生日的汇率
+ */
+export function conversionOf(
+  fee: FeeForm,
+  rates: RatesOn,
+  override: FeeOverride = {},
+): Conversion | null {
   const amount = fee.amount.trim();
-  if (fee.currency === 'USD' || amount === '' || !isValidAmount(amount) || !rates) return null;
+  if (fee.currency === 'USD' || amount === '' || !isValidAmount(amount)) return null;
+  const { frozen, manual, feeDate } = override;
+  const typed = manual?.trim() ?? '';
+  if (typed && isValidRate(typed) && feeDate) {
+    const rate = normalizeRate(typed);
+    return {
+      kind: 'converted',
+      usd: usdOf(amount, rate),
+      rate: { rate, date: feeDate, source: 'manual' },
+    };
+  }
+  if (
+    frozen?.rate &&
+    frozen.currency === fee.currency &&
+    frozen.amount === Number(amount).toFixed(2)
+  ) {
+    return { kind: 'converted', usd: frozen.usd, rate: frozen.rate };
+  }
+  if (!rates) return null;
   const rate = rates[fee.currency];
   return rate ? { kind: 'converted', usd: usdOf(amount, rate.rate), rate } : { kind: 'no_rate' };
 }
@@ -336,4 +401,134 @@ export function shareCents(
 ): { fsh: number; factory: number } {
   const factory = Math.round((amount * factoryPercent) / 100);
   return { fsh: amount - factory, factory };
+}
+
+// ---------------------------------------------------------------- 编辑登记（S14 编辑登记、补充小样之三）
+
+/** 一张单的登记写成表单值（没登记的为空；坐席拿不到费用与比例，那两节为空且不显示） */
+export function formValuesOf(detail: AftersalesDetail): RegistrationFormValues {
+  const side = (group: RatioGroup): RatioSideForm => {
+    const pair = detail.ratios?.[group];
+    return pair
+      ? { fsh: String(pair.fsh), factory: String(pair.factory) }
+      : { fsh: '', factory: '' };
+  };
+  const fee = (item: FeeItem): FeeForm => {
+    const value = detail.fees?.[item];
+    return value
+      ? { amount: value.amount, currency: value.currency }
+      : { amount: '', currency: 'USD' };
+  };
+  return {
+    method: detail.method ?? '',
+    storeId: detail.store.id,
+    site: detail.site ?? '',
+    orderNumber: detail.orderNumber ?? '',
+    customerName: detail.customerName ?? '',
+    sourceTicket: detail.sourceTicket ?? '',
+    feeDate: detail.feeDate ?? '',
+    ownerId: detail.owner?.id ?? '',
+    responsibility: detail.responsibility ?? '',
+    factory: detail.factory ?? '',
+    claimTarget: detail.claimTarget ?? '',
+    claimStatus: detail.claimStatus ?? '',
+    responsibilityReason: detail.responsibilityReason ?? '',
+    ratios: { product: side('product'), freight: side('freight'), other: side('other') },
+    partSku: detail.part?.sku ?? '',
+    partQuantity: detail.part?.quantity == null ? '' : String(detail.part.quantity),
+    shipper: detail.shipper ?? '',
+    carrier: detail.carrier ?? '',
+    shipDate: detail.shipDate ?? '',
+    trackingNumber: detail.trackingNumber ?? '',
+    fees: {
+      productCost: fee('productCost'),
+      freight: fee('freight'),
+      compensation: fee('compensation'),
+      otherCost: fee('otherCost'),
+    },
+  };
+}
+
+/** 抽屉里能单独锁定、单独算改动的一项（比例三组算一项，费用一项一个） */
+export type FormItem =
+  Exclude<keyof RegistrationFormValues, 'ratios' | 'fees'> | 'ratios' | `fees.${FeeItem}`;
+
+/** 抽屉自上而下的各项（同 FORM_ORDER 的顺序） */
+const FORM_ITEMS: readonly FormItem[] = [
+  'method',
+  'storeId',
+  'site',
+  'orderNumber',
+  'customerName',
+  'sourceTicket',
+  'feeDate',
+  'ownerId',
+  'responsibility',
+  'factory',
+  'claimTarget',
+  'claimStatus',
+  'responsibilityReason',
+  'ratios',
+  'partSku',
+  'partQuantity',
+  'shipper',
+  'carrier',
+  'shipDate',
+  'trackingNumber',
+  ...feeItems.map((item) => `fees.${item}` as const),
+];
+
+const feeItemOf = (item: `fees.${FeeItem}`) => item.slice('fees.'.length) as FeeItem;
+const isFeeItem = (item: FormItem): item is `fees.${FeeItem}` => item.startsWith('fees.');
+
+/** 一项的值写成可比较的样子：比例按算出的工厂比例，金额按两位小数（没填不看币种），文字去首尾空白 */
+function comparable(values: RegistrationFormValues, item: FormItem): string {
+  if (item === 'ratios') return JSON.stringify(factoryPercents(values.ratios));
+  if (isFeeItem(item)) {
+    const fee = values.fees[feeItemOf(item)];
+    const amount = fee.amount.trim();
+    if (!amount) return '';
+    return `${isValidAmount(amount) ? Number(amount).toFixed(2) : amount} ${fee.currency}`;
+  }
+  return values[item].trim();
+}
+
+/** 这一项原来有没有填（补登只能填原来空着的） */
+function isFilledItem(values: RegistrationFormValues, item: FormItem): boolean {
+  if (item === 'ratios') {
+    return Object.values(factoryPercents(values.ratios)).every((v) => v !== null);
+  }
+  return comparable(values, item) !== '';
+}
+
+/** 一项的叫法（同抽屉上的字段名；比例写「承担比例（三组）」，费用写费用项名） */
+function itemLabel(item: FormItem): string {
+  if (item === 'ratios') return DRAWER.labels.ratios;
+  if (isFeeItem(item)) return feeItemLabels[feeItemOf(item)];
+  return fieldLabel(item);
+}
+
+/**
+ * 两份表单值不同的项的叫法（按抽屉顺序）：G7「对方改了哪些项」、G8「有 N 项未保存的修改」、补登浮层「补登了 …」
+ */
+export function changedFieldLabels(
+  before: RegistrationFormValues,
+  after: RegistrationFormValues,
+): string[] {
+  return FORM_ITEMS.filter((item) => comparable(before, item) !== comparable(after, item)).map(
+    itemLabel,
+  );
+}
+
+/** 编辑登记抽屉的三种形态（S14 补充小样之三）：进行中编辑全部字段 · 已完成补登空着的字段 · 只读 */
+export type DrawerAccess = 'edit' | 'backfill' | 'readonly';
+
+/** 哪些项锁定（禁用）：只读全锁；补登锁原来已填的；编辑都不锁 */
+export function lockedFields(
+  access: DrawerAccess,
+  base: RegistrationFormValues,
+): (item: FormItem) => boolean {
+  if (access === 'readonly') return () => true;
+  if (access === 'edit') return () => false;
+  return (item) => isFilledItem(base, item);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ManualClock, systemClock } from './index';
+import { ManualClock, startingAt, systemClock } from './index';
 
 describe('可注入时钟', () => {
   it('系统时钟返回真实当前时间', () => {
@@ -27,6 +27,14 @@ describe('可注入时钟', () => {
     const clock = new ManualClock('2026-09-11T02:20:00Z');
     clock.now().setUTCFullYear(2000);
     expect(clock.now().toISOString()).toBe('2026-09-11T02:20:00.000Z');
+  });
+
+  it('从起始时刻走的时钟（非生产环境的 CLOCK_START）：从给定时刻起随底层时钟前进', () => {
+    const base = new ManualClock('2026-10-05T11:00:00Z');
+    const clock = startingAt(new Date('2026-09-11T02:20:00Z'), base);
+    expect(clock.now().toISOString()).toBe('2026-09-11T02:20:00.000Z');
+    base.advance({ minutes: 5, seconds: 3 });
+    expect(clock.now().toISOString()).toBe('2026-09-11T02:25:03.000Z');
   });
 
   it('不接受无效时间；advance 不能倒推', () => {

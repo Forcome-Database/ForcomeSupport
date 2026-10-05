@@ -1,4 +1,5 @@
 import { Toaster as Sonner } from 'sonner';
+import { UNDO_TOASTER } from '@/lib/notify';
 
 /*
  * 浮层提示的容器（shadcn Sonner，按原型 toast() 与全局状态 G5 改过）：右上角堆叠、最多 3 条、间距 10，
@@ -18,6 +19,25 @@ export function Toaster() {
       offset={{ top: 68, right: 16 }}
       hotkey={[]}
       containerAriaLabel="浮层提示"
+    />
+  );
+}
+
+/**
+ * 撤销浮层的容器（G5「可逆操作的 5 秒撤销浮层固定在内容区右下，带倒计时」）：右下角，与内容区留出同样的边距（右 24、下 16），
+ * 最多 3 条；只放 notify 的 showUndo
+ */
+export function UndoToaster() {
+  return (
+    <Sonner
+      id={UNDO_TOASTER}
+      position="bottom-right"
+      visibleToasts={3}
+      expand
+      gap={10}
+      offset={{ bottom: 16, right: 24 }}
+      hotkey={[]}
+      containerAriaLabel="撤销浮层"
     />
   );
 }

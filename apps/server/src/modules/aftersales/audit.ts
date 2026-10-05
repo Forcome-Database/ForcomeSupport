@@ -1,7 +1,10 @@
 import { feesOf } from './fees';
-import { ratiosOf, type AftersalesRow } from './ledger';
+import { keptFeesOf, ratiosOf, type AftersalesRow } from './ledger';
 
-/** 审计里的完整前后值：抽屉能填的全部字段（金额含汇率与冻结美元值）与系统定下的编号、状态、创建路径、登记人 */
+/**
+ * 审计里的完整前后值：抽屉能填的全部字段（金额含汇率与冻结美元值）与系统定下的编号、状态、创建路径、登记人，
+ * 以及完成时间与取消（原因、确认保留的费用项，AC-AS-16）
+ */
 export function auditSnapshot(row: AftersalesRow, ownerName: string | null) {
   return {
     number: row.number,
@@ -29,5 +32,14 @@ export function auditSnapshot(row: AftersalesRow, ownerName: string | null) {
     claimStatus: row.claimStatus,
     fees: feesOf(row),
     ratios: ratiosOf(row),
+    completedAt: row.completedAt?.toISOString() ?? null,
+    cancellation:
+      row.status === 'cancelled'
+        ? {
+            reason: row.cancelReason,
+            at: row.cancelledAt?.toISOString() ?? null,
+            keptFees: keptFeesOf(row),
+          }
+        : null,
   };
 }

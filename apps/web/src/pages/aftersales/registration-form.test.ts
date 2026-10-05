@@ -1,7 +1,8 @@
-import { emptyRegistrationInput } from '@forcome/contracts';
+import { emptyRegistrationInput, type AftersalesDetail } from '@forcome/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   amountText,
+  changedFieldLabels,
   conversionOf,
   emptyRegistrationForm,
   factoryPercents,
@@ -9,9 +10,12 @@ import {
   fieldLabel,
   FORM_ORDER,
   formErrorsOf,
+  formValuesOf,
   groupCents,
+  lockedFields,
   percentText,
   ratioFormOf,
+  rateText,
   registrationInputOf,
   shareCents,
   withRatioSide,
@@ -50,6 +54,9 @@ describe('新建登记的表单（S14）', () => {
     expect(amountText('12.345')).toBe('12.34');
     expect(amountText('-3.2.1x')).toBe('3.21');
     expect(amountText('889')).toBe('889');
+    // 汇率（修改汇率）：数字与一个小数点，最多 6 位整数、6 位小数
+    expect(rateText('17.5x')).toBe('17.5');
+    expect(rateText('1234567.12345678')).toBe('123456.123456');
   });
 
   it('责任类型的默认比例写成两侧；各组的工厂比例只认填对的', () => {
@@ -156,5 +163,148 @@ describe('新建登记的表单（S14）', () => {
     expect(shareCents(320, 100)).toEqual({ fsh: 0, factory: 320 });
     expect(shareCents(1105, 50)).toEqual({ fsh: 552, factory: 553 });
     expect(shareCents(680, 0)).toEqual({ fsh: 680, factory: 0 });
+  });
+});
+
+/** 编辑登记的示例：进行中的 S-20260911-0020（退款或部分补偿，额外赔偿 MX$889.00，售后负责人手工改过汇率 17.50） */
+const DETAIL: AftersalesDetail = {
+  id: '0199a000-0000-7000-8000-000000000020',
+  number: 'S-20260911-0020',
+  status: 'in_progress',
+  origin: 'manual_registration',
+  version: 3,
+  store: { id: '0199a000-0000-7000-8000-00000000000a', name: 'Forcome Direct' },
+  site: 'MX',
+  sourceTicket: null,
+  orderNumber: '302-8811234-9901122',
+  customerName: 'Mateo Rivas',
+  registeredBy: { id: '0199a000-0000-7000-8000-000000000001', name: '王磊' },
+  owner: { id: '0199a000-0000-7000-8000-000000000001', name: '王磊' },
+  feeDate: '2026-09-10',
+  completedAt: null,
+  method: 'refund_or_compensation',
+  responsibility: 'product_quality',
+  responsibilityReason: null,
+  factory: 'FQD',
+  part: null,
+  shipper: null,
+  carrier: null,
+  shipDate: null,
+  trackingNumber: null,
+  claimTarget: null,
+  claimStatus: null,
+  fees: {
+    productCost: { amount: '0.00', currency: 'USD', usd: '0.00', rate: null },
+    freight: { amount: '0.00', currency: 'USD', usd: '0.00', rate: null },
+    compensation: {
+      amount: '889.00',
+      currency: 'MXN',
+      usd: '50.80',
+      rate: { rate: '17.500000', date: '2026-09-10', source: 'manual' },
+    },
+    otherCost: null,
+  },
+  ratios: {
+    product: { fsh: 0, factory: 100 },
+    freight: { fsh: 0, factory: 100 },
+    other: { fsh: 0, factory: 100 },
+  },
+  missing: [],
+  cancellation: null,
+  updatedBy: '王磊',
+  updatedAt: '2026-09-11T02:20:00.000Z',
+};
+
+describe('编辑登记的表单（S14 编辑登记、补充小样之三）', () => {
+  it('一张单的登记写成表单值：没登记的为空，比例两侧，费用原币与币种', () => {
+    const values = formValuesOf(DETAIL);
+    expect(values).toMatchObject({
+      method: 'refund_or_compensation',
+      storeId: DETAIL.store.id,
+      site: 'MX',
+      orderNumber: '302-8811234-9901122',
+      sourceTicket: '',
+      feeDate: '2026-09-10',
+      ownerId: DETAIL.owner?.id,
+      factory: 'FQD',
+      partSku: '',
+      partQuantity: '',
+      carrier: '',
+      ratios: { product: { fsh: '0', factory: '100' } },
+      fees: {
+        compensation: { amount: '889.00', currency: 'MXN' },
+        otherCost: { amount: '', currency: 'USD' },
+      },
+    });
+    // 交上去就是原来的登记（不改就没有改动）
+    expect(changedFieldLabels(values, formValuesOf(DETAIL))).toEqual([]);
+  });
+
+  it('补登只能填原来空着的字段：已填的锁定，空着的可填；进行中的编辑都不锁', () => {
+    const base = formValuesOf({ ...DETAIL, status: 'completed', trackingNumber: null });
+    const locked = lockedFields('backfill', base);
+    expect(locked('customerName')).toBe(true);
+    expect(locked('ratios')).toBe(true);
+    expect(locked('fees.compensation')).toBe(true);
+    expect(locked('fees.otherCost')).toBe(false);
+    expect(locked('trackingNumber')).toBe(false);
+    expect(locked('sourceTicket')).toBe(false);
+    const open = lockedFields('edit', base);
+    expect(open('customerName')).toBe(false);
+    const readonly = lockedFields('readonly', base);
+    expect(readonly('fees.otherCost')).toBe(true);
+  });
+
+  it('改动了哪些项（G7「对方改了哪些项」、G8 计数、补登浮层写补了什么）：字段名同抽屉', () => {
+    const base = formValuesOf(DETAIL);
+    const edited = {
+      ...base,
+      trackingNumber: '1Z-NEW',
+      shipDate: '2026-09-12',
+      ratios: { ...base.ratios, product: { fsh: '50', factory: '50' } },
+      fees: { ...base.fees, otherCost: { amount: '0', currency: 'USD' as const } },
+    };
+    expect(changedFieldLabels(base, edited)).toEqual([
+      '承担比例（三组）',
+      '寄出日期',
+      '快递单号',
+      '其他',
+    ]);
+  });
+
+  it('原来冻结的汇率：原币金额、币种与费用发生日都没改的项沿用它（含手工改过的汇率），改了的按费用发生日取', () => {
+    const fees = formValuesOf(DETAIL).fees;
+    const frozen = { frozen: DETAIL.fees ?? undefined };
+    expect(
+      conversionOf(fees.compensation, DEMO_RATES, { frozen: DETAIL.fees?.compensation }),
+    ).toEqual({
+      kind: 'converted',
+      usd: '50.80',
+      rate: { rate: '17.500000', date: '2026-09-10', source: 'manual' },
+    });
+    expect(groupCents(fees, DEMO_RATES, frozen).other).toBe(5080);
+    const changed = { ...fees, compensation: { amount: '900.00', currency: 'MXN' as const } };
+    expect(groupCents(changed, DEMO_RATES, frozen).other).toBe(5000);
+  });
+
+  it('正在修改的汇率：填对了就按它即时折算，汇率日期为费用发生日、来源手工修改', () => {
+    const fees = formValuesOf(DETAIL).fees;
+    const manual = { manual: { compensation: '20' }, feeDate: '2026-09-10' };
+    expect(
+      conversionOf(fees.compensation, DEMO_RATES, { manual: '20', feeDate: '2026-09-10' }),
+    ).toEqual({
+      kind: 'converted',
+      usd: '44.45',
+      rate: { rate: '20.000000', date: '2026-09-10', source: 'manual' },
+    });
+    expect(groupCents(fees, DEMO_RATES, manual).other).toBe(4445);
+    // 填错的汇率不参与（按原来的算）
+    expect(
+      groupCents(fees, DEMO_RATES, {
+        ...manual,
+        manual: { compensation: '0' },
+        frozen: DETAIL.fees ?? undefined,
+      }).other,
+    ).toBe(5080);
   });
 });

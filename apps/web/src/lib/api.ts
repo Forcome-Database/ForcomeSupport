@@ -1,5 +1,6 @@
 import {
   adminContactsSchema,
+  aftersalesDetailSchema,
   apiErrorSchema,
   channelSettingsSchema,
   currentMemberSchema,
@@ -15,16 +16,21 @@ import {
   storeSchema,
   ticketListSchema,
   type AdminContacts,
+  type AftersalesDetail,
+  type CancelInput,
   type ChannelSettings,
   type CurrentMember,
   type DevMember,
   type ExchangeRatesOn,
   type FieldErrors,
+  type Ledger,
   type LedgerItem,
+  type LedgerQuery,
   type LoginDenialReason,
   type Preferences,
   type RegistrationInput,
   type RegistrationOptions,
+  type RegistrationUpdate,
   type SourceTicket,
   type Store,
   type StoreInput,
@@ -114,6 +120,14 @@ function jsonBody(method: string, body: unknown): RequestInit {
   return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
 }
 
+/** 查询条件写成地址的查询串（没给的条件不写；一个都没有为空串） */
+function queryString(query: Readonly<Record<string, string | undefined>>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, value);
+  const text = params.toString();
+  return text ? `?${text}` : '';
+}
+
 export const api = {
   /** 当前登录的成员（含导航、默认首页与密度）；未登录或会话过期时抛 401 */
   me: (): Promise<CurrentMember> => call('/api/me', currentMemberSchema),
@@ -157,8 +171,8 @@ export const api = {
     (await call('/api/tickets', ticketListSchema)).tickets,
 
   /** P13 登记台账（店铺范围内；坐席拿到的没有财务字段） */
-  ledger: async (): Promise<LedgerItem[]> =>
-    (await call('/api/aftersales/ledger', ledgerSchema)).items,
+  ledger: (query: LedgerQuery = {}): Promise<Ledger> =>
+    call(`/api/aftersales/ledger${queryString(query)}`, ledgerSchema),
 
   /** 新建登记抽屉的选项：可选负责人、责任类型的默认比例、生产厂、配件与所属生产厂 */
   registrationOptions: (): Promise<RegistrationOptions> =>
@@ -175,4 +189,40 @@ export const api = {
   /** 新建登记；字段填错时抛 ApiRequestError（fields 为各字段的错误） */
   register: (input: RegistrationInput): Promise<LedgerItem> =>
     call('/api/aftersales/registrations', ledgerItemSchema, jsonBody('POST', input)),
+
+  /** 一张售后单的完整登记（编辑登记抽屉 S14） */
+  aftersales: (number: string): Promise<AftersalesDetail> =>
+    call(`/api/aftersales/${encodeURIComponent(number)}`, aftersalesDetailSchema),
+
+  /** 编辑登记、补登（含随「保存修改」一起提交的修改汇率），带版本号（G7） */
+  updateAftersales: (number: string, update: RegistrationUpdate): Promise<AftersalesDetail> =>
+    call(
+      `/api/aftersales/${encodeURIComponent(number)}`,
+      aftersalesDetailSchema,
+      jsonBody('PATCH', update),
+    ),
+
+  /** 设为已完成（S15 ①） */
+  completeAftersales: (number: string, version: number): Promise<LedgerItem> =>
+    call(
+      `/api/aftersales/${encodeURIComponent(number)}/complete`,
+      ledgerItemSchema,
+      jsonBody('POST', { version }),
+    ),
+
+  /** 撤销设为已完成（S15 ①「撤销」） */
+  undoComplete: (number: string, version: number): Promise<LedgerItem> =>
+    call(
+      `/api/aftersales/${encodeURIComponent(number)}/undo-complete`,
+      ledgerItemSchema,
+      jsonBody('POST', { version }),
+    ),
+
+  /** 取消售后单（S15 ②） */
+  cancelAftersales: (number: string, input: CancelInput): Promise<LedgerItem> =>
+    call(
+      `/api/aftersales/${encodeURIComponent(number)}/cancel`,
+      ledgerItemSchema,
+      jsonBody('POST', input),
+    ),
 };

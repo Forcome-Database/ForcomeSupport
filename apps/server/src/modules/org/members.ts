@@ -5,7 +5,7 @@ import {
   type OwnerOption,
   type Role,
 } from '@forcome/contracts';
-import { and, arrayContains, eq } from 'drizzle-orm';
+import { and, arrayContains, eq, inArray } from 'drizzle-orm';
 import type { DbExecutor, Tx } from '../core';
 import { member } from './schema';
 import type { MemberRow } from './session';
@@ -50,6 +50,22 @@ export async function createMember(tx: Tx, input: NewMember): Promise<string> {
 export async function findMember(db: DbExecutor, id: string): Promise<MemberRow | null> {
   const [row] = await db.select().from(member).where(eq(member.id, id)).limit(1);
   return row ?? null;
+}
+
+/**
+ * 成员姓名（含已停用的）：售后单的登记人、负责人等只存成员 ID，显示时按它取姓名。成员不属于店铺，不带店铺范围
+ */
+export async function memberNamesById(
+  db: DbExecutor,
+  ids: readonly string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return new Map();
+  const rows = await db
+    .select({ id: member.id, name: member.name })
+    .from(member)
+    .where(inArray(member.id, unique));
+  return new Map(rows.map((row) => [row.id, row.name]));
 }
 
 /** 在职成员，按角色（PRD 10.1 的顺序）再按姓名排序 */

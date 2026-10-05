@@ -39,26 +39,46 @@ function AlertDialogContent({
   );
 }
 
-/** 标题区：tone="warning" 时带浅黄图标块；× 等同「取消」 */
+const TONES = {
+  warning: { box: 'bg-warning-soft', icon: 'text-warning-text' },
+  danger: { box: 'bg-destructive-soft', icon: 'text-destructive-text' },
+} as const;
+
+/**
+ * 标题区：tone 为 warning / danger 时带浅黄 / 浅红图标块（原型 dialog(tone=)）；description 是标题下 13 次要色的一行说明；
+ * × 等同「取消」
+ */
 function AlertDialogHeader({
   title,
   tone,
+  description,
   className,
 }: {
   title: React.ReactNode;
-  tone?: 'warning';
+  tone?: keyof typeof TONES;
+  description?: React.ReactNode;
   className?: string;
 }) {
   return (
     <div className={cn('flex items-start gap-3 px-5 pt-4.5', className)}>
-      {tone === 'warning' && (
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-warning-soft">
-          <TriangleAlert className="size-4.5 text-warning-text" strokeWidth={2} />
+      {tone && (
+        <div
+          className={cn(
+            'flex size-9 shrink-0 items-center justify-center rounded-lg',
+            TONES[tone].box,
+          )}
+        >
+          <TriangleAlert className={cn('size-4.5', TONES[tone].icon)} strokeWidth={2} />
         </div>
       )}
-      <AlertDialogPrimitive.Title className="flex-1 text-16 font-semibold text-foreground">
-        {title}
-      </AlertDialogPrimitive.Title>
+      <div className="flex flex-1 flex-col gap-1">
+        <AlertDialogPrimitive.Title className="text-16 font-semibold text-foreground">
+          {title}
+        </AlertDialogPrimitive.Title>
+        {description && (
+          <div className="text-13 leading-[1.55] text-muted-foreground">{description}</div>
+        )}
+      </div>
       <AlertDialogPrimitive.Cancel
         aria-label="关闭"
         className="rounded-sm text-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"

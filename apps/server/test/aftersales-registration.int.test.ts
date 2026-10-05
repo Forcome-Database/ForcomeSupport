@@ -183,10 +183,14 @@ describe('新建登记（待办 19）', () => {
       expect(Object.keys(item).sort()).toEqual(
         [
           'customerName',
+          'feeDate',
           'id',
           'method',
+          'missing',
           'number',
           'origin',
+          'ownerId',
+          'registeredById',
           'responsibility',
           'site',
           'status',
@@ -417,6 +421,8 @@ describe('新建登记（待办 19）', () => {
         otherCost: { amount: '0.00', currency: 'USD', usd: '0.00', rate: null },
       },
       ratios: ratioPairsOf({ product: 100, freight: 100, other: 100 }),
+      completedAt: null,
+      cancellation: null,
     });
   });
 

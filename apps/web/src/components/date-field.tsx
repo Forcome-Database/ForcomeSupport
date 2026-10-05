@@ -28,6 +28,7 @@ export function DateField({
   onChange,
   placeholder,
   invalid = false,
+  disabled = false,
   ref,
 }: {
   id: string;
@@ -35,6 +36,8 @@ export function DateField({
   onChange: (value: string) => void;
   placeholder?: string;
   invalid?: boolean;
+  /** 禁用（编辑登记里锁定的字段）：浅灰底、占位色字，打不开日历 */
+  disabled?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }) {
   const [open, setOpen] = useState(false);
@@ -46,6 +49,7 @@ export function DateField({
           ref={ref}
           id={id}
           type="button"
+          disabled={disabled}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? `${id}-error` : undefined}
           className={cn(controlClass, 'flex items-center gap-2 px-2.5 text-left')}

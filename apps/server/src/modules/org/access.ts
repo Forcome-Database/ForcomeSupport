@@ -186,12 +186,15 @@ function unauthenticated(c: Context) {
   return c.json({ error: 'unauthenticated', message: '未登录或会话已失效，请重新登录' }, 401);
 }
 
-/** 需要某项能力的接口（挂在 requireSession 之后）：没有则 403（PRD 10.1；界面不会给没有能力的人入口） */
+/**
+ * 需要某项能力的接口（挂在 requireSession 之后）：给了几项时有其中任一项即可，都没有则 403（PRD 10.1；界面不会给没有能力的人入口）
+ */
 export function requireCapability(
-  capability: Capability,
+  ...capabilities: [Capability, ...Capability[]]
 ): MiddlewareHandler<{ Variables: AccessVariables }> {
   return async (c, next) => {
-    if (!c.get('access').can(capability)) {
+    const access = c.get('access');
+    if (!capabilities.some((capability) => access.can(capability))) {
       throw new AccessDeniedError('你的角色没有这项权限');
     }
     await next();

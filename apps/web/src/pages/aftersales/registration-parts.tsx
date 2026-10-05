@@ -5,9 +5,12 @@ import {
   type Currency,
   type RatioGroup,
 } from '@forcome/contracts';
+import { Pencil } from 'lucide-react';
 import type * as React from 'react';
 import { AffixInput } from '@/components/affix-input';
 import { FieldError } from '@/components/form-field';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -15,10 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { A11Y, DRAWER, EMPTY_VALUE } from './p13-copy';
+import { A11Y, DRAWER, EDIT, EMPTY_VALUE } from './p13-copy';
 import {
   amountText,
+  rateText,
   factoryPercents,
   formatUsdCents,
   shareCents,
@@ -27,7 +32,8 @@ import {
 } from './registration-form';
 
 /*
- * 新建登记抽屉的部件（S14，原型 build_ledger.py 的 fsec()、money_field()、ratio_rows()）：分节标题、金额 + 币种、三组承担比例表。
+ * 新建登记与编辑登记抽屉的部件（S14，原型 build_ledger.py 的 fsec()、money_field()、ratio_rows()、edit_drawer()）：分节标题、
+ * 金额 + 币种、三组承担比例表，编辑登记的「修改汇率」与「1 USD = [输入框] 币种」。
  */
 
 /** 分节（原型 fsec()）：20 的浅主色圆标写序号 + 14 / 700 标题（必填带星号），右侧 12 的灰字；节与节之间细线分隔 */
@@ -72,19 +78,21 @@ export function FormSection({
   );
 }
 
-/** 金额 + 币种（原型 money_field()：输入框右侧是 USD / CAD / MXN 的下拉，左边一条细线隔开） */
+/** 金额 + 币种（原型 money_field()：输入框右侧是 USD / CAD / MXN 的下拉，左边一条细线隔开）；disabled 时两者都锁定 */
 export function MoneyInput({
   id,
   label,
   value,
   onChange,
   invalid,
+  disabled = false,
 }: {
   id: string;
   label: string;
   value: FeeForm;
   onChange: (value: FeeForm) => void;
   invalid: boolean;
+  disabled?: boolean;
 }) {
   return (
     <AffixInput
@@ -92,6 +100,7 @@ export function MoneyInput({
       inputMode="decimal"
       autoComplete="off"
       placeholder="0.00"
+      disabled={disabled}
       value={value.amount}
       aria-invalid={invalid || undefined}
       aria-describedby={invalid ? `${id}-error` : undefined}
@@ -100,6 +109,7 @@ export function MoneyInput({
       suffix={
         <Select
           value={value.currency}
+          disabled={disabled}
           onValueChange={(currency) => {
             if (!currency) return;
             onChange({ ...value, currency: currency as Currency });
@@ -135,8 +145,11 @@ export function RatioTable({
   groupAmounts,
   errors,
   onChange,
+  disabled = false,
 }: {
   idOf: (group: RatioGroup, side: 'fsh' | 'factory') => string;
+  /** 锁定（编辑登记里只读或补登时比例已填） */
+  disabled?: boolean;
   ratios: Readonly<Record<RatioGroup, RatioSideForm>>;
   /** 各组金额（分，美元）；不能算时为 null */
   groupAmounts: Readonly<Record<RatioGroup, number | null>>;
@@ -191,6 +204,7 @@ export function RatioTable({
             aria-invalid={groupErrors?.[s] ? true : undefined}
             aria-describedby={messages.length > 0 ? `${idOf(group, 'factory')}-error` : undefined}
             value={ratios[group][s]}
+            disabled={disabled}
             onChange={(event) => onChange(group, s, event.target.value)}
             className="h-7"
             suffix="%"
@@ -233,6 +247,92 @@ export function RatioTable({
               factoryTotal === null ? EMPTY_VALUE : formatUsdCents(factoryTotal),
             )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * 修改汇率时金额框下的那一行（S14 补充小样之三）：「1 USD = [输入框] 币种」（12 次要色、输入框高 28 宽 96、等宽数字），
+ * 汇率填错的报错写在它下方
+ */
+export function RateInput({
+  id,
+  label,
+  currency,
+  value,
+  error,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  currency: string;
+  value: string;
+  error: string | undefined;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1.5 text-12 text-muted-foreground">
+        <span>{EDIT.ratePrefix}</span>
+        <Input
+          id={id}
+          inputMode="decimal"
+          autoComplete="off"
+          aria-label={A11Y.rate(label)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className="h-7 w-24 tabular-nums"
+          value={value}
+          onChange={(event) => onChange(rateText(event.target.value))}
+        />
+        <span>{currency}</span>
+      </div>
+      {error && <FieldError id={`${id}-error`} messages={[error]} />}
+    </div>
+  );
+}
+
+/**
+ * 费用一节下方的「修改汇率」（S14 编辑登记小图与补充小样之三）：主色链接（带笔形图标）+ 灰字说明；点开后链接变灰不可再点；
+ * 不是售后负责人时禁用并悬停说明原因
+ */
+export function RateLine({
+  state,
+  onStart,
+}: {
+  state: 'idle' | 'editing' | 'denied';
+  onStart: () => void;
+}) {
+  const link =
+    state === 'idle' ? (
+      <Button type="button" variant="text-link" size="text" onClick={onStart}>
+        {EDIT.rateLink}
+        <Pencil />
+      </Button>
+    ) : (
+      <span
+        tabIndex={state === 'denied' ? 0 : undefined}
+        aria-disabled
+        className={cn(
+          'inline-flex items-center gap-1 rounded-xs text-12 font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          state === 'denied' ? 'text-placeholder' : 'text-subtle-foreground',
+        )}
+      >
+        {EDIT.rateLink}
+        <Pencil className="size-3" />
+      </span>
+    );
+  return (
+    <div className="flex items-center gap-2">
+      {state === 'denied' ? (
+        <Tooltip>
+          <TooltipTrigger asChild>{link}</TooltipTrigger>
+          <TooltipContent>{EDIT.rateDenied}</TooltipContent>
+        </Tooltip>
+      ) : (
+        link
+      )}
+      <span className="text-12 text-subtle-foreground">{EDIT.rateNote}</span>
     </div>
   );
 }
