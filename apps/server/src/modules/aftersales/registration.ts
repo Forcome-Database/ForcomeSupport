@@ -217,10 +217,9 @@ const REGISTERED_STATUS = (() => {
   return result.to;
 })();
 
-/** 新建的售后单与它的店铺名 */
 /**
  * 新建登记。填错时抛 FieldValidationError（全部字段的错误一次列全），不写任何数据；
- * 选了范围外的店铺、或来源工单在范围外，记越权审计并抛 AccessDeniedError（403，E-24）。
+ * 选了范围外的店铺、或来源工单在范围外，记越权审计并抛 AccessDeniedError（403，E-24）。返回新建的售后单。
  */
 export async function createRegistration(
   runtime: Runtime,
