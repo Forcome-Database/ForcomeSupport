@@ -176,7 +176,13 @@ export function AuditFilterBar({
           options={actions}
           selected={search.action}
           showAll
-          onSelect={(action) => onChange(withFilter(search, { action }))}
+          onSelect={(value) =>
+            onChange(
+              withFilter(search, {
+                action: actions.find((option) => option.value === value)?.value,
+              }),
+            )
+          }
         />
         <SearchBox
           value={search.q ?? ''}

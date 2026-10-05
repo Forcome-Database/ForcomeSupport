@@ -15,6 +15,7 @@ import {
 } from './aftersales';
 import {
   ACCESS_DENIED_ACTION,
+  SYSTEM_ACTOR_NAME,
   auditActions,
   auditSnapshotSchemas,
   isAuditAction,
@@ -264,7 +265,7 @@ function auditFilterWords(value: unknown, ctx: FormatContext): string {
     filter.actor === undefined
       ? undefined
       : filter.actor === SYSTEM_ACTOR
-        ? '系统'
+        ? SYSTEM_ACTOR_NAME
         : memberName(filter.actor, ctx);
   return [time, ...auditConditionWords({ ...filter, actorName })].join(' · ');
 }

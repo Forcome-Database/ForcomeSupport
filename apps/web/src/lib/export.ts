@@ -13,28 +13,31 @@ export function useFileExport(options: {
   readonly id: string;
   /** 失败浮层标题里的动作（「导出失败：…」） */
   readonly action: string;
+  /** 按当前筛选取文件（点「导出」时取定；失败后「立即重试」仍用那一次的条件） */
   readonly download: () => Promise<ExportedFile>;
   readonly done: (file: ExportedFile) => void | Promise<void>;
 }) {
   const queryClient = useQueryClient();
-  const mutation = useMutation({ mutationFn: options.download });
-
-  /** 导出一次：成功下载并提示；失败时抛出（给「立即重试」用） */
-  async function exportOnce(): Promise<void> {
-    const file = await mutation.mutateAsync();
-    dismissToast(options.id);
-    saveFile(file.blob, file.fileName);
-    await options.done(file);
-  }
+  const mutation = useMutation({
+    mutationFn: (download: () => Promise<ExportedFile>) => download(),
+  });
 
   return {
     exporting: mutation.isPending,
     run: async () => {
+      const { download, done, id, action } = options;
+      /** 导出一次：成功下载并提示；失败时抛出（给「立即重试」用） */
+      const exportOnce = async (): Promise<void> => {
+        const file = await mutation.mutateAsync(download);
+        dismissToast(id);
+        saveFile(file.blob, file.fileName);
+        await done(file);
+      };
       try {
         await exportOnce();
       } catch (error) {
         if (endSessionIfUnauthenticated(queryClient, error)) return;
-        showError({ id: options.id, action: options.action, error, retry: exportOnce });
+        showError({ id, action, error, retry: exportOnce });
       }
     },
   };

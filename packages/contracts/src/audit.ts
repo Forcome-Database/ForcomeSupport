@@ -58,7 +58,7 @@ export const SYSTEM_ACTOR_NAME = '系统';
 /*
  * 每种动作的前后值（完整快照）在这里声明结构：写审计时按它做类型检查（core 的 recordAudit），P27 显示时按它过滤财务字段
  * （maskFinanceFields：财务字段换成「已隐藏」，结构里没声明的键不放行，K18），再按 audit-log.ts 的字段表写成中文。
- * 新增一种审计动作：在 auditActions 登记（叫法、对象类型、快照），快照结构放这里，字段表放 audit-log.ts。
+ * 新增一种审计动作：在 auditActions 登记（叫法、对象类型、快照），快照结构放这里，字段表放 audit-describe.ts。
  */
 
 /** 店铺（P18 抽屉的全部字段，K8） */
@@ -247,20 +247,26 @@ export function isAuditAction(value: string): value is AuditAction {
 export const ACCESS_DENIED_ACTION = 'access.denied' satisfies AuditAction;
 
 const actionEntries = Object.entries(auditActions) as [AuditAction, AuditActionDefinition][];
+/** 筛选键（filter 只在 auditActions 里写，类型上就是 AuditActionFilterKey 之一） */
 const filterKeyOf = (action: AuditAction, definition: AuditActionDefinition) =>
-  definition.filter ?? action;
+  (definition.filter ?? action) as AuditActionFilterKey;
+
+/** 「动作」筛选的一项的键：登记了 filter 的写它（如 export），否则就是动作本身 */
+export type AuditActionFilterKey = {
+  [A in AuditAction]: (typeof auditActions)[A] extends { readonly filter: infer F } ? F : A;
+}[AuditAction];
 
 /** 「动作」筛选的键（地址栏与接口里写它，不写叫法：改叫法不影响旧链接与导出记录） */
 export const auditActionFilterKeys = [
   ...new Set(actionEntries.map(([action, definition]) => filterKeyOf(action, definition))),
-] as [string, ...string[]];
+] as [AuditActionFilterKey, ...AuditActionFilterKey[]];
 export const auditActionFilterSchema = z.enum(auditActionFilterKeys);
 
 /** 「动作」筛选的选项（按登记顺序）：选了对象类型时只列该类型的动作，越权访问被拒对任何对象都列 */
 export function auditActionFilterOptions(
   type?: AuditObjectType,
-): { readonly value: string; readonly label: string }[] {
-  const options = new Map<string, string>();
+): { readonly value: AuditActionFilterKey; readonly label: string }[] {
+  const options = new Map<AuditActionFilterKey, string>();
   for (const [action, definition] of actionEntries) {
     if (type && definition.objectType !== null && definition.objectType !== type) continue;
     options.set(filterKeyOf(action, definition), definition.label);

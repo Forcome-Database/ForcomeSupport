@@ -1,4 +1,5 @@
 import {
+  SYSTEM_ACTOR_NAME,
   auditPeriodLabels,
   AUDIT_PAGE_SIZE,
   type AuditPeriod,
@@ -78,7 +79,7 @@ export const COLUMNS = {
 } as const;
 
 /** 系统操作的操作人与角色（原型「系统」，展开的说明行「系统 · 系统」） */
-export const SYSTEM = { avatar: '系', name: '系统' } as const;
+export const SYSTEM = { avatar: '系', name: SYSTEM_ACTOR_NAME } as const;
 /** 没有值（系统操作没有来源 IP） */
 export const NONE = '—';
 

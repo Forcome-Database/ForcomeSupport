@@ -166,6 +166,7 @@ export {
   loginMethods,
   phase1AuditObjectTypes,
   type AuditAction,
+  type AuditActionFilterKey,
   type AuditActionObjectType,
   type AuditObjectType,
   type AuditSnapshot,
