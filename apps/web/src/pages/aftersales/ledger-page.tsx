@@ -80,6 +80,7 @@ import { RegistrationDrawer, type DrawerTarget } from './registration-drawer';
 
 const LOADING_ROWS = 8;
 const BACKFILL_TOAST = 'aftersales-backfill';
+const BACKFILL_STALE_TOAST = 'aftersales-backfill-stale';
 
 const EMPTY = <span className="text-body text-subtle-foreground">{EMPTY_VALUE}</span>;
 const PENDING = <Badge tone="warning">{MISSING.pending}</Badge>;
@@ -362,6 +363,7 @@ function useInlineBackfill(): InlineBackfill {
   async function saveOnce(item: LedgerItem, tracking: string): Promise<void> {
     const saved = await mutation.mutateAsync({ item, tracking });
     dismissToast(BACKFILL_TOAST);
+    dismissToast(BACKFILL_STALE_TOAST);
     setEditing(null);
     showSuccess({
       title: BACKFILL_RESULT.title,
@@ -380,6 +382,13 @@ function useInlineBackfill(): InlineBackfill {
       (error.status === 409 || error.fields?.trackingNumber !== undefined);
     if (!stale) return false;
     setEditing(null);
+    // 说明已刷新、不给重试（再试也只会冲突）；用另一个 id，重试时原来的失败浮层随之撤掉也不会误删它
+    showError({
+      id: BACKFILL_STALE_TOAST,
+      action: BACKFILL_RESULT.failedAction,
+      error,
+      description: STALE,
+    });
     await refresh();
     return true;
   }
@@ -390,22 +399,15 @@ function useInlineBackfill(): InlineBackfill {
       await saveOnce(item, tracking);
     } catch (error) {
       if (endSessionIfUnauthenticated(queryClient, error)) return;
-      if (await collapseIfStale(error)) {
-        showError({
-          id: BACKFILL_TOAST,
-          action: BACKFILL_RESULT.failedAction,
-          error,
-          description: STALE,
-        });
-        return;
-      }
+      if (await collapseIfStale(error)) return;
       showError({
         id: BACKFILL_TOAST,
         action: BACKFILL_RESULT.failedAction,
         error,
+        // 重试时这一格刚被别人补过：收起编辑、另弹「已刷新为最新内容」，这条失败浮层随之撤掉
         retry: () =>
           saveOnce(item, tracking).catch(async (retryError: unknown) => {
-            await collapseIfStale(retryError);
+            if (await collapseIfStale(retryError)) return;
             throw retryError;
           }),
       });
