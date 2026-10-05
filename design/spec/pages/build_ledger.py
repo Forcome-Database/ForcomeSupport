@@ -33,17 +33,20 @@ def amt(x):
 
 
 def completion(c=None, month='9'):
-    """页头「当月登记完整率」（R-AS-08）：只随店铺数据范围与店铺筛选变化，不随日期筛选；点击筛出缺字段的已完成单。"""
+    """页头「当月登记完整率」（R-AS-08）：只随店铺数据范围与店铺筛选变化，不随日期筛选；点击筛出缺字段的已完成单。
+    当月没有已完成的单：写「—」、进度条为空、「0 / 0」，右侧不写筛出与「无缺字段的单」，整块不可点（待办 21，用户确认）。"""
     c = c or COMP
     miss = c['total'] - c['ok']
     v = c['ok'] * 100.0 / c['total'] if c['total'] else 0
     good = v >= 98
     bar = '<div style="width: 56px;">%s</div>' % progress(int(round(v)), 'success' if good else 'warning', 4)
     right = link('筛出缺字段的 %d 单' % miss, 12, 'chev_r') if miss else nowrap('无缺字段的单', 12, T['ok'], 600)
+    tail = divider(True, 16) + right if c['total'] else ''
+    pct = nowrap(c['pct'], 14, T['ink4'], 700) if not c['total'] else nowrap(c['pct'], 14, T['ok'] if good else T['warn'], 700)
     return ('<div title="已完成售后单中适用字段齐全的比例，按完成时间归月，历史导入不计（R-AS-08）。点击筛出缺字段的已完成单" style="height: 32px; box-sizing: border-box; display: inline-flex; align-items: center; gap: 8px; '
-            'background: #ffffff; border: 1px solid %s; border-radius: 8px; padding: 0px 10px; box-shadow: %s; white-space: nowrap; flex-shrink: 0;">%s%s%s%s%s%s%s</div>') % (
-        T['line'], SHADOW_XS, nowrap('%s 月登记完整率' % month, 12, T['ink3']), nowrap(c['pct'], 14, T['ok'] if good else T['warn'], 700), bar,
-        nowrap('%d / %d' % (c['ok'], c['total']), 12, T['ink2'], 600), nowrap('· 目标 ≥ 98%', 12, T['ink4']), divider(True, 16), right)
+            'background: #ffffff; border: 1px solid %s; border-radius: 8px; padding: 0px 10px; box-shadow: %s; white-space: nowrap; flex-shrink: 0;">%s%s%s%s%s%s</div>') % (
+        T['line'], SHADOW_XS, nowrap('%s 月登记完整率' % month, 12, T['ink3']), pct, bar,
+        nowrap('%d / %d' % (c['ok'], c['total']), 12, T['ink2'], 600), nowrap('· 目标 ≥ 98%', 12, T['ink4']), tail)
 
 
 def completion_of(rows, month='09'):
@@ -448,16 +451,18 @@ def s15_backfill_after():
     return '<div style="position: relative; padding-top: 80px;">%s<div style="position: absolute; right: 0px; top: 0px;">%s</div></div>' % (tbl, t), c
 
 
-def cancel_dialog():
-    """② 取消售后单：二次确认，原因必填（0 / 200），逐项列出已登记费用并勾选取消后保留的已产生部分（默认全部保留）；默认焦点在「取消」。"""
-    r = P1R[LEDGER_CANCEL_DEMO]
-    items = [('产品成本', r['product']), ('运费', r['freight']), ('额外赔偿', r['comp']), ('其他', r['other'])]
+def cancel_dialog(no=LEDGER_CANCEL_DEMO, err=False):
+    """② 取消售后单：二次确认，原因必填（0 / 200），逐项列出已登记费用并勾选取消后保留的已产生部分（默认全部保留）；默认焦点在「取消」。
+    没登记的费用项不列（待办 21，用户确认）；err=True：原因为空点「取消售后单」的报错。"""
+    r = P1R[no]
+    items = [(k, v) for k, v in (('产品成本', r['product']), ('运费', r['freight']), ('额外赔偿', r['comp']), ('其他', r['other'])) if v is not None]
     lines = ''.join('<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 12px;%s">%s%s</div>' % (
         ' border-top: 1px solid %s;' % T['line2'] if i else '', checkbox(k, True), nowrap(money(v), 13, T['ink'], 600)) for i, (k, v) in enumerate(items))
     keep = sum(v for _, v in items)
     box = '<div style="border: 1px solid %s; border-radius: 8px; overflow: hidden;">%s<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 12px; background: %s; border-top: 1px solid %s;">%s%s</div></div>' % (
         T['line'], lines, T['subtle'], T['line'], nowrap('保留合计 · 按费用发生日 %s 计入售后成本' % r['fee_date'], 12, T['ink3']), nowrap(money(round(keep, 2)), 13, T['ink'], 700))
-    body = field('取消原因', textarea_box(None, '例如：客户撤回售后申请、改为退款处理', 'default', 56, '0 / 200'), True) + \
+    reason = textarea_box(None, '例如：客户撤回售后申请、改为退款处理', 'error' if err else 'default', 56, '0 / 200')
+    body = field('取消原因', reason, True, error='请填写取消原因' if err else None) + \
         col(between(label('已登记费用 · 勾选取消后保留的已产生部分'), nowrap('默认全部保留', 12, T['ink4'])) + box, 6) + \
         col(bullet('已取消的单不能恢复；保留的费用照常计入售后成本。') + bullet('未勾选的项不计入售后成本，登记值与取消原因记入审计日志。'), 4)
     return dialog('取消 %s？' % r['no'], body, btn('取消', 'secondary', st='focus') + btn('取消售后单', 'danger'), 460, 'danger',

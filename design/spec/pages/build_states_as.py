@@ -189,7 +189,7 @@ def s14():
     left = col(cap('新建登记 · 寄配件（%s · %s）' % (LEDGER_NEW_DEMO['customer'], LEDGER_NEW_DEMO['store'])) + over_page(BL.reg_drawer(), 1030), 8)
     right = col(cap('保存时校验 · 改为退款或部分补偿、责任「其他」') + over_page(BL.reg_drawer(True), 910) +
                 cap('编辑登记 · 进行中的单，比索金额显示折算与汇率日期') + over_page(BL.edit_drawer(), 460, 0.444), 8)
-    return col(frame(grid(left + right, 2, 32, extra='align-items: start;'), WIDE) + s14_more() + s14_rates(), 0)
+    return col(frame(grid(left + right, 2, 32, extra='align-items: start;'), WIDE) + s14_more() + s14_rates() + s14_edit_more(), 0)
 
 
 def s14_more():
@@ -253,6 +253,43 @@ def s14_rates():
     return frame(cap('S14 补充小样之二 · 汇率（第一阶段实现时确认，10-05）') + grid(left + right, 2, 32, extra='align-items: start;'), WIDE, gap=10)
 
 
+def s14_edit_more():
+    """S14 的补充小样之三（第一阶段实现时确认，10-05，待办 21）：编辑登记抽屉按状态与权限的三种形态、修改汇率点开后、未保存离开与保存结果。"""
+    width = lambda html: '<div style="width: 640px; display: flex; flex-direction: column; gap: 10px;">%s</div>' % html
+    r = BL.P1R[LEDGER_DONE_DEMO]
+    off = lambda v: input_box(v, st='disabled')
+    ship = grid(BL.span(field('配件', off('HEPA 滤芯组件 FC-V2-HF01'), True)) + field('数量', input_box('1', st='disabled', suffix='件 · 1–10', mono=True), True) +
+                field('发货方', off(r['shipper']), True) + field('承运方式', off(r['carrier']), True) +
+                field('寄出日期', input_box(None, '寄出后填写', icon_name='calendar'), True) +
+                BL.span(field('快递单号', input_box(None, '寄出后填写', mono=True), True)), 4, 10)
+    backfill = BL.fsec(4, '寄件', ship, '进行中可后填；完成时缺失计入「待回填」')
+    head = row(state('已完成') + nowrap('%s · %s · %s' % (r['customer'], store_site(r), r['method']), 12, T['ink2']) +
+               nowrap('· 负责人 %s' % r['owner'], 12, T['ink4']), 8)
+    readonly_foot = '<div style="display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid %s; background: %s;">%s</div>' % (
+        T['line2'], T['subtle'], btn('关闭', 'secondary'))
+    peso = BL.money_field('额外赔偿', '889.00', 'MXN')
+    rate_line = lambda st='focus', value='17.50': row(nowrap('1 USD =', 12, T['ink3']) + input_box(value, st=st, width='96px', h=28, mono=True) + nowrap('MXN', 12, T['ink3']), 6)
+    editing = col(peso + rate_line(), 6) + row(nowrap('修改汇率', 12, T['ink4'], 500) + icon('edit', 12, T['ink4']) +
+                                                nowrap('取费用发生日的欧洲央行日汇率；只有售后负责人可改，记入审计日志', 12, T['ink4']), 8)
+    rate_error = col(peso + rate_line('error', '0') +
+                     row(icon('alert', 13, T['bad'], 2) + nowrap('汇率须大于 0，最多 6 位整数与 6 位小数', 12, T['bad']), 4), 6)
+    denied = row(row(nowrap('修改汇率', 12, T['ink5'], 500) + icon('edit', 12, T['ink5']), 4) + tooltip('只有售后负责人可以修改汇率'), 10)
+    leave = dialog('离开前保存修改？', muted('「编辑登记」有 2 项未保存的修改。放弃后恢复为上次保存的值。', 13),
+                   btn('继续编辑', 'secondary', st='focus') + btn('放弃修改', 'danger_outline') + btn('保存并离开', 'primary'), 460, 'warning')
+    saved = toast('success', '登记已保存', 'S-20260911-0020 · Mateo Rivas，已记入审计日志。')
+    filled = toast('success', '已补登 · 已记入审计日志', '%s 补登了 寄出日期、快递单号' % LEDGER_DONE_DEMO)
+    left = width(cap('已完成 · 售后负责人补登：已填的字段只读，只有缺失的适用字段可填（%s 设为已完成后缺寄出日期、快递单号）；底部同编辑登记「修改记入审计日志 · 取消 · 保存修改」' % LEDGER_DONE_DEMO) +
+                 head + backfill +
+                 cap('只读（已取消；客服主管打开别人登记的单或已完成的单；售后负责人打开不是自己登记或负责的进行中单；坐席）：字段全部禁用，底部只有「关闭」；坐席不显示比例表与「费用（原币）」一节') +
+                 readonly_foot)
+    right = width(cap('修改汇率 · 点开后每个非美元金额框下的折算行变为「1 USD = [输入框] 币种」，预填当前汇率，链接不可再点；随「保存修改」提交，只交改动过的汇率') + editing +
+                  cap('汇率填错：报错写在该金额的汇率下方') + rate_error +
+                  cap('不是售后负责人：「修改汇率」禁用，悬停说明（只在有非美元费用项时显示这一行）') + denied +
+                  cap('编辑时有未保存的修改就关闭（G8）') + leave +
+                  cap('保存结果：编辑登记 · 补登') + col(saved + filled, 10))
+    return frame(cap('S14 补充小样之三 · 编辑登记（第一阶段实现时确认，10-05）') + grid(left + right, 2, 32, extra='align-items: start;'), WIDE, gap=10)
+
+
 # ---------------------------------------------------------------- S15 设为已完成、取消与补登
 def s15():
     after_bf, c_bf = BL.s15_backfill_after()
@@ -263,7 +300,43 @@ def s15():
                 cap('保存后 · 「缺 1 项」消失') + after_bf +
                 row(muted('补登记入审计日志（P27）。页头完整率：', 12) + BL.completion(c_bf), 10, wrap=True), 10)
     two = col(cap('② 取消售后单 · 二次确认，原因必填') + over_page(BL.cancel_dialog(), 680, drawer_=False), 8)
-    return frame(grid(col(one + three, 24) + two, 2, 32, extra='align-items: start;'), WIDE)
+    return col(frame(grid(col(one + three, 24) + two, 2, 32, extra='align-items: start;'), WIDE) + s15_more(), 0)
+
+
+def s15_more():
+    """S15 的补充小样（第一阶段实现时确认，10-05，待办 21）：完整率的空月与筛出缺字段、「缺 N 项」悬停、更多菜单的禁用项、
+    设为已完成与撤销的其他浮层、取消弹窗的没登记费用与报错、行内补登为空。"""
+    width = lambda html: '<div style="width: 864px; display: flex; flex-direction: column; gap: 10px;">%s</div>' % html
+    empty_month = BL.completion({'ok': 0, 'total': 0, 'pct': '—'}, '10')
+    chip = ('<div style="height: 28px; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: %s; background: %s; border: 1px solid %s; border-radius: 8px; padding: 0px 6px 0px 8px; white-space: nowrap;">'
+            '%s缺字段的已完成单：<span style="font-weight: 600; color: %s;">9 月</span><div title="移除这条筛选" style="display: flex; padding: 2px; border-radius: 4px;">%s</div></div>') % (
+        T['ink3'], T['accent_bg'], T['accent_line'], icon('filter', 13, T['accent_ink']), T['accent_ink'], icon('x', 12, T['accent_ink'], 2))
+    filtered = between(chip, link('清除筛选', 12)) + BL.mini_table([BL.mini_row(BL.P1R[BL.BACKFILL_P1])])
+    miss_tip = row(BL.no_cell(LEDGER_DONE_DEMO, ['寄出日期', '快递单号']) + tooltip('缺：寄出日期、快递单号（含隐藏列里的字段）'), 12, 'center')
+    item = lambda t, ic, tone=None: (t, ic, tone)
+    menus = row(col(nowrap('已完成的单', 12, T['ink3']) + row(menu([item('设为已完成', 'check_c', 'muted'), item('改派负责人', 'users'), '-', item('取消售后单', 'x_c', 'muted')], 168) +
+                    col(tooltip('这张单已完成') + tooltip('已完成的单不能取消'), 6), 8, 'flex-start'), 6) +
+                col(nowrap('客服主管 · 别人登记的进行中单', 12, T['ink3']) + row(menu([item('设为已完成', 'check_c', 'muted'), item('改派负责人', 'users'), '-', item('取消售后单', 'x_c', 'danger')], 168) +
+                    tooltip('只有登记人或负责人可以设为已完成'), 8, 'flex-start'), 6), 24, 'flex-start')
+    done_ok = toast('success', 'S-20260911-0020 已完成', undo=5, remain=4)
+    undo_fail = toast('error', '撤销失败：已超过撤销时限，这张单保持已完成', None, link('立即重试', 12))
+    stale = toast('error', '设为已完成失败：数据已被他人修改', '已刷新为最新内容，请核对后再操作。')
+    cancelled = toast('success', '已取消售后单 S-20260911-0021', '已记入审计日志。')
+    bf = BL.P1R[BL.BACKFILL_P1]
+    ed = row('<div style="flex: 1; min-width: 0px;">%s</div>' % input_box(None, st='focus', mono=True, h=28) +
+             row(btn('保存', 'primary', 'sm', disabled=True, reason='先填写快递单号') + tooltip('先填写快递单号'), 6), 6)
+    empty_bf = BL.mini_table([BL.mini_row(bf, tracking=ed)], {0: 'select'})
+    left = width(cap('当月没有已完成的单（例如月初）：写「—」、进度条为空，右侧不写筛出，整块不可点') + row(empty_month, 0) +
+                 cap('点「筛出缺字段的 N 单」后：选中态的筛选芯片「缺字段的已完成单：9 月」带 ×，右侧「清除筛选」；只列当月（按完成时间）已完成、缺适用字段的单，与完整率同口径，历史导入不列') + filtered +
+                 cap('「缺 N 项」悬停列出缺的字段（按抽屉顺序；配件 × 数量算一项，索赔对象与状态合算一项）') + miss_tip +
+                 cap('行尾「更多」不可用的项禁用并悬停说明原因（这张单已取消时两项都写「这张单已取消」）；坐席没有「更多」') + menus)
+    right = col(cap('设为已完成后不缺字段：只写标题，带撤销倒计时（同 G5「已关闭工单」）') + done_ok +
+                cap('撤销失败（超过撤销时限或网络）') + undo_fail +
+                cap('操作时这张单刚被别人改过（设为已完成、取消、补登同理）：台账随之刷新') + stale +
+                cap('取消成功') + cancelled +
+                cap('行内补登时快递单号为空：「保存」禁用，悬停说明') + empty_bf, 10)
+    return frame(cap('S15 补充小样（第一阶段实现时确认，10-05）') + grid(left + col(right + cap('取消弹窗 · 没登记的费用项不列（S-20260911-0019 的产品成本、运费还没登记）；原因为空点「取消售后单」报错；四项都没登记时不显示费用框与「保留合计」') +
+                                                                          over_page(BL.cancel_dialog('S-20260911-0019', True), 640, drawer_=False), 10), 2, 32, extra='align-items: start;'), WIDE, gap=10)
 
 
 # ---------------------------------------------------------------- S16 第二阶段的手工登记单（prd_b 6.5 边界，D-27）
@@ -318,7 +391,7 @@ def build():
            '责任为物流问题时列出索赔对象与索赔状态，三组工厂比例都为 0 时不显示生产厂。来源工单离开输入框时查询，带入店铺、站点、订单号、客户（仍可改，保存时店铺须一致）；选店铺带出默认站点与默认负责人，费用发生日默认今天，寄配件数量默认 1。'
            '编辑登记为同一抽屉，标题「编辑登记 · S-…」，已完成的单只能由售后负责人补登缺失的适用字段与修改汇率，修改记审计。非美元金额按费用发生日取汇率（当天没有取此前最近一个有汇率的日期），费用发生日及之前都没有汇率时不能保存，报「费用发生日及之前没有汇率，暂时不能折算美元」；修改汇率后汇率日期为费用发生日、来源记「手工修改」，P13 金额的悬停说明随之写手工修改的汇率。下方为补充小样（第一阶段实现时确认）。', s14(), 'P13 点「新建登记」或售后单号') +
         VW('S15 设为已完成、取消与补登', '三张小图：① 设为已完成：直接执行，浮层「S-20260911-0018 已完成 · 缺 2 项，已标黄待回填 · 撤销 4s」；② 取消售后单：二次确认弹窗「取消 S-20260911-0021？」，原因必填（0 / 200），逐项列出已登记费用并勾选取消后保留的已产生部分（默认全部保留），'
-           '说明「已取消的单不能恢复；保留的费用照常计入售后成本」，默认焦点在「取消」；③ 补登：售后负责人点已完成单的「待回填」单元格行内编辑快递单号，保存后浮层「已补登 · 已记入审计日志」，「缺 N 项」随之减少。', s15(),
+           '说明「已取消的单不能恢复；保留的费用照常计入售后成本」，默认焦点在「取消」；③ 补登：售后负责人点已完成单的「待回填」单元格行内编辑快递单号，保存后浮层「已补登 · 已记入审计日志」，「缺 N 项」随之减少。下方为补充小样（第一阶段实现时确认）。', s15(),
            'P13 行尾「更多」或已完成单的「待回填」单元格'),
         40)
     return board('售后状态', '售后单确认、详情、协商、台账、结算的状态与异常（S1–S16；S13–S15 为第一阶段登记台账，S16 为第二阶段的手工登记单）。详情画面同 P09–P12：标题旁只留状态徽标，步骤条上方「当前卡点」；禁用按钮悬停给出原因。示例单号与金额与高保真页面一致；演示时刻 %s，超时类画面按时限推算到之后的时刻。' % NOW_LABEL, body, 1920, 7545)
