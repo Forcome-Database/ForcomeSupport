@@ -8,10 +8,11 @@
 export const PAGE_TITLE = '工单';
 export const PAGE_DESCRIPTION = '全部渠道 · 全部店铺';
 
-/** 待办 08 的六列（来源、订单号、SLA 剩余随 10、14、16、18 加在原型的位置上） */
+/** 已有的七列（订单号、SLA 剩余随 14、18 加在原型的位置上）；来源的取值叫法在 contracts 的 messageSourceLabels */
 export const COLUMNS = {
   number: '工单号',
   subject: '主题',
+  source: '来源',
   channelStore: '渠道与店铺',
   customer: '客户',
   status: '状态',

@@ -1,4 +1,9 @@
-import type { TicketDetail, TicketListItem, TicketMessage } from '@forcome/contracts';
+import {
+  isTicketSource,
+  type TicketDetail,
+  type TicketListItem,
+  type TicketMessage,
+} from '@forcome/contracts';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { listMessageSummaries, storeNamesById } from '../channel';
 import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
@@ -17,6 +22,7 @@ const ticketColumns = {
   storeId: ticket.storeId,
   channel: ticket.channel,
   site: ticket.site,
+  source: ticket.source,
   customerId: ticket.customerId,
   subject: ticket.subject,
   orderNumber: ticket.orderNumber,
@@ -39,6 +45,7 @@ function toListItem(row: TicketRow, storeNames: Map<string, string>): TicketList
     id: row.id,
     number: row.number,
     subject: row.subject,
+    source: row.source,
     channel: row.channel,
     site: row.site,
     store: { id: row.storeId, name: storeNames.get(row.storeId) ?? '' },
@@ -102,11 +109,16 @@ export async function ticketDetail(
     if (!s) {
       throw new Error(`工单 ${row.number} 的消息 ${link.channelMessageId} 在当前店铺范围里读不到`);
     }
+    // 工单里的来信都识别过（归档的来源不进工单）：客户渠道身份与来源不为空
+    if (s.senderAddress === null || s.source === null || !isTicketSource(s.source)) {
+      throw new Error(`工单 ${row.number} 的消息 ${s.id} 没有识别结果`);
+    }
     return {
       id: s.id,
       direction: s.direction,
       mailbox: s.mailbox,
-      from: { name: s.fromName, address: s.fromAddress },
+      from: { name: s.senderName ?? '', address: s.senderAddress },
+      source: s.source,
       subject: s.subject,
       arrivedAt: s.receivedAt.toISOString(),
       alsoSentTo: [...s.alsoSentTo],

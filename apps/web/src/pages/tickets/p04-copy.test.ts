@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import {
+  messageSourceLabels,
   ticketChannelLabels,
   ticketStatuses,
   ticketStatusLabels,
@@ -34,8 +35,22 @@ describe('P04 第一期参照页', () => {
     expectText(P04, EMPTY_VALUE);
   });
 
-  it('待办 08 的六列表头逐字一致（来源、订单号、SLA 剩余随 10、14、16、18）', () => {
+  it('已有的七列表头逐字一致，顺序与原型相同（订单号、SLA 剩余随 14、18）', () => {
     for (const title of Object.values(COLUMNS)) expectText(P04, title);
+    // 表头从「工单号」起（之前的筛选行也有「来源」「状态」等字样）
+    const header = P04.indexOf(`>${COLUMNS.number}<`);
+    const positions = Object.values(COLUMNS).map((title) => P04.indexOf(`>${title}<`, header));
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  it('来源列：客户只写「客户」，生产厂是带图标的徽标（文字紧跟在图标之后）', () => {
+    expectText(P04, messageSourceLabels.customer);
+    expect(P04).toContain(`</svg>${messageSourceLabels.producer}</div>`);
+    expect(messageSourceLabels).toMatchObject({
+      customer: '客户',
+      producer: '生产厂',
+      other_supplier: '其他供应商',
+    });
   });
 
   it('渠道与站点徽标、状态徽标照原型的写法', () => {

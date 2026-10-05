@@ -6,6 +6,8 @@
 //   node deploy/deploy.mjs staging cert         导出 caddy 根证书（发给员工浏览器安装）并显示指纹
 //   node deploy/deploy.mjs staging compose …    带上项目名、Compose 文件、环境文件与当前版本执行 docker compose
 //   node deploy/deploy.mjs staging down         停止并删除容器（保留数据卷）
+//   node deploy/deploy.mjs staging reset-inbound 重放来信：停 worker → 清空收信与工单 → 起 worker（按当前口径重新回放
+//                                               示例来信；只用于非生产环境，docs/部署说明.md「重放来信」）
 //
 // 只依赖 Node（≥ 22）、git 与 Docker（含 compose），不需要 pnpm install；Linux 服务器与 Windows 本机通用。
 // 环境文件默认 deploy/.env.<环境>，可用 FORCOME_ENV_FILE 指到别处；部署产物（根证书、报告）在 deploy/.state/<环境>/。
@@ -28,7 +30,7 @@ import { capture, mustRun, run } from './lib/process.mjs';
 import { formatReport, summarizePlaywright } from './lib/report.mjs';
 
 const ROOT_CERT_IN_CADDY = '/data/caddy/pki/authorities/local/root.crt';
-const USAGE = `用法：node deploy/deploy.mjs <环境> [deploy | smoke | cert | compose <参数…> | down]
+const USAGE = `用法：node deploy/deploy.mjs <环境> [deploy | smoke | cert | compose <参数…> | down | reset-inbound]
 环境：${Object.keys(ENVIRONMENTS).join('、')}`;
 
 // 所有路径相对仓库根目录（Docker 在 Windows 上把「盘符:」当成容器名，所以不用绝对路径）
@@ -291,6 +293,23 @@ async function main() {
     case 'down': {
       const release = existsSync(releaseFile) ? deployedRelease() : 'none';
       composeFor(loadDeployEnv(), release).run('down');
+      return true;
+    }
+    case 'reset-inbound': {
+      // 重放来信（待办 10）：用当前部署的镜像清空收信与工单；镜像里的入口自己也拒绝生产环境
+      if (environment.appEnv === 'production') {
+        console.error('生产环境不能清空收信与工单');
+        return false;
+      }
+      const compose = composeFor(loadDeployEnv(), deployedRelease());
+      compose.run('stop', 'worker');
+      try {
+        compose.run('run', '--rm', '--no-deps', 'migrate', 'node', 'dist/reset-inbound.mjs');
+      } finally {
+        // worker 重启后重新 watch 各邮箱，Fake Gmail 按当前口径重新回放示例来信
+        compose.run('start', 'worker');
+      }
+      console.log('已清空收信与工单，worker 已重启，示例来信几十秒内重新归并成工单');
       return true;
     }
     default:

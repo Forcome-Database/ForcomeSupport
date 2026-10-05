@@ -107,8 +107,13 @@ export { currencies, currencySchema, type Currency } from './money';
 export { homeFor, navFor, navSections, navSectionSchema, type NavSection } from './navigation';
 export { roleByLabel, roleLabels, roleNames, roles, roleSchema, type Role } from './roles';
 export {
+  isArchivedSource,
+  isTicketSource,
   messageDirections,
   messageDirectionSchema,
+  messageSourceLabels,
+  messageSources,
+  messageSourceSchema,
   ticketChannelLabels,
   ticketChannels,
   ticketChannelSchema,
@@ -122,12 +127,15 @@ export {
   ticketListSchema,
   ticketMessageSchema,
   ticketNumberSchema,
+  ticketSources,
+  ticketSourceSchema,
   ticketStatusLabels,
   ticketStatuses,
   ticketStatusSchema,
   ticketTriggers,
   ticketTriggerSchema,
   type MessageDirection,
+  type MessageSource,
   type TicketChannel,
   type TicketCloseReason,
   type TicketDetail,
@@ -135,6 +143,7 @@ export {
   type TicketList,
   type TicketListItem,
   type TicketMessage,
+  type TicketSource,
   type TicketStatus,
   type TicketTrigger,
 } from './ticket';

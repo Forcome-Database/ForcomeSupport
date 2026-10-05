@@ -84,7 +84,8 @@ describe('来信到工单', () => {
         id: expect.any(String) as string,
         number: 'T-20260910-0001',
         subject: 'Box arrived crushed, the vacuum is cracked',
-        // 渠道识别（R-TK-08）与亚马逊按发件域识别站点随待办 10：先记「邮件」、站点取店铺默认站点
+        source: 'customer',
+        // 客户直接写到店铺邮箱（直邮）：渠道「邮件」、站点取店铺默认站点（R-TK-08，渠道与来源识别见 source-recognition）
         channel: 'email',
         site: 'US',
         store: { id: AUTO.id, name: 'Forcome Auto' },
@@ -494,9 +495,9 @@ describe('工单状态只能经迁移表改变（ADR 0008）', () => {
     ).rows;
     await expect(
       t.runtime.db.execute(sql`
-        INSERT INTO ticket.ticket (number, store_id, channel, site, customer_id, subject, status,
+        INSERT INTO ticket.ticket (number, store_id, channel, site, source, customer_id, subject, status,
           first_inbound_at, last_inbound_at, created_at, updated_at)
-        VALUES ('T-20260910-0999', ${existing!.store_id}, 'email', 'US', ${existing!.customer_id}, '绕过', 'awaiting_reply',
+        VALUES ('T-20260910-0999', ${existing!.store_id}, 'email', 'US', 'customer', ${existing!.customer_id}, '绕过', 'awaiting_reply',
           now(), now(), now(), now())`),
     ).rejects.toMatchObject({ cause: { message: expect.stringContaining(GUARD) as string } });
     expect(await ticketList(agent)).toHaveLength(1);
@@ -535,6 +536,40 @@ describe('开发测试环境的示例来信回放（ADR 0009 修订）', () => {
       store: { name: 'Forcome Auto' },
       lastInboundAt: '2026-09-10T00:15:00.000Z',
     });
+  });
+
+  it('回放的来信按新口径识别（待办 10）：每位客户工单的渠道、站点、来源都与原型一致', async () => {
+    const CHANNEL = { 亚马逊: 'amazon', Shopify: 'shopify', 邮件: 'email' } as const;
+    const SOURCE = { 客户: 'customer', 生产厂: 'producer', 其他供应商: 'other_supplier' } as const;
+    const tickets = await ticketList(await t.loginAs('客服主管'));
+    const recognized = (customer: string) => {
+      const ticket = tickets.find((tk) => tk.customer.name === customer)!;
+      return { channel: ticket.channel, site: ticket.site, source: ticket.source };
+    };
+    for (const sample of getDemoFixture().tickets) {
+      expect(recognized(sample.customer), sample.no).toEqual({
+        channel: CHANNEL[sample.channel],
+        site: sample.site,
+        source: SOURCE[sample.source],
+      });
+    }
+    // 几张典型的：亚马逊按中转域定站点（MX、CA）；Shopify 联系表单的客户取回复邮箱；已登记生产厂邮箱标「生产厂」
+    expect(recognized('Mateo Rivas')).toEqual({
+      channel: 'amazon',
+      site: 'MX',
+      source: 'customer',
+    });
+    expect(recognized('Oliver Grant')).toEqual({
+      channel: 'amazon',
+      site: 'CA',
+      source: 'customer',
+    });
+    expect(recognized('Valeria Ríos')).toEqual({
+      channel: 'shopify',
+      site: 'MX',
+      source: 'customer',
+    });
+    expect(recognized('FQD 品质部')).toEqual({ channel: 'email', site: 'US', source: 'producer' });
   });
 
   it('P05 时间线那张工单（Oliver Grant）按时间线里的三封来信回放，编号日期取首封来信', async () => {

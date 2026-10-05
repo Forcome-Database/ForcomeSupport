@@ -3,6 +3,7 @@
 #   docker run <image> node dist/worker.mjs     → worker
 #   docker run <image> node dist/migrate.mjs    → migrate（一次性，先于 api 与 worker）
 #   docker run <image> node dist/seed.mjs       → 灌示例数据（只用于非生产环境，先跑 migrate）
+#   docker run <image> node dist/reset-inbound.mjs → 重放来信：清空收信与工单（只用于非生产环境，先停 worker）
 # 构建上下文是仓库根目录：docker build -f apps/server/Dockerfile -t forcome-server .
 FROM node:24-slim AS build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0

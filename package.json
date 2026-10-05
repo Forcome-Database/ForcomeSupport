@@ -24,6 +24,7 @@
     "db:check": "pnpm --filter @forcome/server db:check",
     "db:migrate": "pnpm --filter @forcome/server db:migrate",
     "db:seed": "pnpm --filter @forcome/server db:seed",
+    "db:reset-inbound": "pnpm --filter @forcome/server db:reset-inbound",
     "db:verify": "pnpm --filter @forcome/server db:check && node scripts/check-migrations.mjs",
     "deploy:staging": "node deploy/deploy.mjs staging deploy",
     "deploy:verify": "node deploy/verify.mjs",

@@ -34,6 +34,45 @@ export const ticketChannelLabels: Record<TicketChannel, string> = {
 };
 
 /**
+ * 来信的来源（PRD 1.4「来源」、11.1 Message）：发件方类型，由 channel 按来源规则表判定（规格 channel「来源识别」）。
+ * 平台通知与营销归档、不建工单；生产厂与其他供应商照常建工单并标注来源，但不是应回复来信，不计工单量与 SLA（D-23、D-24）。
+ */
+export const messageSources = [
+  'customer',
+  'platform_notification',
+  'producer',
+  'other_supplier',
+  'marketing',
+] as const;
+export const messageSourceSchema = z.enum(messageSources);
+export type MessageSource = z.infer<typeof messageSourceSchema>;
+export const messageSourceLabels: Record<MessageSource, string> = {
+  customer: '客户',
+  platform_notification: '平台通知',
+  producer: '生产厂',
+  other_supplier: '其他供应商',
+  marketing: '营销',
+};
+
+/**
+ * 工单的来源（11.1 Ticket「来源（首封来信的来源）」）：只有会建工单的三种，也是 P04 来源筛选的取值
+ * （客户 / 生产厂 / 其他供应商，P04「第一阶段」）
+ */
+export const ticketSources = ['customer', 'producer', 'other_supplier'] as const;
+export const ticketSourceSchema = z.enum(ticketSources);
+export type TicketSource = z.infer<typeof ticketSourceSchema>;
+
+/** 会建工单的来源（客户、生产厂、其他供应商） */
+export function isTicketSource(source: MessageSource): source is TicketSource {
+  return (ticketSources as readonly MessageSource[]).includes(source);
+}
+
+/** 归档、不建工单的来源（平台通知、营销） */
+export function isArchivedSource(source: MessageSource): boolean {
+  return !isTicketSource(source);
+}
+
+/**
  * 引起状态迁移的事件（6.1 第一阶段迁移表的「事件」列，一次定好；各行随待办补齐）：
  * - inbound：新来信（不论来源）——没有可追加或重开的工单时新建为待回复；待回复的工单追加、状态不变；
  *   等客户、已解决的工单回到待回复（16）
@@ -83,11 +122,14 @@ export type MessageDirection = z.infer<typeof messageDirectionSchema>;
 /** 工单号 T-日期-4 位当日序号（11.2；日期取首封来信日期，北京时间） */
 export const ticketNumberSchema = z.string().regex(/^T-\d{8}-\d{4}$/, '工单号的格式是 T-日期-序号');
 
-/** P04 工单列表的一行（第一阶段；待办 08 是最简列表，来源、订单号、SLA 剩余随 10、14、16、18） */
+/** P04 工单列表的一行（第一阶段；订单号、SLA 剩余随 14、16、18） */
 export const ticketListItemSchema = z.object({
   id: z.uuid(),
   number: ticketNumberSchema,
   subject: z.string(),
+  /** 工单的来源：首封来信的来源（11.1 Ticket） */
+  source: ticketSourceSchema,
+  /** 渠道（R-TK-08）与站点（亚马逊按发件域，其余取店铺默认站点；Shopify 按订单收件国家随 14），都取首封来信 */
   channel: ticketChannelSchema,
   site: siteSchema,
   store: z.object({ id: z.uuid(), name: z.string() }),
@@ -108,7 +150,12 @@ export const ticketMessageSchema = z.object({
   direction: messageDirectionSchema,
   /** 收到这封信的店铺邮箱（进线邮箱） */
   mailbox: z.string(),
+  /**
+   * 发件人：客户渠道身份（R-TK-08）——亚马逊为买家消息中转地址，Shopify 联系表单为表单里的回复邮箱，其余为发件地址
+   */
   from: z.object({ name: z.string(), address: z.string() }),
+  /** 来信的来源（归档的平台通知与营销不会进工单）；我方发出的消息为空（16） */
+  source: ticketSourceSchema.nullable(),
   subject: z.string(),
   /** 到达时间（Gmail internalDate） */
   arrivedAt: z.iso.datetime({ offset: true }),

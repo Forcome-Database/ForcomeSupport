@@ -127,6 +127,7 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 | `pnpm db:up` / `pnpm db:down` | 起停本机 PostgreSQL 18（`docker-compose.dev.yml`，端口 4520，可用 `DEV_PG_PORT` 覆盖） |
 | `pnpm db:migrate` | 执行迁移；默认对本机开发库（`apps/server/dev.env`），设 `DATABASE_URL` 可指向别的库 |
 | `pnpm db:seed` | 灌示例数据夹具（各模块登记的加载步骤；生产环境拒绝），先跑 `db:migrate` |
+| `pnpm db:reset-inbound` | 重放来信：清空本机开发库的收信与工单（识别或归并口径变了以后用；先停 `dev:worker`，再启动后按新口径重新回放；生产环境拒绝） |
 | `pnpm db:generate` | 改了某个模块的 `schema.ts` 后生成迁移 |
 | `pnpm --filter @forcome/server dev:api` / `dev:worker` | 本机运行 api（4516）/ worker，环境变量默认取 `apps/server/dev.env`（开启开发登录）；worker 启动时 Fake Gmail 回放示例来信，几秒后在 P04 归并成工单 |
 | `pnpm --filter @forcome/web dev` | 本机运行前端（http://127.0.0.1:4517），`/api` 转给本机 api；未登录时进入开发登录页，选一位示例成员即可登录 |
@@ -137,7 +138,7 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 | `pnpm test:e2e` | Playwright 端到端（需要 `pnpm db:up`；自己起 4518、4519 两个服务，用 e2e 专用库 `forcome_e2e`） |
 | `pnpm ci:local` | 本机跑一遍与 CI 相同的检查（先 `pnpm db:up`，并且需要 Docker 构建镜像） |
 | `pnpm deploy:staging` | 部署到开发测试环境（本机 Docker）：构建镜像 → migrate → 示例数据 → 起服务 → 用根证书核对 HTTPS → Playwright 冒烟，报告在 `deploy/.state/staging/`（`docs/部署说明.md`） |
-| `pnpm staging smoke` · `cert` · `compose …` · `down` | 对开发测试环境：重跑 HTTPS 核对与冒烟 · 导出根证书 · 执行 docker compose · 停止（保留数据） |
+| `pnpm staging smoke` · `cert` · `compose …` · `down` · `reset-inbound` | 对开发测试环境：重跑 HTTPS 核对与冒烟 · 导出根证书 · 执行 docker compose · 停止（保留数据） · 重放来信（停 worker、清空收信与工单、起 worker，`docs/部署说明.md`） |
 | `pnpm deploy:verify` | 部署配置检查：Compose 文件、前端镜像、Caddyfile（CI 与 `ci:local` 执行） |
 
 **测试**：`*.test.ts` 是单元测试；`*.int.test.ts` 是集成测试，用真实 PostgreSQL 18——每次运行先建模板库并迁移，各测试文件再复制出自己的库，互不干扰。集成测试只经主接缝（规格「测试接缝」）：用 `apps/server/test/harness.ts` 的 `startTestHarness()` 在测试进程内调用 HTTP 接口，`t.loginAs('坐席')` 以某个角色登录（`t.addMember(…)` 建多角色、店铺范围受限等示例数据里没有的成员后用 `t.loginAs({ memberId })`），`t.clients.fake(…)` 往 Fake 里放数据、注入故障，`t.clock` 推进时钟，`t.runJobs()` 把 worker 跑到空闲（每轮先拉常驻拉取源，如 Fake Gmail 的推送通知，再跑已排队的任务），`t.auditRecords()` 核对审计；要验证生产环境的限制时用 `startTestHarness({ appEnv: 'production' })`（应用按生产组装，测试工具另用非生产实例做开发登录，见 `apps/server/test/stores.int.test.ts`）；样板见 `apps/server/test/dev-login.int.test.ts`；还没有业务接口使用的公共工具（店铺范围、越权审计、财务字段过滤）用 `startTestHarness({ routes })` 挂示范接口来测，见 `apps/server/test/access-tools.int.test.ts`。外部客户端的「接口 + 真实现 + Fake」写法见 `apps/server/src/modules/integration/fake-framework.test.ts`。来信用 `t.clients.fake(gmailClient).deliver(…)` 放进 Fake Gmail（邮箱要先开始监听：灌完店铺先 `t.runJobs()` 一次），见 `apps/server/test/inbound-to-ticket.int.test.ts`。
@@ -148,7 +149,7 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 
 **部署**：main 上 CI 通过后，`.github/workflows/deploy-staging.yml` 在内网的开发测试运行器上执行 `deploy/deploy.mjs`，部署后对开发测试环境跑 Playwright（`apps/web/e2e` 全部用例）并在作业摘要里报告。仓库暂不上 GitHub，期间在本机用 `pnpm deploy:staging` 部署与冒烟；启用步骤、根证书安装与运维清单见 `docs/部署说明.md`。本机开发时的端到端用 `pnpm test:e2e`。
 
-**镜像**：`docker build -f apps/server/Dockerfile -t forcome-server .`（构建上下文是仓库根目录）；默认运行 api，`node dist/worker.mjs`、`node dist/migrate.mjs` 运行另两个入口，`node dist/seed.mjs` 在非生产环境灌示例数据。前端镜像（caddy + 静态文件）、自建 PostgreSQL 与冒烟镜像在 `deploy/`，由部署脚本构建。
+**镜像**：`docker build -f apps/server/Dockerfile -t forcome-server .`（构建上下文是仓库根目录）；默认运行 api，`node dist/worker.mjs`、`node dist/migrate.mjs` 运行另两个入口，`node dist/seed.mjs` 在非生产环境灌示例数据，`node dist/reset-inbound.mjs` 在非生产环境重放来信。前端镜像（caddy + 静态文件）、自建 PostgreSQL 与冒烟镜像在 `deploy/`，由部署脚本构建。
 
 ## 约定
 

@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 /*
  * 徽标（shadcn Badge，按原型 chip() / state() / channel() 改过默认样式，设计规范第 6 节）：
  * 11 / 600、1px 同色调边线、6 圆角、左右 7、行高 18、不换行；dot 时前面一个 5px 同色圆点（状态一律带点，颜色由
- * 状态 → 色调的唯一映射决定，见各页面）。tone 对应原型 TONES：neutral、muted、outline、accent、success、warning、danger、info。
+ * 状态 → 色调的唯一映射决定，见各页面）。tone 对应原型 TONES：neutral、muted、outline、accent、success、warning、danger、flow、info。
  * 渠道标识（亚马逊橙、Shopify 绿）是没有边线、左右 6 的另一种样式（ChannelBadge）。
  */
 const badgeVariants = cva(
@@ -20,6 +20,7 @@ const badgeVariants = cva(
         success: 'border-success-soft bg-success-soft text-success-text',
         warning: 'border-warning-soft bg-warning-soft text-warning-text',
         danger: 'border-destructive-soft bg-destructive-soft text-destructive-text',
+        flow: 'border-flow-soft bg-flow-soft text-flow',
         info: 'border-info-soft bg-info-soft text-info',
       },
     },

@@ -3,6 +3,7 @@ import {
   sites,
   ticketChannels,
   ticketCloseReasons,
+  ticketSources,
   ticketEvents,
   ticketStatuses,
   ticketTriggers,
@@ -42,10 +43,10 @@ export const customerIdentity = ticketSchema.table(
 );
 
 /**
- * 工单（PRD 11.1 Ticket，第一期用到的字段）：编号 T-首封来信日期-当日序号；店铺、渠道、站点取首封来信的识别结果；
+ * 工单（PRD 11.1 Ticket，第一期用到的字段）：编号 T-首封来信日期-当日序号；店铺、渠道、站点、来源取首封来信的识别结果；
  * 状态只能经迁移表改变（lifecycle.ts → ticket-status.ts 的 createTicket / applyTransition，同一事务写 status_change），
  * 数据库约束保证状态等于最近一条状态变更记录的目标状态（迁移 0007）。
- * 来源（10）、订单号的取值（14）、SLA（16）随后续待办；负责人第一期为空，不建列。
+ * 订单号的取值（14）、SLA（16）随后续待办；负责人第一期为空，不建列。
  */
 export const ticket = ticketSchema.table(
   'ticket',
@@ -55,6 +56,8 @@ export const ticket = ticketSchema.table(
     storeId: uuid('store_id').notNull(),
     channel: text('channel', { enum: ticketChannels }).notNull(),
     site: text('site', { enum: sites }).notNull(),
+    /** 来源：首封来信的来源（客户 / 生产厂 / 其他供应商；平台通知与营销不建工单） */
+    source: text('source', { enum: ticketSources }).notNull(),
     customerId: uuid('customer_id')
       .notNull()
       .references(() => customer.id),

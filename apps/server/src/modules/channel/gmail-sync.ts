@@ -1,4 +1,10 @@
-import type { AdapterMode, MessageDirection, Site } from '@forcome/contracts';
+import {
+  isArchivedSource,
+  type AdapterMode,
+  type MessageDirection,
+  type Platform,
+  type Site,
+} from '@forcome/contracts';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import PostalMime, { type Address, type Email } from 'postal-mime';
 import { z } from 'zod';
@@ -19,16 +25,18 @@ import {
   type GmailRawMessage,
   type IntegrationClients,
 } from '../integration';
-import { mailboxSync, message, store, storeMailbox } from './schema';
+import { recognizeInbound, type MailAddress, type SenderRule } from './recognition';
+import { mailboxSync, message, senderRule, store, storeMailbox } from './schema';
 
 /*
  * 收信（规格 channel「Gmail 客户端」「去重」，ADR 0008 修订；待办 08 是最小形态）：
  * 1. 常驻拉取 channel.gmail_push：先确保每个进线邮箱已 watch（没有游标的先 watch，建立增量游标），
  *    再从 Pub/Sub 拉通知，按邮箱排「同步邮箱」任务，任务入队后才确认通知；
  * 2. 任务 channel.gmail_sync：history.list 取游标之后新到的消息，逐封取原文、解析、入库（去重），
- *    全部入库后才推进游标；新入库、不是别处已收过的来信在同一事务里发出「来信已接收」（ticket 据此归并）。
+ *    全部入库后才推进游标；入库时识别渠道、站点、来源与客户渠道身份（recognition.ts，待办 10）；新入库、
+ *    不是别处已收过、来源也不是平台通知或营销（归档、不建工单）的来信，在同一事务里发出「来信已接收」（ticket 据此归并）。
  * 每天续订 watch、每 5 分钟 history.list 兜底、游标过期按 internalDate 区间补拉、「已发送」、常驻拉取选主、
- * 最近同步成功时间与连接状态随 09 号待办；渠道与亚马逊站点识别随 10；收件地址识别不出店铺的未归属队列随 15。
+ * 最近同步成功时间与连接状态随 09 号待办；收件地址识别不出店铺的未归属队列随 15。
  */
 
 /** 同步一个邮箱：每个邮箱最多一个在排队、一个在跑（stately），通知再多也不会堆积 */
@@ -39,7 +47,10 @@ export const gmailSyncJob = defineJob('channel.gmail_sync', z.object({ mailbox: 
   retryBackoff: true,
 });
 
-/** 领域事件「来信已接收」：一封来信入库（不是别的邮箱已收过的同一封信），ticket 据此归并成工单 */
+/**
+ * 领域事件「来信已接收」：一封来信入库（不是别的邮箱已收过的同一封信，来源也不是归档的平台通知与营销），
+ * ticket 据此归并成工单
+ */
 export const inboundReceivedJob = defineJob(
   'channel.inbound_received',
   z.object({ messageId: z.uuid() }),
@@ -51,6 +62,7 @@ interface MailboxTarget {
   readonly address: string;
   readonly storeId: string;
   readonly adapterMode: AdapterMode;
+  readonly platform: Platform;
   readonly defaultSite: Site;
 }
 
@@ -58,6 +70,7 @@ const mailboxTargetColumns = {
   address: storeMailbox.address,
   storeId: store.id,
   adapterMode: store.adapterMode,
+  platform: store.platform,
   defaultSite: store.defaultSite,
 };
 
@@ -171,9 +184,26 @@ function addressesOf(list: readonly Address[] | undefined): string[] {
   );
 }
 
-function firstMailbox(address: Address | undefined): { name: string; address: string } {
+function firstMailbox(address: Address | undefined): MailAddress {
   const mailbox = address?.group ? address.group[0] : address;
   return { name: mailbox?.name.trim() ?? '', address: mailbox?.address.trim().toLowerCase() ?? '' };
+}
+
+/** 地址列表展开成「地址 + 显示名」（含地址组的成员；Reply-To 用） */
+function mailboxesOf(list: readonly Address[] | undefined): MailAddress[] {
+  return (list ?? []).flatMap((a) => (a.group ?? [a]).map((m) => firstMailbox(m)));
+}
+
+/** 来源规则表（每次同步读一次：规则只在迁移与示例数据里变，读一次足够新） */
+async function loadSenderRules(db: DbExecutor): Promise<SenderRule[]> {
+  return db
+    .select({
+      kind: senderRule.kind,
+      pattern: senderRule.pattern,
+      headerValue: senderRule.headerValue,
+      source: senderRule.source,
+    })
+    .from(senderRule);
 }
 
 /** References 等头里的 Message-ID 列表（各自带尖括号） */
@@ -189,18 +219,20 @@ function messageIdOf(value: string | undefined): string | null {
  * 一封来信入库（规格 channel「去重」，R-TK-07、E-15）：
  * - 同一邮箱里同一个 Gmail 消息 ID 只入库一次（唯一约束，冲突即视为重复、丢弃并记日志）；
  * - Message-ID 相同的信已在别的店铺邮箱入库：只记「同时发送到」，不识别店铺、不发「来信已接收」；
- * - 否则按收件邮箱识别店铺（08：渠道先记「邮件」、站点取店铺默认站点；渠道识别与亚马逊按发件域定站点随 10），
- *   并在同一事务里发出「来信已接收」。
+ * - 否则按收件邮箱识别店铺，识别渠道、站点、来源与客户渠道身份（recognition.ts）；来源是平台通知或营销的
+ *   只入库归档（PRD 1.4），其余在同一事务里发出「来信已接收」。
  */
 async function ingestInbound(
   runtime: Runtime,
   target: MailboxTarget,
+  rules: readonly SenderRule[],
   raw: GmailRawMessage,
   parsed: Email,
   logger: Logger,
 ): Promise<void> {
   const rfcMessageId = messageIdOf(parsed.messageId);
   const from = firstMailbox(parsed.from);
+  const headers = parsed.headers.map((h) => ({ key: h.key, value: h.value }));
   await transaction(runtime, async (tx) => {
     if (rfcMessageId) {
       // 同一封邮件的几份副本可能同时在几个邮箱入库：按 Message-ID 串行，最早入库的一封为准
@@ -213,6 +245,14 @@ async function ingestInbound(
           .where(and(eq(message.rfcMessageId, rfcMessageId), isNull(message.duplicateOfId)))
           .limit(1)
       : [];
+    // 同一封邮件的其余副本不识别（R-TK-07：只按最早收到的一封识别店铺并归并）
+    const recognized = canonical
+      ? null
+      : recognizeInbound(
+          { from, replyTo: mailboxesOf(parsed.replyTo), text: parsed.text ?? null, headers },
+          target,
+          rules,
+        );
     const [row] = await tx.db
       .insert(message)
       .values({
@@ -229,11 +269,14 @@ async function ingestInbound(
         subject: parsed.subject?.trim() ?? '',
         textBody: parsed.text ?? null,
         htmlBody: parsed.html ?? null,
-        headers: parsed.headers.map((h) => ({ key: h.key, value: h.value })),
+        headers,
         receivedAt: raw.internalDate,
-        storeId: canonical ? null : target.storeId,
-        channel: canonical ? null : 'email',
-        site: canonical ? null : target.defaultSite,
+        storeId: recognized ? target.storeId : null,
+        channel: recognized?.channel ?? null,
+        site: recognized?.site ?? null,
+        source: recognized?.source ?? null,
+        senderAddress: recognized?.sender.address ?? null,
+        senderName: recognized?.sender.name ?? null,
         duplicateOfId: canonical?.id ?? null,
         createdAt: tx.now,
       })
@@ -254,6 +297,13 @@ async function ingestInbound(
       logger.info(
         { mailbox: target.address, rfcMessageId, canonicalId: canonical.id },
         '同一封邮件已在别的邮箱收到，只记「同时发送到」（R-TK-07）',
+      );
+      return;
+    }
+    if (recognized && isArchivedSource(recognized.source)) {
+      logger.info(
+        { mailbox: target.address, messageId: row.id, source: recognized.source },
+        '平台通知或营销邮件，已归档，不建工单',
       );
       return;
     }
@@ -298,6 +348,7 @@ export async function syncMailbox(
   }
   const gmail = gmailFor(clients, target);
   const changes = await gmail.listHistory(address, state.historyId);
+  const rules = await loadSenderRules(runtime.db);
   for (const id of new Set(changes.messageIds)) {
     const [stored] = await runtime.db
       .select({ id: message.id })
@@ -319,7 +370,7 @@ export async function syncMailbox(
       continue;
     }
     const parsed = await PostalMime.parse(raw.raw);
-    await ingestInbound(runtime, target, raw, parsed, logger);
+    await ingestInbound(runtime, target, rules, raw, parsed, logger);
   }
   await advanceCursor(runtime, address, state.historyId, changes.historyId);
 }

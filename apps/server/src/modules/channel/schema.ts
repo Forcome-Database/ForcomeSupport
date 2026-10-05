@@ -1,6 +1,7 @@
 import {
   adapterModes,
   messageDirections,
+  messageSources,
   platforms,
   sites,
   ticketChannels,
@@ -18,6 +19,7 @@ import {
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { primaryId, timestamptz, version } from '../core';
+import { ruleSources, senderRuleKinds } from './recognition';
 
 /** channel 模块的数据库 schema（一个模块一个 schema，ADR 0006）；表随各期待办加入 */
 export const channelSchema = pgSchema('channel');
@@ -119,6 +121,7 @@ export const message = channelSchema.table(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
+    /** 发件地址（From 头，小写）；Shopify 联系表单通知是 mailer@shopify.com，客户身份另见 sender_address */
     fromAddress: text('from_address').notNull(),
     /** 发件人显示名；没写时为空串 */
     fromName: text('from_name').notNull(),
@@ -129,15 +132,22 @@ export const message = channelSchema.table(
     subject: text('subject').notNull(),
     textBody: text('text_body'),
     htmlBody: text('html_body'),
-    /** 全部头字段（小写名 + 原值，按出现顺序）：来源规则、自动回复标记、Delivered-To 等识别用（10、15、16） */
+    /** Reply-To 等全部头字段（小写名 + 原值，按出现顺序）：来源规则、自动回复标记、Delivered-To 等识别用（10、15、16） */
     headers: jsonb('headers').$type<{ key: string; value: string }[]>().notNull(),
     /** 到达时间（Gmail internalDate） */
     receivedAt: timestamptz('received_at').notNull(),
     /** 识别出的店铺；识别不出（未归属店铺，15）为空 */
     storeId: uuid('store_id').references(() => store.id),
-    /** 渠道（R-TK-08，10）；同一封邮件的其余副本不识别，为空 */
+    /** 渠道（R-TK-08）；同一封邮件的其余副本不识别，为空（下面几个识别结果同此） */
     channel: text('channel', { enum: ticketChannels }),
+    /** 站点：亚马逊按发件域，其余取店铺默认站点（R-ST-02） */
     site: text('site', { enum: sites }),
+    /** 来源（PRD 1.4，按来源规则表判定）：平台通知与营销归档、不建工单 */
+    source: text('source', { enum: messageSources }),
+    /** 客户渠道身份（小写）：亚马逊中转地址、Shopify 联系表单的回复邮箱，其余同发件地址；ticket 按它建客户与归并 */
+    senderAddress: text('sender_address'),
+    /** 客户渠道身份的显示名（联系表单取表单里的姓名）；没写时为空串 */
+    senderName: text('sender_name'),
     /** 同一封邮件已在别的邮箱入库时，指向准的那封 */
     duplicateOfId: uuid('duplicate_of_id').references((): AnyPgColumn => message.id),
     /** 同一封邮件同时发到的其他店铺邮箱（R-TK-07「同时发送到」） */
@@ -153,5 +163,31 @@ export const message = channelSchema.table(
       .on(t.rfcMessageId)
       .where(sql`${t.duplicateOfId} IS NULL AND ${t.rfcMessageId} IS NOT NULL`),
     index('message_store_received_idx').on(t.storeId, t.receivedAt),
+  ],
+);
+
+/**
+ * 来源规则表（规格 channel「来源识别」，待办 10）：按客户渠道身份与头字段判定来信的来源，没有命中为客户
+ * （匹配与优先级见 recognition.ts）。第一期没有维护页面（随第二期）：平台通知与营销的种子由迁移 0009 写入所有环境；
+ * 已登记生产厂邮箱在非生产环境随示例数据灌入（加载步骤 channel.sender_rules），生产环境的真实名单与其他供应商
+ * 由业务提供后用迁移补（协调者 10-05 决定，待办 32 跟踪）。
+ */
+export const senderRule = channelSchema.table(
+  'sender_rule',
+  {
+    id: primaryId(),
+    /** 匹配方式：精确地址 · 发件域（精确等于，不含子域）· 头字段 */
+    kind: text('kind', { enum: senderRuleKinds }).notNull(),
+    /** 地址、发件域或头字段名（小写） */
+    pattern: text('pattern').notNull(),
+    /** 只用于头字段：头的值（小写）；为空时有这个头就算命中 */
+    headerValue: text('header_value'),
+    source: text('source', { enum: ruleSources }).notNull(),
+    /** 说明（给维护的人看，例如「亚马逊平台通知」「FQD 生产厂」） */
+    label: text('label').notNull(),
+    createdAt: timestamptz('created_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('sender_rule_match_key').on(t.kind, t.pattern, sql`coalesce(${t.headerValue}, '')`),
   ],
 );

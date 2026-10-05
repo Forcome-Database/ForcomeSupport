@@ -1,4 +1,4 @@
-import type { MessageDirection, Site, TicketChannel } from '@forcome/contracts';
+import type { MessageDirection, MessageSource, Site, TicketChannel } from '@forcome/contracts';
 import { and, eq, inArray } from 'drizzle-orm';
 import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
 import { message } from './schema';
@@ -9,7 +9,10 @@ import { message } from './schema';
  * 都带店铺范围（ADR 0010）；店铺为空的邮件（未归属店铺，15）只在不受限的范围里看得到。
  */
 
-/** 归并要用的一封来信：识别出的店铺、渠道、站点与发件人 */
+/**
+ * 归并要用的一封来信：识别出的店铺、渠道、站点、来源与客户渠道身份（recognition.ts）。
+ * 同一封邮件的其余副本（duplicateOfId 不为空）不识别，这几项为空。
+ */
 export interface InboundMessage {
   readonly id: string;
   readonly direction: MessageDirection;
@@ -17,9 +20,11 @@ export interface InboundMessage {
   readonly storeId: string | null;
   readonly channel: TicketChannel | null;
   readonly site: Site | null;
-  /** 客户渠道身份（发件地址，小写）；Shopify 联系表单取表单里的回复邮箱随 10 */
-  readonly fromAddress: string;
-  readonly fromName: string;
+  /** 来源；平台通知与营销已归档，不会发「来信已接收」 */
+  readonly source: MessageSource | null;
+  /** 客户渠道身份（小写）：亚马逊中转地址、Shopify 联系表单的回复邮箱，其余为发件地址 */
+  readonly senderAddress: string | null;
+  readonly senderName: string | null;
   readonly subject: string;
   /** 到达时间（Gmail internalDate） */
   readonly receivedAt: Date;
@@ -39,8 +44,9 @@ export async function findInboundMessage(
       storeId: message.storeId,
       channel: message.channel,
       site: message.site,
-      fromAddress: message.fromAddress,
-      fromName: message.fromName,
+      source: message.source,
+      senderAddress: message.senderAddress,
+      senderName: message.senderName,
       subject: message.subject,
       receivedAt: message.receivedAt,
       duplicateOfId: message.duplicateOfId,
@@ -56,8 +62,10 @@ export interface MessageSummary {
   readonly id: string;
   readonly direction: MessageDirection;
   readonly mailbox: string;
-  readonly fromAddress: string;
-  readonly fromName: string;
+  /** 客户渠道身份（见 InboundMessage）；工单里的消息都识别过，不为空 */
+  readonly senderAddress: string | null;
+  readonly senderName: string | null;
+  readonly source: MessageSource | null;
   readonly subject: string;
   readonly receivedAt: Date;
   /** 同一封邮件同时发到的其他店铺邮箱（R-TK-07） */
@@ -75,8 +83,9 @@ export async function listMessageSummaries(
       id: message.id,
       direction: message.direction,
       mailbox: message.mailbox,
-      fromAddress: message.fromAddress,
-      fromName: message.fromName,
+      senderAddress: message.senderAddress,
+      senderName: message.senderName,
+      source: message.source,
       subject: message.subject,
       receivedAt: message.receivedAt,
       alsoSentTo: message.alsoSentTo,

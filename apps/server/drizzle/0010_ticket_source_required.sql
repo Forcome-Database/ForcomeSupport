@@ -1,0 +1,1 @@
+ALTER TABLE "ticket"."ticket" ALTER COLUMN "source" SET NOT NULL;

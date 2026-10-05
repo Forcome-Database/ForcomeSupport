@@ -1,5 +1,5 @@
 import { businessDate } from '@forcome/calendar';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Tx } from './runtime';
 import { businessNumberCounter } from './schema';
 
@@ -41,4 +41,12 @@ export async function nextBusinessNumber(
     throw new Error(`业务编号生成失败：${kind}`);
   }
   return `${rule.prefix}-${date}-${String(row.value).padStart(4, '0')}`;
+}
+
+/**
+ * 清掉某类业务编号的计数，之后从 0001 重新发号。只用于非生产环境的「重放来信」（该类对象已全部清掉时），
+ * 生产环境的编号不回收、不重用。
+ */
+export async function resetBusinessNumbers(tx: Tx, kind: BusinessNumberKind): Promise<void> {
+  await tx.db.delete(businessNumberCounter).where(eq(businessNumberCounter.kind, kind));
 }

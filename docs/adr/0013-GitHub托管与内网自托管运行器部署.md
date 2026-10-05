@@ -60,3 +60,7 @@ status: accepted
 - **冒烟**：在一次性容器里运行（底是与 `pnpm-lock.yaml` 中 `@playwright/test` 同版本的官方镜像，加装 certutil），只把本环境 caddy 的根证书加进容器内 Chromium 的证书库，经 Compose 网络按内网域名访问 caddy（模拟内网 DNS），不忽略证书错误、不改宿主机证书库；不装根证书时同样的用例以 `ERR_CERT_AUTHORITY_INVALID` 失败。报告用 `docker cp` 取出，不挂宿主机目录。e2e 用例的断言不依赖端口与协议，HTTPS 下另核对会话 Cookie 带 `Secure`。部署后跑 `apps/web/e2e` 全部用例：以后加入的端到端用例要能在长期运行、已灌示例数据的开发测试环境上重复执行。
 - **发信白名单**：`MAIL_SEND_ALLOWLIST_ONLY`（不设时取 `core` 的 `defaultMailSendPolicy`：非生产 `true`、生产 `false`；模板里留空，免得照抄到生产）与 `MAIL_SEND_ALLOWLIST`（逗号分隔的完整地址或 `@域名`，`@域名` 不含子域名，空白名单即一封也不发）。`integration` 的 `MailRecipientGuard` 经 `RealClientContext.mailRecipientGuard` 交给真实现：会发信的真实现（第二期的 Gmail 发信）发出前必须对全部收件人调用 `assertAllowed`，有一个不在白名单就整封不发（`MailRecipientNotAllowedError`）。Fake 不真的发信，不检查。
 - **部署说明**：组成、命令、根证书安装、切换 DNS-01、放行域名与 `NO_PROXY` 清单、内网 DNS、迁移到 Linux 服务器与上 GitHub 后的启用步骤写在 `docs/部署说明.md`。
+
+## 修订（2026-10-05，待办 10 落地）
+
+- **重放来信**（协调者 10-05 要求做成可重复的步骤）：识别或归并的口径变了，已入库的示例来信不会回头重新识别。非生产环境用 `pnpm staging reset-inbound`（部署脚本：停 worker → 用当前部署的镜像执行 `node dist/reset-inbound.mjs` → 起 worker）或本机 `pnpm db:reset-inbound`（先停 `dev:worker`）清掉收取的邮件、邮箱游标、工单与客户，并把工单编号从 0001 重新发号；worker 重启后重新 watch，Fake Gmail 按新口径重新回放。成员、店铺、来源规则、会话、审计与根证书不动。生产环境三处拒绝：部署脚本、入口（`APP_ENV=production` 时报错退出）、组合函数本身。口径变更后先部署新版本，再重放，再跑一次 `pnpm staging smoke`（或重新部署）核对。

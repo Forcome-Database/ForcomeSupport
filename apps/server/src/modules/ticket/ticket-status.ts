@@ -84,3 +84,11 @@ export async function applyTransition(
   await recordChange(tx, current.id, result, event, actor);
   return updated;
 }
+
+/**
+ * 清掉全部状态变更记录：只给非生产环境的「重放来信」用（reset.ts 随后删掉全部工单）。状态变更记录只由本文件写，
+ * 删除也放在这里。
+ */
+export async function clearStatusChanges(tx: Tx): Promise<void> {
+  await tx.db.delete(statusChange);
+}

@@ -1,15 +1,19 @@
 import {
+  messageSourceLabels,
   ticketChannelLabels,
   ticketStatusLabels,
   type Site,
   type TicketChannel,
+  type TicketSource,
   type TicketStatus,
 } from '@forcome/contracts';
+import { Factory, Truck } from 'lucide-react';
 import { Badge, ChannelBadge, type BadgeTone } from '@/components/ui/badge';
 
 /*
- * 工单的状态与渠道徽标（原型 state() 与 channel()，P04、P05 共用）：状态一律带点，颜色由原型 STATE_TONE 的
- * 唯一映射决定（待回复 浅靛蓝、等客户 描边、已解决 绿、已关闭 灰）；渠道徽标写「渠道 站点」，后面跟店铺名。
+ * 工单的状态、渠道与来源徽标（原型 state()、channel() 与 source_badge()，P04、P05 共用）：状态一律带点，颜色由原型
+ * STATE_TONE 的唯一映射决定（待回复 浅靛蓝、等客户 描边、已解决 绿、已关闭 灰）；渠道徽标写「渠道 站点」，后面跟店铺名；
+ * 来源只给非客户标徽标。
  */
 
 const STATUS_TONE: Record<TicketStatus, BadgeTone> = {
@@ -51,5 +55,26 @@ export function TicketChannelStore({
         {store}
       </span>
     </span>
+  );
+}
+
+/**
+ * 来源（原型 p1_row 与 source_badge()，P04「来源（非客户时显示徽标）」）：客户只写「客户」（最淡的次要色，
+ * 随密度 12 / 11）；生产厂、其他供应商为紫色徽标（flow 色调，与时间线「工厂」执行者同色），带工厂、货车图标
+ */
+export function TicketSourceLabel({ source }: { source: TicketSource }) {
+  if (source === 'customer') {
+    return (
+      <span className="text-minor whitespace-nowrap text-subtle-foreground">
+        {messageSourceLabels.customer}
+      </span>
+    );
+  }
+  const Icon = source === 'producer' ? Factory : Truck;
+  return (
+    <Badge tone="flow">
+      <Icon aria-hidden className="size-3" strokeWidth={2} />
+      {messageSourceLabels[source]}
+    </Badge>
   );
 }
