@@ -129,13 +129,18 @@ def gmail_card(err=False):
     return ch_card('message', 'Gmail', state('已连接'), ['4 个邮箱：2 个亚马逊买家消息、2 个 Shopify 客服', '新邮件推送，实时收取'], '', 'ok', sync=CHANNEL_SYNC['Gmail'])
 
 
-def dingtalk_card(late=False):
-    """钉钉卡。late=True 为同步延迟（超过 2 小时）：只在本卡显示、只提醒管理员，不出全站横幅（6.9、E-32）。"""
+DINGTALK_LINES_P1 = ['通讯录：成员与部门每小时同步', '工作通知推送；扫码登录']  # 第一阶段已连接时的说明行（钉钉内免登随第二阶段）
+
+
+def dingtalk_card(late=False, phase1=False):
+    """钉钉卡。late=True 为同步延迟（超过 2 小时）：只在本卡显示、只提醒管理员，不出全站横幅（6.9、E-32）。
+    phase1=True 且已连接时用第一阶段的说明行（没有钉钉内免登）。"""
     if late:
         return ch_card('users', '钉钉', state('同步延迟'),
                        ['通讯录 %s 后未同步成功，超过 2 小时' % DINGTALK_LATE_SYNC, '只提醒管理员，不出全站横幅；成员与部门保持上次结果，登录与权限不受影响', '工作通知推送；扫码登录'],
                        '', 'warn', 'warning', sync=DINGTALK_LATE_SYNC)
-    return ch_card('users', '钉钉', state('已连接'), ['通讯录：成员与部门每小时同步', '工作通知推送；扫码登录与钉钉内免登'], '', 'ok', sync=CHANNEL_SYNC['钉钉'])
+    lines = DINGTALK_LINES_P1 if phase1 else ['通讯录：成员与部门每小时同步', '工作通知推送；扫码登录与钉钉内免登']
+    return ch_card('users', '钉钉', state('已连接'), lines, '', 'ok', sync=CHANNEL_SYNC['钉钉'])
 
 
 def grid3(cells):
@@ -174,7 +179,10 @@ def copy_val(v):
     return row(nowrap(v, 13, T['ink2']) + '<div title="复制" style="flex-shrink: 0; display: flex;">%s</div>' % icon('copy', 13, T['ink4']), 6)
 
 
-RULE_ROUTE = '亚马逊按买家消息的收件邮箱（每店一个）与发件域名（amazon.com / .ca / .com.mx）识别店铺和站点；Shopify 按客服邮箱。识别不出的来信进入「未归属店铺」队列，由客服主管指定店铺，不生成草稿。'
+RULE_ROUTE = ('亚马逊按买家消息的收件邮箱与发件域名（amazon.com / .ca / .com.mx）识别店铺和站点；Shopify 按客服邮箱。'
+              '一个店铺可以登记多个进线邮箱（含别名）。识别不出的来信进入「未归属店铺」队列，由客服主管指定店铺，不生成草稿。')
+# 第一阶段没有草稿，不写「不生成草稿」（D-26：进线邮箱可填多个，含别名；待办 07 实现时与用户确认，10-05）
+RULE_ROUTE_P1 = RULE_ROUTE.replace('，不生成草稿。', '。')
 RULE_LAYER = '配置按「全局 → 平台 → 店铺」取值。店铺可覆盖签名、政策口径、模板、素材与链接白名单、SLA 内部目标；意图、风险信号、动作分级只能全局配置。'
 
 
@@ -218,7 +226,7 @@ def p18_stores(phase1=False, issues=None):
     if phase1:
         tpl = '200px 150px 260px minmax(0, 1fr) 160px 40px'
     t = table(cols, rows, tpl, py=12)
-    head = between(row(label('店铺') + nowrap('%d 个' % len(STORES), 12, T['ink3']) + divider(True, 12) + info_tip('进线识别', RULE_ROUTE) +
+    head = between(row(label('店铺') + nowrap('%d 个' % len(STORES), 12, T['ink3']) + divider(True, 12) + info_tip('进线识别', RULE_ROUTE_P1 if phase1 else RULE_ROUTE) +
                        ('' if phase1 else info_tip('配置取值层级', RULE_LAYER)), 10),
                    btn('新增店铺', 'secondary', 'sm', 'plus'))
     return col(head + t, 10)

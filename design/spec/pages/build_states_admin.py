@@ -130,10 +130,51 @@ def multi_select(values):
         T['line_strong'], row(chips, 4), icon('chev_d', 14, T['ink4']))
 
 
+def err_chip(t):
+    """填错的进线邮箱小标签：描边小标签换成红色边线与红字（抽屉里已加入的邮箱被其他店铺占用时）。"""
+    return chip(t, 'outline', 11).replace('color: %s; background: #ffffff; border: 1px solid %s;' % TONES['outline'][0::2], 'color: %s; background: #ffffff; border: 1px solid %s;' % (T['bad'], T['bad_solid']))
+
+
+def err_lines(lines):
+    """字段下方的多条错误（进线邮箱每个地址一条）。"""
+    return col(''.join('<div style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: %s;">%s%s</div>' % (T['bad'], icon('alert', 13, T['bad'], 2), t) for t in lines), 4)
+
+
+def k8_more():
+    """K8 的补充小样（第一阶段实现时确认，10-05）：进线邮箱的提示、亚马逊店铺的平台标识、进线邮箱重复、必填项、编辑抽屉、保存结果、店铺表为空、新增时的未保存离开。"""
+    amz = field('平台标识 · 亚马逊卖家 ID', input_box(None, '例如 A1FD7Q2M9XK3LC', 'error'), True, error='请填写卖家 ID')
+    hint = field('进线邮箱（可填多个，含别名）', col(row(chip('support@forcome.mx', 'outline', 11) + chip('ventas@forcome.mx', 'outline', 11), 6) + input_box(), 6), True,
+                 hint='每个地址都用来识别店铺；寄到这些地址的未归属来信保存后自动归位')
+    mails = ('<div style="display: flex; flex-direction: column; gap: 6px;"><div style="font-size: 12px; font-weight: 600; color: %s;">进线邮箱（可填多个，含别名）<span style="color: %s; margin-left: 2px;">*</span></div>%s%s%s</div>' % (
+        T['ink2'], T['bad'], row(err_chip('support@forcome.mx') + chip('ventas@forcome.mx', 'outline', 11), 6), input_box('ventas@forcome.mx', st='error'),
+        err_lines(['ventas@forcome.mx 已经填过', 'support@forcome.mx 已是 forcome.mx 的进线邮箱'])))
+    required = col(''.join(row(icon('alert', 13, T['bad'], 2) + nowrap(t, 12, T['bad']), 4) for t in
+                           ('请选择平台', '请填写店铺名', '请选择站点', '请选择默认站点', '至少填写一个进线邮箱', '请填写平台标识')), 6)
+    edit_head = ('<div style="background: #ffffff; border: 1px solid %s; border-radius: 12px; padding: 16px 20px 14px 20px; display: flex; gap: 12px; align-items: flex-start;">'
+                 '<div style="flex: 1; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 16px; font-weight: 600; color: %s;">编辑店铺</div>'
+                 '<div style="font-size: 12px; color: %s; line-height: 1.5;">保存记入审计日志；未归属队列中收件地址与新店铺进线邮箱匹配的来信自动归位。</div></div>%s</div>') % (
+        T['line'], T['ink'], T['ink3'], icon('x', 16, T['ink4']))
+    ok = toast('success', '店铺已保存', 'forcome.mx，已记入审计日志（刘洋 10:24）。')
+    fail = toast('error', '保存失败：网络不可用', '填写的内容已保留在抽屉里。', link('立即重试', 12))
+    none = card(empty('store', '还没有店铺', '新增店铺并登记进线邮箱后，来信才能识别店铺、匹配订单。', btn('新增店铺', 'secondary', 'md', 'plus')), pad='0px')
+    leave = dialog('离开前保存修改？', muted('「新增店铺」填写的内容还没保存，放弃后不保留。', 13),
+                   btn('继续编辑', 'secondary', st='focus') + btn('放弃修改', 'danger_outline') + btn('保存并离开', 'primary'), 460, 'warning')
+    return frame(cap('进线邮箱 · 没有错误时字段下方写提示') + hint +
+                 cap('亚马逊店铺 · 平台标识为空') + amz +
+                 cap('进线邮箱重复 · 输入框里的与已填的重复、已加入的被其他店铺占用') + mails +
+                 cap('其余必填项为空（未选平台时平台标识写「平台标识」）') + required +
+                 cap('编辑店铺 · 抽屉标题') + edit_head +
+                 cap('保存结果') + grid(ok + fail, 2, 12, extra='align-items: start;') +
+                 cap('店铺表为空（生产环境上线初期）') + none +
+                 cap('新增店铺时有未保存的输入就关闭（G8）') + '<div style="display: flex; justify-content: center;">%s</div>' % leave,
+                 w=W, gap=10)
+
+
 def k8():
-    """P18「新增店铺」右侧抽屉：保存时校验全部，错误写在字段下方，保存按钮保持可点、点击后定位到第一个错误（店铺名）。"""
+    """P18「新增店铺」右侧抽屉：保存时校验全部，错误写在字段下方，保存按钮保持可点、点击后定位到第一个错误（店铺名）。
+    数据来源新建时默认模拟数据（开发测试环境外部客户端默认 Fake，ADR 0009；10-05 用户确认）。下方为补充小样（k8_more）。"""
     over = row(chip('签名', 'outline', 11) + link('添加覆盖项', 12, 'plus'), 8)
-    dev = dashed_card(row(nowrap('数据来源', 12, T['ink2'], 600) + chip('仅开发测试环境', 'info', 11), 8) + row(radio('真实接口', True) + radio('模拟数据'), 20) +
+    dev = dashed_card(row(nowrap('数据来源', 12, T['ink2'], 600) + chip('仅开发测试环境', 'info', 11), 8) + row(radio('真实接口') + radio('模拟数据', True), 20) +
                       muted('生产环境不显示此项；接模拟数据时渠道卡头标「模拟数据」。', 12), '10px 12px', 8)
     body = (grid(field('平台', select_box('Shopify'), True) + field('店铺名', input_box('forcome.com', st='error'), True, error='店铺名已存在，请换一个'), 2, 12, extra='align-items: start;') +
             grid(field('站点（多选）', multi_select(['MX']), True) + field('默认站点', select_box('MX'), True, hint='无订单的来信按它归站点'), 2, 12, extra='align-items: start;') +
@@ -144,7 +185,7 @@ def k8():
             field('覆盖项', over, hint='可覆盖签名、政策口径、模板、素材与链接白名单、SLA 内部目标') + dev)
     drw = BS.drawer('新增店铺', body, btn('取消', 'secondary') + btn('保存', 'primary'), 440, '保存记入审计日志；未归属队列中收件地址与新店铺进线邮箱匹配的来信自动归位。')
     page_h = int(K8_H / 0.6)
-    return BS.drawer_over(scaled(BS.p18(page_h), 1440, page_h, 0.6), drw, W, K8_H)
+    return col(BS.drawer_over(scaled(BS.p18(page_h), 1440, page_h, 0.6), drw, W, K8_H) + k8_more(), 0)
 
 
 # ---------------------------------------------------------------- K9 放开自动发送不可用
@@ -411,7 +452,9 @@ def k20():
     strip = grid(''.join(col(c + nowrap(t, 11, T['ink3'], 600), 6) for t, c in samples), 5, 12)
     st_col = row(nowrap('店铺表「状态」列的写法：', 12, T['ink3']) + BS.store_status(S) + BS.store_status(S, ('Gmail', '同步延迟')) + BS.store_status(S, ('SP-API', '连接异常')) +
                  muted('（店铺任一连接异常时，所属渠道卡同时显示最差状态）', 12), 14)
-    return frame(BS.p18(phase1=True) + cap('卡头小样 · 卡片状态的五种写法') + strip + cap('店铺表状态列') + st_col, w=1472, gap=12)
+    ding = '<div style="width: 470px;">%s</div>' % BS.dingtalk_card(phase1=True)
+    return frame(BS.p18(phase1=True) + cap('卡头小样 · 卡片状态的五种写法') + strip + cap('店铺表状态列') + st_col +
+                 cap('钉钉卡 · 第一阶段已连接') + ding, w=1472, gap=12)
 
 
 # ---------------------------------------------------------------- K22–K24 客服主管的设置页「SLA」「标签库」「模板」（局部 1:1）
@@ -477,13 +520,13 @@ def k24():
 
 SPEC = {
     'K5': '服务端按当前筛选与字段权限同步生成：生成中按钮转圈并写「正在生成，约 3 秒」；完成后浏览器直接下载，浮层「已导出 %s · 已记入审计日志」；不留存文件、没有导出记录页。' % EXPORT_FILE,
-    'K8': 'P18 点「新增店铺」或行尾「编辑」从右侧滑出抽屉（页面保持可见）：店铺名、平台、站点（多选）、默认站点、进线邮箱、平台标识、签名与覆盖项；开发测试环境另有「数据来源：真实接口 / 模拟数据」，生产环境不显示。店铺名重复、平台标识为空、邮箱格式错误在字段下方报错；保存按钮保持可点，点击后定位到第一个错误（AC-ST-01）。保存记入审计日志，未归属队列中收件地址匹配的来信自动归位。',
+    'K8': 'P18 点「新增店铺」或行尾「编辑」从右侧滑出抽屉（页面保持可见）：店铺名、平台、站点（多选）、默认站点、进线邮箱、平台标识、签名与覆盖项；开发测试环境另有「数据来源：真实接口 / 模拟数据」（新建时默认模拟数据），生产环境不显示也不接受。店铺名重复、平台标识为空、邮箱格式错误在字段下方报错，多个错误一次列全；保存按钮保持可点，点击后定位到第一个错误（AC-ST-01）。保存记入审计日志，未归属队列中收件地址匹配的来信自动归位。下方补充小样：进线邮箱没有错误时的提示、亚马逊店铺的平台标识、进线邮箱重复（每个地址一条错误）、其余必填项、编辑抽屉标题、保存结果浮层（成功 3 秒消失；失败保留输入、可立即重试）、店铺表为空、新增时的未保存离开（G8）。',
     'K10': '二次确认弹窗列出该成员的未关闭工单与进行中售后单，分别选接手人：工单选坐席或客服主管，售后单只列有该店铺范围的售后负责人；选齐后「改派并停用」，变更记审计（AC-ST-02）。成员在钉钉离职后自动停用，其未关闭工单与进行中售后单进入客服主管改派队列（AC-ST-05）。示例：停用李婷，未关闭工单按 data.TICKETS 计 → 接手人陈晨，进行中售后单 0 张；另一张小图：停用王磊，4 张进行中售后单但没有其他售后负责人，「改派并停用」置灰并写原因。',
     'K15': '页签「风险信号 · 7」，7 条风险信号命中即转人工（data.RISK_SIGNALS）。安全事故、平台风险与疑似提示注入（D-21）为硬规则：开关锁定并写「硬规则，不可关闭」。重复联系、高价值行内写明关闭影响「关闭需二次确认：近 30 天约少转人工 N 封」（data.RISK_OFF_IMPACT）；关闭任一可关的信号都是危险开关，二次确认并写明影响（关闭后命中的来信不再转人工，可能自动发送），确认后进入吸底保存栏。「发送方式与阈值」页签名旁圆点表示该页签有未保存修改。',
     'K17': '权限矩阵一张表全部展开（不折叠），按 工单 / 审批 / 售后 / 知识 / 报表 / 设置 / 工厂 分组，能力行照 prd_d 10.1（含第一阶段的标记无需回复、新建与编辑登记、设为已完成，以及指定店铺、补登与汇率、改派售后单负责人、查看成本与结算金额、查看审计日志）；● 有权限、○ 只能看自己发起或负责的（「○ 自己登记的」写明范围）、「—」无权限、文字为部分能力。只读，按角色固定；第一阶段只显示已上线的能力行。',
     'K18': '两张小图：① 李婷（坐席）视角：页头提示「你只能看到自己的操作记录」，操作人筛选锁定为本人，列表只有李婷的记录；② 刘洋（管理员，没有财务权限）视角：展开 S-20260909-0016 的记录（data.AUDIT_EXPAND_DEMO），产品成本、运费、承担比例的前后值显示灰色「已隐藏」，其他字段照常显示（10.2、D-24）。示例为完整版，第一阶段只有 P27「第一阶段」列出的对象类型。',
     'K19': '周敏视角，第一阶段外壳（导航 工单 · 售后 · 报表，无店铺范围与搜索）：筛选 近 7 天 · 本月 · 自定义 · 店铺 · 站点；标题下「数据来源：工单（Gmail）、平台订单、登记台账 · 更新于 %s」（取 Gmail、亚马逊订单、Shopify 订单中最旧的同步）与两条注；指标 3 个；图表 每日工单量 + 售后成本按责任类型（卡头总额即售后成本）。右为管理员视角局部：没有售后成本卡，每日工单量不可点、没有「查看明细」。导出同步生成后直接下载，记入审计（K5）。' % report_updated(),
-    'K20': '刘洋视角，第一阶段外壳：亚马逊 SP-API（订单同步与 SQS 状态、订单回补 %d 天已完成）、Shopify Admin API（回补 %d 天 · 未开通 read_all_orders）、Gmail（4 个邮箱，收件与「已发送」）、钉钉（同步延迟 · 最近同步 %s，超过 2 小时，只提醒管理员、不出全站横幅）；积加、易仓为灰色虚线卡「第二阶段接入」，没有同步时间与测试连接；不显示 17TRACK。店铺表没有覆盖项列，没有吸底保存栏。下方为卡头小样（已连接 · 同步延迟 · 连接异常 · 未连接 · 模拟数据）与店铺表状态列写法。' % (BS.AMZ_BACKFILL_DAYS, SHOPIFY_BACKFILL_DAYS, BS.DINGTALK_LATE_SYNC),
+    'K20': '刘洋视角，第一阶段外壳：亚马逊 SP-API（订单同步与 SQS 状态、订单回补 %d 天已完成）、Shopify Admin API（回补 %d 天 · 未开通 read_all_orders）、Gmail（4 个邮箱，收件与「已发送」）、钉钉（同步延迟 · 最近同步 %s，超过 2 小时，只提醒管理员、不出全站横幅）；积加、易仓为灰色虚线卡「第二阶段接入」，没有同步时间与测试连接；不显示 17TRACK。店铺表没有覆盖项列，没有吸底保存栏。下方为卡头小样（已连接 · 同步延迟 · 连接异常 · 未连接 · 模拟数据）、店铺表状态列写法与钉钉卡第一阶段已连接时的说明行（没有钉钉内免登）。' % (BS.AMZ_BACKFILL_DAYS, SHOPIFY_BACKFILL_DAYS, BS.DINGTALK_LATE_SYNC),
     'K21': '左侧 12 个意图（每项写发布版本，「未收到与异常」选中并标「草稿 v5 未发布」）；上方「发布版本 v4 · 09-08 周敏 · 草稿 v5（未发布）」与店铺下拉；中间四段说明，「何时给哪种方案」一段标「Forcome Direct 覆盖」；右栏结构化部分（只读，代码执行）与回归结果「v5 草稿：18 / 20 通过」，展开 1 条未通过样例（期望「先补发」，实际「先查件」）；「发布 v5」置灰，悬停「还有 2 条回归样例未通过，全部通过后才能发布」。每次发布记入审计，可查看历史版本与对比（D-21）。',
     'K22': '首次回复时限：亚马逊 24 小时（自然小时，平台考核，锁定只读）；Shopify 与邮件内部目标 24 小时（1–72 的整数小时）+ 店铺覆盖表（继承 / 覆盖值，示例 forcome.mx 覆盖为 12 小时，data.SLA_OVERRIDES）。工作时间：周一至周五 09:00–18:00（北京时间），不扣节假日，1 个工作日 = 9 个工作小时，算例「周五 16:00 起 4 个工作小时 → 下周一 11:00」（R-CL-01、R-CL-02）。修改进吸底保存栏，记审计。',
     'K23': '表格：标签 · 说明 · 近 30 天使用 · 状态 · 操作（data.TAG_LIBRARY 4 个）；「新增标签」右侧抽屉，名称不重复、说明必填，保存时校验；停用而不删除（已打在工单上的保留）；表下注「一张工单最多 5 个标签，坐席只能选用；报表可按标签筛选」。',
