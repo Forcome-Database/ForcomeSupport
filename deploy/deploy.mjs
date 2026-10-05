@@ -228,15 +228,19 @@ function publishReport(report) {
   console.log(`\n${report}\n报告：${stateDir}/report.md`);
 }
 
+/** 重放来信只用于非生产环境：deploy --reset-inbound 与 reset-inbound 两个入口在动手之前都先问它 */
+function refuseResetInProduction() {
+  if (environment.appEnv !== 'production') return false;
+  console.error('生产环境不能清空收信与工单');
+  return true;
+}
+
 /**
  * 重放来信（待办 10，ADR 0013 修订）：先停 worker，再用 compose 当前指向的镜像执行 dist/reset-inbound.mjs，
  * 清掉收取的邮件、邮箱游标、工单与客户；worker 再起来时重新 watch，Fake Gmail 按当前口径重新回放示例来信。
- * 生产环境拒绝（镜像里的入口与清理函数也各拒绝一次）。
+ * 调用方先用 refuseResetInProduction 挡住生产环境（镜像里的入口与清理函数也各拒绝一次）。
  */
 function resetInbound(compose) {
-  if (environment.appEnv === 'production') {
-    throw new Error('生产环境不能清空收信与工单');
-  }
   compose.run('stop', 'worker');
   compose.run('run', '--rm', '--no-deps', 'migrate', 'node', 'dist/reset-inbound.mjs');
 }
@@ -304,10 +308,7 @@ async function main() {
         console.error(`不认识的参数：${unknown.join(' ')}\n${USAGE}`);
         return false;
       }
-      if (commandArgs.includes('--reset-inbound') && environment.appEnv === 'production') {
-        console.error('生产环境不能清空收信与工单');
-        return false;
-      }
+      if (commandArgs.includes('--reset-inbound') && refuseResetInProduction()) return false;
       return deploy({
         smokeOnly: false,
         resetInboundData: commandArgs.includes('--reset-inbound'),
@@ -330,10 +331,7 @@ async function main() {
     }
     case 'reset-inbound': {
       // 对当前部署的版本重放来信：清空后把 worker 起回来
-      if (environment.appEnv === 'production') {
-        console.error('生产环境不能清空收信与工单');
-        return false;
-      }
+      if (refuseResetInProduction()) return false;
       const compose = composeFor(loadDeployEnv(), deployedRelease());
       try {
         resetInbound(compose);

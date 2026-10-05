@@ -2,6 +2,9 @@ import { clearInboundMail, gmailSyncJob, inboundReceivedJob } from './modules/ch
 import { resetBusinessNumbers, transaction, type AppEnv, type Runtime } from './modules/core';
 import { clearTickets } from './modules/ticket';
 
+/** 生产环境执行「重放来信」时的报错（入口、组合函数与测试共用） */
+export const RESET_INBOUND_REFUSED = '生产环境不能清空收信与工单';
+
 export interface InboundResetReport {
   readonly messages: number;
   readonly mailboxes: number;
@@ -21,7 +24,7 @@ export async function resetInboundData(
   appEnv: AppEnv,
 ): Promise<InboundResetReport> {
   if (appEnv === 'production') {
-    throw new Error('生产环境不能清空收信与工单');
+    throw new Error(RESET_INBOUND_REFUSED);
   }
   // 还没跑的同步与归并任务指向马上要清掉的邮件，先丢掉
   for (const job of [gmailSyncJob, inboundReceivedJob]) {

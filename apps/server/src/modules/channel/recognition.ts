@@ -1,5 +1,6 @@
 import {
   amazonDomains,
+  isTicketSource,
   SHOPIFY_CONTACT_FORM_SENDER,
   sites,
   type MessageSource,
@@ -181,11 +182,7 @@ function sourceOf(
   relayed: boolean,
 ): MessageSource {
   const applicable = relayed
-    ? rules.filter(
-        (rule) =>
-          rule.kind !== 'header' &&
-          (rule.source === 'producer' || rule.source === 'other_supplier'),
-      )
+    ? rules.filter((rule) => rule.kind !== 'header' && isTicketSource(rule.source))
     : rules;
   const hit = applicable
     .filter((rule) => matches(rule, sender, headers))

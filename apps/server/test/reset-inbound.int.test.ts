@@ -2,6 +2,7 @@ import { storeOptionsSchema, ticketListSchema, type TicketListItem } from '@forc
 import { getDemoFixture } from '@forcome/fixtures';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { gmailClient, type FakeGmail, type FakeMailInput } from '../src/modules/integration';
+import { RESET_INBOUND_REFUSED } from '../src/reset-inbound-data';
 import type { ApiClient } from './api-client';
 import { startTestHarness, type TestHarness } from './harness';
 
@@ -105,7 +106,7 @@ describe('重放来信在生产环境被拒绝', () => {
     await t.close();
   });
 
-  it('生产环境拒绝（在动任何数据之前）', async () => {
-    await expect(t.resetInbound()).rejects.toThrow('生产环境不能清空收信与工单');
+  it('生产环境拒绝：报错，不执行清理（生产配置下没有 Fake，造不出来信，只核对拒绝本身）', async () => {
+    await expect(t.resetInbound()).rejects.toThrow(RESET_INBOUND_REFUSED);
   });
 });
