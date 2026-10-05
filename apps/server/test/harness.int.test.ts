@@ -58,6 +58,8 @@ const handled: string[] = [];
 beforeAll(async () => {
   t = await startTestHarness({
     clientDefinitions: [exampleTracking],
+    // 示范客户端清单里没有 Gmail，不拉 Gmail 推送
+    feeds: () => [],
     jobHandlers: ({ clients }) => [
       handleJob(checkDelivery, async ({ trackingNo }, { runtime }) => {
         handled.push(`check:${trackingNo}`);

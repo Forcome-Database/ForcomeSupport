@@ -7,6 +7,7 @@ import {
   loginDeniedSchema,
   preferencesSchema,
   storeSchema,
+  ticketListSchema,
   type AdminContacts,
   type ChannelSettings,
   type CurrentMember,
@@ -17,6 +18,7 @@ import {
   type Store,
   type StoreInput,
   type StoreUpdate,
+  type TicketListItem,
 } from '@forcome/contracts';
 import type { z } from 'zod';
 
@@ -133,4 +135,8 @@ export const api = {
   /** 编辑店铺（带打开时的版本号）；别人先保存了抛 409 optimistic_lock（G7） */
   updateStore: (id: string, input: StoreUpdate): Promise<Store> =>
     call(`/api/channel/stores/${id}`, storeSchema, jsonBody('PUT', input)),
+
+  /** P04 工单列表（店铺范围内） */
+  tickets: async (): Promise<TicketListItem[]> =>
+    (await call('/api/tickets', ticketListSchema)).tickets,
 };

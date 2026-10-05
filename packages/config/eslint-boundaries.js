@@ -6,6 +6,13 @@ import boundaries from 'eslint-plugin-boundaries';
 export const MODULES_DIR = 'apps/server/src/modules';
 
 const MODULE = { type: 'module' };
+
+/** 店铺范围只由 org 构造（ADR 0010 修订），见下方第二段配置 */
+const MEMBER_STORE_SCOPE_ONLY_IN_ORG = {
+  group: ['**/core', '**/core/index'],
+  importNames: ['memberStoreScope'],
+  message: "店铺范围（ADR 0010）：成员的店铺范围只由 org 构造，接口里用 c.get('access').stores",
+};
 const moduleNamed = (name) => ({ type: 'module', captured: { name } });
 
 /** @type {import('eslint').Linter.Config[]} */
@@ -104,15 +111,26 @@ export const boundariesConfig = [
     files: [`${MODULES_DIR}/*/**/*.ts`],
     ignores: [`${MODULES_DIR}/org/**`, `${MODULES_DIR}/core/**`],
     rules: {
+      'no-restricted-imports': ['error', { patterns: [MEMBER_STORE_SCOPE_ONLY_IN_ORG] }],
+    },
+  },
+  {
+    // 工单状态只能经迁移表改变（ADR 0008 修订）：状态变更记录表只由 ticket-status.ts 写，数据库再保证工单状态等于
+    // 最近一条记录的目标状态，于是别处改状态的写入提交不了。同一条规则在这里要连同上一条的限制一起写
+    // （平面配置里后面的规则选项覆盖前面的）。
+    files: [`${MODULES_DIR}/ticket/**/*.ts`],
+    ignores: [`${MODULES_DIR}/ticket/ticket-status.ts`, `${MODULES_DIR}/ticket/schema.ts`],
+    rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
+            MEMBER_STORE_SCOPE_ONLY_IN_ORG,
             {
-              group: ['**/core', '**/core/index'],
-              importNames: ['memberStoreScope'],
+              group: ['./schema', '**/ticket/schema'],
+              importNames: ['statusChange'],
               message:
-                "店铺范围（ADR 0010）：成员的店铺范围只由 org 构造，接口里用 c.get('access').stores",
+                '工单状态只能经迁移表改变（ADR 0008）：状态与状态变更记录只由 ticket-status.ts 的 createTicket / applyTransition 写',
             },
           ],
         },

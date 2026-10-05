@@ -43,6 +43,20 @@
       "when": 1791065667426,
       "tag": "0005_channel_store",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791170172322,
+      "tag": "0006_inbound_ticket",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791170190806,
+      "tag": "0007_ticket_status_guard",
+      "breakpoints": true
     }
   ]
 }

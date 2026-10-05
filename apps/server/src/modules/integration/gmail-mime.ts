@@ -1,0 +1,71 @@
+/*
+ * Fake Gmail 里的邮件原文：把测试或示例数据给出的来信拼成 RFC 822（真实 Gmail 的 messages.get format=raw 返回的就是它），
+ * 这样解析走的是生产同一条路（channel 用 postal-mime 解析）。只生成纯文本单段邮件：非 ASCII 的头字段按
+ * RFC 2047 写成 UTF-8 encoded-word，正文 base64，每行 76 个字符。
+ */
+
+/** 放进 Fake Gmail 的一封信 */
+export interface FakeMailInput {
+  /** 收件的店铺邮箱；发给几个邮箱时每个邮箱各收到一份（同一个 Message-ID） */
+  readonly to: string | readonly string[];
+  readonly from: { readonly name?: string; readonly address: string };
+  readonly subject: string;
+  readonly text: string;
+  /** 到达时间（Gmail internalDate），带时区的 ISO 8601 或 Date */
+  readonly at: string | Date;
+  /** RFC Message-ID（带尖括号）；不给时 Fake 生成一个 */
+  readonly messageId?: string;
+  /** Gmail 消息 ID；只发给一个邮箱时可以指定（回放示例数据用确定的 ID，重启后不变） */
+  readonly gmailId?: string;
+  /** 另加的头字段（如 In-Reply-To、Auto-Submitted、List-Unsubscribe），值为原文 */
+  readonly headers?: Readonly<Record<string, string>>;
+}
+
+const ASCII_PRINTABLE = /^[\x20-\x7e]*$/;
+
+function encodedWord(value: string): string {
+  return `=?UTF-8?B?${Buffer.from(value, 'utf8').toString('base64')}?=`;
+}
+
+function headerText(value: string): string {
+  return ASCII_PRINTABLE.test(value) ? value : encodedWord(value);
+}
+
+function mailbox(address: { readonly name?: string; readonly address: string }): string {
+  if (!address.name) return address.address;
+  const name = ASCII_PRINTABLE.test(address.name)
+    ? `"${address.name.replace(/(["\\])/g, '\\$1')}"`
+    : encodedWord(address.name);
+  return `${name} <${address.address}>`;
+}
+
+function wrap(base64: string): string {
+  return base64.match(/.{1,76}/g)?.join('\r\n') ?? '';
+}
+
+export interface BuiltFakeMail {
+  readonly internalDate: Date;
+  readonly raw: Uint8Array;
+}
+
+export function buildFakeMail(mail: FakeMailInput, defaultMessageId: string): BuiltFakeMail {
+  const internalDate = new Date(mail.at);
+  if (Number.isNaN(internalDate.getTime()))
+    throw new RangeError(`到达时间无效：${String(mail.at)}`);
+  const to: readonly string[] = typeof mail.to === 'string' ? [mail.to] : mail.to;
+  const lines = [
+    `Message-ID: ${mail.messageId ?? defaultMessageId}`,
+    `Date: ${internalDate.toUTCString()}`,
+    `From: ${mailbox(mail.from)}`,
+    `To: ${to.join(', ')}`,
+    `Subject: ${headerText(mail.subject)}`,
+    ...Object.entries(mail.headers ?? {}).map(([key, value]) => `${key}: ${headerText(value)}`),
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=utf-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    wrap(Buffer.from(mail.text, 'utf8').toString('base64')),
+    '',
+  ];
+  return { internalDate, raw: new TextEncoder().encode(lines.join('\r\n')) };
+}

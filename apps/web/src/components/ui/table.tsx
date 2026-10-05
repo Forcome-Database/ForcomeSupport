@@ -6,13 +6,18 @@ import { cn } from '@/lib/utils';
  * 表头浅灰底、下边线、11 / 600 最浅次要色、字距 0.02em、不换行，上下 9；数据行白底、下边浅线、正文字号，上下 10
  * （行高另由使用处给，如 P18 店铺表上下 12）；列间距 12、首尾列距边 16（单元格左右各 6，首尾列外侧 16）。
  * 列宽用 <colgroup> 照原型的 grid-template-columns 给定。排序、筛选、分页的表格再接 TanStack Table。
+ * 工单列表（原型 tk_table()）的外框圆角是 8、表头 11 / 700 次要色、行上下 7，用 containerClassName 与单元格的 className 改。
  */
 
-function Table({ className, ...props }: React.ComponentProps<'table'>) {
+function Table({
+  className,
+  containerClassName,
+  ...props
+}: React.ComponentProps<'table'> & { containerClassName?: string }) {
   return (
     <div
       data-slot="table-container"
-      className="overflow-hidden rounded-lg border bg-card shadow-xs"
+      className={cn('overflow-hidden rounded-lg border bg-card shadow-xs', containerClassName)}
     >
       <table
         data-slot="table"

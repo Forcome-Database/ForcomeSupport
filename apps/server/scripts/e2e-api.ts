@@ -1,5 +1,6 @@
 // Playwright 用的 api（待办 02）：每次启动先重建 e2e 专用库、执行迁移、灌示例数据，
-// 再以开发登录启动正式的 api 入口。环境变量取自 e2e.env（端口 4518、库 forcome_e2e）。
+// 再以开发登录启动正式的 api 入口，并在同一进程里启动 worker（待办 08：示例来信由 worker 的 Fake Gmail 回放、
+// 同步并归并成工单）。环境变量取自 e2e.env（端口 4518、库 forcome_e2e）。
 import pg from 'pg';
 import { jobDefinitions } from '../src/jobs';
 import { runMigrations } from '../src/migrations';
@@ -31,3 +32,4 @@ const report = await seedDemoData(config.databaseUrl, config.appEnv, logger);
 logger.info({ database, steps: report.steps }, 'e2e 库已重建并灌入示例数据');
 
 await import('../src/api');
+await import('../src/worker');

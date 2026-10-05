@@ -1,0 +1,143 @@
+import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { findInboundMessage, type InboundMessage } from '../channel';
+import { nextBusinessNumber, systemActor, transaction, type JobContext, type Tx } from '../core';
+import { customer, customerIdentity, ticket, ticketMessage } from './schema';
+import { applyTransition, createTicket } from './ticket-status';
+
+/*
+ * 归并（规格 ticket「归并」，PRD R-TK-02、6.1 第一阶段迁移表；处理 channel 的「来信已接收」）：
+ * 无订单号的来信——同一店铺、同一客户渠道身份有未关闭的无订单工单则追加，否则新建「待回复」工单。
+ * 在事务内按「店铺 + 客户渠道身份」取 pg_advisory_xact_lock 后再查再写，并发到达的同一客户来信不会各建一张；
+ * 任务幂等：一封信只归并一次（工单消息按邮件 id 唯一），重跑结果不变。
+ * 带订单号的来信按 R-TK-01 追加、重开或新建随 14；未归属店铺的来信进队列随 15。
+ */
+
+async function lock(tx: Tx, key: string): Promise<void> {
+  await tx.db.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${key}))`);
+}
+
+async function alreadyMerged(tx: Tx, channelMessageId: string): Promise<boolean> {
+  const [row] = await tx.db
+    .select({ id: ticketMessage.id })
+    .from(ticketMessage)
+    .where(eq(ticketMessage.channelMessageId, channelMessageId))
+    .limit(1);
+  return Boolean(row);
+}
+
+/**
+ * 客户渠道身份对应的客户，没有就建（第一期一个身份就是一个客户）。按身份地址加锁后再查再写：
+ * 同一个新客户的几封信同时归并时只建一个客户。
+ */
+async function customerOf(tx: Tx, mail: InboundMessage): Promise<string> {
+  const address = mail.fromAddress;
+  await lock(tx, `ticket.customer:${address}`);
+  const [identity] = await tx.db
+    .select({ customerId: customerIdentity.customerId })
+    .from(customerIdentity)
+    .where(eq(customerIdentity.address, address))
+    .limit(1);
+  if (identity) return identity.customerId;
+  const [created] = await tx.db
+    .insert(customer)
+    .values({ name: mail.fromName || address, createdAt: tx.now })
+    .returning({ id: customer.id });
+  if (!created) throw new Error('客户创建失败');
+  await tx.db
+    .insert(customerIdentity)
+    .values({ customerId: created.id, address, createdAt: tx.now });
+  return created.id;
+}
+
+/** 把一封来信归并成工单（「来信已接收」的处理器） */
+export async function mergeInbound(
+  { messageId }: { messageId: string },
+  { runtime, logger }: JobContext,
+): Promise<void> {
+  const mail = await findInboundMessage(runtime.db, messageId);
+  if (!mail) throw new Error(`没有这封来信：${messageId}`);
+  if (mail.direction !== 'inbound' || mail.duplicateOfId) {
+    logger.warn({ messageId }, '不是要归并的来信，跳过');
+    return;
+  }
+  const { storeId, channel, site } = mail;
+  if (!storeId || !channel || !site) {
+    // 未归属店铺的来信队列随 15 号待办
+    logger.warn({ messageId }, '来信没有识别出店铺，暂不归并');
+    return;
+  }
+  if (!mail.fromAddress) {
+    logger.warn({ messageId }, '来信没有发件地址，无法确定客户，暂不归并');
+    return;
+  }
+
+  await transaction(runtime, async (tx) => {
+    if (await alreadyMerged(tx, messageId)) return;
+    const customerId = await customerOf(tx, mail);
+    await lock(tx, `ticket.merge:${storeId}:customer:${mail.fromAddress}`);
+    // 加锁后再查一次：同一封信的归并任务可能被重复执行
+    if (await alreadyMerged(tx, messageId)) return;
+
+    const [open] = await tx.db
+      .select()
+      .from(ticket)
+      .where(
+        and(
+          eq(ticket.storeId, storeId),
+          eq(ticket.customerId, customerId),
+          isNull(ticket.orderNumber),
+          ne(ticket.status, 'closed'),
+        ),
+      )
+      .orderBy(desc(ticket.lastInboundAt))
+      .limit(1)
+      .for('update');
+
+    let target;
+    if (open) {
+      // 追加（R-TK-02）：状态按迁移表变化（待回复保持待回复）
+      const current = await applyTransition(tx, open, 'inbound', systemActor);
+      const [touched] = await tx.db
+        .update(ticket)
+        .set({
+          lastInboundAt: sql`greatest(${ticket.lastInboundAt}, ${mail.receivedAt.toISOString()}::timestamptz)`,
+          updatedAt: tx.now,
+          version: sql`${ticket.version} + 1`,
+        })
+        .where(eq(ticket.id, current.id))
+        .returning({ id: ticket.id, number: ticket.number });
+      target = touched;
+    } else {
+      const created = await createTicket(
+        tx,
+        {
+          number: await nextBusinessNumber(tx, 'ticket', mail.receivedAt),
+          storeId,
+          channel,
+          site,
+          customerId,
+          subject: mail.subject,
+          orderNumber: null,
+          firstInboundAt: mail.receivedAt,
+          lastInboundAt: mail.receivedAt,
+        },
+        'inbound',
+        systemActor,
+      );
+      target = { id: created.id, number: created.number };
+    }
+    if (!target) throw new Error(`工单更新失败：${messageId}`);
+
+    await tx.db.insert(ticketMessage).values({
+      ticketId: target.id,
+      channelMessageId: messageId,
+      direction: 'inbound',
+      receivedAt: mail.receivedAt,
+      createdAt: tx.now,
+    });
+    logger.info(
+      { messageId, ticket: target.number, appended: Boolean(open) },
+      open ? '来信已追加到工单' : '来信已新建工单',
+    );
+  });
+}

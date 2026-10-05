@@ -19,12 +19,14 @@ import { applyDensity, currentMemberQuery, devMembersQuery } from '@/lib/session
 import { DevLoginPage } from '@/pages/dev-login';
 import { ChannelsPage } from '@/pages/settings/channels-page';
 import { TeamPage } from '@/pages/settings/team-page';
+import { TicketsPage } from '@/pages/tickets/tickets-page';
 
 /*
  * 路由（ADR 0007：TanStack Router，代码定义）。登录后的页面都挂在 app 布局下：
  * 没登录（含会话 7 天无操作过期）时，开启了开发登录就去开发登录页；钉钉扫码登录页（G11）随 05 号待办。
  * 「/」按角色进入默认首页（PRD 4.1）；各页面按能力把关，没有权限时在原地址显示 G2。
- * 第一期各页面的内容随各自的待办加进来（P04 18、P05 17、P13 19、P17 24、P20 06、P27 30），在那之前内容区为空；P18 已有（07）。
+ * 第一期各页面的内容随各自的待办加进来（P05 17、P13 19、P17 24、P20 06、P27 30），在那之前内容区为空；
+ * P18 已有（07），P04 先是最简列表（08，完整版随 18）。
  */
 
 interface RouterContext {
@@ -154,7 +156,7 @@ const routeTree = rootRoute.addChildren([
   devLoginRoute,
   appRoute.addChildren([
     homeRoute,
-    pageRoute(pages.tickets),
+    pageRoute(pages.tickets, TicketsPage),
     aftersalesRoute,
     pageRoute(pages.aftersalesLedger),
     pageRoute(pages.reports),

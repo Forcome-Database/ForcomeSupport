@@ -13,10 +13,10 @@ beforeAll(() => {
   eslint = new ESLint({ cwd: repoRoot });
 });
 
-/** 以 modules/<module>/index.ts 的身份检查代码，返回边界规则的报错 */
-async function boundaryErrors(module: string, code: string): Promise<string[]> {
+/** 以 modules/<module>/<file>（默认 index.ts）的身份检查代码，返回边界规则的报错 */
+async function boundaryErrors(module: string, code: string, file = 'index.ts'): Promise<string[]> {
   const [result] = await eslint.lintText(code, {
-    filePath: `${repoRoot}/apps/server/src/modules/${module}/index.ts`,
+    filePath: `${repoRoot}/apps/server/src/modules/${module}/${file}`,
   });
   return (result?.messages ?? [])
     .filter((m) =>
@@ -149,5 +149,21 @@ describe('模块边界 lint', () => {
       `import { createApp } from '../../app';\nexport const a = createApp;\n`,
     );
     expect(errors).toEqual(['模块边界（ADR 0005）：模块不能引用后端入口与组装代码']);
+  });
+});
+
+describe('工单状态只能经迁移表改变（ADR 0008 修订）', () => {
+  const useStatusLog = `import { statusChange } from './schema';
+export const s = statusChange;
+`;
+
+  it('ticket 模块里除 ticket-status.ts 以外的文件不能引用状态变更记录表', async () => {
+    expect(await boundaryErrors('ticket', useStatusLog, 'merge.ts')).toEqual([
+      expect.stringContaining('工单状态只能经迁移表改变（ADR 0008）'),
+    ]);
+  });
+
+  it('ticket-status.ts 是状态的唯一写入口，可以引用', async () => {
+    expect(await boundaryErrors('ticket', useStatusLog, 'ticket-status.ts')).toEqual([]);
   });
 });

@@ -12,6 +12,7 @@ import {
   type Runtime,
 } from './modules/core';
 import { createDevLoginRoutes, createOrgRoutes, devLoginAvailable } from './modules/org';
+import { createTicketRoutes } from './modules/ticket';
 
 const DATABASE_CHECK_TIMEOUT_MS = 3_000;
 
@@ -83,6 +84,7 @@ export function createApp(deps: ServerDeps) {
 
   app.route('/', createOrgRoutes({ runtime, appEnv: config.appEnv }));
   app.route('/', createChannelRoutes({ runtime, appEnv: config.appEnv, clients }));
+  app.route('/', createTicketRoutes({ runtime, appEnv: config.appEnv }));
   if (devLoginAvailable(config)) {
     app.route('/', createDevLoginRoutes({ runtime, appEnv: config.appEnv }));
   }

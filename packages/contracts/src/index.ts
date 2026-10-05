@@ -106,3 +106,32 @@ export { adapterModeSchema, adapterModes, type AdapterMode } from './integration
 export { currencies, currencySchema, type Currency } from './money';
 export { homeFor, navFor, navSections, navSectionSchema, type NavSection } from './navigation';
 export { roleByLabel, roleLabels, roleNames, roles, roleSchema, type Role } from './roles';
+export {
+  ticketChannelLabels,
+  ticketChannels,
+  ticketChannelSchema,
+  ticketCloseReasonLabels,
+  ticketCloseReasons,
+  ticketCloseReasonSchema,
+  ticketDetailSchema,
+  ticketEvents,
+  ticketEventSchema,
+  ticketListItemSchema,
+  ticketListSchema,
+  ticketMessageSchema,
+  ticketNumberSchema,
+  ticketStatusLabels,
+  ticketStatuses,
+  ticketStatusSchema,
+  ticketTriggers,
+  ticketTriggerSchema,
+  type TicketChannel,
+  type TicketCloseReason,
+  type TicketDetail,
+  type TicketEvent,
+  type TicketList,
+  type TicketListItem,
+  type TicketMessage,
+  type TicketStatus,
+  type TicketTrigger,
+} from './ticket';

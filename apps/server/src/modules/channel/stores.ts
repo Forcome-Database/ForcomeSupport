@@ -83,6 +83,22 @@ export async function listStoreOptions(db: DbExecutor, scope: StoreScope): Promi
     .orderBy(asc(store.createdAt), asc(store.id));
 }
 
+/**
+ * 店铺名（工单列表等业务页面显示「渠道与店铺」用）：调用方传入的是它已按店铺范围查出的数据里的店铺 ID，
+ * 这里只把 ID 换成名字，不另做范围判断
+ */
+export async function storeNamesById(
+  db: DbExecutor,
+  ids: readonly string[],
+): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const rows = await db
+    .select({ id: store.id, name: store.name })
+    .from(store)
+    .where(inArray(store.id, [...new Set(ids)]));
+  return new Map(rows.map((row) => [row.id, row.name]));
+}
+
 /** 接口输出（contracts 的 Store） */
 export function toStore(record: StoreRecord): Store {
   return {

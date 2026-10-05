@@ -5,7 +5,7 @@ import type { JobOptions } from 'pg-boss';
 import { createApp } from '../src/app';
 import type { ServerDeps } from '../src/deps';
 import { fixtureSteps } from '../src/fixture-steps';
-import { createJobHandlers } from '../src/jobs';
+import { createFeeds, createJobHandlers } from '../src/jobs';
 import { findAuditRecords, type AuditQuery, type AuditRecord } from '../src/modules/core/audit';
 import {
   ensureQueues,
@@ -16,6 +16,7 @@ import {
   transaction,
   type AnyJobHandler,
   type AppEnv,
+  type Feed,
   type FixtureLoadReport,
   type JobDefinition,
   type Runtime,
@@ -54,6 +55,8 @@ export interface StartTestHarnessOptions {
   readonly now?: string;
   /** 后台任务处理器，默认 jobs.ts 组装的全部处理器；测试工具自己的测试会换成示范处理器 */
   readonly jobHandlers?: (deps: ServerDeps) => readonly AnyJobHandler[];
+  /** 常驻拉取（Gmail 推送等），默认 jobs.ts 组装的全部拉取源 */
+  readonly feeds?: (deps: ServerDeps) => readonly Feed[];
   /** 外部客户端清单，默认 integration 登记的全部客户端 */
   readonly clientDefinitions?: readonly AnyClientDefinition[];
   /**
@@ -85,7 +88,10 @@ export interface TestHarness {
    * 钉钉通讯录同步与 P20 成员管理（05、06 号待办）上线前，测试经 org 的 createMember 建成员。
    */
   addMember(member: Omit<NewMember, 'id'>): Promise<string>;
-  /** 同步把已排队的后台任务跑到空闲（见 run-jobs.ts）；有任务失败默认抛错 */
+  /**
+   * 同步把 worker 跑到空闲（见 run-jobs.ts）：先拉常驻拉取源（如 Fake Gmail 的推送通知），再跑已排队的任务，
+   * 反复直到都空闲；有任务失败默认抛错
+   */
   runJobs(options?: RunJobsOptions): Promise<JobRunReport>;
   /** 直接排一个任务（例如模拟每分钟扫描的定时触发），随后用 runJobs 跑 */
   enqueue<T extends object>(
@@ -138,6 +144,7 @@ export async function startTestHarness(
   };
   let app: RequestHandler;
   let handlers: readonly AnyJobHandler[];
+  let feeds: readonly Feed[];
   try {
     const main = createApp(deps);
     if (options.routes) main.route('/', options.routes(deps));
@@ -157,6 +164,7 @@ export async function startTestHarness(
       steps: [orgMembersFixtureStep],
     });
     handlers = (options.jobHandlers ?? createJobHandlers)(deps);
+    feeds = (options.feeds ?? createFeeds)(deps);
     // 模板库只建了 jobs.ts 登记的队列；测试自己的处理器在这里补建
     await ensureQueues(
       runtime.boss,
@@ -216,7 +224,7 @@ export async function startTestHarness(
 
     addMember: (member) => transaction(runtime, (tx) => createMember(tx, member)),
 
-    runJobs: (runOptions) => runQueuedJobs(runtime, handlers, silentLogger, runOptions),
+    runJobs: (runOptions) => runQueuedJobs(runtime, { handlers, feeds }, silentLogger, runOptions),
 
     enqueue: (job, payload, jobOptions) =>
       transaction(runtime, (tx) => tx.enqueue(job, payload, jobOptions)),

@@ -97,7 +97,7 @@ apps/server              后端：一个镜像，三个入口（ADR 0005、0006�
 ├── src/modules/<模块>/  12 个模块；index.ts 是唯一对外入口，schema.ts 放本模块的表（一个模块一个 schema）
 ├── drizzle/             drizzle-kit 生成的 SQL 迁移（提交进仓库，不手改；自定义 SQL 用 drizzle-kit generate --custom）
 ├── test/                集成测试的数据库准备、主接缝测试工具（harness.ts）与跨模块测试
-├── scripts/e2e-api.ts   Playwright 用的 api（重建 e2e 库、迁移、灌示例数据后启动）
+├── scripts/e2e-api.ts   Playwright 用的 api（重建 e2e 库、迁移、灌示例数据后启动，同一进程里起 worker）
 ├── dev.env · e2e.env    本机开发与 e2e 的环境变量默认值（只有本机库口令，没有外部凭据）
 └── Dockerfile           后端镜像
 packages/contracts       前后端共享的 zod 模式与类型
@@ -128,7 +128,7 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 | `pnpm db:migrate` | 执行迁移；默认对本机开发库（`apps/server/dev.env`），设 `DATABASE_URL` 可指向别的库 |
 | `pnpm db:seed` | 灌示例数据夹具（各模块登记的加载步骤；生产环境拒绝），先跑 `db:migrate` |
 | `pnpm db:generate` | 改了某个模块的 `schema.ts` 后生成迁移 |
-| `pnpm --filter @forcome/server dev:api` / `dev:worker` | 本机运行 api（4516）/ worker，环境变量默认取 `apps/server/dev.env`（开启开发登录） |
+| `pnpm --filter @forcome/server dev:api` / `dev:worker` | 本机运行 api（4516）/ worker，环境变量默认取 `apps/server/dev.env`（开启开发登录）；worker 启动时 Fake Gmail 回放示例来信，几秒后在 P04 归并成工单 |
 | `pnpm --filter @forcome/web dev` | 本机运行前端（http://127.0.0.1:4517），`/api` 转给本机 api；未登录时进入开发登录页，选一位示例成员即可登录 |
 | `pnpm typecheck` · `pnpm lint` · `pnpm build` | 类型检查 · lint（含模块边界）与格式 · 构建 |
 | `pnpm lint:workflows` | 用 actionlint（Docker）校验 CI 工作流语法 |
@@ -140,7 +140,7 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 | `pnpm staging smoke` · `cert` · `compose …` · `down` | 对开发测试环境：重跑 HTTPS 核对与冒烟 · 导出根证书 · 执行 docker compose · 停止（保留数据） |
 | `pnpm deploy:verify` | 部署配置检查：Compose 文件、前端镜像、Caddyfile（CI 与 `ci:local` 执行） |
 
-**测试**：`*.test.ts` 是单元测试；`*.int.test.ts` 是集成测试，用真实 PostgreSQL 18——每次运行先建模板库并迁移，各测试文件再复制出自己的库，互不干扰。集成测试只经主接缝（规格「测试接缝」）：用 `apps/server/test/harness.ts` 的 `startTestHarness()` 在测试进程内调用 HTTP 接口，`t.loginAs('坐席')` 以某个角色登录（`t.addMember(…)` 建多角色、店铺范围受限等示例数据里没有的成员后用 `t.loginAs({ memberId })`），`t.clients.fake(…)` 往 Fake 里放数据、注入故障，`t.clock` 推进时钟，`t.runJobs()` 把后台任务跑到空闲，`t.auditRecords()` 核对审计；要验证生产环境的限制时用 `startTestHarness({ appEnv: 'production' })`（应用按生产组装，测试工具另用非生产实例做开发登录，见 `apps/server/test/stores.int.test.ts`）；样板见 `apps/server/test/dev-login.int.test.ts`；还没有业务接口使用的公共工具（店铺范围、越权审计、财务字段过滤）用 `startTestHarness({ routes })` 挂示范接口来测，见 `apps/server/test/access-tools.int.test.ts`。外部客户端的「接口 + 真实现 + Fake」写法见 `apps/server/src/modules/integration/fake-framework.test.ts`。
+**测试**：`*.test.ts` 是单元测试；`*.int.test.ts` 是集成测试，用真实 PostgreSQL 18——每次运行先建模板库并迁移，各测试文件再复制出自己的库，互不干扰。集成测试只经主接缝（规格「测试接缝」）：用 `apps/server/test/harness.ts` 的 `startTestHarness()` 在测试进程内调用 HTTP 接口，`t.loginAs('坐席')` 以某个角色登录（`t.addMember(…)` 建多角色、店铺范围受限等示例数据里没有的成员后用 `t.loginAs({ memberId })`），`t.clients.fake(…)` 往 Fake 里放数据、注入故障，`t.clock` 推进时钟，`t.runJobs()` 把 worker 跑到空闲（每轮先拉常驻拉取源，如 Fake Gmail 的推送通知，再跑已排队的任务），`t.auditRecords()` 核对审计；要验证生产环境的限制时用 `startTestHarness({ appEnv: 'production' })`（应用按生产组装，测试工具另用非生产实例做开发登录，见 `apps/server/test/stores.int.test.ts`）；样板见 `apps/server/test/dev-login.int.test.ts`；还没有业务接口使用的公共工具（店铺范围、越权审计、财务字段过滤）用 `startTestHarness({ routes })` 挂示范接口来测，见 `apps/server/test/access-tools.int.test.ts`。外部客户端的「接口 + 真实现 + Fake」写法见 `apps/server/src/modules/integration/fake-framework.test.ts`。来信用 `t.clients.fake(gmailClient).deliver(…)` 放进 Fake Gmail（邮箱要先开始监听：灌完店铺先 `t.runJobs()` 一次），见 `apps/server/test/inbound-to-ticket.int.test.ts`。
 
 **开发登录**：只在非生产环境、`DEV_LOGIN_ENABLED=true` 时开启（`dev.env` 已开启），从成员表里的在职成员（示例数据灌入）里选一位直接登录，换出与钉钉扫码登录相同的会话，能不能进入与正式登录同一套判断（第一期只有生产厂对接人角色的陈工、张工会看到「暂时无法进入」）；生产环境配置了就拒绝启动（ADR 0010 修订）。
 

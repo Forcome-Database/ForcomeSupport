@@ -2,17 +2,31 @@
 // 其他模块只能经本文件调用本模块，不能引用内部文件或读写本模块的表。
 export {
   createIntegrationClients,
-  defineClient,
   FakeNotAllowedError,
   IntegrationClients,
+  type IntegrationClientsOptions,
+  type StoreClientSelection,
+} from './clients';
+export {
+  defineClient,
   type AnyClientDefinition,
   type ClientDefinition,
   type ClientScope,
   type FakeClient,
-  type IntegrationClientsOptions,
+  type FakeContext,
   type RealClientContext,
-  type StoreClientSelection,
-} from './clients';
+} from './definition';
+export {
+  FakeGmail,
+  FakeGmailPush,
+  gmailClient,
+  gmailPushClient,
+  type GmailClient,
+  type GmailNotification,
+  type GmailPushClient,
+  type GmailRawMessage,
+} from './gmail';
+export { type FakeMailInput } from './gmail-mime';
 export { MailRecipientGuard, MailRecipientNotAllowedError } from './mail-recipient-guard';
 export {
   ConnectionLostError,

@@ -7,6 +7,7 @@ import {
   type AppEnv,
   type MailSendPolicy,
 } from '../core';
+import type { AnyClientDefinition, ClientDefinition, FakeClient } from './definition';
 import { MailRecipientGuard } from './mail-recipient-guard';
 import { clientDefinitions } from './registry';
 
@@ -20,47 +21,6 @@ import { clientDefinitions } from './registry';
  * - 非生产环境的进程（本机开发、开发测试环境、Playwright 的 api）启动时，Fake 从示例数据夹具回放数据；
  *   api 与 worker 各有一份 Fake，靠同一份夹具保持一致。测试不自动回放，需要时自己调 replayFixtures。
  */
-
-export type ClientScope = 'store' | 'global';
-
-/** 真实现的构造参数；店铺级客户端带店铺 ID。凭据与出站 HTTP 客户端随各集成的待办加入 */
-export interface RealClientContext {
-  readonly storeId?: string;
-  /** 发信白名单（ADR 0013 修订）：会发信的真实现在发出前对全部收件人调用 assertAllowed */
-  readonly mailRecipientGuard: MailRecipientGuard;
-}
-
-/** Fake 的最小约定：给出（某店铺视角的）客户端，能重置到初始状态 */
-export interface FakeClient<C> {
-  /** 店铺级客户端按店铺 ID 返回该店铺视角的客户端；全局客户端忽略参数 */
-  client(storeId?: string): C;
-  /** 清空数据、故障与调用记录 */
-  reset(): void;
-  /** 从示例数据夹具装入数据（ADR 0009 修订）；没有可回放的数据就不实现 */
-  replay?(fixture: DemoFixture): void;
-}
-
-export interface ClientDefinition<C, F extends FakeClient<C> = FakeClient<C>> {
-  /** 外部系统名，小写 snake_case，如 gmail、dingtalk、exchange_rate；也是 CLIENT_MODE_<系统> 的后缀 */
-  readonly system: string;
-  readonly scope: ClientScope;
-  readonly createReal: (context: RealClientContext) => C;
-  /** 一个进程只建一次，服务全部店铺（店铺级的 Fake 自己按店铺分开数据） */
-  readonly createFake: () => F;
-}
-
-export type AnyClientDefinition = ClientDefinition<unknown, FakeClient<unknown>>;
-
-const SYSTEM_NAME = /^[a-z][a-z0-9_]*$/;
-
-export function defineClient<C, F extends FakeClient<C>>(
-  definition: ClientDefinition<C, F>,
-): ClientDefinition<C, F> {
-  if (!SYSTEM_NAME.test(definition.system)) {
-    throw new Error(`外部系统名必须是小写 snake_case：${definition.system}`);
-  }
-  return definition;
-}
 
 /** 生产环境要用 Fake（店铺配置写成了 Fake、或要取 Fake 实例） */
 export class FakeNotAllowedError extends Error {
@@ -162,7 +122,7 @@ export class IntegrationClients {
     const key = definition as unknown as AnyClientDefinition;
     let fake = this.#fakes.get(key);
     if (!fake) {
-      fake = definition.createFake();
+      fake = definition.createFake({ fake: (other) => this.fake(other) });
       this.#fakes.set(key, fake);
     }
     return fake as F;
