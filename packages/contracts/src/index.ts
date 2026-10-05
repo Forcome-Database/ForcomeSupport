@@ -60,6 +60,7 @@ export {
   storeInputSchema,
   storeOptionSchema,
   storeOptionsSchema,
+  storeSaveMessages,
   storeSchema,
   storeUpdateSchema,
   worstConnectionStatus,

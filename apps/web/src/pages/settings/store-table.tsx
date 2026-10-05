@@ -21,16 +21,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ConnectionBadge } from './channel-cards';
+import { EMPTY_STORES, RULE_ROUTE } from './p18-copy';
 
 /*
  * P18 店铺表（第一阶段，K20；原型 build_settings.p18_stores(phase1=True)）：
  * 列为 店铺 · 站点（加粗为默认）· 进线邮箱 · 平台标识（可复制）· 状态 · 行尾「编辑」，第一阶段没有覆盖项列；
  * 表头上方「店铺 N 个 | ⓘ 进线识别」，右侧「新增店铺」。上线初期没有店铺时显示空状态。
  */
-
-const RULE_ROUTE =
-  '亚马逊按买家消息的收件邮箱与发件域名（amazon.com / .ca / .com.mx）识别店铺和站点；Shopify 按客服邮箱。' +
-  '一个店铺可以登记多个进线邮箱（含别名）。识别不出的来信进入「未归属店铺」队列，由客服主管指定店铺。';
 
 function SiteCell({ store }: { store: Store }) {
   return (
@@ -191,8 +188,8 @@ export function StoreTable({
         <Card>
           <EmptyState
             icon={StoreIcon}
-            title="还没有店铺"
-            description="新增店铺并登记进线邮箱后，来信才能识别店铺、匹配订单。"
+            title={EMPTY_STORES.title}
+            description={EMPTY_STORES.description}
             action={
               <Button variant="outline" onClick={onCreate}>
                 <Plus />

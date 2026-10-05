@@ -42,6 +42,7 @@ import { CHANNEL_QUERY_KEY, channelSettingsQuery, formatClock } from '@/lib/chan
 import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { endSessionIfUnauthenticated } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { DRAWER, LEAVE, SAVE_RESULT } from './p18-copy';
 import {
   changedFields,
   defaultSiteAfter,
@@ -69,7 +70,6 @@ import {
 export type StoreDrawerTarget = { mode: 'create' } | { mode: 'edit'; store: Store };
 
 const SAVE_TOAST = 'store-save';
-const DESCRIPTION = '保存记入审计日志；未归属队列中收件地址与新店铺进线邮箱匹配的来信自动归位。';
 
 /** 站点多选（原型 multi_select()）：已选的站点是框内可移除的小标签，点开为勾选列表 */
 function SitesSelect({
@@ -177,10 +177,10 @@ function MailboxesField({ id, form }: { id: string; form: UseFormReturn<StoreFor
 
   return (
     <FormField
-      label="进线邮箱（可填多个，含别名）"
+      label={DRAWER.labels.mailboxes}
       htmlFor={id}
       required
-      hint="每个地址都用来识别店铺；寄到这些地址的未归属来信保存后自动归位"
+      hint={DRAWER.mailboxHint}
       error={messages}
     >
       <div className="flex flex-col gap-1.5">
@@ -301,8 +301,12 @@ function StoreDrawerContent({
     dismissToast(SAVE_TOAST);
     await queryClient.invalidateQueries({ queryKey: CHANNEL_QUERY_KEY });
     showSuccess({
-      title: '店铺已保存',
-      description: `${store.name}，已记入审计日志（${store.updatedBy ?? '系统'} ${formatClock(store.updatedAt)}）。`,
+      title: SAVE_RESULT.savedTitle,
+      description: SAVE_RESULT.savedDescription(
+        store.name,
+        store.updatedBy ?? '系统',
+        formatClock(store.updatedAt),
+      ),
     });
     onClose();
   }
@@ -352,7 +356,7 @@ function StoreDrawerContent({
         id: SAVE_TOAST,
         action: '保存',
         error,
-        description: '填写的内容已保留在抽屉里。',
+        description: SAVE_RESULT.failedDescription,
         retry: async () => {
           try {
             await saved(await save.mutateAsync({ values, version }));
@@ -381,7 +385,10 @@ function StoreDrawerContent({
       }}
     >
       <SheetContent className="w-110">
-        <SheetHeader title={editing ? '编辑店铺' : '新增店铺'} description={DESCRIPTION} />
+        <SheetHeader
+          title={editing ? DRAWER.editTitle : DRAWER.createTitle}
+          description={DRAWER.description}
+        />
         <form
           noValidate
           className="flex min-h-0 flex-1 flex-col"
@@ -401,7 +408,7 @@ function StoreDrawerContent({
             )}
             <div className="grid grid-cols-2 items-start gap-3">
               <FormField
-                label="平台"
+                label={DRAWER.labels.platform}
                 htmlFor={fieldId('platform')}
                 required
                 error={formState.errors.platform?.message}
@@ -441,7 +448,7 @@ function StoreDrawerContent({
                 />
               </FormField>
               <FormField
-                label="店铺名"
+                label={DRAWER.labels.name}
                 htmlFor={fieldId('name')}
                 required
                 error={formState.errors.name?.message}
@@ -457,7 +464,7 @@ function StoreDrawerContent({
             </div>
             <div className="grid grid-cols-2 items-start gap-3">
               <FormField
-                label="站点（多选）"
+                label={DRAWER.labels.sites}
                 htmlFor={fieldId('sites')}
                 required
                 error={formState.errors.sites?.message}
@@ -485,10 +492,10 @@ function StoreDrawerContent({
                 />
               </FormField>
               <FormField
-                label="默认站点"
+                label={DRAWER.labels.defaultSite}
                 htmlFor={fieldId('defaultSite')}
                 required
-                hint="无订单的来信按它归站点"
+                hint={DRAWER.defaultSiteHint}
                 error={formState.errors.defaultSite?.message}
               >
                 <Controller
@@ -527,7 +534,7 @@ function StoreDrawerContent({
             </div>
             <MailboxesField id={fieldId('mailboxes')} form={form} />
             <FormField
-              label={terms?.platformIdField ?? '平台标识'}
+              label={terms?.platformIdField ?? DRAWER.labels.platformId}
               htmlFor={fieldId('platformId')}
               required
               error={formState.errors.platformId?.message}
@@ -547,9 +554,9 @@ function StoreDrawerContent({
               <div className="flex flex-col gap-2 rounded-md border border-dashed border-input bg-muted px-3 py-2.5">
                 <div className="flex items-center gap-2">
                   <span id={fieldId('adapterMode')} className="text-12 font-semibold text-ink-2">
-                    数据来源
+                    {DRAWER.labels.dataSource}
                   </span>
-                  <Badge tone="info">仅开发测试环境</Badge>
+                  <Badge tone="info">{DRAWER.dataSourceBadge}</Badge>
                 </div>
                 <Controller
                   control={control}
@@ -564,18 +571,13 @@ function StoreDrawerContent({
                         clearErrors('adapterMode');
                       }}
                     >
-                      {(
-                        [
-                          ['real', '真实接口'],
-                          ['fake', '模拟数据'],
-                        ] as const
-                      ).map(([value, label]) => (
+                      {(['real', 'fake'] as const).map((value) => (
                         <label
                           key={value}
                           className="flex items-center gap-2 text-13 text-foreground"
                         >
                           <RadioGroupItem value={value} />
-                          {label}
+                          {DRAWER.dataSourceOptions[value]}
                         </label>
                       ))}
                     </RadioGroup>
@@ -584,9 +586,7 @@ function StoreDrawerContent({
                 {formState.errors.adapterMode?.message ? (
                   <FieldError messages={[formState.errors.adapterMode.message]} />
                 ) : (
-                  <p className="text-12 text-muted-foreground">
-                    生产环境不显示此项；接模拟数据时渠道卡头标「模拟数据」。
-                  </p>
+                  <p className="text-12 text-muted-foreground">{DRAWER.dataSourceNote}</p>
                 )}
               </div>
             )}
@@ -619,11 +619,7 @@ function StoreDrawerContent({
       <UnsavedChangesDialog
         open={leaving}
         onOpenChange={setLeaving}
-        description={
-          editing
-            ? `「编辑店铺」有 ${unsavedFieldCount(dirtyFields)} 项未保存的修改。放弃后恢复为上次保存的值。`
-            : '「新增店铺」填写的内容还没保存，放弃后不保留。'
-        }
+        description={editing ? LEAVE.edit(unsavedFieldCount(dirtyFields)) : LEAVE.create}
         onDiscard={() => {
           setLeaving(false);
           onClose();

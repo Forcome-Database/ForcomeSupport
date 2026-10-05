@@ -4,6 +4,7 @@ import { LoadError } from '@/components/load-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { channelSettingsQuery } from '@/lib/channel';
 import { ChannelCards } from './channel-cards';
+import { PAGE_DESCRIPTION } from './p18-copy';
 import { SettingsHeader, SettingsLayout } from './settings-layout';
 import { StoreDrawer, type StoreDrawerTarget } from './store-drawer';
 import { StoreTable } from './store-table';
@@ -38,10 +39,7 @@ export function ChannelsPage() {
 
   return (
     <SettingsLayout>
-      <SettingsHeader
-        title="渠道与店铺"
-        description="订单由平台直读；客户来信统一经 Gmail 收取。店铺决定订单匹配与数据权限。"
-      />
+      <SettingsHeader title="渠道与店铺" description={PAGE_DESCRIPTION} />
       {settings.isPending ? (
         <ChannelsSkeleton />
       ) : settings.isError ? (

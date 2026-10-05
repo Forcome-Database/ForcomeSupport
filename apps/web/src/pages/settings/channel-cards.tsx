@@ -20,6 +20,7 @@ import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { formatClock } from '@/lib/channel';
 import { cn } from '@/lib/utils';
+import { CARD_LINES, NOT_AUTHORIZED, PHASE2_CARDS, RULE_CARD_STATE } from './p18-copy';
 
 /*
  * P18 渠道卡（第一阶段，K20；原型 build_settings.p18_channels_p1()）：3 × 2 网格，间距 10。
@@ -27,11 +28,6 @@ import { cn } from '@/lib/utils';
  * 有同步记录时副标题写「最近同步 hh:mm」，未连接写「尚未授权」；积加、易仓为灰色虚线卡「第二阶段接入」，没有同步时间与测试连接。
  * 「测试连接」、亚马逊卡的订单通知队列（SQS）与订单回补行、Shopify 卡的回补窗口行随 09、11、12、13 号待办加上。
  */
-
-const RULE_CARD_STATE =
-  '卡片显示该渠道下最差的状态，并列出异常的邮箱或店铺；店铺表「状态」列显示该店铺各连接的状态。' +
-  '同步延迟按数据源阈值：Gmail、订单 10 分钟，钉钉 2 小时；连续 3 次失败为连接异常。' +
-  '钉钉例外：异常只在钉钉卡显示、只提醒管理员，不出全站横幅（6.9）。';
 
 /** 连接状态 → 徽标色调（原型 STATE_TONE 的渠道连接一组） */
 export const connectionTones = {
@@ -109,15 +105,15 @@ function cardLines(kind: ChannelKind, stores: readonly Store[]): string[] {
     case 'shopify':
       return [`${storeCount('shopify')} 个店铺 · 订单经 Admin API 准实时同步`];
     case 'gmail':
-      return [mailboxLine(stores), '收件与「已发送」：识别到我方回复即转等客户'];
+      return [mailboxLine(stores), CARD_LINES.gmailSent];
     case 'dingtalk':
-      return ['通讯录：成员与部门每小时同步', '工作通知推送；扫码登录'];
+      return [...CARD_LINES.dingtalk];
   }
 }
 
 function subtitle(card: ChannelCard): string | null {
   if (card.lastSyncAt) return `最近同步 ${formatClock(card.lastSyncAt)}`;
-  return card.status === 'not_connected' ? '尚未授权' : null;
+  return card.status === 'not_connected' ? NOT_AUTHORIZED : null;
 }
 
 function CardHead({
@@ -202,9 +198,9 @@ function PhaseTwoCard({
         icon={icon}
         tone="muted"
         name={name}
-        sub="暂不连接"
+        sub={PHASE2_CARDS.subtitle}
         muted
-        right={<Badge tone="muted">第二阶段接入</Badge>}
+        right={<Badge tone="muted">{PHASE2_CARDS.badge}</Badge>}
       />
       <div className="text-12 text-muted-foreground">{description}</div>
     </div>
@@ -228,16 +224,8 @@ export function ChannelCards({
         {channels.map((card) => (
           <ConnectedCard key={card.kind} card={card} stores={stores} />
         ))}
-        <PhaseTwoCard
-          icon={Link2}
-          name="积加 ERP"
-          description="亚马逊订单收件人、库存、售后出库单、单号与运费。"
-        />
-        <PhaseTwoCard
-          icon={Package}
-          name="易仓海外仓"
-          description="库存与售后出库单经积加读写，本系统不直连易仓接口。"
-        />
+        <PhaseTwoCard icon={Link2} {...PHASE2_CARDS.jijia} />
+        <PhaseTwoCard icon={Package} {...PHASE2_CARDS.yicang} />
       </div>
     </section>
   );

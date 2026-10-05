@@ -137,6 +137,14 @@ export function storeInputErrors(raw: StoreInput): FieldErrors {
   return errors;
 }
 
+/** 要查库才知道的错误与生产环境的限制（channel 模块保存时给出；前两条的文案照原型 K8 与其补充小样） */
+export const storeSaveMessages = {
+  duplicateName: '店铺名已存在，请换一个',
+  mailboxTaken: (mailbox: string, storeName: string) => `${mailbox} 已是 ${storeName} 的进线邮箱`,
+  /** 生产环境不显示「数据来源」，只有直接调接口才会收到，原型不画 */
+  fakeInProduction: '生产环境不能使用模拟数据',
+} as const;
+
 /**
  * 渠道连接状态（PRD 6.9）：已连接 / 同步延迟（Gmail、订单 10 分钟，钉钉 2 小时）/ 连接异常（连续 3 次失败）/ 未连接。
  * 待办 07 只用到已连接与未连接（店铺的数据来源决定），同步延迟与连接异常随 05、09、11、12 接上同步记录。

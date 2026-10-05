@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { Store, Users, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { pages, type PageDefinition } from '@/lib/pages';
+import { MENU_NOTE } from './p18-copy';
 
 /*
  * 设置页外壳（原型 build_settings.spage() 与 as_common.settings_menu()，第一阶段：PRD 4.1、P18）：
@@ -34,7 +35,7 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
           </Link>
         ))}
         <div className="mt-auto border-t p-2.5 text-11 leading-normal text-subtle-foreground">
-          第一阶段只开放这两项设置
+          {MENU_NOTE}
         </div>
       </nav>
       <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">{children}</div>

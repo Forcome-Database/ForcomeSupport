@@ -1,6 +1,7 @@
 import {
   normalizeStoreInput,
   storeInputErrors,
+  storeSaveMessages,
   type AdapterMode,
   type FieldErrors,
   type Store,
@@ -39,9 +40,6 @@ type StoreRow = typeof store.$inferSelect;
 export interface StoreRecord extends StoreRow {
   readonly mailboxes: readonly string[];
 }
-
-const INVALID_ADAPTER_MODE = '生产环境不能使用模拟数据';
-const DUPLICATE_NAME = '店铺名已存在，请换一个';
 
 async function withMailboxes(db: DbExecutor, rows: readonly StoreRow[]): Promise<StoreRecord[]> {
   if (rows.length === 0) return [];
@@ -140,7 +138,7 @@ async function conflictErrors(
       .from(store)
       .where(and(eq(sql`lower(${store.name})`, input.name.toLowerCase()), notSelf))
       .limit(1);
-    if (sameName) errors.name = DUPLICATE_NAME;
+    if (sameName) errors.name = storeSaveMessages.duplicateName;
   }
   if (input.mailboxes.length > 0) {
     const taken = await db
@@ -150,7 +148,9 @@ async function conflictErrors(
       .where(and(inArray(storeMailbox.address, [...input.mailboxes]), notSelf));
     input.mailboxes.forEach((mailbox, index) => {
       const owner = taken.find((row) => row.address === mailbox);
-      if (owner) errors[`mailboxes.${index}`] = `${mailbox} 已是 ${owner.storeName} 的进线邮箱`;
+      if (owner) {
+        errors[`mailboxes.${index}`] = storeSaveMessages.mailboxTaken(mailbox, owner.storeName);
+      }
     });
   }
   return errors;
@@ -166,7 +166,9 @@ function resolveAdapterMode(
   current: AdapterMode | null,
 ): { mode: AdapterMode; error?: string } {
   if (appEnv === 'production') {
-    return requested === 'fake' ? { mode: 'real', error: INVALID_ADAPTER_MODE } : { mode: 'real' };
+    return requested === 'fake'
+      ? { mode: 'real', error: storeSaveMessages.fakeInProduction }
+      : { mode: 'real' };
   }
   return { mode: requested ?? current ?? 'fake' };
 }
