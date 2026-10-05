@@ -11,6 +11,7 @@ export {
   type FixtureFee,
   type FixtureLedgerRow,
   type FixtureMember,
+  type FixtureNotification,
   type FixtureStore,
   type FixtureTicket,
 } from './schema';

@@ -10,7 +10,9 @@ export {
 } from './access';
 export { createAuditLogRoutes, type StoreNamesById } from './audit-log';
 export { createDevLoginRoutes, devLoginAvailable } from './dev-login';
+export { createDevNotificationRoutes } from './dev-notifications';
 export { orgMembersFixtureStep } from './fixtures';
 export { createMember, listAftersalesOwners, memberNamesById, type NewMember } from './members';
+export { createNotificationRoutes, notifyMembers } from './notifications';
 export { createOrgRoutes } from './routes';
 export { SESSION_COOKIE, SESSION_IDLE_TIMEOUT_MS } from './session';

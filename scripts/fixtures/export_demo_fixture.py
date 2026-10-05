@@ -11,7 +11,9 @@
 - 另带被引用的参照数据：成员（钉钉通讯录里的人）、店铺、生产厂、配件与生产厂对应、责任类型默认比例。
 时间一律写成带 +08:00 的 ISO 8601（原型的时间都是北京时间）；金额写成两位小数的字符串，未填为 null。
 成员与店铺的 id 用 UUIDv5 从 key 派生，重复运行结果不变，各模块的加载步骤与测试可以直接引用。
-订单、未归属店铺来信、站内通知等其余数据，由需要它们的待办在这里补充转换规则。
+- 站内通知取 NOTIFICATIONS（G10，周敏的面板）：只转第一期的类型（11.4 阶段「一起」，按原型的图标对上通知类型），
+  第二期的「新审批单」不转换；时刻落在演示当天。
+订单、未归属店铺来信等其余数据，由需要它们的待办在这里补充转换规则。
 
 用法（仓库根目录）：pnpm fixtures:generate；pnpm fixtures:verify 检查产物与 data.py 一致。
 可直接运行：python scripts/fixtures/export_demo_fixture.py [输出路径]
@@ -257,6 +259,34 @@ def ticket_timeline():
     }
 
 
+# ---------------------------------------------------------------- 站内通知（G10）
+# 原型的图标 → 第一期的通知类型（contracts 的 notificationTypes）；不在表里的（新审批单 approve）是第二期的，不转换
+NOTIFICATION_TYPES = {'check_c': 'channel_recovered', 'alert': 'channel_disconnected', 'store': 'unassigned_mail'}
+# 原型的对象写法 → 关联对象（类型与 id）；未归属来信的 id 按说明派生（示例里没有对应的来信）
+NOTIFICATION_OBJECTS = {'P18 · Gmail': ('channel', 'gmail'), 'P04 · 未归属店铺': ('message', None)}
+NOTIFICATION_RECIPIENT = 'zhoumin'  # data.py：周敏 · 客服主管的面板
+
+
+def notifications():
+    out = []
+    for hhmm, _tone, icon_name, title, desc, obj, read in d.NOTIFICATIONS:
+        kind = NOTIFICATION_TYPES.get(icon_name)
+        if kind is None:
+            continue
+        object_type, object_id = NOTIFICATION_OBJECTS[obj]
+        out.append({
+            'id': entity_id('notification', '%s %s %s' % (hhmm, title, desc)),
+            'recipientKey': NOTIFICATION_RECIPIENT,
+            'type': kind,
+            'title': title,
+            'body': desc,
+            'object': {'type': object_type, 'id': object_id or entity_id('message', desc), 'label': obj},
+            'at': at('%s %s' % (d.NOW[5:10], hhmm)),
+            'read': read,
+        })
+    return out
+
+
 def build():
     return {
         'meta': {
@@ -276,6 +306,7 @@ def build():
         # 原型用过的最大售后单序号（含第一期丢弃的待确认单 S-20260911-0022）：加载示例台账后新单号接在它之后，不与原型撞号
         'aftersalesLastSequence': max(int(a['no'][-4:]) for a in d.AFTERSALES),
         'ticketTimeline': ticket_timeline(),
+        'notifications': notifications(),
     }
 
 

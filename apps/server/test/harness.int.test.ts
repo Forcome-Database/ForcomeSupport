@@ -223,6 +223,7 @@ describe('灌示例数据', () => {
       'channel.sender_rules',
       'factory.parts',
       'aftersales.ledger',
+      'core.notifications',
     ];
     await expect(t.loadFixtures()).resolves.toEqual({ steps });
     await expect(t.loadFixtures()).resolves.toEqual({ steps });

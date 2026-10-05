@@ -5,6 +5,8 @@ describe('合并 Tailwind 类名', () => {
   it('设计规范的字号刻度（text-11 … text-24、随密度的 text-body 等）不会被当成文字颜色吃掉', () => {
     expect(cn('text-primary-foreground', 'text-13')).toBe('text-primary-foreground text-13');
     expect(cn('text-muted-foreground', 'text-body')).toBe('text-muted-foreground text-body');
+    // 数字角标的 10px（只用于数字）
+    expect(cn('text-primary-foreground', 'text-10')).toBe('text-primary-foreground text-10');
   });
 
   it('同类的后者覆盖前者：字号对字号、颜色对颜色', () => {

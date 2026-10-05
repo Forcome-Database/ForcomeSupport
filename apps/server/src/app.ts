@@ -15,6 +15,8 @@ import {
 import {
   createAuditLogRoutes,
   createDevLoginRoutes,
+  createDevNotificationRoutes,
+  createNotificationRoutes,
   createOrgRoutes,
   devLoginAvailable,
 } from './modules/org';
@@ -89,6 +91,8 @@ export function createApp(deps: ServerDeps) {
   });
 
   app.route('/', createOrgRoutes({ runtime, appEnv: config.appEnv }));
+  // 站内通知（G10）的铃铛面板：只看自己的通知，在 org（会话与店铺范围）；写入与查询在 core
+  app.route('/', createNotificationRoutes({ runtime, appEnv: config.appEnv }));
   app.route('/', createChannelRoutes({ runtime, appEnv: config.appEnv, clients }));
   app.route('/', createTicketRoutes({ runtime, appEnv: config.appEnv }));
   app.route('/', createAftersalesRoutes({ runtime, appEnv: config.appEnv }));
@@ -96,6 +100,8 @@ export function createApp(deps: ServerDeps) {
   app.route('/', createAuditLogRoutes({ runtime, appEnv: config.appEnv, storeNamesById }));
   if (devLoginAvailable(config)) {
     app.route('/', createDevLoginRoutes({ runtime, appEnv: config.appEnv }));
+    // 示例通知与开发登录同一个开关（产生通知的业务上线前，演示与 Playwright 用）
+    app.route('/', createDevNotificationRoutes({ runtime, appEnv: config.appEnv }));
   }
 
   app.doc31('/api/openapi.json', {

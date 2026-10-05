@@ -1,4 +1,4 @@
-import type { Capability, NavSection } from '@forcome/contracts';
+import { can, type Capability, type CurrentMember, type NavSection } from '@forcome/contracts';
 
 /*
  * 第一期的页面（PRD 4.1 第一阶段、4.2）：路径、无权限页面 G2 里写的页面名、进入页面需要的能力（PRD 10.1）。
@@ -45,3 +45,10 @@ export const sectionPaths: Record<NavSection, string> = {
   reports: pages.reports.path,
   settings: '/settings',
 };
+
+/**
+ * 这位成员能不能打开这个页面（PRD 10.1：有页面要的能力）。页面把关（没有时显示 G2）、P27 的对象链接与站内通知的跳转共用
+ */
+export function canOpenPage(member: Pick<CurrentMember, 'roles'>, page: PageDefinition): boolean {
+  return can(member.roles, page.capability);
+}

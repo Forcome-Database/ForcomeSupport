@@ -1,4 +1,4 @@
-import { can, type CurrentMember } from '@forcome/contracts';
+import type { CurrentMember } from '@forcome/contracts';
 import { useSuspenseQuery, type QueryClient } from '@tanstack/react-query';
 import {
   createRootRouteWithContext,
@@ -15,7 +15,7 @@ import { Toaster, UndoToaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { LoadError } from '@/components/load-error';
 import { CurrentMemberContext, useCurrentMember } from '@/lib/current-member';
-import { pages, sectionPaths, type PageDefinition } from '@/lib/pages';
+import { canOpenPage, pages, sectionPaths, type PageDefinition } from '@/lib/pages';
 import { applyDensity, currentMemberQuery, devMembersQuery } from '@/lib/session';
 import { LedgerPage } from '@/pages/aftersales/ledger-page';
 import { ledgerSearchSchema } from '@/pages/aftersales/ledger-search';
@@ -118,7 +118,7 @@ const homeRoute = createRoute({
 /** 按能力把关的页面：有能力显示页面内容，没有显示 G2（写明哪个角色能看，按钮「返回首页」） */
 function PageGate({ page, children }: { page: PageDefinition; children?: ReactNode }) {
   const member = useCurrentMember();
-  if (!can(member.roles, page.capability)) return <Forbidden page={page} member={member} />;
+  if (!canOpenPage(member, page)) return <Forbidden page={page} member={member} />;
   return children ?? null;
 }
 

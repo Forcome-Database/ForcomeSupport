@@ -38,6 +38,7 @@ import {
 import { requireCapability, requireSession, type Access, type AccessVariables } from './access';
 import { AUDIT_EXPORT_SHEET, auditExportFileName, auditWorkbook } from './audit-export';
 import { listMembers, memberNamesById } from './members';
+import { json, unauthenticated } from './openapi';
 
 /*
  * P27 审计日志（PRD P27、10.2、K18、K5；规格 core「审计写入与查询」）：所有角色从头像菜单进入。
@@ -55,11 +56,6 @@ export type StoreNamesById = (
   ids: readonly string[],
 ) => Promise<ReadonlyMap<string, string>>;
 
-const json = <T extends z.ZodType>(schema: T, description: string) => ({
-  description,
-  content: { 'application/json': { schema } },
-});
-const unauthenticated = json(apiErrorSchema, '未登录或会话已失效');
 const forbidden = json(apiErrorSchema, '没有查看审计日志的权限（只有生产厂对接人角色）');
 
 const listRoute = createRoute({

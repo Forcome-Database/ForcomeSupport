@@ -4,6 +4,7 @@ import {
   apiErrorSchema,
   auditLogOptionsSchema,
   auditLogSchema,
+  BACKGROUND_REQUEST_HEADER,
   channelSettingsSchema,
   currentMemberSchema,
   devMembersResponseSchema,
@@ -13,6 +14,8 @@ import {
   ledgerOptionsSchema,
   ledgerSchema,
   loginDeniedSchema,
+  notificationListSchema,
+  notificationUnreadSchema,
   preferencesSchema,
   registrationOptionsSchema,
   sourceTicketSchema,
@@ -36,6 +39,8 @@ import {
   type LedgerOptions,
   type LedgerQuery,
   type LoginDenialReason,
+  type NotificationList,
+  type NotificationView,
   type Preferences,
   type RegistrationInput,
   type RegistrationOptions,
@@ -149,6 +154,12 @@ async function call<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): 
   return schema.parse(await response.json());
 }
 
+/**
+ * 后台请求（铃铛的轮询、以后 SSE 推送后的重新拉取）：不是人的操作，服务端照常校验会话但不续期，
+ * 否则开着页面会话就永远不会过期（ADR 0010 修订「7 天无操作过期」）
+ */
+const backgroundRequest: RequestInit = { headers: { [BACKGROUND_REQUEST_HEADER]: '1' } };
+
 function jsonBody(method: string, body: unknown): RequestInit {
   return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
 }
@@ -182,6 +193,35 @@ export const api = {
 
   /** 在职的管理员（G2「如需开通请联系管理员刘洋」） */
   adminContacts: (): Promise<AdminContacts> => call('/api/org/admin-contacts', adminContactsSchema),
+
+  /** 铃铛的未读数（G10；后台请求，不续期会话） */
+  notificationUnread: async (): Promise<number> =>
+    (await call('/api/notifications/unread-count', notificationUnreadSchema, backgroundRequest))
+      .unread,
+
+  /**
+   * 站内通知面板的一个页签（全部 · 未读）：新的在前，另带未读数。打开面板、切换页签、点「重试」取的是人的操作；
+   * 面板开着时的定时重新拉取是后台请求（background），不续期会话
+   */
+  notifications: (
+    view: NotificationView,
+    { background }: { readonly background: boolean },
+  ): Promise<NotificationList> =>
+    call(
+      `/api/notifications?view=${view}`,
+      notificationListSchema,
+      background ? backgroundRequest : undefined,
+    ),
+
+  /** 点一条：标为已读 */
+  markNotificationRead: async (id: string): Promise<void> => {
+    await send(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' });
+  },
+
+  /** 全部已读 */
+  markAllNotificationsRead: async (): Promise<void> => {
+    await send('/api/notifications/read-all', { method: 'POST' });
+  },
 
   /** P18 渠道与店铺：渠道卡、店铺表，以及是否显示「数据来源」 */
   channelSettings: (): Promise<ChannelSettings> =>

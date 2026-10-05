@@ -10,6 +10,11 @@ export interface Runtime {
   readonly db: Database;
   readonly boss: PgBoss;
   readonly clock: Clock;
+  /**
+   * 历史邮件回放（待办 26）：流水线照常跑、「当前时间」注入为邮件时间，但提醒与通知关闭（规格「历史导入与切换」）。
+   * 回放的入口用 replay: true 组装运行时；不填为实时
+   */
+  readonly replay?: boolean;
 }
 
 /** 一个业务事务：所有写入、审计与发出的任务同时提交或同时回滚 */
@@ -17,6 +22,8 @@ export interface Tx {
   readonly db: DbTransaction;
   /** 本事务的「当前时间」：事务开始时从时钟取一次，事务内所有写入共用 */
   readonly now: Date;
+  /** 是否在历史回放里（Runtime.replay）：站内通知的写入据此不产生通知，要另发提醒的调用方也据此跳过 */
+  readonly replay: boolean;
   /**
    * 在本事务内插入后台任务（发件箱），返回任务 ID。
    * 有意去重（singletonKey、singletonSeconds，或队列策略不是 standard）且已有同类任务时返回 null；
@@ -34,6 +41,7 @@ export async function transaction<T>(runtime: Runtime, fn: (tx: Tx) => Promise<T
     const tx: Tx = {
       db,
       now: runtime.clock.now(),
+      replay: runtime.replay === true,
       async enqueue(job, payload, options) {
         const data = job.payload.parse(payload);
         const id = await runtime.boss.send(job.name, data, {
@@ -65,6 +73,8 @@ export interface RuntimeOptions {
   clock?: Clock;
   /** 数据库连接池上限；不填用 createDatabase 的默认值 */
   poolMax?: number;
+  /** 历史邮件回放的运行时（待办 26）：提醒与通知关闭 */
+  replay?: boolean;
 }
 
 export interface RunningRuntime {
@@ -90,7 +100,7 @@ export async function startRuntime(
     throw error;
   }
   return {
-    runtime: { db, boss, clock: options.clock ?? systemClock },
+    runtime: { db, boss, clock: options.clock ?? systemClock, replay: options.replay === true },
     async stop({ graceful = true, timeoutMs } = {}) {
       try {
         await boss.stop({ graceful, close: true, ...(timeoutMs ? { timeout: timeoutMs } : {}) });

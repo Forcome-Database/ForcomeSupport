@@ -14,6 +14,8 @@ import {
 } from 'drizzle-orm/pg-core';
 import {
   foreignCurrencies,
+  notificationObjectTypes,
+  notificationTypes,
   publishedRateSources,
   type AuditObjectType,
   type Role,
@@ -100,5 +102,40 @@ export const exchangeRate = coreSchema.table(
     unique('exchange_rate_date_currency_key').on(t.date, t.currency),
     check('exchange_rate_rate_check', sql`${t.rate} > 0`),
     check('exchange_rate_source_check', sql`${t.source} IN ('ecb', 'frankfurter')`),
+  ],
+);
+
+/**
+ * 站内通知（PRD 11.1 Notification、11.4、G10，待办 31）：每个接收人一行。其他模块只经 core 的写入（sendNotification，
+ * 或 org 按 11.4 取接收人的 notifyMembers）写这张表，不直接写。接收人只存成员 ID（org 的成员，跨模块不设外键）；
+ * 通知是给人看的提醒，不是业务数据：不加版本号、不记审计，标记已读只改 read_at。
+ */
+export const notification = coreSchema.table(
+  'notification',
+  {
+    id: primaryId(),
+    /** 接收人（成员 ID） */
+    recipientId: uuid('recipient_id').notNull(),
+    type: text('type', { enum: notificationTypes }).notNull(),
+    /** 标题（原型「Gmail 连接异常」） */
+    title: text('title').notNull(),
+    /** 说明（原型「support@forcome.mx 连续 3 次失败，来信暂存」） */
+    body: text('body').notNull(),
+    /** 关联对象：类型、ID 与显示的编号或页面（原型「P18 · Gmail」） */
+    objectType: text('object_type', { enum: notificationObjectTypes }).notNull(),
+    objectId: text('object_id').notNull(),
+    objectLabel: text('object_label').notNull(),
+    /** 关联对象所属店铺；没有店铺属性的为空。查询时按接收人当前的店铺范围过滤（R-ST-06） */
+    storeId: uuid('store_id'),
+    createdAt: timestamptz('created_at').notNull(),
+    /** 已读时间；未读为空 */
+    readAt: timestamptz('read_at'),
+  },
+  (t) => [
+    index('notification_recipient_idx').on(t.recipientId, desc(t.createdAt)),
+    // 铃铛的未读数与「未读」页签
+    index('notification_unread_idx')
+      .on(t.recipientId, desc(t.createdAt))
+      .where(sql`${t.readAt} IS NULL`),
   ],
 );

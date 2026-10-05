@@ -40,6 +40,11 @@ export interface RunJobsOptions {
    * 同一封邮件的几份副本在几个邮箱同时入库（规格「需要覆盖的场景·并发」）。默认按先后逐个处理
    */
   readonly concurrently?: boolean;
+  /**
+   * 按历史回放跑（待办 26）：拉取与任务都在回放的运行时里跑（Runtime.replay），提醒与通知关闭。
+   * 回放的真正入口随 26 号待办，这里只是让测试能在回放模式下跑同一条流水线
+   */
+  readonly replay?: boolean;
 }
 
 const BATCH_SIZE = 100;
@@ -62,11 +67,12 @@ async function failAll(runtime: Runtime, failed: readonly FailedJobRun[]): Promi
  * - 不跑 pg-boss 的定时（cron）：定时扫描在测试里用 t.enqueue 显式排一次再跑。
  */
 export async function runQueuedJobs(
-  runtime: Runtime,
+  liveRuntime: Runtime,
   { handlers, feeds }: WorkerUnderTest,
   logger: Logger,
   options: RunJobsOptions = {},
 ): Promise<JobRunReport> {
+  const runtime: Runtime = options.replay ? { ...liveRuntime, replay: true } : liveRuntime;
   const byName = new Map(handlers.map((h) => [h.job.name, h]));
   const signal = new AbortController().signal;
   const completed: JobRun[] = [];

@@ -1483,5 +1483,63 @@
     "autoCloseAt": "2026-09-17T09:00:00+08:00",
     "closeReason": "已解决后无来信",
     "orderSyncedAt": "2026-09-10T09:02:00+08:00"
-  }
+  },
+  "notifications": [
+    {
+      "id": "80aac85d-6783-5994-8248-50ed9300ea36",
+      "recipientKey": "zhoumin",
+      "type": "channel_recovered",
+      "title": "Gmail 已恢复",
+      "body": "support@forcome.mx 已重新连接，补拉 3 封来信",
+      "object": {
+        "type": "channel",
+        "id": "gmail",
+        "label": "P18 · Gmail"
+      },
+      "at": "2026-09-11T10:14:00+08:00",
+      "read": false
+    },
+    {
+      "id": "6edf409f-7f96-554e-aed0-becf38f3185c",
+      "recipientKey": "zhoumin",
+      "type": "channel_disconnected",
+      "title": "Gmail 连接异常",
+      "body": "support@forcome.mx 连续 3 次失败，来信暂存",
+      "object": {
+        "type": "channel",
+        "id": "gmail",
+        "label": "P18 · Gmail"
+      },
+      "at": "2026-09-11T10:05:00+08:00",
+      "read": false
+    },
+    {
+      "id": "ec9f5802-90bb-57c9-80ac-bcc53dcdbeb1",
+      "recipientKey": "zhoumin",
+      "type": "unassigned_mail",
+      "title": "未归属店铺来信",
+      "body": "Tom Harris · amz-ca2@forcome.com 未登记",
+      "object": {
+        "type": "message",
+        "id": "dbce5184-e52f-5999-9bc2-84fd423193d1",
+        "label": "P04 · 未归属店铺"
+      },
+      "at": "2026-09-11T10:02:00+08:00",
+      "read": false
+    },
+    {
+      "id": "84560df6-9d37-5044-8182-cf93fa0f29f3",
+      "recipientKey": "zhoumin",
+      "type": "unassigned_mail",
+      "title": "未归属店铺来信",
+      "body": "Lucía Herrera · info@forcome.mx 未登记",
+      "object": {
+        "type": "message",
+        "id": "c9d3c77b-219a-57b7-9ebb-69d9fe30ce82",
+        "label": "P04 · 未归属店铺"
+      },
+      "at": "2026-09-11T09:47:00+08:00",
+      "read": true
+    }
+  ]
 }

@@ -135,6 +135,19 @@ export const fixtureTicketTimelineSchema = z.object({
   orderSyncedAt: instant,
 });
 
+/** 站内通知（G10 周敏的面板，第一期的类型）：类型取值同 contracts 的 notificationTypes，加载时再按枚举校验 */
+export const fixtureNotificationSchema = z.object({
+  id: uuid,
+  /** 接收人（成员 key） */
+  recipientKey: z.string(),
+  type: z.string(),
+  title: z.string(),
+  body: z.string(),
+  object: z.object({ type: z.string(), id: z.string(), label: z.string() }),
+  at: instant,
+  read: z.boolean(),
+});
+
 export const demoFixtureSchema = z.object({
   meta: z.object({
     source: z.string(),
@@ -169,6 +182,7 @@ export const demoFixtureSchema = z.object({
   /** 原型用过的最大售后单序号（含第一期丢弃的待确认单）；示例台账之后新发的单号接在它后面 */
   aftersalesLastSequence: z.int().positive(),
   ticketTimeline: fixtureTicketTimelineSchema,
+  notifications: z.array(fixtureNotificationSchema),
 });
 
 export type DemoFixture = z.infer<typeof demoFixtureSchema>;
@@ -177,3 +191,4 @@ export type FixtureStore = z.infer<typeof fixtureStoreSchema>;
 export type FixtureTicket = z.infer<typeof fixtureTicketSchema>;
 export type FixtureLedgerRow = z.infer<typeof fixtureLedgerRowSchema>;
 export type FixtureFee = z.infer<typeof fixtureFeeSchema>;
+export type FixtureNotification = z.infer<typeof fixtureNotificationSchema>;

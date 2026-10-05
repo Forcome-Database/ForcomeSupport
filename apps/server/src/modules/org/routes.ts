@@ -1,19 +1,10 @@
-import {
-  adminContactsSchema,
-  apiErrorSchema,
-  currentMemberSchema,
-  preferencesSchema,
-} from '@forcome/contracts';
+import { adminContactsSchema, currentMemberSchema, preferencesSchema } from '@forcome/contracts';
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { recordAudit, transaction, type AppEnv, type Runtime } from '../core';
 import { currentMember, requireSession, type AccessVariables } from './access';
 import { listAdmins, saveDensity } from './members';
+import { unauthenticated } from './openapi';
 import { clearSessionCookie, closeSession } from './session';
-
-const unauthenticated = {
-  description: '未登录、会话已失效或 7 天无操作已过期',
-  content: { 'application/json': { schema: apiErrorSchema } },
-};
 
 const meRoute = createRoute({
   method: 'get',

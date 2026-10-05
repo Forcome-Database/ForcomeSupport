@@ -1,7 +1,6 @@
 import {
   auditObjectTypeLabels,
   auditTimeWords,
-  can,
   roles,
   type AuditLogEntry,
   type AuditLogField,
@@ -32,7 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { avatarText } from '@/lib/avatar';
-import { pages } from '@/lib/pages';
+import { canOpenPage, pages } from '@/lib/pages';
 import { cn } from '@/lib/utils';
 import { A11Y, COLUMNS, EMPTY, EXPAND, MORE, NONE, SYSTEM } from './p27-copy';
 
@@ -69,7 +68,7 @@ const stopRowToggle = (event: MouseEvent) => event.stopPropagation();
 
 /** 对象能不能点进详情（PRD P27 v2.20）：查看者能打开目标页时给链接，否则只显示编号 */
 function objectLink(entry: AuditLogEntry, member: CurrentMember): ReactNode {
-  if (entry.objectType === 'aftersales' && can(member.roles, pages.aftersalesLedger.capability)) {
+  if (entry.objectType === 'aftersales' && canOpenPage(member, pages.aftersalesLedger)) {
     return (
       <Link
         to={pages.aftersalesLedger.path}
@@ -81,7 +80,7 @@ function objectLink(entry: AuditLogEntry, member: CurrentMember): ReactNode {
       </Link>
     );
   }
-  if (entry.objectType === 'store' && can(member.roles, pages.settingsChannels.capability)) {
+  if (entry.objectType === 'store' && canOpenPage(member, pages.settingsChannels)) {
     return (
       <Link
         to={pages.settingsChannels.path}

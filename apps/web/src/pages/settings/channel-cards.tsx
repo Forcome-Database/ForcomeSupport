@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { IconTile, type IconTileTone } from '@/components/icon-tile';
 import { InfoTip } from '@/components/info-tip';
 import { SectionLabel } from '@/components/section-label';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
@@ -52,27 +53,6 @@ export function ConnectionBadge({ status, prefix }: { status: ConnectionStatus; 
     <Badge tone={connectionTones[status]} dot>
       {prefix ? `${prefix} ${connectionStatusLabels[status]}` : connectionStatusLabels[status]}
     </Badge>
-  );
-}
-
-type TileTone = (typeof connectionTones)[ConnectionStatus];
-
-/** 图标块的色调（原型 tile()：ok / warn / bad 为浅底配文字色，muted 为浅线色底配次要色） */
-const tileTones: Record<TileTone, string> = {
-  success: 'bg-success-soft text-success-text',
-  warning: 'bg-warning-soft text-warning-text',
-  danger: 'bg-destructive-soft text-destructive-text',
-  muted: 'bg-border-soft text-muted-foreground',
-};
-
-/** 卡头左侧 32 的图标块（原型 tile()），色调跟连接状态（与状态徽标同一张映射） */
-function Tile({ icon: Icon, tone }: { icon: LucideIcon; tone: TileTone }) {
-  return (
-    <div
-      className={cn('flex size-8 shrink-0 items-center justify-center rounded-md', tileTones[tone])}
-    >
-      <Icon className="size-4.5" strokeWidth={1.75} />
-    </div>
   );
 }
 
@@ -126,7 +106,7 @@ function CardHead({
   muted = false,
 }: {
   icon: LucideIcon;
-  tone: TileTone;
+  tone: IconTileTone;
   name: string;
   sub: string | null;
   right: ReactNode;
@@ -135,7 +115,7 @@ function CardHead({
   return (
     <div className="flex items-center justify-between gap-2">
       <div className="flex min-w-0 items-center gap-2.5">
-        <Tile icon={icon} tone={tone} />
+        <IconTile icon={icon} tone={tone} />
         <div className="flex min-w-0 flex-col">
           <div
             className={cn(
