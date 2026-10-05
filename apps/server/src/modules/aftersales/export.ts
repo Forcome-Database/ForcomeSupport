@@ -7,6 +7,7 @@ import {
   handlingMethodLabels,
   ledgerColumnLabels,
   ledgerColumns,
+  ledgerColumnTotals,
   ledgerFinanceColumns,
   ledgerItemSchema,
   missingItemLabels,
@@ -31,14 +32,11 @@ import { businessMonth, listLedger } from './ledger';
 
 /*
  * 导出 Excel（PRD P13「第一阶段」、S11、K5、规格「导出」）：按当前筛选与字段权限，服务端用 exceljs 同步生成后直接下载，
- * 不留存文件；导出记审计（对象类型「导出」，P27 写「导出 · 登记台账 · 导出 Excel」）。
+ * 不留存文件；导出记审计（动作 ledger.export，对象类型「导出」，P27 写「导出 · 登记台账 · 导出 Excel」）。
  * 列与台账相同（17 列，含默认隐藏的四列，不随列设置变化），坐席不含七个金额列（P13「第一阶段」）；
  * 悬停里的内容另列：缺失字段（「缺 N 项」），有财务权限时另有承担比例、原币与汇率、取消时没有保留的费用，末行合计。
  * 金额写计入售后成本的美元值（与台账一致：已取消的单只计保留的部分），数值格式便于在 Excel 里再求和。
  */
-
-export const XLSX_CONTENT_TYPE =
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 /** 已完成的单缺这个字段时写的（同台账的「待回填」） */
 const PENDING = '待回填';
@@ -47,7 +45,7 @@ const SHEET_NAME = '登记台账';
 
 type Cell = string | number | null;
 
-/** 一列：表头、列宽（字符数）、取值；金额列（total 为合计行取的合计项）按美元数值格式 */
+/** 一列：表头、列宽（字符数）、取值；金额列（total 为合计行取的合计项，contracts 的 ledgerColumnTotals）按美元数值格式 */
 interface ExportColumn {
   readonly header: string;
   readonly width: number;
@@ -73,7 +71,7 @@ const feeCell =
     money(item, `fees.${key}`, item.cost?.[key] ?? null);
 
 /** 台账 17 列的取值（与 P13 的单元格同一套写法） */
-const COLUMN_VALUES: Record<LedgerColumn, Omit<ExportColumn, 'header'>> = {
+const COLUMN_VALUES: Record<LedgerColumn, Omit<ExportColumn, 'header' | 'total'>> = {
   number: { width: 18, value: (item) => item.number },
   customer: { width: 18, value: (item) => valueOr(item, 'customerName', item.customerName) },
   storeSite: {
@@ -104,23 +102,20 @@ const COLUMN_VALUES: Record<LedgerColumn, Omit<ExportColumn, 'header'>> = {
     width: 22,
     value: (item) => valueOr(item, 'trackingNumber', item.trackingNumber),
   },
-  productCost: { width: 12, total: 'productCost', value: feeCell('productCost') },
-  freight: { width: 12, total: 'freight', value: feeCell('freight') },
-  compensation: { width: 12, total: 'compensation', value: feeCell('compensation') },
-  otherCost: { width: 12, total: 'otherCost', value: feeCell('otherCost') },
+  productCost: { width: 12, value: feeCell('productCost') },
+  freight: { width: 12, value: feeCell('freight') },
+  compensation: { width: 12, value: feeCell('compensation') },
+  otherCost: { width: 12, value: feeCell('otherCost') },
   feeTotal: {
     width: 12,
-    total: 'total',
     value: (item) => money(item, null, item.cost?.total ?? null),
   },
   fshShare: {
     width: 12,
-    total: 'fsh',
     value: (item) => money(item, 'ratios', item.cost?.fsh ?? null),
   },
   factoryShare: {
     width: 12,
-    total: 'factory',
     value: (item) => money(item, 'ratios', item.cost?.factory ?? null),
   },
 };
@@ -182,7 +177,11 @@ async function workbookOf(
   const columns: ExportColumn[] = [
     ...ledgerColumns
       .filter((column) => finance || !ledgerFinanceColumns.has(column))
-      .map((column) => ({ header: ledgerColumnLabels[column], ...COLUMN_VALUES[column] })),
+      .map((column) => ({
+        header: ledgerColumnLabels[column],
+        total: ledgerColumnTotals[column],
+        ...COLUMN_VALUES[column],
+      })),
     MISSING_COLUMN,
     ...(finance ? FINANCE_EXTRA_COLUMNS : []),
   ];
@@ -235,7 +234,7 @@ export async function exportLedger(
   const fileName = ledgerExportFileName(range, now);
   await transaction(runtime, (tx) =>
     recordAudit(tx, access.actor, {
-      action: 'export.excel',
+      action: 'ledger.export',
       objectType: 'export',
       objectId: 'aftersales.ledger',
       objectLabel: SHEET_NAME,

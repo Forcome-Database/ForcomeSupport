@@ -12,12 +12,14 @@ import { cn } from '@/lib/utils';
  * 值是北京时间的日期字符串（YYYY-MM-DD），日历里的「今天」也按北京时间。
  */
 
-function toDate(value: string): Date {
+/** YYYY-MM-DD → 本地时区那一天的 Date（日历按本地日期显示；值本身是北京时间的日期字符串） */
+export function toDate(value: string): Date {
   const [y = 1970, m = 1, d = 1] = value.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
 
-function toValue(date: Date): string {
+/** 日历选中的 Date → YYYY-MM-DD */
+export function toValue(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }

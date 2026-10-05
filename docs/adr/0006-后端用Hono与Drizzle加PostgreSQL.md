@@ -89,3 +89,10 @@ status: accepted
 - **迁移 0015**：售后单加取消原因与时刻（`cancel_reason`、`cancelled_at`）、确认保留的已产生费用（一个费用项一列布尔 `<费用项>_kept`，只在已取消的单上有值，没登记的项为空）、最近保存的人（`updated_by_name`，G7 横幅写谁改的）与完成时间索引。原登记的费用列取消时不动，售后成本视图（22）按保留项计、原登记额在悬停里。两条 CHECK 把关状态与时间：只有已完成的单有完成时间；只有已取消的单有取消原因、时刻与保留项（历史导入的单可以没有完成或取消时间）。
 - **「适用字段是否齐全」不写成 SQL**：缺失字段与当月登记完整率都在应用层用 `contracts` 的 `missingFields` 判断（与前端同一条规则；坐席拿不到费用与比例，所以台账每行由后端算好 `missing`，只对已完成的单算）。当月按完成时间换成北京时间的本地时刻比月份（`completed_at AT TIME ZONE 'Asia/Shanghai'`），日界不随 UTC 走；历史导入不计。第一期台账量小，按月取已完成的单在应用层数，以后变慢再挪进视图。
 - **编辑登记与补登一个接口**（`PATCH /api/aftersales/{单号}`，体 `{ version, changes?, rates? }`）：服务层把这次提交盖到原登记上，按 `contracts` 的 `registrationItems`（登记项清单，前后端共用）逐项比较。进行中按新建登记的规则整张校验（不适用的字段清空；改了原币金额、币种或费用发生日的项按费用发生日重新取汇率，没改的保留原来冻结的值）；已完成只认原来空着的、或按 R-AS-08 算缺的项（例如退款的额外赔偿登记成 0），其余已填的项改了报「已完成的单只能补登缺失的字段」，原值一律不动，只校验这次填的项。随保存一起改汇率在同一个事务里先改字段、再改汇率（同 `PUT …/rates` 的 `applyRateChanges`），版本只加一次，改字段与改汇率各记一条审计。
+
+## 修订（2026-10-05，待办 22 落地）
+
+- **视图**：用 drizzle 的 ``pgSchema(…).view(名, 列).as(sql`…`)`` 写在模块的 `schema.ts`，由 drizzle-kit 生成 `CREATE VIEW` 迁移（0016；`drizzle-kit generate --name …` 起个看得懂的名字，SQL 写成子查询 + 外层求和，迁移文件可读）。计算列在视图里显式 `::numeric(12, 2)`。迁移测试的数据约定（主键 UUIDv7、有金额就有币种列等）只针对基表，视图另有一条：金额列是冻结的美元值，numeric(12,2)、列名以 `_usd` 结尾、不带币种列。视图依赖的列以后改类型或删除时，迁移要先删视图再重建。`report_reader` 的默认授权对以后新建的视图同样生效（迁移测试按 relkind 'v' 核对）。
+- **合计在应用层求和**：「缺字段」筛选在应用层判断（ADR 本文「待办 21 落地」），合计行也就在应用层用 big.js 把视图逐行的美元值相加；承担金额 `costShares` 逐行四舍五入到分（ROUND_HALF_UP），两方之和恒等于费用合计，合计行为各行之和。
+- **默认的费用发生日按服务端时钟**：台账查询没给的一端由接口按注入的时钟取本月（`contracts` 的 `defaultFeeDateRange(businessDate(now))`），响应的 `range` 写这次按的起止；「今天」以服务端为准（演示的 `CLOCK_START`、测试的手动时钟都跟着走），前端不自己算。
+- **导出文件**：exceljs（规格指定）在内存里同步生成，响应类型 `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`，文件名放 `Content-Disposition` 的 `filename*`（UTF-8 编码），行数放 `X-Export-Rows`（`contracts` 的 `EXPORT_ROWS_HEADER`），`Cache-Control: no-store`；不落盘、不留存。导出记一条审计：动作 `ledger.export`（「对象.动词」，报表随 25 为 `report.export`）、对象类型「导出」、对象 `aftersales.ledger`（「登记台账」），后值写文件名、筛选条件（含这次按的起止）、行数与是否含财务字段，店铺为筛选的店铺（没筛为空）。被拒的导出（店铺范围外 403、条件写错 400）没有文件，不记导出。exceljs 4.4 的几个间接依赖已标弃用（fstream、rimraf 2 等），只在生成文件时用，后续有维护更好的同类库再换。

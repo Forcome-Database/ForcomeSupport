@@ -36,18 +36,29 @@ export function ledgerQueryOf(search: LedgerSearch): LedgerQuery {
   return { from, to, store, method, responsibility, status, owner };
 }
 
-/** 条件是否就是默认（费用发生日本月、其余都没选）：是的话不出「清除筛选」，列表为空时也没有按钮 */
-export function isDefaultSearch(search: LedgerSearch): boolean {
+/**
+ * 条件是否就是默认（费用发生日本月、其余都没选）：是的话不出「清除筛选」，列表为空时也没有按钮。
+ * 地址栏写的起止与默认的本月相同也算默认（defaultRange 由接口按服务端时钟给出，加载前不知道时只认没写的）
+ */
+export function isDefaultSearch(search: LedgerSearch, defaultRange?: FeeDateRange): boolean {
+  const sameDay = (value: string | undefined, fallback: string | undefined) =>
+    value === undefined || value === fallback;
   return (
     !search.missing &&
-    search.from === undefined &&
-    search.to === undefined &&
+    sameDay(search.from, defaultRange?.from) &&
+    sameDay(search.to, defaultRange?.to) &&
     choiceFilters.every((key) => search[key] === undefined)
   );
 }
 
-/** 费用发生日的写法（原型芯片「2026-09-01 至 09-11」）：同一年的结束日不写年份，跨年写全 */
-export function rangeLabel(range: FeeDateRange): string {
-  const sameYear = range.from.slice(0, 4) === range.to.slice(0, 4);
-  return `${range.from} 至 ${sameYear ? range.to.slice(5) : range.to}`;
+/** 选了费用发生日：与默认的本月相同时地址栏不写起止（回到默认） */
+export function withRange(
+  search: LedgerSearch,
+  range: FeeDateRange,
+  defaultRange: FeeDateRange | undefined,
+): LedgerSearch {
+  const isDefault = range.from === defaultRange?.from && range.to === defaultRange.to;
+  return isDefault
+    ? { ...search, from: undefined, to: undefined }
+    : { ...search, from: range.from, to: range.to };
 }

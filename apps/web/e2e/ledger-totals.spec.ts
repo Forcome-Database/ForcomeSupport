@@ -257,6 +257,23 @@ test('列设置：默认隐藏四列；勾选显示「其他」等列，「已�
   await expect(row(page, 'S-20260904-0013')).toContainText('HEPA 滤芯组件 FC-V2-HF01 × 2');
   await expect(row(page, 'S-20260904-0013')).toContainText('FQD');
 
+  // 七个金额列都隐藏：合计行只剩「合计 · N 单」与说明，照样固定在底部
+  await page.getByRole('button', { name: '列设置', exact: true }).click();
+  for (const label of [
+    '产品成本',
+    '运费',
+    '额外赔偿',
+    '其他',
+    '费用合计',
+    'FSH 承担 $',
+    '工厂承担 $',
+  ]) {
+    await page.getByRole('menuitemcheckbox', { name: label, exact: true }).click();
+  }
+  await page.keyboard.press('Escape');
+  await expect(totalsRow(page)).toContainText(/^合计 · \d+ 单/);
+  await expect(totalsRow(page).getByText(/^\$/)).toHaveCount(0);
+
   await page.getByRole('button', { name: '列设置', exact: true }).click();
   await page.getByRole('menuitem', { name: '恢复默认' }).click();
   await expect(hiddenLine).toHaveText(
@@ -341,6 +358,20 @@ test('筛选行：费用发生日默认本月，区间日历选好起止即生�
   await expect(page).toHaveURL(/\/aftersales\/ledger$/);
   await expect(chip(page, '店铺')).toHaveText('店铺：全部');
   await expect(chip(page, '费用发生日')).toHaveText(`费用发生日：${month}-01 至 ${today.slice(5)}`);
+
+  // 选回本月（1 日至今天）就是默认：地址栏不写起止，也没有「清除筛选」
+  await pick(page, '状态', '进行中');
+  await chip(page, '费用发生日').click();
+  await calendar.locator('td button').filter({ hasText: /^1$/ }).click();
+  await calendar
+    .locator('td button')
+    .filter({ hasText: new RegExp(`^${Number(today.slice(8))}$`) })
+    .click();
+  await expect(page).toHaveURL(/\?status=in_progress$/);
+  await pick(page, '状态', '全部');
+  await expect(
+    page.getByTestId('ledger-filters').getByRole('button', { name: '清除筛选' }),
+  ).toHaveCount(0);
 });
 
 test('列表为空：说明写当前筛选与「清除筛选查看全部 N 张」，按钮「清除筛选」；条件就是默认时没有按钮', async ({

@@ -235,6 +235,9 @@ describe('合计行（R-AS-08、AC-RP-01 的 P13 一侧）', () => {
   it('费用发生日默认本月（北京时间当月 1 日至今天，按服务端时钟）；只给一端时另一端取本月的；筛出缺字段时不按日期', async () => {
     const data = await ledger(owner);
     expect(data.range).toEqual({ from: '2026-09-01', to: '2026-09-11' });
+    // 默认的本月另给一份（界面据它判断条件是否就是默认），带了别的起止也照样给
+    expect(data.defaultRange).toEqual({ from: '2026-09-01', to: '2026-09-11' });
+    expect((await ledger(owner, SEPTEMBER)).defaultRange).toEqual(data.defaultRange);
     expect(data.totals).toEqual(FIXTURE_TOTALS);
     expect((await ledger(owner, '?from=2026-09-10')).range).toEqual({
       from: '2026-09-10',
@@ -383,12 +386,12 @@ describe('店铺范围施加在售后成本视图的查询上（ADR 0010、R-ST-
 
   it('筛选范围外的店铺：403 并记越权审计（列表与导出都一样）', async () => {
     const denied = (await t.auditRecords({ action: 'access.denied' })).length;
-    const exported = (await t.auditRecords({ action: 'export.excel' })).length;
+    const exported = (await t.auditRecords({ action: 'ledger.export' })).length;
     expect((await limited.get(`/api/aftersales/ledger?store=${AUTO.id}`)).status).toBe(403);
     expect((await limited.get(`/api/aftersales/ledger/export?store=${AUTO.id}`)).status).toBe(403);
     expect((await t.auditRecords({ action: 'access.denied' })).length).toBe(denied + 2);
     // 被拒的导出没有生成文件，不记导出
-    expect((await t.auditRecords({ action: 'export.excel' })).length).toBe(exported);
+    expect((await t.auditRecords({ action: 'ledger.export' })).length).toBe(exported);
   });
 });
 
@@ -450,7 +453,7 @@ describe('导出 Excel（S11、K5）', () => {
     expect(total[col('FSH 承担 $')]).toBe(58.85);
     expect(total[col('工厂承担 $')]).toBe(129.94);
 
-    const [audit] = await t.auditRecords({ action: 'export.excel' });
+    const [audit] = await t.auditRecords({ action: 'ledger.export' });
     expect(audit).toMatchObject({
       actorName: '王磊',
       objectType: 'export',
@@ -484,7 +487,7 @@ describe('导出 Excel（S11、K5）', () => {
     // 表头 + 12 行，没有合计
     expect(file.rows).toHaveLength(13);
     expect(file.rows.flat().some((cell) => typeof cell === 'number')).toBe(false);
-    const records = await t.auditRecords({ action: 'export.excel' });
+    const records = await t.auditRecords({ action: 'ledger.export' });
     expect(records.at(-1)).toMatchObject({
       actorName: '李婷',
       objectType: 'export',
@@ -501,8 +504,8 @@ describe('导出 Excel（S11、K5）', () => {
 
   it('筛选条件写错返回 400，不写审计', async () => {
     const owner = await t.loginAs('售后负责人');
-    const before = (await t.auditRecords({ action: 'export.excel' })).length;
+    const before = (await t.auditRecords({ action: 'ledger.export' })).length;
     expect((await owner.get('/api/aftersales/ledger/export?from=09-01')).status).toBe(400);
-    expect((await t.auditRecords({ action: 'export.excel' })).length).toBe(before);
+    expect((await t.auditRecords({ action: 'ledger.export' })).length).toBe(before);
   });
 });

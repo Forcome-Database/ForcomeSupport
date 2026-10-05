@@ -8,8 +8,6 @@ import {
   type FactoryRatios,
   type FeeItem,
   type FieldErrors,
-  type LedgerOptions,
-  type OwnerOption,
   type RegistrationInput,
   type RegistrationOptions,
   type StoreOption,
@@ -17,7 +15,6 @@ import {
 import { listStoreOptions } from '../channel';
 import {
   FieldValidationError,
-  isStoreInScope,
   nextBusinessNumber,
   recordAudit,
   transaction,
@@ -30,7 +27,7 @@ import { listAftersalesOwners, type Access } from '../org';
 import { findTicketReference, type TicketReference } from '../ticket';
 import { actorName, auditSnapshot } from './audit';
 import { convertFees, feeColumnValues, type FeeValue } from './fees';
-import { type AftersalesRow } from './ledger';
+import { ownerWithinScope, type AftersalesRow } from './ledger';
 import { ledgerTransition } from './lifecycle';
 import { aftersales, responsibilityRatio } from './schema';
 
@@ -41,30 +38,6 @@ import { aftersales, responsibilityRatio } from './schema';
  * 合格、生产厂与配件是否存在、非美元金额有没有汇率）一次列全；保存记审计（完整后值）。
  * 查库的校验与登记内容到表列的换算，编辑登记与补登（edit.ts）共用。
  */
-
-/**
- * 售后负责人在查看者店铺范围内的那部分：查看者只能给自己范围内的店铺登记，候选人的范围只需要（也只该）露出这部分；
- * 与查看者的范围没有交集的售后负责人不列出
- */
-function ownerWithinScope(owner: OwnerOption, scope: StoreScope): OwnerOption | null {
-  if (scope.all) return owner;
-  const storeIds = owner.stores.all
-    ? [...scope.storeIds]
-    : owner.stores.storeIds.filter((id) => isStoreInScope(scope, id));
-  return storeIds.length > 0 ? { ...owner, stores: { all: false, storeIds } } : null;
-}
-
-/**
- * P13 筛选行的选项：负责人筛选列出查看者店铺范围内在职的售后负责人（与新建登记的可选负责人同一批人；「待分配」随待办 23）
- */
-export async function ledgerOptions(db: DbExecutor, scope: StoreScope): Promise<LedgerOptions> {
-  const owners = await listAftersalesOwners(db);
-  return {
-    owners: owners.flatMap((owner) =>
-      ownerWithinScope(owner, scope) ? [{ id: owner.id, name: owner.name }] : [],
-    ),
-  };
-}
 
 /**
  * 新建登记抽屉的选项：可选负责人（只露出查看者店铺范围内的部分）、责任类型的默认比例、生产厂、配件与所属生产厂
@@ -245,11 +218,6 @@ const REGISTERED_STATUS = (() => {
 })();
 
 /** 新建的售后单与它的店铺名 */
-export interface Registered {
-  readonly row: AftersalesRow;
-  readonly storeName: string;
-}
-
 /**
  * 新建登记。填错时抛 FieldValidationError（全部字段的错误一次列全），不写任何数据；
  * 选了范围外的店铺、或来源工单在范围外，记越权审计并抛 AccessDeniedError（403，E-24）。
@@ -258,7 +226,7 @@ export async function createRegistration(
   runtime: Runtime,
   access: Access,
   raw: RegistrationInput,
-): Promise<Registered> {
+): Promise<AftersalesRow> {
   const input = normalizeRegistration(raw);
   const errors: FieldErrors = registrationErrors(input);
 
@@ -315,6 +283,6 @@ export async function createRegistration(
       storeId: row.storeId,
       after: auditSnapshot(row, lookups.ownerName),
     });
-    return { row, storeName: store.name };
+    return row;
   });
 }

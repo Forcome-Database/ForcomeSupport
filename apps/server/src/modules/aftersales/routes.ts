@@ -6,6 +6,7 @@ import {
   exchangeRatesOnSchema,
   ledgerItemSchema,
   ledgerOptionsSchema,
+  XLSX_CONTENT_TYPE,
   ledgerQuerySchema,
   ledgerSchema,
   rateChangeInputSchema,
@@ -31,20 +32,17 @@ import {
 import { updateRegistration } from './edit';
 import {
   completionOf,
+  defaultFeeDateRangeAt,
   findOwnedAftersales,
   ledgerItemOf,
+  ledgerOptions,
   listLedger,
   toDetail,
   type AftersalesRow,
 } from './ledger';
-import { exportLedger, XLSX_CONTENT_TYPE } from './export';
+import { exportLedger } from './export';
 import { changeFeeRates } from './rates';
-import {
-  createRegistration,
-  findSourceTicket,
-  ledgerOptions,
-  registrationOptions,
-} from './registration';
+import { createRegistration, findSourceTicket, registrationOptions } from './registration';
 import { cancelAftersales, completeAftersales, undoComplete } from './status';
 
 const json = <T extends z.ZodType>(schema: T, description: string) => ({
@@ -293,7 +291,7 @@ export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv 
 
   /** 一行台账（财务字段按查看者的权限过滤） */
   async function itemOf(access: Access, row: AftersalesRow) {
-    const item = await ledgerItemOf(runtime.db, row);
+    const item = await ledgerItemOf(runtime.db, access.stores, row);
     return stripFinanceFields(ledgerItemSchema, item, access.financeVisible);
   }
 
@@ -328,7 +326,11 @@ export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv 
       completionOf(runtime.db, access.stores, query.store, now),
     ]);
     return c.json(
-      stripFinanceFields(ledgerSchema, { items, totals, range, completion }, access.financeVisible),
+      stripFinanceFields(
+        ledgerSchema,
+        { items, totals, range, defaultRange: defaultFeeDateRangeAt(now), completion },
+        access.financeVisible,
+      ),
       200,
     );
   });
@@ -352,7 +354,7 @@ export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv 
 
   routes.openapi(registerRoute, async (c) => {
     const access = c.get('access');
-    const { row } = await createRegistration(runtime, access, c.req.valid('json'));
+    const row = await createRegistration(runtime, access, c.req.valid('json'));
     return c.json(await itemOf(access, row), 201);
   });
 

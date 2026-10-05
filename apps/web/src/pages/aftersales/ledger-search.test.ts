@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isDefaultSearch, ledgerQueryOf, ledgerSearchSchema, rangeLabel } from './ledger-search';
+import { isDefaultSearch, ledgerQueryOf, ledgerSearchSchema, withRange } from './ledger-search';
 
 /*
  * P13 地址栏的筛选条件（S13 补充小样，用户确认 10-05）：费用发生日不在地址栏时是默认的本月（由接口补上）；
@@ -43,15 +43,28 @@ describe('P13 的筛选条件', () => {
     ).toEqual({ missing: '1', store: STORE });
   });
 
-  it('条件是否就是默认：地址栏没有任何条件', () => {
+  it('条件是否就是默认：地址栏没有任何条件，或写的起止与默认的本月相同', () => {
+    const month = { from: '2026-09-01', to: '2026-09-11' };
+    expect(isDefaultSearch({ from: '2026-09-01', to: '2026-09-11' }, month)).toBe(true);
+    expect(isDefaultSearch({ from: '2026-09-01', to: '2026-09-11' })).toBe(false);
+    expect(isDefaultSearch({ from: '2026-09-01' }, month)).toBe(true);
+    expect(isDefaultSearch({ from: '2026-09-02' }, month)).toBe(false);
     expect(isDefaultSearch({})).toBe(true);
     expect(isDefaultSearch({ from: '2026-09-02' })).toBe(false);
     expect(isDefaultSearch({ status: 'completed' })).toBe(false);
     expect(isDefaultSearch({ missing: '1' })).toBe(false);
   });
 
-  it('费用发生日的写法：同一年的结束日不写年份（原型「2026-09-01 至 09-11」）', () => {
-    expect(rangeLabel({ from: '2026-09-01', to: '2026-09-11' })).toBe('2026-09-01 至 09-11');
-    expect(rangeLabel({ from: '2025-12-20', to: '2026-01-05' })).toBe('2025-12-20 至 2026-01-05');
+  it('选了与默认的本月相同的起止：地址栏不写起止', () => {
+    const month = { from: '2026-09-01', to: '2026-09-11' };
+    expect(withRange({ store: STORE }, month, month)).toEqual({
+      store: STORE,
+      from: undefined,
+      to: undefined,
+    });
+    expect(withRange({}, { from: '2026-09-01', to: '2026-09-05' }, month)).toEqual({
+      from: '2026-09-01',
+      to: '2026-09-05',
+    });
   });
 });

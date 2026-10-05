@@ -51,7 +51,15 @@ export const FILTERS = {
   owner: '负责人',
   all: '全部',
   clear: '清除筛选',
+  /** 芯片「名称：值」中间的冒号 */
+  colon: '：',
 } as const;
+
+/** 费用发生日的写法（原型芯片「2026-09-01 至 09-11」）：同一年的结束日不写年份，跨年写全 */
+export function rangeLabel(range: { readonly from: string; readonly to: string }): string {
+  const sameYear = range.from.slice(0, 4) === range.to.slice(0, 4);
+  return `${range.from} 至 ${sameYear ? range.to.slice(5) : range.to}`;
+}
 
 /** 合计行（原型 p13_p1_table() 的合计行：「合计 · 12 单」「首列与合计行固定」，「其他」列隐藏时另写它的合计） */
 export const TOTALS = {
@@ -246,6 +254,8 @@ export const COMPLETION = {
 
 /** 点完整率后的筛选芯片（S15 补充小样：选中态，带 ×，右侧「清除筛选」） */
 export const MISSING_FILTER = {
+  /** 「当前筛选：缺字段的已完成单 9 月」里的叫法 */
+  name: '缺字段的已完成单',
   label: '缺字段的已完成单：',
   month: (month: number) => `${month} 月`,
   remove: '移除这条筛选',

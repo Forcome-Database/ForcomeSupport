@@ -250,7 +250,7 @@ export function LedgerPage() {
   const backfill = useInlineBackfill();
   const complete = useCompleteAction();
   const exporter = useLedgerExport(query);
-  const clearable = !isDefaultSearch(search);
+  const clearable = !isDefaultSearch(search, ledger.data?.defaultRange);
   const items = ledger.data?.items ?? null;
   // 列表为空时「清除筛选查看全部 N 张」：N 是清除后（默认的本月、其余不选）会列出的单数
   const fallback = useQuery({
@@ -329,6 +329,7 @@ export function LedgerPage() {
           <LedgerFilterBar
             search={search}
             range={ledger.data?.range ?? null}
+            defaultRange={ledger.data?.defaultRange}
             month={month}
             stores={storeOptions}
             owners={ownerOptions}

@@ -1,4 +1,5 @@
 import {
+  costShares,
   factoryRatiosOf,
   feeItemGroup,
   feeItemLabels,
@@ -33,7 +34,7 @@ import {
   type Site,
 } from '@forcome/contracts';
 import type { FieldPath } from 'react-hook-form';
-import { centsOf } from '@/lib/cents';
+import { amountOfCents, centsOf } from '@/lib/cents';
 import { DRAWER } from './p13-copy';
 
 /*
@@ -386,18 +387,22 @@ export function shareTotalCents(
   amounts: Readonly<Record<RatioGroup, number | null>>,
   percents: Readonly<Record<RatioGroup, number | null>>,
 ): { fsh: number; factory: number } | null {
-  let total = 0;
-  let factoryTimes100 = 0;
-  for (const group of ratioGroups) {
-    const amount = amounts[group];
-    const percent = percents[group];
-    if (amount === null || percent === null) return null;
-    total += amount;
-    factoryTimes100 += amount * percent;
-  }
-  // 分 × 百分比是整数，除以 100 后按四舍五入取整（金额不为负，Math.round 的半数进位即四舍五入）
-  const factory = Math.round(factoryTimes100 / 100);
-  return { fsh: total - factory, factory };
+  const { product, freight, other } = amounts;
+  const ratios = { product: percents.product, freight: percents.freight, other: percents.other };
+  if (product === null || freight === null || other === null) return null;
+  if (ratios.product === null || ratios.freight === null || ratios.other === null) return null;
+  // 额外赔偿与其他同属「其他费用」一组，这里各组金额已经合好，记在额外赔偿一项即可
+  const shares = costShares(
+    {
+      productCost: amountOfCents(product),
+      freight: amountOfCents(freight),
+      compensation: amountOfCents(other),
+      otherCost: null,
+    },
+    { product: ratios.product, freight: ratios.freight, other: ratios.other },
+  );
+  if (shares.fsh === null || shares.factory === null) return null;
+  return { fsh: centsOf(shares.fsh) ?? 0, factory: centsOf(shares.factory) ?? 0 };
 }
 
 /** 一组的两方承担（分）：工厂 = 金额 × 工厂比例（四舍五入到分），FSH = 金额 − 工厂（R-AS-08） */

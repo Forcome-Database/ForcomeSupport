@@ -1,6 +1,7 @@
 import {
   formatMoney,
   ledgerColumnLabels,
+  ledgerColumnTotals,
   ledgerFinanceColumns,
   type LedgerColumn,
   type LedgerItem,
@@ -61,11 +62,10 @@ const NO_ROWS: LedgerItem[] = [];
 /** 快递单号（占剩余宽度的一列）的最小宽度：列多时整表横向滚动 */
 const FLEX_MIN_WIDTH = 136;
 
-/** 列的附加信息：对齐、两种视角的列宽（null 为占剩余宽度）、合计行里写的合计项 */
+/** 列的附加信息：对齐、两种视角的列宽（null 为占剩余宽度）；合计行里写的合计项取 contracts 的 ledgerColumnTotals */
 interface ColumnMeta {
   readonly align: 'left' | 'right';
   readonly width: { readonly finance: number | null; readonly readOnly: number | null };
-  readonly total?: Exclude<keyof LedgerTotals, 'count'>;
 }
 
 /** 单元格要用的上下文与行尾「更多」（交给表格的 meta） */
@@ -114,23 +114,17 @@ const COLUMNS = helper.columns([
   column('factory', left(64, 76), factoryCell),
   column('part', left(200, 212), partCell),
   column('trackingNumber', left(null), trackingCell),
-  column('productCost', { align: 'right', width: width(78), total: 'productCost' }, (item) =>
+  column('productCost', { align: 'right', width: width(78) }, (item) =>
     feeCell(item, 'productCost'),
   ),
-  column('freight', { align: 'right', width: width(70), total: 'freight' }, (item) =>
-    feeCell(item, 'freight'),
-  ),
-  column('compensation', { align: 'right', width: width(152), total: 'compensation' }, (item) =>
+  column('freight', { align: 'right', width: width(70) }, (item) => feeCell(item, 'freight')),
+  column('compensation', { align: 'right', width: width(152) }, (item) =>
     feeCell(item, 'compensation'),
   ),
-  column('otherCost', { align: 'right', width: width(78), total: 'otherCost' }, (item) =>
-    feeCell(item, 'otherCost'),
-  ),
-  column('feeTotal', { align: 'right', width: width(82), total: 'total' }, feeTotalCell),
-  column('fshShare', { align: 'right', width: width(84), total: 'fsh' }, (item) =>
-    shareCell(item, 'fsh'),
-  ),
-  column('factoryShare', { align: 'right', width: width(84), total: 'factory' }, (item) =>
+  column('otherCost', { align: 'right', width: width(78) }, (item) => feeCell(item, 'otherCost')),
+  column('feeTotal', { align: 'right', width: width(82) }, feeTotalCell),
+  column('fshShare', { align: 'right', width: width(84) }, (item) => shareCell(item, 'fsh')),
+  column('factoryShare', { align: 'right', width: width(84) }, (item) =>
     shareCell(item, 'factory'),
   ),
   helper.display({
@@ -186,7 +180,9 @@ export function LedgerTable({
   const view = finance ? 'finance' : 'readOnly';
   const columns = table.getVisibleLeafColumns();
   const fixed = columns.reduce((sum, c) => sum + (c.columnDef.meta?.width[view] ?? 0), 0);
+  // 合计行的金额从第一个可见的金额列开始；金额列全被隐藏时只剩「合计 · N 单」与说明
   const firstMoney = columns.findIndex((c) => ledgerFinanceColumns.has(c.id as LedgerColumn));
+  const moneyStart = firstMoney === -1 ? columns.length : firstMoney;
   const otherHidden = finance && !columns.some((c) => c.id === 'otherCost');
 
   return (
@@ -271,7 +267,7 @@ export function LedgerTable({
           })
         )}
       </TableBody>
-      {totals && items !== null && items.length > 0 && firstMoney > 0 && (
+      {totals && items !== null && items.length > 0 && (
         <tfoot>
           <tr data-testid="ledger-totals" className="text-13 font-bold text-foreground">
             {/* 首列固定：说明文字接在「合计 · N 单」后面，越过首列落在右边空着的格子上（原型合计行的左半边是一整段） */}
@@ -286,11 +282,11 @@ export function LedgerTable({
                 )}
               </span>
             </td>
-            {firstMoney > 1 && (
-              <td colSpan={firstMoney - 1} className="sticky bottom-0 z-[2] bg-muted" />
+            {moneyStart > 1 && (
+              <td colSpan={moneyStart - 1} className="sticky bottom-0 z-[2] bg-muted" />
             )}
-            {columns.slice(firstMoney).map((c) => {
-              const key = c.columnDef.meta?.total;
+            {columns.slice(moneyStart).map((c) => {
+              const key = ledgerColumnTotals[c.id as LedgerColumn];
               return (
                 <td
                   key={c.id}

@@ -22,7 +22,6 @@ import {
 } from '@forcome/contracts';
 import { describe, expect, it } from 'vitest';
 import { pages } from '@/lib/pages';
-import { rangeLabel } from './ledger-search';
 import {
   BACKFILL_RESULT,
   CANCEL,
@@ -47,6 +46,7 @@ import {
   NOTE,
   PAGE_DESCRIPTION,
   PAGE_TITLE,
+  rangeLabel,
   SAVE_RESULT,
   SHARE,
   LOOKUP,
@@ -128,11 +128,17 @@ describe('P13 第一期参照页', () => {
     }
   });
 
+  it('费用发生日的写法：同一年的结束日不写年份（原型「2026-09-01 至 09-11」），跨年写全', () => {
+    expect(rangeLabel({ from: '2025-12-20', to: '2026-01-05' })).toBe('2025-12-20 至 2026-01-05');
+    expectText(P13, rangeLabel({ from: '2026-09-01', to: '2026-09-11' }));
+    expect(`${MISSING_FILTER.name}${FILTERS.colon}`).toBe(MISSING_FILTER.label);
+  });
+
   it('筛选行：费用发生日（本月）、店铺（没选写「全部」）、处理方式、责任、状态、负责人', () => {
     for (const page of [P13, P13_AGENT]) {
-      expectIn(page, `>${FILTERS.feeDate}：<span`);
+      expectIn(page, `>${FILTERS.feeDate}${FILTERS.colon}<span`);
       expectText(page, rangeLabel({ from: '2026-09-01', to: '2026-09-11' }));
-      expectIn(page, `>${FILTERS.store}：<span`);
+      expectIn(page, `>${FILTERS.store}${FILTERS.colon}<span`);
       expectText(page, FILTERS.all);
       for (const label of [FILTERS.method, FILTERS.responsibility, FILTERS.status, FILTERS.owner]) {
         expectIn(page, `>${label}<svg`);
@@ -212,9 +218,9 @@ describe('S13 补充小样（用户确认 10-05）与 S11 导出', () => {
   });
 
   it('筛选芯片选中后写「名称：值」；下拉第一项「全部」', () => {
-    expectIn(STATES, `>${FILTERS.store}：<span`);
+    expectIn(STATES, `>${FILTERS.store}${FILTERS.colon}<span`);
     expectText(STATES, 'forcome.com');
-    expectIn(STATES, `>${FILTERS.responsibility}：<span`);
+    expectIn(STATES, `>${FILTERS.responsibility}${FILTERS.colon}<span`);
     expectIn(STATES, `>${FILTERS.all}<`);
   });
 

@@ -12,8 +12,10 @@ import {
   type FeeItem,
   type LedgerCost,
   type LedgerItem,
+  type LedgerOptions,
   type LedgerQuery,
   type LedgerTotals,
+  type OwnerOption,
   type Ratios,
   type RegistrationField,
   type RegistrationRecord,
@@ -21,9 +23,9 @@ import {
 import Big from 'big.js';
 import { and, asc, eq, getViewSelectedFields, gte, lte, ne, sql, type SQL } from 'drizzle-orm';
 import { storeNamesById } from '../channel';
-import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
+import { isStoreInScope, storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
 import { listParts } from '../factory';
-import { memberNamesById, type Access } from '../org';
+import { listAftersalesOwners, memberNamesById, type Access } from '../org';
 import { feesOf } from './fees';
 import { aftersales, aftersalesCost } from './schema';
 
@@ -169,10 +171,25 @@ export function toLedgerItem(row: AftersalesRow, cost: CostRow, names: LedgerNam
   };
 }
 
-/** 一张单的台账行（新建登记、设为已完成、取消等接口返回刚改过的这一行；店铺范围已由调用方把关） */
-export async function ledgerItemOf(db: DbExecutor, row: AftersalesRow): Promise<LedgerItem> {
+/**
+ * 一张单的台账行（新建登记、设为已完成、取消等接口返回刚改过的这一行）：这张单已由调用方在店铺范围内取到，
+ * 读视图时照样施加店铺范围（ADR 0010：读视图都显式施加）
+ */
+export async function ledgerItemOf(
+  db: DbExecutor,
+  scope: StoreScope,
+  row: AftersalesRow,
+): Promise<LedgerItem> {
   const [[cost], names] = await Promise.all([
-    db.select().from(aftersalesCost).where(eq(aftersalesCost.aftersalesId, row.id)),
+    db
+      .select()
+      .from(aftersalesCost)
+      .where(
+        and(
+          eq(aftersalesCost.aftersalesId, row.id),
+          storeScopeCondition(scope, aftersalesCost.storeId),
+        ),
+      ),
     ledgerNamesOf(db, [row]),
   ]);
   if (!cost) throw new Error(`售后单 ${row.number} 不在售后成本视图里`);
@@ -252,6 +269,30 @@ export function toDetail(
   };
 }
 
+/**
+ * 售后负责人在查看者店铺范围内的那部分：查看者只能给自己范围内的店铺登记，候选人的范围只需要（也只该）露出这部分；
+ * 与查看者的范围没有交集的售后负责人不列出
+ */
+export function ownerWithinScope(owner: OwnerOption, scope: StoreScope): OwnerOption | null {
+  if (scope.all) return owner;
+  const storeIds = owner.stores.all
+    ? [...scope.storeIds]
+    : owner.stores.storeIds.filter((id) => isStoreInScope(scope, id));
+  return storeIds.length > 0 ? { ...owner, stores: { all: false, storeIds } } : null;
+}
+
+/**
+ * P13 筛选行的选项：负责人筛选列出查看者店铺范围内在职的售后负责人（与新建登记的可选负责人同一批人；「待分配」随待办 23）
+ */
+export async function ledgerOptions(db: DbExecutor, scope: StoreScope): Promise<LedgerOptions> {
+  const owners = await listAftersalesOwners(db);
+  return {
+    owners: owners.flatMap((owner) =>
+      ownerWithinScope(owner, scope) ? [{ id: owner.id, name: owner.name }] : [],
+    ),
+  };
+}
+
 // ---------------------------------------------------------------- 当月登记完整率（R-AS-08）
 
 /** 当月 YYYY-MM（北京时间） */
@@ -307,12 +348,17 @@ export async function completionOf(
   };
 }
 
+/** 默认的费用发生日：本月（北京时间当月 1 日至今天，按注入的时钟） */
+export function defaultFeeDateRangeAt(now: Date): FeeDateRange {
+  return defaultFeeDateRange(businessDate(now));
+}
+
 /**
  * 这次按的费用发生日起止：没给的一端取本月的那一端（北京时间，按注入的时钟；S13 补充小样）；筛出缺字段时不按日期，为 null
  */
 export function feeDateRangeOf(query: LedgerQuery, now: Date): FeeDateRange | null {
   if (query.missing) return null;
-  const fallback = defaultFeeDateRange(businessDate(now));
+  const fallback = defaultFeeDateRangeAt(now);
   return { from: query.from ?? fallback.from, to: query.to ?? fallback.to };
 }
 

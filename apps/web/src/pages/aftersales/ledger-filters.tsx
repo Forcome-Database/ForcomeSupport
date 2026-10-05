@@ -9,13 +9,14 @@ import {
 } from '@forcome/contracts';
 import { Check, ChevronDown, Filter, X } from 'lucide-react';
 import { useState, type ComponentProps, type ReactNode } from 'react';
+import { toDate, toValue } from '@/components/date-field';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Command, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { type ChoiceFilter, type LedgerSearch, rangeLabel } from './ledger-search';
-import { EMPTY, FILTERS, MISSING_FILTER } from './p13-copy';
+import { type ChoiceFilter, type LedgerSearch, withRange } from './ledger-search';
+import { EMPTY, FILTERS, MISSING_FILTER, rangeLabel } from './p13-copy';
 
 /*
  * P13 的筛选行（PRD P13「第一阶段」、S13 与补充小样，用户确认 10-05）：费用发生日 · 店铺 · 处理方式 · 责任 · 状态 · 负责人。
@@ -51,7 +52,8 @@ function ChipFace({
         label
       ) : (
         <>
-          {label}：
+          {label}
+          {FILTERS.colon}
           <span className={cn('font-semibold', active ? 'text-primary-text' : 'text-foreground')}>
             {shown}
           </span>
@@ -122,25 +124,15 @@ function ChoiceChip({
  * 区间日历的日期格（原型 range_picker()）：起止两天主色实心白字，中间的浅主色底、主色字、不圆角；不用单选日历的「选中」样式。
  * 写在带属性的选择器里，与「今天」同时成立时以区间为准
  */
+const RANGE_END =
+  '[&[data-selected=true]>button]:bg-primary [&[data-selected=true]>button]:font-bold [&[data-selected=true]>button]:text-primary-foreground [&[data-selected=true]>button]:shadow-none';
 const RANGE_DAYS = {
   selected: '',
-  range_start:
-    '[&[data-selected=true]>button]:bg-primary [&[data-selected=true]>button]:font-bold [&[data-selected=true]>button]:text-primary-foreground [&[data-selected=true]>button]:shadow-none',
-  range_end:
-    '[&[data-selected=true]>button]:bg-primary [&[data-selected=true]>button]:font-bold [&[data-selected=true]>button]:text-primary-foreground [&[data-selected=true]>button]:shadow-none',
+  range_start: RANGE_END,
+  range_end: RANGE_END,
   range_middle:
     '[&[data-selected=true]>button]:rounded-none [&[data-selected=true]>button]:bg-primary-soft [&[data-selected=true]>button]:text-primary-text [&[data-selected=true]>button]:shadow-none',
 };
-
-function toDate(value: string): Date {
-  const [y = 1970, m = 1, d = 1] = value.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function toValue(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
 
 /**
  * 费用发生日的芯片：写这次按的起止（「2026-09-01 至 09-11」）；点开为区间日历（原型 range_picker()：起止两天实心主色，
@@ -223,7 +215,7 @@ export function filterSummary(
     options.find((option) => option.value === value)?.label;
   const parts: [string, string | undefined][] = search.missing
     ? [
-        [MISSING_FILTER.label.replace('：', ''), MISSING_FILTER.month(month)],
+        [MISSING_FILTER.name, MISSING_FILTER.month(month)],
         [FILTERS.store, labelOf(stores, search.store)],
       ]
     : [
@@ -244,6 +236,7 @@ export function filterSummary(
 export function LedgerFilterBar({
   search,
   range,
+  defaultRange,
   month,
   stores,
   owners,
@@ -254,6 +247,8 @@ export function LedgerFilterBar({
   search: LedgerSearch;
   /** 这次按的费用发生日（接口返回；加载前为 null） */
   range: FeeDateRange | null;
+  /** 默认的本月（接口返回；选到它时地址栏不写起止） */
+  defaultRange: FeeDateRange | undefined;
   /** 完整率的月份（「缺字段的已完成单：9 月」） */
   month: number;
   stores: readonly FilterOption[];
@@ -297,7 +292,10 @@ export function LedgerFilterBar({
   } else {
     chips = (
       <>
-        <DateRangeChip range={range} onChange={(next) => onChange({ ...search, ...next })} />
+        <DateRangeChip
+          range={range}
+          onChange={(next) => onChange(withRange(search, next, defaultRange))}
+        />
         {storeChip}
         <ChoiceChip
           label={FILTERS.method}

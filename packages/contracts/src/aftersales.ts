@@ -1007,6 +1007,21 @@ export const ledgerFinanceColumns: ReadonlySet<LedgerColumn> = new Set([
   'fshShare',
   'factoryShare',
 ]);
+/** 合计行里各金额列写的合计项（P13 合计行与导出的末行共用） */
+export const ledgerColumnTotals: Partial<
+  Record<
+    LedgerColumn,
+    'productCost' | 'freight' | 'compensation' | 'otherCost' | 'total' | 'fsh' | 'factory'
+  >
+> = {
+  productCost: 'productCost',
+  freight: 'freight',
+  compensation: 'compensation',
+  otherCost: 'otherCost',
+  feeTotal: 'total',
+  fshShare: 'fsh',
+  factoryShare: 'factory',
+};
 /** 默认隐藏的列，按「已隐藏 4 列：配件 × 数量、负责人、其他、生产厂」的顺序（P13「第一阶段」） */
 export const ledgerDefaultHidden: readonly LedgerColumn[] = [
   'part',
@@ -1067,6 +1082,8 @@ export const ledgerSchema = z.object({
   totals: financeField(ledgerTotalsSchema),
   /** 这次按的费用发生日起止（没给的一端取本月的那一端）；筛出缺字段时不按日期，为 null */
   range: feeDateRangeSchema.nullable(),
+  /** 默认的费用发生日（本月，按服务端时钟）：界面据它判断条件是否就是默认（不出「清除筛选」） */
+  defaultRange: feeDateRangeSchema,
   completion: completionSchema,
 });
 export type Ledger = z.infer<typeof ledgerSchema>;
@@ -1100,6 +1117,9 @@ export type LedgerOptions = z.infer<typeof ledgerOptionsSchema>;
 
 /** 导出 Excel 的响应头：导出的行数（浮层「· 12 单」）；文件名在 Content-Disposition 的 filename* */
 export const EXPORT_ROWS_HEADER = 'X-Export-Rows';
+/** 导出 Excel 的文件类型 */
+export const XLSX_CONTENT_TYPE =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 /**
  * 一张售后单的完整登记（编辑登记抽屉 S14：进行中可改、已完成补登、已取消只读；「查看最新」也取它）。
