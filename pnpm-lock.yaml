@@ -235,6 +235,9 @@ importers:
 
   packages/contracts:
     dependencies:
+      '@forcome/calendar':
+        specifier: workspace:*
+        version: link:../calendar
       big.js:
         specifier: ^7.0.1
         version: 7.0.1

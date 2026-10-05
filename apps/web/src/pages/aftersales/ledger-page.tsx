@@ -244,7 +244,7 @@ export function LedgerPage() {
   const options = useQuery(ledgerOptionsQuery);
   const columns = useColumnVisibility(member.id);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [drawer, setDrawer] = useState<DrawerTarget | null>(null);
+  const [opened, setDrawer] = useState<DrawerTarget | null>(null);
   const [cancelling, setCancelling] = useState<LedgerItem | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const backfill = useInlineBackfill();
@@ -260,6 +260,13 @@ export function LedgerPage() {
 
   const go = (next: LedgerSearch) =>
     void navigate({ to: pages.aftersalesLedger.path, search: next });
+  // 地址栏带了售后单号（从 P27 点进来）时打开它的编辑登记抽屉；页面里点开的优先
+  const drawer: DrawerTarget | null =
+    opened ?? (search.open ? { mode: 'edit', number: search.open } : null);
+  const closeDrawer = () => {
+    setDrawer(null);
+    if (search.open) go({ ...search, open: undefined });
+  };
   const storeOptions = (stores.data ?? []).map((store) => ({ value: store.id, label: store.name }));
   const ownerOptions = (options.data?.owners ?? []).map((owner) => ({
     value: owner.id,
@@ -379,9 +386,7 @@ export function LedgerPage() {
           {finance ? NOTE.finance : NOTE.readOnly}
         </p>
       </div>
-      {drawer && (
-        <RegistrationDrawer registrar={member} target={drawer} onClose={() => setDrawer(null)} />
-      )}
+      {drawer && <RegistrationDrawer registrar={member} target={drawer} onClose={closeDrawer} />}
       {cancelling && <CancelDialog item={cancelling} onClose={() => setCancelling(null)} />}
     </div>
   );

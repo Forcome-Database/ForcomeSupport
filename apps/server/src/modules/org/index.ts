@@ -8,6 +8,7 @@ export {
   type SessionMember,
   type StoreAccessTarget,
 } from './access';
+export { createAuditLogRoutes, type StoreNamesById } from './audit-log';
 export { createDevLoginRoutes, devLoginAvailable } from './dev-login';
 export { orgMembersFixtureStep } from './fixtures';
 export { createMember, listAftersalesOwners, memberNamesById, type NewMember } from './members';

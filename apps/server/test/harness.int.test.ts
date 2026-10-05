@@ -75,7 +75,7 @@ beforeAll(async () => {
         // 任务里的「当前时间」也来自手动时钟
         await transaction(runtime, (tx) =>
           recordAudit(tx, systemActor, {
-            action: 'example.notified',
+            action: 'aftersales.complete',
             objectType: 'aftersales',
             objectId: trackingNo,
           }),
@@ -165,7 +165,7 @@ describe('推进时钟', () => {
     await t.enqueue(checkDelivery, { trackingNo: '1Z-CLOCK' });
     await t.runJobs();
 
-    const [record] = await t.auditRecords({ action: 'example.notified', objectId: '1Z-CLOCK' });
+    const [record] = await t.auditRecords({ action: 'aftersales.complete', objectId: '1Z-CLOCK' });
     expect(record?.occurredAt).toEqual(new Date('2026-09-18T02:21:00Z'));
     const health = (await (await t.api.get('/api/health')).json()) as { time: string };
     expect(health.time).toBe('2026-09-18T02:21:00.000Z');

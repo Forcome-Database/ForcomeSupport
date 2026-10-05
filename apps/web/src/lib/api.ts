@@ -2,6 +2,8 @@ import {
   adminContactsSchema,
   aftersalesDetailSchema,
   apiErrorSchema,
+  auditLogOptionsSchema,
+  auditLogSchema,
   channelSettingsSchema,
   currentMemberSchema,
   devMembersResponseSchema,
@@ -19,6 +21,10 @@ import {
   ticketListSchema,
   type AdminContacts,
   type AftersalesDetail,
+  type AuditLog,
+  type AuditLogFilter,
+  type AuditLogOptions,
+  type AuditLogQuery,
   type CancelInput,
   type ChannelSettings,
   type CurrentMember,
@@ -123,6 +129,21 @@ async function send(path: string, init?: RequestInit): Promise<Response> {
   return response;
 }
 
+/**
+ * 下载服务端同步生成的文件（S11、K5）：返回文件、文件名（Content-Disposition 的 filename*）与行数。
+ * 失败时抛 ApiRequestError（同其他接口）
+ */
+async function download(path: string, fallbackName: string): Promise<ExportedFile> {
+  const response = await send(path, { headers: { accept: XLSX_TYPE } });
+  const disposition = response.headers.get('content-disposition') ?? '';
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+  return {
+    blob: await response.blob(),
+    fileName: encoded ? decodeURIComponent(encoded) : fallbackName,
+    rows: Number(response.headers.get(EXPORT_ROWS_HEADER) ?? 0),
+  };
+}
+
 async function call<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
   const response = await send(path, init);
   return schema.parse(await response.json());
@@ -194,18 +215,23 @@ export const api = {
    * 导出 P13 台账（S11、K5）：按当前筛选与字段权限在服务端生成 Excel；返回文件、文件名（Content-Disposition 的 filename*）
    * 与行数。失败时抛 ApiRequestError（同其他接口）
    */
-  exportLedger: async (query: LedgerQuery): Promise<ExportedFile> => {
-    const response = await send(`/api/aftersales/ledger/export${queryString(query)}`, {
-      headers: { accept: XLSX_TYPE },
-    });
-    const disposition = response.headers.get('content-disposition') ?? '';
-    const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
-    return {
-      blob: await response.blob(),
-      fileName: encoded ? decodeURIComponent(encoded) : 'ledger.xlsx',
-      rows: Number(response.headers.get(EXPORT_ROWS_HEADER) ?? 0),
-    };
-  },
+  exportLedger: (query: LedgerQuery): Promise<ExportedFile> =>
+    download(`/api/aftersales/ledger/export${queryString(query)}`, 'ledger.xlsx'),
+
+  /** P27 审计日志的一页（查看范围与财务字段由后端按角色过滤，PRD 10.2） */
+  auditLog: (query: AuditLogQuery): Promise<AuditLog> =>
+    call(
+      `/api/audit${queryString({ ...query, page: query.page === undefined ? undefined : String(query.page) })}`,
+      auditLogSchema,
+    ),
+
+  /** P27 操作人筛选的选项（看全部时为「系统」与全部成员，只看自己时只有本人） */
+  auditLogOptions: (): Promise<AuditLogOptions> =>
+    call('/api/audit/options', auditLogOptionsSchema),
+
+  /** 导出 P27（K5）：按当前筛选（不分页）在服务端生成 Excel，导出本身记审计 */
+  exportAuditLog: (filter: AuditLogFilter): Promise<ExportedFile> =>
+    download(`/api/audit/export${queryString(filter)}`, 'audit-log.xlsx'),
 
   /** 新建登记抽屉的选项：可选负责人、责任类型的默认比例、生产厂、配件与所属生产厂 */
   registrationOptions: (): Promise<RegistrationOptions> =>

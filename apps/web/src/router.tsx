@@ -19,8 +19,10 @@ import { pages, sectionPaths, type PageDefinition } from '@/lib/pages';
 import { applyDensity, currentMemberQuery, devMembersQuery } from '@/lib/session';
 import { LedgerPage } from '@/pages/aftersales/ledger-page';
 import { ledgerSearchSchema } from '@/pages/aftersales/ledger-search';
+import { AuditPage } from '@/pages/audit/audit-page';
+import { auditSearchSchema } from '@/pages/audit/audit-search';
 import { DevLoginPage } from '@/pages/dev-login';
-import { ChannelsPage } from '@/pages/settings/channels-page';
+import { ChannelsPage, channelsSearchSchema } from '@/pages/settings/channels-page';
 import { TeamPage } from '@/pages/settings/team-page';
 import { TicketsPage } from '@/pages/tickets/tickets-page';
 
@@ -28,7 +30,7 @@ import { TicketsPage } from '@/pages/tickets/tickets-page';
  * 路由（ADR 0007：TanStack Router，代码定义）。登录后的页面都挂在 app 布局下：
  * 没登录（含会话 7 天无操作过期）时，开启了开发登录就去开发登录页；钉钉扫码登录页（G11）随 05 号待办。
  * 「/」按角色进入默认首页（PRD 4.1）；各页面按能力把关，没有权限时在原地址显示 G2。
- * 第一期各页面的内容随各自的待办加进来（P05 17、P17 24、P20 06、P27 30），在那之前内容区为空；
+ * 第一期各页面的内容随各自的待办加进来（P05 17、P17 24、P20 06），在那之前内容区为空；P27 已有（30）；
  * P18 已有（07），P04 先是最简列表（08，完整版随 18），P13 先是最简列表与新建登记（19，完整版随 20–22）。
  */
 
@@ -143,6 +145,30 @@ const ledgerRoute = createRoute({
   ),
 });
 
+/** P18 渠道与店铺：地址栏可带要打开编辑抽屉的店铺（从 P27 点店铺进来） */
+const channelsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: pages.settingsChannels.path,
+  validateSearch: channelsSearchSchema,
+  component: () => (
+    <PageGate page={pages.settingsChannels}>
+      <ChannelsPage />
+    </PageGate>
+  ),
+});
+
+/** P27 审计日志：筛选条件在地址栏（PRD P27） */
+const auditRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: pages.audit.path,
+  validateSearch: auditSearchSchema,
+  component: () => (
+    <PageGate page={pages.audit}>
+      <AuditPage />
+    </PageGate>
+  ),
+});
+
 /** 「/aftersales」「/settings」：第一期售后只有 P13，设置先落到 P18（各自再按能力把关） */
 const aftersalesRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -168,9 +194,9 @@ const routeTree = rootRoute.addChildren([
     ledgerRoute,
     pageRoute(pages.reports),
     settingsRoute,
-    pageRoute(pages.settingsChannels, ChannelsPage),
+    channelsRoute,
     pageRoute(pages.settingsTeam, TeamPage),
-    pageRoute(pages.audit),
+    auditRoute,
   ]),
 ]);
 

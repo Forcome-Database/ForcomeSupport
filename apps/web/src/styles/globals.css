@@ -67,6 +67,7 @@
   --info: #0e7490;
   --info-soft: #e7f6f9;
   --info-line: #b9e3ec;
+  --info-banner: #f0f9fb; /* 信息横幅底色（ui.banner info；图标圆底同 --info-soft） */
 
   /* 渠道识别色 */
   --channel-amazon: #b45309;
@@ -165,6 +166,7 @@
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
   --color-info-line: var(--info-line);
+  --color-info-banner: var(--info-banner);
   --color-channel-amazon: var(--channel-amazon);
   --color-channel-amazon-soft: var(--channel-amazon-soft);
   --color-channel-amazon-line: var(--channel-amazon-line);

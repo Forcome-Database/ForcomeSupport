@@ -3,7 +3,17 @@
 // 其他模块只能经本文件使用 core；core 不依赖任何业务模块。
 export { AccessDeniedError } from './access-denied';
 export { FieldValidationError } from './field-validation';
-export { recordAudit, systemActor, type Actor, type AuditEntry } from './audit';
+export {
+  queryAuditLog,
+  recordAudit,
+  systemActor,
+  type Actor,
+  type AuditEntry,
+  type AuditLogConditions,
+  type AuditLogPage,
+  type AuditRecord,
+  type AuditVisibility,
+} from './audit';
 export { ManualClock, startingAt, systemClock, type Clock, type Duration } from './clock';
 export {
   amount,

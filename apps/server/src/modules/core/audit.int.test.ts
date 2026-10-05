@@ -32,21 +32,29 @@ const admin: Actor = {
 describe('审计写入', () => {
   it('成员操作记录操作人、角色、来源 IP、对象与完整前后值，时间取注入的时钟', async () => {
     t.clock.set('2026-09-11T01:52:00Z');
-    const before = { name: '赵倩', stores: ['Forcome Direct'], disabled: false };
-    const after = { name: '赵倩', stores: ['全部店铺'], disabled: false };
+    const before = {
+      name: 'forcome.mx',
+      platform: 'shopify' as const,
+      sites: ['MX' as const],
+      defaultSite: 'MX' as const,
+      mailboxes: ['support@forcome.mx'],
+      platformId: 'forcome-mx.myshopify.com',
+      adapterMode: 'fake' as const,
+    };
+    const after = { ...before, mailboxes: ['support@forcome.mx', 'hola@forcome.mx'] };
 
     await transaction(t.runtime, (tx) =>
       recordAudit(tx, admin, {
-        action: 'member.update_store_scope',
-        objectType: 'member',
-        objectId: 'member-zhaoqian',
-        objectLabel: '赵倩',
+        action: 'store.update',
+        objectType: 'store',
+        objectId: 'store-forcome-mx',
+        objectLabel: 'forcome.mx',
         before,
         after,
       }),
     );
 
-    const [record] = await findAuditRecords(t.runtime.db, { objectId: 'member-zhaoqian' });
+    const [record] = await findAuditRecords(t.runtime.db, { objectId: 'store-forcome-mx' });
     expect(record).toMatchObject({
       occurredAt: new Date('2026-09-11T01:52:00Z'),
       actorType: 'member',
@@ -54,9 +62,9 @@ describe('审计写入', () => {
       actorName: '刘洋',
       actorRoles: ['admin'],
       ip: '10.0.8.21',
-      action: 'member.update_store_scope',
-      objectType: 'member',
-      objectLabel: '赵倩',
+      action: 'store.update',
+      objectType: 'store',
+      objectLabel: 'forcome.mx',
       storeId: null,
       before,
       after,
@@ -68,15 +76,14 @@ describe('审计写入', () => {
     const storeId = '01920000-0000-7000-8000-0000000000aa';
     await transaction(t.runtime, (tx) =>
       recordAudit(tx, systemActor, {
-        action: 'channel.reconnect',
-        objectType: 'channel',
-        objectId: 'gmail:support@forcome.mx',
+        action: 'aftersales.complete',
+        objectType: 'aftersales',
+        objectId: 'aftersales-by-system',
         storeId,
-        after: { status: 'connected', backfilled: 3 },
       }),
     );
 
-    const [record] = await findAuditRecords(t.runtime.db, { objectId: 'gmail:support@forcome.mx' });
+    const [record] = await findAuditRecords(t.runtime.db, { objectId: 'aftersales-by-system' });
     expect(record).toMatchObject({
       occurredAt: new Date('2026-09-11T02:14:00Z'),
       actorType: 'system',
@@ -86,7 +93,7 @@ describe('审计写入', () => {
       ip: null,
       storeId,
       before: null,
-      after: { status: 'connected', backfilled: 3 },
+      after: null,
     });
   });
 
@@ -97,7 +104,6 @@ describe('审计写入', () => {
           action: 'store.create',
           objectType: 'store',
           objectId: 'store-rolled-back',
-          after: { name: 'Forcome Test' },
         });
         throw new Error('保存店铺失败');
       }),

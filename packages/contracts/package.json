@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@forcome/calendar": "workspace:*",
     "big.js": "^7.0.1",
     "zod": "^4.6.5"
   },

@@ -67,7 +67,7 @@ function changeStatus(
   runtime: Runtime,
   access: Access,
   found: AftersalesRow,
-  action: string,
+  action: 'aftersales.complete' | 'aftersales.undo_complete' | 'aftersales.cancel',
   values: (now: Date) => Partial<typeof aftersales.$inferInsert>,
 ): Promise<AftersalesRow> {
   return transaction(runtime, async (tx) => {

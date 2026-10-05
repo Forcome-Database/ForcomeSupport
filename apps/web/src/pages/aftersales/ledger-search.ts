@@ -1,4 +1,5 @@
 import {
+  aftersalesNumberSchema,
   aftersalesStatusSchema,
   handlingMethodSchema,
   responsibilitySchema,
@@ -9,7 +10,8 @@ import { z } from 'zod';
 
 /**
  * P13 地址栏里的筛选条件（TanStack Router 按它校验，ADR 0007）：筛选行的费用发生日起止、店铺、处理方式、责任、状态、负责人
- * （PRD P13「第一阶段」）；missing 是点页头完整率「筛出缺字段的 N 单」，只列当月缺字段的已完成单（只随店铺）。
+ * （PRD P13「第一阶段」）；missing 是点页头完整率「筛出缺字段的 N 单」，只列当月缺字段的已完成单（只随店铺）；
+ * open 是要打开编辑登记抽屉的售后单号（P27 点进详情）。
  * 写错的条件丢掉。费用发生日不在地址栏时是默认的本月（S13 补充小样），由接口按服务端时钟补上并在 range 里返回。
  */
 export const ledgerSearchSchema = z.object({
@@ -22,6 +24,8 @@ export const ledgerSearchSchema = z.object({
   owner: z.uuid().optional().catch(undefined),
   // 地址栏手写的 ?missing=1 会被路由当成数字 1（值按 JSON 解析），页面里跳转写的是字符串 "1"：两种都认
   missing: z.coerce.string().pipe(z.literal('1')).optional().catch(undefined),
+  /** 打开这张单的编辑登记抽屉（从 P27 审计日志点售后单号进来，PRD P27 v2.20）；不影响列表的筛选 */
+  open: aftersalesNumberSchema.optional().catch(undefined),
 });
 export type LedgerSearch = z.infer<typeof ledgerSearchSchema>;
 

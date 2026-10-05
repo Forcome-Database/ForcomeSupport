@@ -1,4 +1,19 @@
 import { z } from 'zod';
+import {
+  aftersalesOriginSchema,
+  aftersalesStatusSchema,
+  claimStatusSchema,
+  claimTargetSchema,
+  feeItems,
+  feesSchema,
+  handlingMethodSchema,
+  ratiosSchema,
+  responsibilitySchema,
+  shipperSchema,
+} from './aftersales';
+import { platformSchema, siteSchema } from './channel';
+import { financeField } from './finance';
+import { adapterModeSchema } from './integration';
 
 /**
  * 审计对象类型与中文名（PRD 11.1 AuditLog、P27 筛选「对象类型」）。
@@ -22,5 +37,192 @@ export const auditObjectTypeSchema = z.enum(
   Object.keys(auditObjectTypeLabels) as [AuditObjectType, ...AuditObjectType[]],
 );
 
+/** 第一期 P27「对象类型」筛选的选项（PRD P27「第一阶段」：审批单随第二阶段） */
+export const phase1AuditObjectTypes = [
+  'ticket',
+  'message',
+  'aftersales',
+  'store',
+  'channel',
+  'member',
+  'setting',
+  'export',
+  'login',
+] as const satisfies readonly AuditObjectType[];
+
 /** 系统操作在审计里的操作人（PRD 10.2：系统操作写「系统」） */
 export const SYSTEM_ACTOR_NAME = '系统';
+
+// ---------------------------------------------------------------- 前后值的结构（快照）
+
+/*
+ * 每种动作的前后值（完整快照）在这里声明结构：写审计时按它做类型检查（core 的 recordAudit），P27 显示时按它过滤财务字段
+ * （maskFinanceFields：财务字段换成「已隐藏」，结构里没声明的键不放行，K18），再按 audit-log.ts 的字段表写成中文。
+ * 新增一种审计动作：在 auditActions 登记（叫法、对象类型、快照），快照结构放这里，字段表放 audit-log.ts。
+ */
+
+/** 店铺（P18 抽屉的全部字段，K8） */
+export const storeAuditSnapshotSchema = z.object({
+  name: z.string(),
+  platform: platformSchema.nullable(),
+  sites: z.array(siteSchema),
+  defaultSite: siteSchema.nullable(),
+  mailboxes: z.array(z.string()),
+  platformId: z.string(),
+  adapterMode: adapterModeSchema,
+});
+
+/**
+ * 售后单（台账一张单的完整登记：抽屉能填的全部字段与系统定下的编号、状态、创建路径、登记人、完成与取消）。
+ * 费用、承担比例与取消时保留的费用项是财务字段（PRD 10.1「查看成本、承担比例与结算金额（含……审计前后值）」）
+ */
+export const aftersalesAuditSnapshotSchema = z.object({
+  number: z.string(),
+  status: aftersalesStatusSchema,
+  origin: aftersalesOriginSchema,
+  storeId: z.string(),
+  site: siteSchema.nullable(),
+  sourceTicket: z.string().nullable(),
+  orderNumber: z.string().nullable(),
+  customerName: z.string().nullable(),
+  registeredBy: z.string().nullable(),
+  ownerId: z.string().nullable(),
+  ownerName: z.string().nullable(),
+  feeDate: z.string().nullable(),
+  method: handlingMethodSchema.nullable(),
+  responsibility: responsibilitySchema.nullable(),
+  responsibilityReason: z.string().nullable(),
+  factory: z.string().nullable(),
+  part: z.object({ sku: z.string(), quantity: z.int().nullable() }).nullable(),
+  shipper: shipperSchema.nullable(),
+  carrier: z.string().nullable(),
+  shipDate: z.string().nullable(),
+  trackingNumber: z.string().nullable(),
+  claimTarget: claimTargetSchema.nullable(),
+  claimStatus: claimStatusSchema.nullable(),
+  fees: financeField(feesSchema),
+  ratios: financeField(ratiosSchema.nullable()),
+  completedAt: z.string().nullable(),
+  cancellation: z
+    .object({
+      reason: z.string().nullable(),
+      at: z.string().nullable(),
+      keptFees: financeField(z.array(z.enum(feeItems))),
+    })
+    .nullable(),
+});
+
+/** 台账导出（S11、K5）：文件名、这次的筛选条件（含按的费用发生日起止）、行数、是否含财务字段 */
+export const ledgerExportAuditSnapshotSchema = z.object({
+  fileName: z.string(),
+  filters: z.object({
+    store: z.string().optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    method: handlingMethodSchema.optional(),
+    responsibility: responsibilitySchema.optional(),
+    status: aftersalesStatusSchema.optional(),
+    owner: z.string().optional(),
+    missing: z.literal('1').optional(),
+  }),
+  rows: z.int(),
+  financeFields: z.boolean(),
+});
+
+/** 审计日志导出（P27「导出」，按当前筛选）：文件名、筛选条件、行数 */
+export const auditExportAuditSnapshotSchema = z.object({
+  fileName: z.string(),
+  filters: z.object({
+    period: z.string(),
+    from: z.string(),
+    to: z.string(),
+    actor: z.string().optional(),
+    type: auditObjectTypeSchema.optional(),
+    action: z.string().optional(),
+    q: z.string().optional(),
+  }),
+  rows: z.int(),
+});
+
+/** 登录方式：钉钉扫码（G11，随待办 05）、开发登录（只在非生产环境） */
+export const loginMethods = ['dingtalk', 'dev'] as const;
+export const loginMethodLabels: Record<(typeof loginMethods)[number], string> = {
+  dingtalk: '钉钉扫码',
+  dev: '开发登录',
+};
+export const loginAuditSnapshotSchema = z.object({ method: z.enum(loginMethods) });
+
+/** 越权访问（E-24）：原因、越权的店铺、请求 */
+export const accessDeniedAuditSnapshotSchema = z.object({
+  reason: z.literal('store_scope'),
+  storeIds: z.array(z.string()),
+  method: z.string(),
+  path: z.string(),
+});
+
+/** 没有前后值的动作（如退出登录） */
+export const emptyAuditSnapshotSchema = z.object({});
+
+export const auditSnapshotSchemas = {
+  store: storeAuditSnapshotSchema,
+  aftersales: aftersalesAuditSnapshotSchema,
+  ledgerExport: ledgerExportAuditSnapshotSchema,
+  auditExport: auditExportAuditSnapshotSchema,
+  login: loginAuditSnapshotSchema,
+  accessDenied: accessDeniedAuditSnapshotSchema,
+  empty: emptyAuditSnapshotSchema,
+} as const;
+export type AuditSnapshotKind = keyof typeof auditSnapshotSchemas;
+
+// ---------------------------------------------------------------- 动作
+
+interface AuditActionDefinition {
+  /** P27「动作」列与筛选的叫法 */
+  readonly label: string;
+  /** 动作作用的对象类型；越权访问可以是任何对象（null） */
+  readonly objectType: AuditObjectType | null;
+  readonly snapshot: AuditSnapshotKind;
+}
+
+/**
+ * 审计动作（`对象.动词`，ADR 0010）与叫法。写审计只能用这里登记的动作（core 的 recordAudit 按它检查类型），
+ * P27 的「动作」筛选也从这里来。叫法相同的动作在筛选里是同一项（如两种「导出 Excel」）。
+ */
+export const auditActions = {
+  'store.create': { label: '新增店铺', objectType: 'store', snapshot: 'store' },
+  'store.update': { label: '编辑店铺', objectType: 'store', snapshot: 'store' },
+  'aftersales.create': { label: '新建登记', objectType: 'aftersales', snapshot: 'aftersales' },
+  'aftersales.update': { label: '编辑登记', objectType: 'aftersales', snapshot: 'aftersales' },
+  'aftersales.backfill': { label: '补登', objectType: 'aftersales', snapshot: 'aftersales' },
+  'aftersales.change_rate': {
+    label: '修改汇率',
+    objectType: 'aftersales',
+    snapshot: 'aftersales',
+  },
+  'aftersales.complete': { label: '设为已完成', objectType: 'aftersales', snapshot: 'aftersales' },
+  'aftersales.undo_complete': {
+    label: '撤销设为已完成',
+    objectType: 'aftersales',
+    snapshot: 'aftersales',
+  },
+  'aftersales.cancel': { label: '取消', objectType: 'aftersales', snapshot: 'aftersales' },
+  'ledger.export': { label: '导出 Excel', objectType: 'export', snapshot: 'ledgerExport' },
+  'audit.export': { label: '导出 Excel', objectType: 'export', snapshot: 'auditExport' },
+  'access.denied': { label: '越权访问被拒', objectType: null, snapshot: 'accessDenied' },
+  'auth.login': { label: '登录', objectType: 'login', snapshot: 'login' },
+  'auth.logout': { label: '退出登录', objectType: 'login', snapshot: 'empty' },
+} as const satisfies Record<string, AuditActionDefinition>;
+
+export type AuditAction = keyof typeof auditActions;
+
+/** 某个动作的前后值（写审计时的输入形状） */
+export type AuditSnapshot<A extends AuditAction> = z.input<
+  (typeof auditSnapshotSchemas)[(typeof auditActions)[A]['snapshot']]
+>;
+
+export function isAuditAction(value: string): value is AuditAction {
+  return Object.hasOwn(auditActions, value);
+}
+
+/** 越权访问被拒（E-24）：P27 红色标出、可按动作筛选 */
+export const ACCESS_DENIED_ACTION = 'access.denied' satisfies AuditAction;

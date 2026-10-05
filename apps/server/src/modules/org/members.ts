@@ -68,11 +68,21 @@ export async function memberNamesById(
   return new Map(rows.map((row) => [row.id, row.name]));
 }
 
+/** 按角色（PRD 10.1 的顺序）再按姓名排序；没有角色的排最后 */
+function byRoleThenName(rows: MemberRow[]): MemberRow[] {
+  const rank = (row: MemberRow) =>
+    Math.min(...row.roles.map((role) => allRoles.indexOf(role)), allRoles.length);
+  return rows.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, 'zh-Hans-CN'));
+}
+
 /** 在职成员，按角色（PRD 10.1 的顺序）再按姓名排序 */
 export async function listActiveMembers(db: DbExecutor): Promise<MemberRow[]> {
-  const rows = await db.select().from(member).where(eq(member.status, 'active'));
-  const rank = (row: MemberRow) => Math.min(...row.roles.map((role) => allRoles.indexOf(role)));
-  return rows.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, 'zh-Hans-CN'));
+  return byRoleThenName(await db.select().from(member).where(eq(member.status, 'active')));
+}
+
+/** 全部成员（含已停用的：他们的操作记录仍在，P27 的操作人筛选要列出），排序同上 */
+export async function listMembers(db: DbExecutor): Promise<MemberRow[]> {
+  return byRoleThenName(await db.select().from(member));
 }
 
 /** 在职的管理员（G2、G12 写「请联系管理员刘洋」） */

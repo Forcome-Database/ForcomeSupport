@@ -59,6 +59,9 @@ export const CARD_LINES = {
   dingtalk: ['通讯录：成员与部门每小时同步', '工作通知推送；扫码登录'],
 } as const;
 
+/** 页头右上（原型 btn('查看审计日志', 'secondary', 'md', 'history')）：进入 P27，管理员另一个入口（PRD P27） */
+export const VIEW_AUDIT_LOG = '查看审计日志';
+
 /** 卡头：接模拟数据时的标签、最近同步时间、未连接时的副标题（K20 小样） */
 export const SIMULATED = '模拟数据';
 export const LAST_SYNC = (at: string) => `最近同步 ${at}`;
