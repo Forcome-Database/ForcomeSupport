@@ -137,6 +137,31 @@ async function changeViaApi(
   );
 }
 
+/** 等 worker 的汇率同步写完（刚起服务时可能还在跑），非美元金额才能折算 */
+async function waitForRates(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async (day) => {
+          const res = await fetch(`/api/aftersales/exchange-rates?date=${day}`);
+          const body = (await res.json()) as { rates?: { MXN: unknown } };
+          return body.rates?.MXN ?? null;
+        }, beijingToday()),
+      { timeout: 30_000 },
+    )
+    .not.toBeNull();
+}
+
+/** 「更多」里这一项禁用，悬停写原因；看完把鼠标移开，下一项的说明单独出现 */
+async function expectBlocked(page: Page, name: string, reason: string): Promise<void> {
+  const item = page.getByRole('menuitem', { name });
+  await expect(item).toHaveAttribute('aria-disabled', 'true');
+  await item.hover();
+  await expect(page.getByRole('tooltip', { name: reason })).toBeVisible();
+  await page.mouse.move(0, 0);
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
+}
+
 async function openLedger(page: Page): Promise<void> {
   await page.goto('/aftersales/ledger');
   await expect(page.getByTestId('ledger-row').first()).toBeVisible();
@@ -179,6 +204,31 @@ test('设为已完成：不要求齐全，标黄「待回填」与「缺 N 项�
   await expect(row(page, number).getByText(/^缺 \d+ 项$/)).toHaveCount(0);
 });
 
+test('设为已完成且适用字段齐全：撤销浮层只有标题，没有「缺 N 项」那一行；台账不标缺（S15 ①、补充小样）', async ({
+  page,
+}) => {
+  const stamp = Date.now();
+  await loginAs(page, '王磊');
+  const number = await register(page, {
+    customer: `E2E 齐全 ${stamp}`,
+    shipDate: beijingToday(),
+    trackingNumber: `1Z${stamp}`,
+  });
+  await openLedger(page);
+
+  const mine = row(page, number);
+  await mine.getByRole('button', { name: `${number} 的更多操作` }).click();
+  await page.getByRole('menuitem', { name: '设为已完成' }).click();
+  const toast = page.locator('[data-sonner-toast]').filter({ hasText: `${number} 已完成` });
+  await expect(toast).toBeVisible();
+  await expect(toast.getByRole('button', { name: '撤销' })).toBeVisible();
+  await expect(toast).not.toContainText('缺');
+  await expect(toast).not.toContainText('已标黄待回填');
+  await expect(mine).toContainText('已完成');
+  await expect(mine.getByText(/^缺 \d+ 项$/)).toHaveCount(0);
+  await expect(mine.getByText('待回填')).toHaveCount(0);
+});
+
 test('行内补登：售后负责人点「补登」填快递单号，为空时「保存」禁用，保存后「缺 N 项」消失（S15 ③、AC-P1-19）', async ({
   page,
 }) => {
@@ -205,7 +255,7 @@ test('行内补登：售后负责人点「补登」填快递单号，为空时�
   await expect(mine.getByText(/^缺 \d+ 项$/)).toHaveCount(0);
 });
 
-test('取消售后单：二次确认，原因必填，勾选保留的已产生费用；取消后只读（S15 ②、AC-AS-16）', async ({
+test('取消售后单：二次确认，原因必填，勾选保留的已产生费用；取消后只读，「更多」悬停写「这张单已取消」（S15 ②、AC-AS-16）', async ({
   page,
 }) => {
   const customer = `E2E 取消 ${Date.now()}`;
@@ -237,14 +287,12 @@ test('取消售后单：二次确认，原因必填，勾选保留的已产生�
   await expect(page.getByText(`已取消售后单 ${number}`)).toBeVisible();
   await expect(row(page, number)).toContainText('已取消');
 
-  // 已取消为终态：「更多」两项都禁用；抽屉只读，只有「关闭」
+  // 已取消为终态：「更多」两项都禁用，悬停写「这张单已取消」；抽屉只读，只有「关闭」
   await row(page, number)
     .getByRole('button', { name: `${number} 的更多操作` })
     .click();
-  await expect(page.getByRole('menuitem', { name: '设为已完成' })).toHaveAttribute(
-    'aria-disabled',
-    'true',
-  );
+  await expectBlocked(page, '设为已完成', '这张单已取消');
+  await expectBlocked(page, '取消售后单', '这张单已取消');
   await page.keyboard.press('Escape');
   await row(page, number)
     .getByRole('button', { name: `打开 ${number} 的登记` })
@@ -365,18 +413,7 @@ test('修改汇率：点开后金额框下变成「1 USD = [输入框] MXN」，
 }) => {
   const customer = `E2E 改汇率 ${Date.now()}`;
   await loginAs(page, '王磊');
-  // 等 worker 的汇率同步写完（刚起服务时可能还在跑）
-  await expect
-    .poll(
-      () =>
-        page.evaluate(async (day) => {
-          const res = await fetch(`/api/aftersales/exchange-rates?date=${day}`);
-          const body = (await res.json()) as { rates?: { MXN: unknown } };
-          return body.rates?.MXN ?? null;
-        }, beijingToday()),
-      { timeout: 30_000 },
-    )
-    .not.toBeNull();
+  await waitForRates(page);
   const number = await register(page, {
     customer,
     method: 'refund_or_compensation',
@@ -396,7 +433,16 @@ test('修改汇率：点开后金额框下变成「1 USD = [输入框] MXN」，
   await drawer(page).getByRole('button', { name: '修改汇率' }).click();
   const rate = drawer(page).getByRole('textbox', { name: '额外赔偿的汇率' });
   await expect(rate).toHaveValue('18.00');
+  // 汇率填错（0、格式不对）：保存时报在这一项的汇率下方并定位过去，不保存；改了这一项，报错撤掉
+  const rateError = drawer(page).getByText('汇率须大于 0，最多 6 位整数与 6 位小数');
+  for (const wrong of ['0', '.']) {
+    await rate.fill(wrong);
+    await expect(rateError).toHaveCount(0);
+    await drawer(page).getByRole('button', { name: '保存修改' }).click();
+    await expect(rateError).toBeInViewport();
+  }
   await rate.fill('17.5');
+  await expect(rateError).toHaveCount(0);
   await expect(drawer(page).getByText('费用合计 $60.80')).toBeVisible();
   await drawer(page).getByRole('button', { name: '保存修改' }).click();
   await expect(page.getByText('登记已保存')).toBeVisible();
@@ -406,6 +452,30 @@ test('修改汇率：点开后金额框下变成「1 USD = [输入框] MXN」，
       '汇率为手工修改：1 USD = 17.50 MXN（售后负责人修改，已记入审计日志）',
     ),
   ).toBeVisible();
+});
+
+test('客服主管编辑自己登记、带非美元费用的进行中单：「修改汇率」禁用，悬停写原因（S14 补充小样之三、PRD 10.1）', async ({
+  page,
+}) => {
+  await loginAs(page, '周敏');
+  await waitForRates(page);
+  const number = await register(page, {
+    customer: `E2E 主管汇率 ${Date.now()}`,
+    method: 'refund_or_compensation',
+    compensation: { amount: '889.00', currency: 'MXN' },
+  });
+  await openLedger(page);
+
+  await row(page, number)
+    .getByRole('button', { name: `打开 ${number} 的登记` })
+    .click();
+  // 自己登记的进行中单可以编辑，但只有售后负责人能改汇率
+  await expect(drawer(page).getByRole('button', { name: '保存修改' })).toBeVisible();
+  await expect(drawer(page).getByRole('button', { name: '修改汇率' })).toHaveCount(0);
+  const link = drawer(page).getByText('修改汇率', { exact: true });
+  await expect(link).toHaveAttribute('aria-disabled', 'true');
+  await link.hover();
+  await expect(page.getByRole('tooltip', { name: '只有售后负责人可以修改汇率' })).toBeVisible();
 });
 
 test('有人先保存了：保存时顶部给 G7 横幅，「查看最新」换成最新内容（G7）', async ({ page }) => {
@@ -440,7 +510,7 @@ test('有人先保存了：保存时顶部给 G7 横幅，「查看最新」换�
   );
 });
 
-test('客服主管：已完成的单没有补登入口，抽屉只读；别人登记的进行中单不能设为已完成（悬停写原因）（AC-P1-19、S15 补充小样）', async ({
+test('客服主管：已完成的单没有补登入口，抽屉只读，「更多」两项禁用并写原因；别人登记的进行中单不能设为已完成（悬停写原因）（AC-P1-19、S15 补充小样）', async ({
   page,
 }) => {
   const customer = `E2E 主管 ${Date.now()}`;
@@ -460,13 +530,18 @@ test('客服主管：已完成的单没有补登入口，抽屉只读；别人�
   await expect(drawer(page).getByRole('button', { name: '保存修改' })).toHaveCount(0);
   await closeButton(page).click();
 
+  // 已完成的单：「更多」两项都禁用，悬停各写原因
+  await row(page, done)
+    .getByRole('button', { name: `${done} 的更多操作` })
+    .click();
+  await expectBlocked(page, '设为已完成', '这张单已完成');
+  await expectBlocked(page, '取消售后单', '已完成的单不能取消');
+  await page.keyboard.press('Escape');
+
   await row(page, open)
     .getByRole('button', { name: `${open} 的更多操作` })
     .click();
-  const item = page.getByRole('menuitem', { name: '设为已完成' });
-  await expect(item).toHaveAttribute('aria-disabled', 'true');
-  await item.hover();
-  await expect(page.getByText('只有登记人或负责人可以设为已完成').first()).toBeVisible();
+  await expectBlocked(page, '设为已完成', '只有登记人或负责人可以设为已完成');
   // 进行中的单客服主管可以取消
   await expect(page.getByRole('menuitem', { name: '取消售后单' })).not.toHaveAttribute(
     'aria-disabled',
