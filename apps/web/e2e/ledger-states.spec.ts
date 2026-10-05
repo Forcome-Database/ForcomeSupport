@@ -32,6 +32,8 @@ interface Registration {
   readonly shipDate?: string | null;
   readonly trackingNumber?: string;
   readonly compensation?: { amount: string; currency: 'USD' | 'MXN' };
+  /** 还没登记的费用项（进行中可后填） */
+  readonly unregistered?: readonly ('productCost' | 'freight' | 'compensation' | 'otherCost')[];
 }
 
 /** 经接口登记一张单（登记人是当前登录的人，负责人王磊），返回售后单号 */
@@ -54,6 +56,9 @@ async function register(page: Page, input: Registration): Promise<string> {
       const owner = options.owners.find((o) => o.name === '王磊');
       const refund = input.method === 'refund_or_compensation';
       const fee = (amount: string) => ({ amount, currency: 'USD' });
+      const unregistered = (key: string) => input.unregistered?.includes(key as never) ?? false;
+      const feeOf = (key: string, registered: { amount: string; currency: string }) =>
+        unregistered(key) ? { amount: null, currency: 'USD' } : registered;
       const body = {
         method: input.method ?? 'send_parts',
         storeId: store?.id,
@@ -80,10 +85,10 @@ async function register(page: Page, input: Registration): Promise<string> {
         shipDate: input.shipDate === undefined ? null : input.shipDate,
         trackingNumber: input.trackingNumber ?? '',
         fees: {
-          productCost: fee('3.20'),
-          freight: fee('6.80'),
-          compensation: input.compensation ?? fee('0.00'),
-          otherCost: fee('0.00'),
+          productCost: feeOf('productCost', fee('3.20')),
+          freight: feeOf('freight', fee('6.80')),
+          compensation: feeOf('compensation', input.compensation ?? fee('0.00')),
+          otherCost: feeOf('otherCost', fee('0.00')),
         },
       };
       const created = await json(
@@ -110,6 +115,26 @@ async function completeViaApi(page: Page, number: string): Promise<void> {
     });
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
   }, number);
+}
+
+/** 经接口改登记（编辑或补登），让页面上这一行的版本过期——模拟别人刚保存过 */
+async function changeViaApi(
+  page: Page,
+  number: string,
+  changes: Record<string, unknown>,
+): Promise<void> {
+  await page.evaluate(
+    async ({ n, changes }) => {
+      const detail = (await (await fetch(`/api/aftersales/${n}`)).json()) as { version: number };
+      const res = await fetch(`/api/aftersales/${n}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ version: detail.version, changes }),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    },
+    { n: number, changes },
+  );
 }
 
 async function openLedger(page: Page): Promise<void> {
@@ -169,6 +194,9 @@ test('行内补登：售后负责人点「补登」填快递单号，为空时�
   const input = page.getByRole('textbox', { name: `${number} 的快递单号` });
   await expect(input).toBeFocused();
   await expect(mine.getByRole('button', { name: '保存' })).toBeDisabled();
+  // 禁用的按钮收不到悬停，悬停落在外面一层，说明为什么不能点
+  await mine.getByRole('button', { name: '保存' }).hover({ force: true });
+  await expect(page.getByRole('tooltip', { name: '先填写快递单号' })).toBeVisible();
   await input.fill('1Z4R28830358229088');
   await mine.getByRole('button', { name: '保存' }).click();
   await expect(page.getByText('已补登 · 已记入审计日志')).toBeVisible();
@@ -223,6 +251,61 @@ test('取消售后单：二次确认，原因必填，勾选保留的已产生�
     .click();
   await expect(closeButton(page)).toBeVisible();
   await expect(drawer(page).getByRole('button', { name: '保存修改' })).toHaveCount(0);
+});
+
+test('取消弹窗只列已登记的费用项，四项都没登记时没有费用框；别人刚改过时设为已完成与撤销失败都说明原因（S15 补充小样）', async ({
+  page,
+}) => {
+  const stamp = Date.now();
+  await loginAs(page, '王磊');
+  const partial = await register(page, {
+    customer: `E2E 部分费用 ${stamp}`,
+    unregistered: ['productCost', 'freight'],
+  });
+  const none = await register(page, {
+    customer: `E2E 没有费用 ${stamp}`,
+    unregistered: ['productCost', 'freight', 'compensation', 'otherCost'],
+  });
+  await openLedger(page);
+  const dialog = page.getByRole('alertdialog');
+  const openMenu = (number: string) =>
+    row(page, number)
+      .getByRole('button', { name: `${number} 的更多操作` })
+      .click();
+
+  // 产品成本、运费还没登记：只列额外赔偿与其他
+  await openMenu(partial);
+  await page.getByRole('menuitem', { name: '取消售后单' }).click();
+  await expect(dialog.getByRole('checkbox')).toHaveCount(2);
+  await expect(dialog.getByRole('checkbox', { name: '保留额外赔偿' })).toBeChecked();
+  await expect(dialog.getByRole('checkbox', { name: '保留其他' })).toBeChecked();
+  await expect(dialog.getByText(/保留合计/)).toBeVisible();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+
+  // 四项都没登记：没有费用框与「保留合计」
+  await openMenu(none);
+  await page.getByRole('menuitem', { name: '取消售后单' }).click();
+  await expect(dialog.getByText(`取消 ${none}？`)).toBeVisible();
+  await expect(dialog.getByRole('checkbox')).toHaveCount(0);
+  await expect(dialog.getByText(/保留合计/)).toHaveCount(0);
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+
+  // 设为已完成前别人刚保存过（G7）：浮层说明已刷新，这张单保持进行中
+  await changeViaApi(page, partial, { orderNumber: '#1064' });
+  await openMenu(partial);
+  await page.getByRole('menuitem', { name: '设为已完成' }).click();
+  await expect(page.getByText('设为已完成失败：数据已被他人修改')).toBeVisible();
+  await expect(page.getByText('已刷新为最新内容，请核对后再操作。')).toBeVisible();
+  await expect(row(page, partial)).toContainText('进行中');
+
+  // 设为已完成后、撤销前别人补登了：撤销失败写原因，这张单保持已完成
+  await openMenu(partial);
+  await page.getByRole('menuitem', { name: '设为已完成' }).click();
+  await expect(page.getByText(`${partial} 已完成`)).toBeVisible();
+  await changeViaApi(page, partial, { trackingNumber: '1Z4R28830358229099' });
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.getByText('撤销失败：数据已被他人修改')).toBeVisible();
+  await expect(row(page, partial)).toContainText('已完成');
 });
 
 test('编辑登记：登记人修改进行中的单（寄出后补寄出日期与快递单号），保存后台账更新；有未保存的修改时关闭先确认（S14、G8）', async ({
