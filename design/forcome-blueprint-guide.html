@@ -123,7 +123,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tbody>
 <tr>
 <td>版本</td>
-<td>v2.14 定稿评审稿 · 2026-10-05</td>
+<td>v2.15 定稿评审稿 · 2026-10-05</td>
 </tr>
 <tr>
 <td>状态</td>
@@ -257,6 +257,11 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>10-05</td>
 <td>第一期实现回写（待办 08，用户确认）：R-TK-07「最早到达的一封」明确为最早收到（同步入库）的一封；已归并后才收到的副本即使到达时间更早，也只记「同时发送到」，不改工单的店铺</td>
 </tr>
+<tr>
+<td><strong>v2.15</strong></td>
+<td>10-05</td>
+<td>第一期实现回写（待办 10，协调者决定的字面澄清，不改业务含义）：R-ST-02、5.1、AC-TK-14 里「亚马逊按发件域 amazon.com / .ca / .com.mx 识别站点」改准为按买家消息中转域 marketplace.amazon.com / .ca / .com.mx 识别站点（买家来信实际从中转域发出）；从平台域 amazon.com / .ca / .com.mx 直发的是平台通知，按发件人规则归档、不建工单（1.4「来源」）</td>
+</tr>
 </tbody>
 </table></div>
 <h2 id="s-0">0 本版关键调整</h2>
@@ -377,7 +382,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <td>D-18</td>
 <td>站点改为美国、加拿大、墨西哥；首批回复语言英语、西班牙语</td>
 <td>客户确认（Q-16）：业务重心在北美三国</td>
-<td>1.1、R-ST-02 发件域（amazon.com / .ca / .com.mx）、R-LG-02、R-CK 语言一致、知识库模板语言；示例数据与原型的德国、英国站点整体换成加拿大、墨西哥，forcome.eu 改为 forcome.mx，德语示例改为西班牙语，欧元金额改为比索</td>
+<td>1.1、R-ST-02 买家消息中转域（marketplace.amazon.com / .ca / .com.mx；v2.15 由「发件域 amazon.com / .ca / .com.mx」改准）、R-LG-02、R-CK 语言一致、知识库模板语言；示例数据与原型的德国、英国站点整体换成加拿大、墨西哥，forcome.eu 改为 forcome.mx，德语示例改为西班牙语，欧元金额改为比索</td>
 </tr>
 <tr>
 <td>D-19</td>
@@ -1663,7 +1668,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 <tr>
 <td>① 接收与关联</td>
 <td>亚马逊买家消息（亚马逊邮件中转到店铺绑定邮箱）、Shopify 与直邮邮件，均经 Gmail API 收取</td>
-<td>去重（R-TK-07）；识别店铺（收件邮箱；亚马逊另按发件域 amazon.com / .ca / .com.mx 识别站点）；识别来源（客户、平台通知、已登记生产厂、其他供应商）；在该店铺内关联订单（平台订单镜像，D-21）与客户；按 R-TK-01 归并到工单</td>
+<td>去重（R-TK-07）；识别店铺（收件邮箱；亚马逊另按买家消息中转域 marketplace.amazon.com / .ca / .com.mx 识别站点；从平台域 amazon.com / .ca / .com.mx 直发的是平台通知，按发件人规则归档、不建工单）；识别来源（客户、平台通知、已登记生产厂、其他供应商）；在该店铺内关联订单（平台订单镜像，D-21）与客户；按 R-TK-01 归并到工单</td>
 <td>工单与消息；SLA 开始计时</td>
 <td>店铺识别不出 → 进「未归属店铺」队列（E-13）；订单关联不上 → 继续处理，草稿里一次问全订单信息</td>
 </tr>
@@ -3047,7 +3052,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>R-ST-02</td>
-<td>进线识别：亚马逊按买家消息的收件邮箱识别店铺（每个店铺在卖家后台绑定一个邮箱）、按发件域（amazon.com / .ca / .com.mx）识别站点；Shopify 与直邮按客服邮箱。识别不出进「未归属店铺」队列，由客服主管指定；系统按收件地址（前缀、域名）与买家历史订单 ✦ 推荐店铺，写明依据与生成时间，主管确认后生效（I14；第一阶段没有推荐，I17）。管理员登记新店铺或为现有店铺增加进线邮箱（含别名）后，队列中收件地址与之匹配的来信自动归位并通知客服主管（D-24）。未归属来信对客服主管可见、不受店铺数据范围限制（来信尚无店铺），指定时只能选其授权店铺。</td>
+<td>进线识别：亚马逊按买家消息的收件邮箱识别店铺（每个店铺在卖家后台绑定一个邮箱）、按买家消息中转域（marketplace.amazon.com / .ca / .com.mx）识别站点（从平台域 amazon.com / .ca / .com.mx 直发的是平台通知，按发件人规则归档、不建工单，见 1.4「来源」）；Shopify 与直邮按客服邮箱。识别不出进「未归属店铺」队列，由客服主管指定；系统按收件地址（前缀、域名）与买家历史订单 ✦ 推荐店铺，写明依据与生成时间，主管确认后生效（I14；第一阶段没有推荐，I17）。管理员登记新店铺或为现有店铺增加进线邮箱（含别名）后，队列中收件地址与之匹配的来信自动归位并通知客服主管（D-24）。未归属来信对客服主管可见、不受店铺数据范围限制（来信尚无店铺），指定时只能选其授权店铺。</td>
 </tr>
 <tr>
 <td>R-ST-03</td>
@@ -5514,7 +5519,7 @@ figure.flow figcaption { font-size: 12px; font-weight: 700; letter-spacing: 0.04
 </tr>
 <tr>
 <td>AC-TK-14</td>
-<td>amz-direct@forcome.com 收到亚马逊中转的买家来信（发件域 amazon.com.mx）</td>
+<td>amz-direct@forcome.com 收到亚马逊中转的买家来信（买家消息中转域 marketplace.amazon.com.mx）</td>
 <td>系统处理</td>
 <td>归属 Forcome Direct、站点 MX，建工单并开始 SLA 计时</td>
 </tr>
