@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { EmptyState } from '@/components/empty-state';
 import { LoadError } from '@/components/load-error';
+import { PageHead } from '@/components/page-head';
 import {
   TicketChannelStore,
   TicketSourceLabel,
@@ -29,15 +30,6 @@ import { A11Y, COLUMNS, EMPTY_TITLE, EMPTY_VALUE, PAGE_DESCRIPTION, PAGE_TITLE }
  */
 
 const LOADING_ROWS = 8;
-
-function TicketsHead() {
-  return (
-    <div className="flex shrink-0 flex-col gap-1 px-6 pt-4 pb-0.5">
-      <h1 className="text-20 font-bold tracking-[-0.015em] text-foreground">{PAGE_TITLE}</h1>
-      <p className="text-13 text-muted-foreground">{PAGE_DESCRIPTION}</p>
-    </div>
-  );
-}
 
 function TicketRow({ ticket, now }: { ticket: TicketListItem; now: Date }) {
   return (
@@ -126,7 +118,7 @@ export function TicketsPage() {
   const tickets = useQuery(ticketListQuery);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <TicketsHead />
+      <PageHead title={PAGE_TITLE} description={PAGE_DESCRIPTION} />
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pt-3.5 pb-3">
         {tickets.isError ? (
           <LoadError onRetry={() => void tickets.refetch()} />

@@ -1,8 +1,14 @@
 import {
+  factoryRatiosOf,
   feeItemGroup,
+  feeItemLabels,
   feeItems,
+  formatMoney,
+  isPercent,
+  isValidAmount,
   ratioGroups,
-  registrationFieldLabels,
+  ratioPairsOf,
+  registrationFields,
   type ClaimStatus,
   type ClaimTarget,
   type Currency,
@@ -10,6 +16,8 @@ import {
   type FieldErrors,
   type HandlingMethod,
   type RatioGroup,
+  type RatiosInput,
+  type RegistrationField,
   type RegistrationInput,
   type Responsibility,
   type Shipper,
@@ -93,12 +101,17 @@ export function emptyRegistrationForm(today: string): RegistrationFormValues {
 const orNull = <T extends string>(value: T | ''): T | null => (value === '' ? null : value);
 const numberOrNull = (text: string): number | null => (text.trim() === '' ? null : Number(text));
 
+/** 三组比例的输入框文字 → 接口的比例输入（没填为 null） */
+function ratiosInputOf(ratios: Readonly<Record<RatioGroup, RatioSideForm>>): RatiosInput {
+  const side = (group: RatioGroup) => ({
+    fsh: numberOrNull(ratios[group].fsh),
+    factory: numberOrNull(ratios[group].factory),
+  });
+  return { product: side('product'), freight: side('freight'), other: side('other') };
+}
+
 /** 表单值 → 接口输入（不适用的字段由接口按 R-AS-08 清空，这里原样交上去） */
 export function registrationInputOf(values: RegistrationFormValues): RegistrationInput {
-  const side = (group: RatioGroup) => ({
-    fsh: numberOrNull(values.ratios[group].fsh),
-    factory: numberOrNull(values.ratios[group].factory),
-  });
   const fee = (item: FeeItem) => ({
     amount: values.fees[item].amount.trim() === '' ? null : values.fees[item].amount.trim(),
     currency: values.fees[item].currency,
@@ -115,7 +128,7 @@ export function registrationInputOf(values: RegistrationFormValues): Registratio
     responsibility: orNull(values.responsibility),
     responsibilityReason: values.responsibilityReason,
     factory: orNull(values.factory),
-    ratios: { product: side('product'), freight: side('freight'), other: side('other') },
+    ratios: ratiosInputOf(values.ratios),
     claimTarget: orNull(values.claimTarget),
     claimStatus: orNull(values.claimStatus),
     partSku: orNull(values.partSku),
@@ -163,67 +176,46 @@ export function withRatioSide(
   const text = percentText(raw);
   const other = changed === 'fsh' ? 'factory' : 'fsh';
   const value = Number(text);
-  const valid = text !== '' && Number.isInteger(value) && value >= 0 && value <= 100;
+  const valid = text !== '' && isPercent(value);
   const next: RatioSideForm = { ...side, [changed]: text };
   next[other] = valid ? String(100 - value) : '';
   return next;
 }
 
-/** 责任类型的默认比例（工厂一侧）写成两侧 */
+/** 责任类型的默认比例（工厂一侧）写成两侧的输入框文字 */
 export function ratioFormOf(
   factory: Readonly<Record<RatioGroup, number>>,
 ): Record<RatioGroup, RatioSideForm> {
-  const side = (value: number): RatioSideForm => ({
-    fsh: String(100 - value),
-    factory: String(value),
+  const pairs = ratioPairsOf(factory);
+  const side = (group: RatioGroup): RatioSideForm => ({
+    fsh: String(pairs[group].fsh),
+    factory: String(pairs[group].factory),
   });
-  return {
-    product: side(factory.product),
-    freight: side(factory.freight),
-    other: side(factory.other),
-  };
+  return { product: side('product'), freight: side('freight'), other: side('other') };
 }
 
-/** 各组的工厂比例：填对的组为数字，没填或填错为 null（判断生产厂是否适用、算两方金额用） */
+/** 各组的工厂比例：填对的组为数字，没填或填错为 null（判断生产厂是否适用、算两方金额用；同 contracts 的 factoryRatiosOf） */
 export function factoryPercents(
   ratios: Readonly<Record<RatioGroup, RatioSideForm>>,
 ): Record<RatioGroup, number | null> {
-  const out = {} as Record<RatioGroup, number | null>;
-  for (const group of ratioGroups) {
-    const { fsh, factory } = ratios[group];
-    const valid = (text: string) =>
-      text !== '' && Number.isInteger(Number(text)) && Number(text) >= 0 && Number(text) <= 100;
-    out[group] = valid(factory) ? Number(factory) : valid(fsh) ? 100 - Number(fsh) : null;
+  return factoryRatiosOf(ratiosInputOf(ratios));
+}
+
+/** R-AS-08 的一个字段在表单里对应的输入（来源工单跟在客户后面；比例每组两侧；配件 × 数量是两个输入；费用写在金额框） */
+function formPathsOf(field: RegistrationField): RegistrationFormPath[] {
+  if (field === 'customerName') return ['customerName', 'sourceTicket'];
+  if (field === 'ratios') {
+    return ratioGroups.flatMap(
+      (group) => [`ratios.${group}.fsh`, `ratios.${group}.factory`] as RegistrationFormPath[],
+    );
   }
-  return out;
+  if (field === 'part') return ['partSku', 'partQuantity'];
+  if (field.startsWith('fees.')) return [`${field}.amount` as RegistrationFormPath];
+  return [field];
 }
 
 /** 表单里自上而下的字段（S14 抽屉的顺序）：保存后定位到最靠上的错误、横幅写第一个错误都按它 */
-export const FORM_ORDER: readonly RegistrationFormPath[] = [
-  'method',
-  'storeId',
-  'site',
-  'orderNumber',
-  'customerName',
-  'sourceTicket',
-  'feeDate',
-  'ownerId',
-  'responsibility',
-  'factory',
-  'claimTarget',
-  'claimStatus',
-  'responsibilityReason',
-  ...ratioGroups.flatMap(
-    (group) => [`ratios.${group}.fsh`, `ratios.${group}.factory`] as RegistrationFormPath[],
-  ),
-  'partSku',
-  'partQuantity',
-  'shipper',
-  'carrier',
-  'shipDate',
-  'trackingNumber',
-  ...feeItems.map((item) => `fees.${item}.amount` as RegistrationFormPath),
-];
+export const FORM_ORDER: readonly RegistrationFormPath[] = registrationFields.flatMap(formPathsOf);
 
 export interface FormError {
   readonly field: RegistrationFormPath;
@@ -249,29 +241,34 @@ export function formErrorsOf(fields: FieldErrors): FormError[] {
   return errors.sort((a, b) => FORM_ORDER.indexOf(a.field) - FORM_ORDER.indexOf(b.field));
 }
 
-/** 字段的叫法（错误横幅「已滚动到第一个错误「…」」） */
+/** 字段的叫法（错误横幅「已滚动到第一个错误「…」」）：与抽屉上的字段名一致 */
 export function fieldLabel(field: RegistrationFormPath): string {
-  if (field.startsWith('ratios.')) return registrationFieldLabels.ratios;
+  if (field === 'method') return DRAWER.sections.method;
+  if (field.startsWith('ratios.')) return DRAWER.labels.ratios;
   const fee = /^fees\.(\w+)\.amount$/.exec(field);
-  if (fee) return registrationFieldLabels[`fees.${fee[1]}` as `fees.${FeeItem}`];
+  if (fee) return feeItemLabels[fee[1] as FeeItem];
   return DRAWER.labels[field as keyof typeof DRAWER.labels];
 }
 
 // ---------------------------------------------------------------- 比例表与费用合计
 
-const CENTS = /^(\d+)(?:\.(\d{1,2}))?$/;
-
+/** 金额文字 → 分；没填为 0，不是合法金额（contracts 的 isValidAmount）为 null */
 function centsOf(amount: string): number | null {
   const text = amount.trim();
   if (text === '') return 0;
-  const match = CENTS.exec(text);
-  if (!match) return null;
-  return Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0'));
+  if (!isValidAmount(text)) return null;
+  const [whole = '0', fraction = ''] = text.split('.');
+  return Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
 }
 
 /** 分 → 金额字符串（两位小数） */
 export function amountOfCents(cents: number): string {
   return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
+}
+
+/** 分 → 美元写法（「$10.00」）：比例表与费用合计用 */
+export function formatUsdCents(cents: number): string {
+  return formatMoney(amountOfCents(cents), 'USD');
 }
 
 /**

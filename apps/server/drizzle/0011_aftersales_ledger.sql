@@ -45,7 +45,11 @@ CREATE TABLE "aftersales"."aftersales" (
 	CONSTRAINT "aftersales_product_factory_pct_check" CHECK ("aftersales"."aftersales"."product_factory_pct" BETWEEN 0 AND 100),
 	CONSTRAINT "aftersales_freight_factory_pct_check" CHECK ("aftersales"."aftersales"."freight_factory_pct" BETWEEN 0 AND 100),
 	CONSTRAINT "aftersales_other_factory_pct_check" CHECK ("aftersales"."aftersales"."other_factory_pct" BETWEEN 0 AND 100),
-	CONSTRAINT "aftersales_part_quantity_check" CHECK ("aftersales"."aftersales"."part_quantity" BETWEEN 1 AND 10)
+	CONSTRAINT "aftersales_part_quantity_check" CHECK ("aftersales"."aftersales"."part_quantity" BETWEEN 1 AND 10),
+	CONSTRAINT "aftersales_product_cost_currency_check" CHECK (("aftersales"."aftersales"."product_cost" IS NULL) = ("aftersales"."aftersales"."product_cost_currency" IS NULL)),
+	CONSTRAINT "aftersales_freight_currency_check" CHECK (("aftersales"."aftersales"."freight" IS NULL) = ("aftersales"."aftersales"."freight_currency" IS NULL)),
+	CONSTRAINT "aftersales_compensation_currency_check" CHECK (("aftersales"."aftersales"."compensation" IS NULL) = ("aftersales"."aftersales"."compensation_currency" IS NULL)),
+	CONSTRAINT "aftersales_other_cost_currency_check" CHECK (("aftersales"."aftersales"."other_cost" IS NULL) = ("aftersales"."aftersales"."other_cost_currency" IS NULL))
 );
 --> statement-breakpoint
 CREATE TABLE "aftersales"."responsibility_ratio" (
@@ -74,7 +78,6 @@ CREATE TABLE "factory"."part" (
 	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"sku" text NOT NULL,
 	"name" text NOT NULL,
-	"category" text,
 	"factory_id" uuid NOT NULL,
 	"created_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "part_sku_key" UNIQUE("sku")

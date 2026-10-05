@@ -1,6 +1,6 @@
 {
-  "id": "946f292b-591d-41f9-a441-b24240f8b0bb",
-  "prevId": "67499de3-c9a5-4d4e-9ff1-13abf78e5799",
+  "id": "56a0b8d0-71ed-42ed-92dc-c087a54021a6",
+  "prevId": "17b4cb93-5464-4c6e-879c-1b5644b62e59",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -314,6 +314,22 @@
         "aftersales_part_quantity_check": {
           "name": "aftersales_part_quantity_check",
           "value": "\"aftersales\".\"aftersales\".\"part_quantity\" BETWEEN 1 AND 10"
+        },
+        "aftersales_product_cost_currency_check": {
+          "name": "aftersales_product_cost_currency_check",
+          "value": "(\"aftersales\".\"aftersales\".\"product_cost\" IS NULL) = (\"aftersales\".\"aftersales\".\"product_cost_currency\" IS NULL)"
+        },
+        "aftersales_freight_currency_check": {
+          "name": "aftersales_freight_currency_check",
+          "value": "(\"aftersales\".\"aftersales\".\"freight\" IS NULL) = (\"aftersales\".\"aftersales\".\"freight_currency\" IS NULL)"
+        },
+        "aftersales_compensation_currency_check": {
+          "name": "aftersales_compensation_currency_check",
+          "value": "(\"aftersales\".\"aftersales\".\"compensation\" IS NULL) = (\"aftersales\".\"aftersales\".\"compensation_currency\" IS NULL)"
+        },
+        "aftersales_other_cost_currency_check": {
+          "name": "aftersales_other_cost_currency_check",
+          "value": "(\"aftersales\".\"aftersales\".\"other_cost\" IS NULL) = (\"aftersales\".\"aftersales\".\"other_cost_currency\" IS NULL)"
         }
       },
       "isRLSEnabled": false
@@ -1246,12 +1262,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "category": {
-          "name": "category",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "factory_id": {
           "name": "factory_id",

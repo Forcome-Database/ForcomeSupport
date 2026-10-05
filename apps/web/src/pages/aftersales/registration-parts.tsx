@@ -1,6 +1,5 @@
 import {
   currencies,
-  formatMoney,
   ratioGroupLabels,
   ratioGroups,
   type Currency,
@@ -9,7 +8,6 @@ import {
 import type * as React from 'react';
 import { AffixInput } from '@/components/affix-input';
 import { FieldError } from '@/components/form-field';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -20,9 +18,9 @@ import {
 import { cn } from '@/lib/utils';
 import { A11Y, DRAWER, EMPTY_VALUE } from './p13-copy';
 import {
-  amountOfCents,
   amountText,
   factoryPercents,
+  formatUsdCents,
   shareCents,
   type FeeForm,
   type RatioSideForm,
@@ -74,31 +72,6 @@ export function FormSection({
   );
 }
 
-/** 字段名 + 必填星号 + 灰色短注（原型 lbl_note()，如「负责人 * 该店铺唯一的售后负责人，已默认」：星号紧跟字段名，短注在后） */
-export function NoteLabel({
-  htmlFor,
-  label,
-  required = false,
-  note,
-}: {
-  htmlFor?: string;
-  label: string;
-  required?: boolean;
-  note?: string;
-}) {
-  return (
-    <Label htmlFor={htmlFor}>
-      {label}
-      {required && (
-        <span aria-hidden className="ml-0.5 text-destructive-text">
-          *
-        </span>
-      )}
-      {note && <span className="ml-1.5 font-normal text-subtle-foreground">{note}</span>}
-    </Label>
-  );
-}
-
 /** 金额 + 币种（原型 money_field()：输入框右侧是 USD / CAD / MXN 的下拉，左边一条细线隔开） */
 export function MoneyInput({
   id,
@@ -132,10 +105,7 @@ export function MoneyInput({
             onChange({ ...value, currency: currency as Currency });
           }}
         >
-          <SelectTrigger
-            aria-label={A11Y.currency(label)}
-            className="h-6 w-auto gap-0.5 rounded-none border-0 border-l border-input bg-transparent pr-1.5 pl-2 text-12 font-semibold text-ink-2 hover:border-input focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:ring-0"
-          >
+          <SelectTrigger variant="inline" aria-label={A11Y.currency(label)}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end">
@@ -153,8 +123,6 @@ export function MoneyInput({
 
 const RATIO_GRID =
   'grid grid-cols-[72px_64px_minmax(0,1fr)_minmax(0,1fr)_76px_76px] items-center gap-2';
-
-const usd = (cents: number) => formatMoney(amountOfCents(cents), 'USD');
 
 /**
  * 三组承担比例（原型 ratio_rows()）：费用组 · 金额 · FSH % · 工厂 % · FSH 承担 · 工厂承担；改一侧另一侧自动补足 100。
@@ -233,15 +201,15 @@ export function RatioTable({
             <div className={RATIO_GRID}>
               <span className="text-12 font-semibold text-ink-2">{ratioGroupLabels[group]}</span>
               <span className="text-right text-12 text-muted-foreground tabular-nums">
-                {amount === null ? EMPTY_VALUE : usd(amount)}
+                {amount === null ? EMPTY_VALUE : formatUsdCents(amount)}
               </span>
               {side('fsh')}
               {side('factory')}
               <span className="text-right text-12 text-ink-2 tabular-nums">
-                {share ? usd(share.fsh) : EMPTY_VALUE}
+                {share ? formatUsdCents(share.fsh) : EMPTY_VALUE}
               </span>
               <span className="text-right text-12 text-ink-2 tabular-nums">
-                {share ? usd(share.factory) : EMPTY_VALUE}
+                {share ? formatUsdCents(share.factory) : EMPTY_VALUE}
               </span>
             </div>
             {messages.length > 0 && (
@@ -261,8 +229,8 @@ export function RatioTable({
         {anyError
           ? DRAWER.ratioTotalError
           : DRAWER.ratioTotal(
-              fshTotal === null ? EMPTY_VALUE : usd(fshTotal),
-              factoryTotal === null ? EMPTY_VALUE : usd(factoryTotal),
+              fshTotal === null ? EMPTY_VALUE : formatUsdCents(fshTotal),
+              factoryTotal === null ? EMPTY_VALUE : formatUsdCents(factoryTotal),
             )}
       </div>
     </div>

@@ -18,24 +18,38 @@ function SelectValue(props: React.ComponentProps<typeof SelectPrimitive.Value>) 
   return <SelectPrimitive.Value data-slot="select-value" {...props} />;
 }
 
+/**
+ * variant="inline"：嵌在输入框右侧的小下拉（原型 money_field() 的币种「USD ▾」）：没有外框，左边一条细线隔开，
+ * 12 / 600 次要深色字、12 的箭头；外框与输入中、报错的样子由外面的输入框给。
+ */
 function SelectTrigger({
   className,
   children,
+  variant = 'default',
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Trigger>) {
+}: React.ComponentProps<typeof SelectPrimitive.Trigger> & { variant?: 'default' | 'inline' }) {
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        controlClass,
-        'flex items-center justify-between gap-2 px-2.5 whitespace-nowrap select-none data-placeholder:text-placeholder *:data-[slot=select-value]:truncate',
+        variant === 'inline'
+          ? 'flex h-6 shrink-0 items-center gap-0.5 border-l border-input bg-transparent pr-1.5 pl-2 text-12 font-semibold whitespace-nowrap text-ink-2 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring'
+          : cn(
+              controlClass,
+              'flex items-center justify-between gap-2 px-2.5 whitespace-nowrap select-none data-placeholder:text-placeholder *:data-[slot=select-value]:truncate',
+            ),
         className,
       )}
       {...props}
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <ChevronDown className="pointer-events-none size-3.5 shrink-0 text-subtle-foreground" />
+        <ChevronDown
+          className={cn(
+            'pointer-events-none shrink-0 text-subtle-foreground',
+            variant === 'inline' ? 'size-3' : 'size-3.5',
+          )}
+        />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );

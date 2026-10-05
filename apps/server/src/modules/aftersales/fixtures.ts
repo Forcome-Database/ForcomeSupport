@@ -8,7 +8,8 @@ import {
   shipperLabels,
 } from '@forcome/contracts';
 import type { FixtureFee, FixtureLedgerRow } from '@forcome/fixtures';
-import { defineFixtureStep, reserveBusinessNumbers } from '../core';
+import { businessNumberSequence, defineFixtureStep, reserveBusinessNumbers } from '../core';
+import { feeColumnValues, type FeeValue } from './fees';
 import { aftersales } from './schema';
 
 /** 示例数据里的中文取值换成枚举（夹具保留原型与 PRD 的写法，加载步骤自己映射） */
@@ -18,18 +19,13 @@ function byLabel<K extends string>(labels: Record<K, string>, label: string, wha
   return found;
 }
 
-function feeColumns(fee: FixtureFee | null) {
+function feeValue(fee: FixtureFee | null): FeeValue {
   return fee ? { amount: fee.amount, currency: fee.currency } : { amount: null, currency: null };
-}
-
-/** 序号部分（S-日期-序号） */
-function sequenceOf(number: string): number {
-  return Number(number.slice(-4));
 }
 
 /**
  * 示例台账（原型 data.py 的 p1_ledger_rows()，待办 19；规格「什么是好测试」的夹具转换规则：丢弃待确认的单）：
- * 12 张售后单沿用原型的单号，已存在的跳过；之后新登记的单号接在示例最大序号之后（全局序号不重号）。
+ * 12 张售后单沿用原型的单号，已存在的跳过；之后新登记的单号接在原型用过的最大序号之后（含丢弃的待确认单，全局序号不重号）。
  * 店铺、负责人、登记人按示例数据的 key 换成 id；来源工单只留编号（示例工单在开发测试环境由来信回放重新编号，
  * 对不上 ID）。金额按原币写入；汇率与美元折算随待办 20 补进这个加载步骤。只在非生产环境运行。
  */
@@ -59,16 +55,15 @@ export const aftersalesLedgerFixtureStep = defineFixtureStep({
         })
         .onConflictDoNothing({ target: aftersales.number });
     }
-    const last = Math.max(0, ...fixture.ledger.map((r) => sequenceOf(r.no)));
+    const last = Math.max(
+      fixture.aftersalesLastSequence,
+      ...fixture.ledger.map((r) => businessNumberSequence(r.no)),
+    );
     await reserveBusinessNumbers(tx, 'aftersales', last);
   },
 });
 
 function ledgerColumns(r: FixtureLedgerRow) {
-  const product = feeColumns(r.fees.product);
-  const freight = feeColumns(r.fees.freight);
-  const compensation = feeColumns(r.fees.compensation);
-  const other = feeColumns(r.fees.other);
   return {
     number: r.no,
     status: byLabel(aftersalesStatusLabels, r.status, '状态'),
@@ -91,14 +86,12 @@ function ledgerColumns(r: FixtureLedgerRow) {
     trackingNumber: r.tracking,
     claimTarget: r.claim ? byLabel(claimTargetLabels, r.claim.target, '索赔对象') : null,
     claimStatus: r.claim ? byLabel(claimStatusLabels, r.claim.state, '索赔状态') : null,
-    productCost: product.amount,
-    productCostCurrency: product.currency,
-    freight: freight.amount,
-    freightCurrency: freight.currency,
-    compensation: compensation.amount,
-    compensationCurrency: compensation.currency,
-    otherCost: other.amount,
-    otherCostCurrency: other.currency,
+    ...feeColumnValues({
+      productCost: feeValue(r.fees.product),
+      freight: feeValue(r.fees.freight),
+      compensation: feeValue(r.fees.compensation),
+      otherCost: feeValue(r.fees.other),
+    }),
     productFactoryPct: r.ratios.product.factory,
     freightFactoryPct: r.ratios.freight.factory,
     otherFactoryPct: r.ratios.other.factory,

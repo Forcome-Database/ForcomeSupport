@@ -1383,6 +1383,7 @@
       "createdVia": "手工登记"
     }
   ],
+  "aftersalesLastSequence": 22,
   "ticketTimeline": {
     "ticket": "T-20260904-0098",
     "mailbox": "amz-direct@forcome.com",

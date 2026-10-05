@@ -1,4 +1,4 @@
-import { formatMoney, type Currency, type OwnerNote } from '@forcome/contracts';
+import type { OwnerNote } from '@forcome/contracts';
 
 /*
  * P13 登记台账与新建登记抽屉的界面文案（逐字照原型；p13-copy.test.ts 直接读原型生成物核对）：第一期参照页
@@ -20,7 +20,7 @@ export const PAGE_DESCRIPTION = {
 export const NEW_REGISTRATION = '新建登记';
 
 /**
- * 台账的列（待办 19 的最简列表；快递单号、费用合计、FSH / 工厂承担、更多随 21、22 加在原型的位置上）。
+ * 台账的列（待办 19 的最简列表；费用合计、FSH / 工厂承担、行尾「更多」随 20–22 加在原型的位置上，快递单号的「待回填」与补登随 21）。
  * 金额三列只给有财务权限的角色（坐席看不到）。
  */
 export const COLUMNS = {
@@ -30,6 +30,7 @@ export const COLUMNS = {
   method: '处理方式',
   responsibility: '责任',
   status: '状态',
+  trackingNumber: '快递单号',
 } as const;
 export const FINANCE_COLUMNS = {
   productCost: '产品成本',
@@ -140,13 +141,11 @@ export const SAVE_RESULT = {
   failedDescription: '填写的内容已保留在抽屉里。',
 } as const;
 
+/** 来源工单查询失败（不是没有这张工单，而是接口出错）：G5 失败浮层「查询失败：原因」+「立即重试」 */
+export const SOURCE_TICKET_LOOKUP = { failedAction: '查询' } as const;
+
 /** 关闭抽屉时还有未保存的输入（G8，新建的写法同 P18） */
 export const LEAVE = '「新建登记」填写的内容还没保存，放弃后不保留。';
-
-/** 金额：原币写法（「$3.20」「MX$889.00」）；美元折算与汇率日期随待办 20 */
-export function money(amount: string, currency: Currency): string {
-  return formatMoney(amount, currency);
-}
 
 /** 只给读屏器的说明（原型不画、不核对） */
 export const A11Y = {

@@ -245,15 +245,21 @@ describe('新建登记的校验（S14：保存时校验全部，错误写在字�
       freight: { amount: '6.805', currency: 'USD' as const },
       otherCost: { amount: 'abc', currency: 'USD' as const },
     };
-    expect(registrationErrors(sendParts({ fees, partQuantity: 11 }))).toEqual({
+    expect(
+      registrationErrors(sendParts({ fees, partSku: 'FC-V2-HF01', partQuantity: 11 })),
+    ).toEqual({
       'fees.productCost': '金额不能为负数，最多两位小数',
       'fees.freight': '金额不能为负数，最多两位小数',
       'fees.otherCost': '金额不能为负数，最多两位小数',
       partQuantity: '数量为 1–10 的整数',
     });
-    expect(registrationErrors(sendParts({ partQuantity: 0 }))).toEqual({
+    expect(registrationErrors(sendParts({ partSku: 'FC-V2-HF01', partQuantity: 0 }))).toEqual({
       partQuantity: '数量为 1–10 的整数',
     });
+    // 「配件 × 数量」是一项：没选配件时数量不保存
+    expect(
+      normalizeRegistration(sendParts({ partSku: null, partQuantity: 1 })).partQuantity,
+    ).toBeNull();
   });
 
   it('比例错误与其他错误一起列出', () => {

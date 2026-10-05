@@ -8,7 +8,6 @@ import {
   defaultOwnerId,
   feeItemLabels,
   feeItems,
-  formatMoney,
   handlingMethodLabels,
   handlingMethods,
   ownerNote,
@@ -24,6 +23,7 @@ import {
   type LedgerItem,
   type RatioGroup,
   type RegistrationOptions,
+  type SourceTicket,
   type StoreOption,
 } from '@forcome/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -44,6 +44,7 @@ import { LoadError } from '@/components/load-error';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { RadioCard, RadioGroup } from '@/components/ui/radio-group';
 import {
   Select,
@@ -53,6 +54,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Sheet, SheetBody, SheetContent, SheetFooter, SheetHeader } from '@/components/ui/sheet';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { UnsavedChangesDialog } from '@/components/unsaved-changes-dialog';
@@ -61,14 +63,15 @@ import { api, ApiRequestError } from '@/lib/api';
 import { storeOptionsQuery } from '@/lib/channel';
 import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { endSessionIfUnauthenticated } from '@/lib/session';
-import { DRAWER, LEAVE, SAVE_RESULT } from './p13-copy';
-import { FormSection, MoneyInput, NoteLabel, RatioTable } from './registration-parts';
+import { cn } from '@/lib/utils';
+import { DRAWER, EMPTY_VALUE, LEAVE, SAVE_RESULT, SOURCE_TICKET_LOOKUP } from './p13-copy';
+import { FormSection, MoneyInput, RatioTable } from './registration-parts';
 import {
-  amountOfCents,
   emptyRegistrationForm,
   factoryPercents,
   feeTotalCents,
   fieldLabel,
+  formatUsdCents,
   FORM_ORDER,
   formErrorsOf,
   groupCents,
@@ -94,6 +97,7 @@ import {
  */
 
 const SAVE_TOAST = 'aftersales-register';
+const LOOKUP_TOAST = 'aftersales-source-ticket';
 
 /** 已经报出的字段错误（按表单顺序） */
 function presentErrors(errors: FieldErrors<RegistrationFormValues>): FormError[] {
@@ -132,18 +136,44 @@ export function RegistrationDrawer({
     >
       <SheetContent className="w-160">
         <SheetHeader title={DRAWER.createTitle} description={DRAWER.description} />
-        <SheetBody>
-          {(stores.isError || options.isError) && (
+        <SheetBody aria-busy={!(stores.isError || options.isError)}>
+          {stores.isError || options.isError ? (
             <LoadError
               onRetry={() => {
                 void stores.refetch();
                 void options.refetch();
               }}
             />
+          ) : (
+            <DrawerSkeleton />
           )}
         </SheetBody>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** 选项加载中的抽屉正文：处理方式三张卡片与两节字段的骨架 */
+function DrawerSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      <Skeleton className="h-5 w-32 rounded-sm" />
+      <div className="flex gap-2">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-15 flex-1 rounded-lg" />
+        ))}
+      </div>
+      {[0, 1].map((section) => (
+        <div key={section} className="flex flex-col gap-2.5 border-t border-border-soft pt-3">
+          <Skeleton className="h-5 w-28 rounded-sm" />
+          <div className="grid grid-cols-4 gap-2.5">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-8 rounded-md" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -353,30 +383,53 @@ function RegistrationForm({
     clearErrors(['storeId', 'site', 'ownerId', 'sourceTicket']);
   }
 
-  /** 来源工单：离开输入框时按工单号查，带入店铺、站点、订单号（工单有时）、客户 */
-  async function lookUpTicket() {
-    const number = getValues('sourceTicket').trim();
-    if (!number || number === lookedUpTicket) return;
-    setLookedUpTicket(number);
+  /** 把查到的来源工单带入店铺、站点、订单号（工单有时）、客户 */
+  function applyTicket(ticket: SourceTicket) {
+    const ticketStore = stores.find((s) => s.id === ticket.store.id);
+    if (ticketStore) chooseStore(ticketStore, ticket.site);
+    setValue('sourceTicket', ticket.number, { shouldDirty: true });
+    if (ticket.orderNumber) setValue('orderNumber', ticket.orderNumber, { shouldDirty: true });
+    setValue('customerName', ticket.customerName, { shouldDirty: true });
+    clearErrors(['orderNumber', 'customerName']);
+  }
+
+  /**
+   * 按工单号查来源工单并带入；没有这张工单（或在别的店铺）写在字段下方。返回 true 表示已处理（查到或报在字段上），
+   * 接口出错抛出，由调用方给失败浮层
+   */
+  async function fetchTicket(number: string): Promise<void> {
     try {
-      const ticket = await api.sourceTicket(number);
-      const ticketStore = stores.find((s) => s.id === ticket.store.id);
-      if (ticketStore) chooseStore(ticketStore, ticket.site);
-      setValue('sourceTicket', ticket.number, { shouldDirty: true });
-      if (ticket.orderNumber) setValue('orderNumber', ticket.orderNumber, { shouldDirty: true });
-      setValue('customerName', ticket.customerName, { shouldDirty: true });
-      clearErrors(['orderNumber', 'customerName']);
+      applyTicket(await api.sourceTicket(number));
+      dismissToast(LOOKUP_TOAST);
     } catch (error) {
       if (endSessionIfUnauthenticated(queryClient, error)) return;
       if (error instanceof ApiRequestError && (error.status === 404 || error.status === 403)) {
+        dismissToast(LOOKUP_TOAST);
         setError('sourceTicket', {
           type: 'server',
           message: registrationMessages.sourceTicketNotFound,
         });
         return;
       }
+      throw error;
+    }
+  }
+
+  /** 来源工单：离开输入框时查（同一个号只查一次） */
+  async function lookUpTicket() {
+    const number = getValues('sourceTicket').trim();
+    if (!number || number === lookedUpTicket) return;
+    setLookedUpTicket(number);
+    try {
+      await fetchTicket(number);
+    } catch (error) {
       setLookedUpTicket('');
-      showError({ id: 'aftersales-source-ticket', action: '查询', error, retry: lookUpTicket });
+      showError({
+        id: LOOKUP_TOAST,
+        action: SOURCE_TICKET_LOOKUP.failedAction,
+        error,
+        retry: () => fetchTicket(number),
+      });
     }
   }
 
@@ -396,10 +449,10 @@ function RegistrationForm({
     clearErrors([`ratios.${group}.fsh`, `ratios.${group}.factory`]);
   }
 
-  const selectError = (field: RegistrationFormPath) =>
+  const errorOf = (field: RegistrationFormPath) =>
     (get(errors, field) as { message?: string } | undefined)?.message;
   const describedBy = (field: RegistrationFormPath) =>
-    selectError(field) ? `${fieldId(field)}-error` : undefined;
+    errorOf(field) ? `${fieldId(field)}-error` : undefined;
 
   /** 抽屉里的下拉（同一套写法：错误写在下方，改了就撤掉这个字段的错误） */
   const select = <T extends string>(
@@ -414,7 +467,7 @@ function RegistrationForm({
       id={fieldId(name)}
       values={values}
       labelOf={labelOf}
-      invalid={Boolean(selectError(name))}
+      invalid={Boolean(errorOf(name))}
       disabled={extra.disabled}
       onPick={extra.onPick}
       onChanged={() => clearErrors(name)}
@@ -430,7 +483,7 @@ function RegistrationForm({
       autoComplete="off"
       placeholder={extra.placeholder}
       className={extra.mono ? 'tabular-nums' : undefined}
-      aria-invalid={selectError(field) ? true : undefined}
+      aria-invalid={errorOf(field) ? true : undefined}
       aria-describedby={describedBy(field)}
       {...register(field, { onChange: () => clearErrors(field) })}
     />
@@ -515,8 +568,8 @@ function RegistrationForm({
                   </RadioGroup>
                 )}
               />
-              {selectError('method') && (
-                <FieldError id={`${fieldId('method')}-error`} messages={[selectError('method')!]} />
+              {errorOf('method') && (
+                <FieldError id={`${fieldId('method')}-error`} messages={[errorOf('method')!]} />
               )}
             </FormSection>
 
@@ -526,7 +579,7 @@ function RegistrationForm({
                   label={DRAWER.labels.storeId}
                   htmlFor={fieldId('storeId')}
                   required
-                  error={selectError('storeId')}
+                  error={errorOf('storeId')}
                 >
                   {select(
                     'storeId',
@@ -544,7 +597,7 @@ function RegistrationForm({
                   label={DRAWER.labels.site}
                   htmlFor={fieldId('site')}
                   required
-                  error={selectError('site')}
+                  error={errorOf('site')}
                 >
                   {select('site', siteOptions, (s) => s)}
                 </FormField>
@@ -552,7 +605,7 @@ function RegistrationForm({
                   label={DRAWER.labels.orderNumber}
                   htmlFor={fieldId('orderNumber')}
                   required
-                  error={selectError('orderNumber')}
+                  error={errorOf('orderNumber')}
                 >
                   {textInput('orderNumber', { mono: true })}
                 </FormField>
@@ -560,39 +613,33 @@ function RegistrationForm({
                   label={DRAWER.labels.customerName}
                   htmlFor={fieldId('customerName')}
                   required
-                  error={selectError('customerName')}
+                  error={errorOf('customerName')}
                 >
                   {textInput('customerName')}
                 </FormField>
-                <div className="flex min-w-0 flex-col gap-1.5">
-                  <NoteLabel
-                    htmlFor={fieldId('sourceTicket')}
-                    label={DRAWER.labels.sourceTicket}
-                    note={DRAWER.sourceTicketNote}
-                  />
+                <FormField
+                  label={DRAWER.labels.sourceTicket}
+                  htmlFor={fieldId('sourceTicket')}
+                  note={DRAWER.sourceTicketNote}
+                  error={errorOf('sourceTicket')}
+                >
                   <Input
                     id={fieldId('sourceTicket')}
                     autoComplete="off"
                     className="tabular-nums"
-                    aria-invalid={selectError('sourceTicket') ? true : undefined}
+                    aria-invalid={errorOf('sourceTicket') ? true : undefined}
                     aria-describedby={describedBy('sourceTicket')}
                     {...register('sourceTicket', {
                       onChange: () => clearErrors('sourceTicket'),
                       onBlur: () => void lookUpTicket(),
                     })}
                   />
-                  {selectError('sourceTicket') && (
-                    <FieldError
-                      id={`${fieldId('sourceTicket')}-error`}
-                      messages={[selectError('sourceTicket')!]}
-                    />
-                  )}
-                </div>
+                </FormField>
                 <FormField
                   label={DRAWER.labels.feeDate}
                   htmlFor={fieldId('feeDate')}
                   required
-                  error={selectError('feeDate')}
+                  error={errorOf('feeDate')}
                 >
                   <Controller
                     control={control}
@@ -611,34 +658,30 @@ function RegistrationForm({
                     )}
                   />
                 </FormField>
-                <div className="col-span-2 flex min-w-0 flex-col gap-1.5">
-                  <NoteLabel
-                    htmlFor={fieldId('ownerId')}
+                <div className="col-span-2">
+                  <FormField
                     label={DRAWER.labels.ownerId}
+                    htmlFor={fieldId('ownerId')}
                     required
                     note={DRAWER.ownerNotes[note] || undefined}
-                  />
-                  {storeId ? (
-                    ownerSelect
-                  ) : (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span
-                          tabIndex={0}
-                          className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          {ownerSelect}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{DRAWER.ownerNeedsStore}</TooltipContent>
-                    </Tooltip>
-                  )}
-                  {selectError('ownerId') && (
-                    <FieldError
-                      id={`${fieldId('ownerId')}-error`}
-                      messages={[selectError('ownerId')!]}
-                    />
-                  )}
+                    error={errorOf('ownerId')}
+                  >
+                    {storeId ? (
+                      ownerSelect
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            tabIndex={0}
+                            className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {ownerSelect}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>{DRAWER.ownerNeedsStore}</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </FormField>
                 </div>
               </div>
             </FormSection>
@@ -650,7 +693,7 @@ function RegistrationForm({
                     label={DRAWER.labels.responsibility}
                     htmlFor={fieldId('responsibility')}
                     required
-                    error={selectError('responsibility')}
+                    error={errorOf('responsibility')}
                   >
                     {select('responsibility', responsibilities, (r) => responsibilityLabels[r], {
                       onPick: chooseResponsibility,
@@ -658,24 +701,20 @@ function RegistrationForm({
                   </FormField>
                 </div>
                 {applicable.has('factory') && (
-                  <div className="col-span-2 flex min-w-0 flex-col gap-1.5">
-                    <NoteLabel
-                      htmlFor={fieldId('factory')}
+                  <div className="col-span-2">
+                    <FormField
                       label={DRAWER.labels.factory}
+                      htmlFor={fieldId('factory')}
                       required
                       note={factoryNote}
-                    />
-                    {select(
-                      'factory',
-                      options.factories.map((f) => f.code),
-                      (code) => code,
-                    )}
-                    {selectError('factory') && (
-                      <FieldError
-                        id={`${fieldId('factory')}-error`}
-                        messages={[selectError('factory')!]}
-                      />
-                    )}
+                      error={errorOf('factory')}
+                    >
+                      {select(
+                        'factory',
+                        options.factories.map((f) => f.code),
+                        (code) => code,
+                      )}
+                    </FormField>
                   </div>
                 )}
                 {applicable.has('claimTarget') && (
@@ -685,7 +724,7 @@ function RegistrationForm({
                         label={DRAWER.labels.claimTarget}
                         htmlFor={fieldId('claimTarget')}
                         required
-                        error={selectError('claimTarget')}
+                        error={errorOf('claimTarget')}
                       >
                         {select('claimTarget', claimTargets, (t) => claimTargetLabels[t])}
                       </FormField>
@@ -695,7 +734,7 @@ function RegistrationForm({
                         label={DRAWER.labels.claimStatus}
                         htmlFor={fieldId('claimStatus')}
                         required
-                        error={selectError('claimStatus')}
+                        error={errorOf('claimStatus')}
                       >
                         {select('claimStatus', claimStatuses, (s) => claimStatusLabels[s])}
                       </FormField>
@@ -708,7 +747,7 @@ function RegistrationForm({
                   label={DRAWER.labels.responsibilityReason}
                   htmlFor={fieldId('responsibilityReason')}
                   required
-                  error={selectError('responsibilityReason')}
+                  error={errorOf('responsibilityReason')}
                 >
                   <Textarea
                     id={fieldId('responsibilityReason')}
@@ -716,7 +755,7 @@ function RegistrationForm({
                     maxLength={RESPONSIBILITY_REASON_MAX}
                     placeholder={DRAWER.reasonPlaceholder}
                     counter={DRAWER.reasonCounter(reason.length, RESPONSIBILITY_REASON_MAX)}
-                    aria-invalid={selectError('responsibilityReason') ? true : undefined}
+                    aria-invalid={errorOf('responsibilityReason') ? true : undefined}
                     aria-describedby={describedBy('responsibilityReason')}
                     {...register('responsibilityReason', {
                       onChange: () => clearErrors('responsibilityReason'),
@@ -725,7 +764,9 @@ function RegistrationForm({
                 </FormField>
               )}
               <div className="flex flex-col gap-1.5">
-                <NoteLabel label={DRAWER.labels.ratios} required note={DRAWER.ratioNote} />
+                <Label required note={DRAWER.ratioNote}>
+                  {DRAWER.labels.ratios}
+                </Label>
                 <RatioTable
                   idOf={(group, side) => fieldId(`ratios.${group}.${side}`)}
                   ratios={ratios}
@@ -734,8 +775,8 @@ function RegistrationForm({
                     ratioGroups.map((group) => [
                       group,
                       {
-                        fsh: selectError(`ratios.${group}.fsh`),
-                        factory: selectError(`ratios.${group}.factory`),
+                        fsh: errorOf(`ratios.${group}.fsh`),
+                        factory: errorOf(`ratios.${group}.factory`),
                       },
                     ]),
                   )}
@@ -756,7 +797,7 @@ function RegistrationForm({
                       label={DRAWER.labels.partSku}
                       htmlFor={fieldId('partSku')}
                       required
-                      error={selectError('partSku')}
+                      error={errorOf('partSku')}
                     >
                       {select(
                         'partSku',
@@ -781,14 +822,14 @@ function RegistrationForm({
                     label={DRAWER.labels.partQuantity}
                     htmlFor={fieldId('partQuantity')}
                     required
-                    error={selectError('partQuantity')}
+                    error={errorOf('partQuantity')}
                   >
                     <AffixInput
                       id={fieldId('partQuantity')}
                       inputMode="numeric"
                       autoComplete="off"
                       suffix={DRAWER.quantitySuffix}
-                      aria-invalid={selectError('partQuantity') ? true : undefined}
+                      aria-invalid={errorOf('partQuantity') ? true : undefined}
                       aria-describedby={describedBy('partQuantity')}
                       {...register('partQuantity', {
                         onChange: (event: { target: { value: string } }) => {
@@ -802,7 +843,7 @@ function RegistrationForm({
                     label={DRAWER.labels.shipper}
                     htmlFor={fieldId('shipper')}
                     required
-                    error={selectError('shipper')}
+                    error={errorOf('shipper')}
                   >
                     {select('shipper', shippers, (s) => shipperLabels[s])}
                   </FormField>
@@ -810,7 +851,7 @@ function RegistrationForm({
                     label={DRAWER.labels.carrier}
                     htmlFor={fieldId('carrier')}
                     required
-                    error={selectError('carrier')}
+                    error={errorOf('carrier')}
                   >
                     {textInput('carrier')}
                   </FormField>
@@ -818,7 +859,7 @@ function RegistrationForm({
                     label={DRAWER.labels.shipDate}
                     htmlFor={fieldId('shipDate')}
                     required
-                    error={selectError('shipDate')}
+                    error={errorOf('shipDate')}
                   >
                     <Controller
                       control={control}
@@ -843,7 +884,7 @@ function RegistrationForm({
                       label={DRAWER.labels.trackingNumber}
                       htmlFor={fieldId('trackingNumber')}
                       required
-                      error={selectError('trackingNumber')}
+                      error={errorOf('trackingNumber')}
                     >
                       {textInput('trackingNumber', {
                         placeholder: DRAWER.afterShipping,
@@ -858,11 +899,14 @@ function RegistrationForm({
             <FormSection
               n={feesSection}
               title={DRAWER.sections.fees}
-              note={DRAWER.sections.feeTotal(
-                total === null ? '—' : formatMoney(amountOfCents(total), 'USD'),
-              )}
+              note={DRAWER.sections.feeTotal(total === null ? EMPTY_VALUE : formatUsdCents(total))}
             >
-              <div className="grid grid-cols-4 items-start gap-2.5">
+              <div
+                className={cn(
+                  'grid items-start gap-2.5',
+                  method === 'send_parts' ? 'grid-cols-4' : 'grid-cols-2',
+                )}
+              >
                 {feeItems.map((item) => {
                   const path = `fees.${item}.amount` as const;
                   return (
@@ -871,7 +915,7 @@ function RegistrationForm({
                       label={feeItemLabels[item]}
                       htmlFor={fieldId(path)}
                       required
-                      error={selectError(path)}
+                      error={errorOf(path)}
                     >
                       <Controller
                         control={control}
@@ -881,7 +925,7 @@ function RegistrationForm({
                             id={fieldId(path)}
                             label={feeItemLabels[item]}
                             value={field.value}
-                            invalid={Boolean(selectError(path))}
+                            invalid={Boolean(errorOf(path))}
                             onChange={(value) => {
                               field.onChange(value);
                               clearErrors(path);

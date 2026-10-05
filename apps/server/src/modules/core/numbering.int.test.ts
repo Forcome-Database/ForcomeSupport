@@ -6,6 +6,7 @@ import {
   type TestRuntime,
 } from '../../../test/database';
 import {
+  businessNumberSequence,
   nextBusinessNumber,
   reserveBusinessNumbers,
   transaction,
@@ -53,6 +54,8 @@ describe('业务编号（事务内生成）', () => {
     expect(await next('aftersales', '2026-09-11T02:00:00Z')).toBe('S-20260911-0022');
     await reserve(5);
     expect(await next('aftersales', '2026-09-11T02:00:00Z')).toBe('S-20260911-0023');
+    expect(businessNumberSequence('S-20260911-0021')).toBe(21);
+    expect(() => businessNumberSequence('S-20260911')).toThrow(/不是业务编号/);
     // 工单编号按日计数，不能整体预留
     await expect(
       transaction(t.runtime, (tx) => reserveBusinessNumbers(tx, 'ticket', 9)),

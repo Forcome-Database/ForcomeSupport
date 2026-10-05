@@ -6,6 +6,7 @@ import {
   factoryPercents,
   feeTotalCents,
   fieldLabel,
+  FORM_ORDER,
   formErrorsOf,
   groupCents,
   percentText,
@@ -71,8 +72,31 @@ describe('新建登记的表单（S14）', () => {
       'ratios.product.factory',
       'fees.compensation.amount',
     ]);
-    expect(errors.map((e) => fieldLabel(e.field))).toEqual(['责任理由', '承担比例', '额外赔偿']);
+    expect(errors.map((e) => fieldLabel(e.field))).toEqual([
+      '责任理由',
+      '承担比例（三组）',
+      '额外赔偿',
+    ]);
     expect(fieldLabel('sourceTicket')).toBe('来源工单');
+  });
+
+  it('抽屉的字段顺序：索赔对象与状态在责任理由之前（S14 自上而下），每个字段都有叫法', () => {
+    expect(FORM_ORDER.slice(0, 13)).toEqual([
+      'method',
+      'storeId',
+      'site',
+      'orderNumber',
+      'customerName',
+      'sourceTicket',
+      'feeDate',
+      'ownerId',
+      'responsibility',
+      'factory',
+      'claimTarget',
+      'claimStatus',
+      'responsibilityReason',
+    ]);
+    for (const field of FORM_ORDER) expect(fieldLabel(field), field).toBeTruthy();
   });
 
   it('比例表的金额：三组按费用项归组（其他费用 = 额外赔偿 + 其他），没填按 0；有非美元的组暂不计算', () => {

@@ -5,7 +5,15 @@ export { AccessDeniedError } from './access-denied';
 export { FieldValidationError } from './field-validation';
 export { recordAudit, systemActor, type Actor, type AuditEntry } from './audit';
 export { ManualClock, systemClock, type Clock, type Duration } from './clock';
-export { amount, currency, primaryId, timestamptz, version } from './columns';
+export {
+  amount,
+  currency,
+  feeColumns,
+  feeCurrencyCheck,
+  primaryId,
+  timestamptz,
+  version,
+} from './columns';
 export {
   clientModeVariable,
   ConfigError,
@@ -49,6 +57,7 @@ export {
 } from './jobs';
 export { createLogger, silentLogger, type Logger } from './logger';
 export {
+  businessNumberSequence,
   nextBusinessNumber,
   reserveBusinessNumbers,
   resetBusinessNumbers,

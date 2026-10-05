@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import {
   aftersalesStatusLabels,
   feeItemLabels,
+  formatMoney,
   handlingMethodLabels,
   ratioGroupLabels,
   registrationMessages,
@@ -15,7 +16,6 @@ import {
   EMPTY_TITLE,
   EMPTY_VALUE,
   FINANCE_COLUMNS,
-  money,
   NEW_REGISTRATION,
   PAGE_DESCRIPTION,
   PAGE_TITLE,
@@ -63,7 +63,7 @@ describe('P13 第一期参照页', () => {
     expect(P13_AGENT.includes(`>${NEW_REGISTRATION}<`)).toBe(false);
   });
 
-  it('列名：六列两个画面都有，金额列只在售后负责人的画面里', () => {
+  it('列名：售后单号到快递单号七列两个画面都有，金额列只在售后负责人的画面里', () => {
     for (const title of Object.values(COLUMNS)) {
       expectText(P13, title);
       expectText(P13_AGENT, title);
@@ -89,8 +89,9 @@ describe('P13 第一期参照页', () => {
     ]);
     expectIn(P13, aftersalesStatusLabels.completed);
     expectIn(P13, aftersalesStatusLabels.in_progress);
-    expectText(P13, money('3.20', 'USD'));
-    expectIn(P13, money('889.00', 'MXN'));
+    expectText(P13, formatMoney('3.20', 'USD'));
+    expectIn(P13, formatMoney('889.00', 'MXN'));
+    expectIn(P13_AGENT, '>1Z4R28830358229041<');
     expectText(P13, EMPTY_VALUE);
   });
 });

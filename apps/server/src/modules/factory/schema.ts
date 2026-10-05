@@ -30,8 +30,6 @@ export const part = factorySchema.table(
     id: primaryId(),
     sku: text('sku').notNull(),
     name: text('name').notNull(),
-    /** 类别（P24「负责的 SKU」表；示例数据有，台账不用） */
-    category: text('category'),
     factoryId: uuid('factory_id')
       .notNull()
       .references(() => factory.id),

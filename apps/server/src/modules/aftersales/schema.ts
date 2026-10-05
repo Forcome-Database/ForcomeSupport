@@ -20,7 +20,7 @@ import {
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
-import { amount, currency, primaryId, timestamptz, version } from '../core';
+import { feeColumns, feeCurrencyCheck, primaryId, timestamptz, version } from '../core';
 
 /** aftersales 模块的数据库 schema（一个模块一个 schema，ADR 0006）；表随各期待办加入 */
 export const aftersalesSchema = pgSchema('aftersales');
@@ -35,7 +35,7 @@ const pctCheck = (name: string, column: AnyPgColumn) =>
  * 状态只有 进行中 / 已完成 / 已取消（6.5「第一阶段台账状态」）；第二期的流程字段（分支、判定方式、比例与协商、
  * 结算状态与批次、当前环节、等待方、发起人）随第二期加列。
  * 字段按 R-AS-08 是否适用由新建登记的校验把关；历史导入的单可能缺字段（「历史导入」不计完整率），所以多数列可空。
- * 费用项先保存原币金额与币种；汇率、汇率日期与来源、冻结的美元值随待办 20 加列。
+ * 费用项一项一组列（core 的 feeColumns），先保存原币金额与币种；汇率、汇率日期与来源、冻结的美元值随待办 20 加列。
  * 店铺、负责人、登记人、来源工单、客户都是别的模块的 ID，跨模块不设外键（ADR 0005）。
  */
 export const aftersales = aftersalesSchema.table(
@@ -79,14 +79,11 @@ export const aftersales = aftersalesSchema.table(
     trackingNumber: text('tracking_number'),
     claimTarget: text('claim_target', { enum: claimTargets }),
     claimStatus: text('claim_status', { enum: claimStatuses }),
-    productCost: amount('product_cost'),
-    productCostCurrency: currency('product_cost_currency'),
-    freight: amount('freight'),
-    freightCurrency: currency('freight_currency'),
-    compensation: amount('compensation'),
-    compensationCurrency: currency('compensation_currency'),
-    otherCost: amount('other_cost'),
-    otherCostCurrency: currency('other_cost_currency'),
+    // 四个费用项（键与 contracts 的 feeItems 一致）：原币金额与币种
+    ...feeColumns('productCost', 'product_cost'),
+    ...feeColumns('freight', 'freight'),
+    ...feeColumns('compensation', 'compensation'),
+    ...feeColumns('otherCost', 'other_cost'),
     /** 承担比例三组的工厂一侧（R-AS-02） */
     productFactoryPct: pct('product_factory_pct'),
     freightFactoryPct: pct('freight_factory_pct'),
@@ -102,6 +99,18 @@ export const aftersales = aftersalesSchema.table(
     pctCheck('aftersales_freight_factory_pct_check', t.freightFactoryPct),
     pctCheck('aftersales_other_factory_pct_check', t.otherFactoryPct),
     check('aftersales_part_quantity_check', sql`${t.partQuantity} BETWEEN 1 AND 10`),
+    feeCurrencyCheck(
+      'aftersales_product_cost_currency_check',
+      t.productCost,
+      t.productCostCurrency,
+    ),
+    feeCurrencyCheck('aftersales_freight_currency_check', t.freight, t.freightCurrency),
+    feeCurrencyCheck(
+      'aftersales_compensation_currency_check',
+      t.compensation,
+      t.compensationCurrency,
+    ),
+    feeCurrencyCheck('aftersales_other_cost_currency_check', t.otherCost, t.otherCostCurrency),
   ],
 );
 

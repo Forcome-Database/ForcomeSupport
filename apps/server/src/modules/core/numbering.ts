@@ -43,6 +43,13 @@ export async function nextBusinessNumber(
   return `${rule.prefix}-${date}-${String(row.value).padStart(4, '0')}`;
 }
 
+/** 业务编号里的序号（S-20260911-0021 → 21） */
+export function businessNumberSequence(number: string): number {
+  const sequence = /-(\d{4})$/.exec(number)?.[1];
+  if (!sequence) throw new Error(`不是业务编号：${number}`);
+  return Number(sequence);
+}
+
 /**
  * 带着既有编号写入的对象（示例数据、历史导入的原编号）占用的序号：把全局递增的计数推到至少 value，
  * 之后发的号接在它们后面，不会与它们重号。只用于序号全局递增、不按日重置的编号（售后单）；已经更大时不变。

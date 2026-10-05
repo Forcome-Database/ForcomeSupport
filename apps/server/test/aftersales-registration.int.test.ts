@@ -128,10 +128,10 @@ describe('新建登记（待办 19）', () => {
     });
   });
 
-  it('客服主管与售后负责人可新建：状态「进行中」，单号 S-创建日期-全局序号（接在示例最大序号之后）', async () => {
+  it('客服主管与售后负责人可新建：状态「进行中」，单号 S-创建日期-全局序号（接在原型用过的最大序号之后，含第一期丢弃的待确认单 0022）', async () => {
     const bySupervisor = await register(supervisor, registration());
     expect(bySupervisor).toMatchObject({
-      number: 'S-20260911-0022',
+      number: 'S-20260911-0023',
       status: 'in_progress',
       origin: 'manual_registration',
       customerName: 'Olivia Turner',
@@ -139,6 +139,7 @@ describe('新建登记（待办 19）', () => {
       site: 'US',
       method: 'send_parts',
       responsibility: 'product_quality',
+      trackingNumber: null,
       fees: {
         productCost: { amount: '3.20', currency: 'USD' },
         freight: { amount: '6.80', currency: 'USD' },
@@ -148,11 +149,11 @@ describe('新建登记（待办 19）', () => {
       ratios: ratioPairsOf({ product: 100, freight: 100, other: 100 }),
     });
     const byOwner = await register(owner, registration({ customerName: 'Noah Kim' }));
-    expect(byOwner.number).toBe('S-20260911-0023');
+    expect(byOwner.number).toBe('S-20260911-0024');
 
     // 新登记的单出现在台账里
     expect((await ledger(owner)).map((item) => item.number)).toEqual(
-      expect.arrayContaining(['S-20260911-0022', 'S-20260911-0023']),
+      expect.arrayContaining(['S-20260911-0023', 'S-20260911-0024']),
     );
   });
 
@@ -186,6 +187,7 @@ describe('新建登记（待办 19）', () => {
           'site',
           'status',
           'store',
+          'trackingNumber',
         ].sort(),
       );
     }
@@ -326,6 +328,20 @@ describe('新建登记（待办 19）', () => {
     // 登记人是售后负责人时默认本人
     expect(defaultOwnerId(owners, DIRECT.id, zhaoId)).toBe(zhaoId);
 
+    // 只授权 forcome.mx 的客服主管：候选人的范围只露出 forcome.mx，与之没有交集的赵敏不列出
+    const mxOnly = await t.loginAs({
+      memberId: await t.addMember({
+        name: '吴越',
+        dept: 'FSH / 客服部',
+        roles: ['supervisor'],
+        allStores: false,
+        storeIds: [MX.id],
+      }),
+    });
+    expect((await options(mxOnly)).owners).toEqual([
+      { id: WANG.id, name: '王磊', stores: { all: false, storeIds: [MX.id] } },
+    ]);
+
     const forMx = registration({ storeId: MX.id, site: 'MX', orderNumber: '#2001' });
     expect(await fieldErrors(supervisor, { ...forMx, ownerId: zhaoId })).toEqual({
       ownerId: '只能选有该店铺数据范围的售后负责人',
@@ -390,7 +406,7 @@ describe('新建登记（待办 19）', () => {
         compensation: { amount: '0.00', currency: 'USD' },
         otherCost: { amount: '0.00', currency: 'USD' },
       },
-      ratios: { product: 100, freight: 100, other: 100 },
+      ratios: ratioPairsOf({ product: 100, freight: 100, other: 100 }),
     });
   });
 

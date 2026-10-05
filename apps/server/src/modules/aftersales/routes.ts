@@ -59,7 +59,8 @@ const registerRoute = createRoute({
 const optionsRoute = createRoute({
   method: 'get',
   path: '/api/aftersales/registration-options',
-  summary: '新建登记抽屉的选项：可选负责人、责任类型的默认比例、生产厂、配件与所属生产厂',
+  summary:
+    '新建登记抽屉的选项：可选负责人（只露出查看者店铺范围内的部分）、责任类型的默认比例、生产厂、配件与所属生产厂',
   responses: {
     200: json(registrationOptionsSchema, '选项'),
     401: unauthenticated,
@@ -107,7 +108,9 @@ export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv 
     return c.json(stripFinanceFields(ledgerItemSchema, item, access.financeVisible), 201);
   });
 
-  routes.openapi(optionsRoute, async (c) => c.json(await registrationOptions(runtime.db), 200));
+  routes.openapi(optionsRoute, async (c) =>
+    c.json(await registrationOptions(runtime.db, c.get('access').stores), 200),
+  );
 
   routes.openapi(sourceTicketRoute, async (c) => {
     const found = await findSourceTicket(runtime, c.get('access'), c.req.valid('param').number);

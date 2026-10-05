@@ -6,6 +6,7 @@ import {
   resolveRatios,
   responsibilities,
   type FieldErrors,
+  type OwnerOption,
   type RegistrationInput,
   type RegistrationOptions,
 } from '@forcome/contracts';
@@ -17,11 +18,13 @@ import {
   transaction,
   type DbExecutor,
   type Runtime,
+  type StoreScope,
 } from '../core';
 import { listFactories, listParts } from '../factory';
 import { listAftersalesOwners, type Access } from '../org';
 import { findTicketReference, type TicketReference } from '../ticket';
-import type { AftersalesRow } from './ledger';
+import { feeColumnValues, feesOf } from './fees';
+import { ratiosOf, type AftersalesRow } from './ledger';
 import { aftersales, responsibilityRatio } from './schema';
 
 /*
@@ -31,15 +34,36 @@ import { aftersales, responsibilityRatio } from './schema';
  * 保存记审计（完整后值）。
  */
 
-/** 新建登记抽屉的选项：可选负责人、责任类型的默认比例、生产厂、配件与所属生产厂 */
-export async function registrationOptions(db: DbExecutor): Promise<RegistrationOptions> {
-  const [owners, ratios, factories, parts] = await Promise.all([
+/**
+ * 售后负责人在查看者店铺范围内的那部分：查看者只能给自己范围内的店铺登记，候选人的范围只需要（也只该）露出这部分；
+ * 与查看者的范围没有交集的售后负责人不列出
+ */
+function ownerWithinScope(owner: OwnerOption, scope: StoreScope): OwnerOption | null {
+  if (scope.all) return owner;
+  const storeIds = owner.stores.all
+    ? [...scope.storeIds]
+    : owner.stores.storeIds.filter((id) => scope.storeIds.includes(id));
+  return storeIds.length > 0 ? { ...owner, stores: { all: false, storeIds } } : null;
+}
+
+/**
+ * 新建登记抽屉的选项：可选负责人（只露出查看者店铺范围内的部分）、责任类型的默认比例、生产厂、配件与所属生产厂
+ */
+export async function registrationOptions(
+  db: DbExecutor,
+  scope: StoreScope,
+): Promise<RegistrationOptions> {
+  const [allOwners, ratios, factories, parts] = await Promise.all([
     listAftersalesOwners(db),
     db.select().from(responsibilityRatio),
     listFactories(db),
     listParts(db),
   ]);
   const byResponsibility = new Map(ratios.map((row) => [row.responsibility, row]));
+  const owners = allOwners.flatMap((owner) => {
+    const visible = ownerWithinScope(owner, scope);
+    return visible ? [visible] : [];
+  });
   return {
     owners,
     defaultRatios: responsibilities.flatMap((responsibility) => {
@@ -114,23 +138,8 @@ function snapshot(row: AftersalesRow, ownerName: string | null) {
     trackingNumber: row.trackingNumber,
     claimTarget: row.claimTarget,
     claimStatus: row.claimStatus,
-    fees: {
-      productCost: row.productCost && {
-        amount: row.productCost,
-        currency: row.productCostCurrency,
-      },
-      freight: row.freight && { amount: row.freight, currency: row.freightCurrency },
-      compensation: row.compensation && {
-        amount: row.compensation,
-        currency: row.compensationCurrency,
-      },
-      otherCost: row.otherCost && { amount: row.otherCost, currency: row.otherCostCurrency },
-    },
-    ratios: {
-      product: row.productFactoryPct,
-      freight: row.freightFactoryPct,
-      other: row.otherFactoryPct,
-    },
+    fees: feesOf(row),
+    ratios: ratiosOf(row),
   };
 }
 
@@ -194,14 +203,6 @@ export async function createRegistration(
       throw new FieldValidationError(errors);
     }
 
-    const fee = (item: keyof RegistrationInput['fees']) => {
-      const { amount, currency } = input.fees[item];
-      return { amount, currency: amount === null ? null : currency };
-    };
-    const productCost = fee('productCost');
-    const freight = fee('freight');
-    const compensation = fee('compensation');
-    const otherCost = fee('otherCost');
     const registrar = access.actor.kind === 'member' ? access.actor : null;
 
     const [row] = await tx.db
@@ -233,14 +234,7 @@ export async function createRegistration(
         trackingNumber: input.trackingNumber || null,
         claimTarget: input.claimTarget,
         claimStatus: input.claimStatus,
-        productCost: productCost.amount,
-        productCostCurrency: productCost.currency,
-        freight: freight.amount,
-        freightCurrency: freight.currency,
-        compensation: compensation.amount,
-        compensationCurrency: compensation.currency,
-        otherCost: otherCost.amount,
-        otherCostCurrency: otherCost.currency,
+        ...feeColumnValues(input.fees),
         productFactoryPct: ratios.product,
         freightFactoryPct: ratios.freight,
         otherFactoryPct: ratios.other,

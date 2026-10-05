@@ -129,9 +129,9 @@ export const registrationFields = [
   'ownerId',
   'responsibility',
   'factory',
-  'responsibilityReason',
   'claimTarget',
   'claimStatus',
+  'responsibilityReason',
   'ratios',
   'part',
   'shipper',
@@ -156,9 +156,9 @@ export const registrationFieldLabels: Record<RegistrationField, string> = {
   ownerId: '负责人',
   responsibility: '责任类型',
   factory: '生产厂',
-  responsibilityReason: '责任理由',
   claimTarget: '索赔对象',
   claimStatus: '索赔状态',
+  responsibilityReason: '责任理由',
   ratios: '承担比例',
   part: '配件 × 数量',
   shipper: '发货方',
@@ -331,7 +331,8 @@ export const RESPONSIBILITY_REASON_MAX = 200;
 export const PART_QUANTITY_MIN = 1;
 export const PART_QUANTITY_MAX = 10;
 
-function isPercent(value: number): boolean {
+/** 比例的一侧是否填对：0–100 的整数（抽屉就地补足另一侧与接口校验共用） */
+export function isPercent(value: number): boolean {
   return Number.isInteger(value) && value >= 0 && value <= 100;
 }
 
@@ -434,7 +435,7 @@ export function normalizeRegistration(raw: RegistrationInput): RegistrationInput
     claimStatus: applicable.has('claimStatus') ? input.claimStatus : null,
     factory: applicable.has('factory') ? input.factory : null,
     partSku: applicable.has('part') ? input.partSku : null,
-    partQuantity: applicable.has('part') ? input.partQuantity : null,
+    partQuantity: applicable.has('part') && input.partSku ? input.partQuantity : null,
     shipper: applicable.has('shipper') ? input.shipper : null,
     carrier: applicable.has('carrier') ? input.carrier : '',
     shipDate: applicable.has('shipDate') ? input.shipDate : null,
@@ -590,7 +591,7 @@ export function ratioPairsOf(factory: FactoryRatios): Ratios {
 }
 
 /**
- * P13 台账的一行（第一期最简列表：售后单号、客户、店铺与站点、处理方式、责任、状态、费用列；
+ * P13 台账的一行（第一期最简列表：售后单号、客户、店铺与站点、处理方式、责任、状态、快递单号、费用列；
  * 完整的列、合计与列设置随待办 22）。费用与承担比例是财务字段，坐席看不到（PRD 10.1、P13「第一阶段」）；
  * 比例在台账里写在 FSH / 工厂承担的悬停说明（22），历史导入缺比例时为 null。
  */
@@ -604,6 +605,8 @@ export const ledgerItemSchema = z.object({
   site: siteSchema.nullable(),
   method: handlingMethodSchema.nullable(),
   responsibility: responsibilitySchema.nullable(),
+  /** 快递单号（寄配件寄出后填写；没有为 null） */
+  trackingNumber: z.string().nullable(),
   fees: financeField(feesSchema),
   ratios: financeField(ratiosSchema.nullable()),
 });

@@ -28,6 +28,7 @@ export {
   handlingMethods,
   handlingMethodSchema,
   involvesFactory,
+  isPercent,
   isValidAmount,
   ledgerItemSchema,
   ledgerSchema,
@@ -192,7 +193,7 @@ export {
 } from './finance';
 export { healthResponseSchema, type HealthResponse } from './health';
 export { adapterModeSchema, adapterModes, type AdapterMode } from './integration';
-export { currencies, currencySchema, currencySymbols, formatMoney, type Currency } from './money';
+export { currencies, currencySchema, formatMoney, type Currency } from './money';
 export { homeFor, navFor, navSections, navSectionSchema, type NavSection } from './navigation';
 export { roleByLabel, roleLabels, roleNames, roles, roleSchema, type Role } from './roles';
 export {

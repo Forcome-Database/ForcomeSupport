@@ -18,13 +18,15 @@ export function FieldError({ id, messages }: { id?: string; messages: readonly s
 }
 
 /**
- * 表单字段（原型 field()，设计规范第 5 节「标签在上、控件在中、说明或错误在下」）：12 / 600 标签（必填带红色星号）、间距 6；
+ * 表单字段（原型 field()，设计规范第 5 节「标签在上、控件在中、说明或错误在下」）：12 / 600 标签（必填带红色星号，
+ * note 为标签后的灰色短注）、间距 6；
  * 有错误时下方写错误（id 为 `${htmlFor}-error`，供控件的 aria-describedby 指向），否则写说明（12 次要色、行高 1.45）。
  */
 export function FormField({
   label,
   htmlFor,
   required = false,
+  note,
   hint,
   error,
   children,
@@ -32,6 +34,7 @@ export function FormField({
   label: string;
   htmlFor?: string;
   required?: boolean;
+  note?: string;
   hint?: string;
   error?: string | readonly string[];
   children: ReactNode;
@@ -39,7 +42,7 @@ export function FormField({
   const messages = (typeof error === 'string' ? [error] : (error ?? [])).filter(Boolean);
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <Label htmlFor={htmlFor} required={required}>
+      <Label htmlFor={htmlFor} required={required} note={note}>
         {label}
       </Label>
       {children}

@@ -1,17 +1,20 @@
 import {
   can,
   canViewFinance,
+  formatMoney,
   handlingMethodLabels,
   responsibilityLabels,
   type Fee,
+  type FeeItem,
   type LedgerItem,
 } from '@forcome/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Search } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { AftersalesStatusBadge, CategoryBadge } from '@/components/aftersales-badges';
 import { EmptyState } from '@/components/empty-state';
 import { LoadError } from '@/components/load-error';
+import { PageHead } from '@/components/page-head';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -31,7 +34,6 @@ import {
   EMPTY_TITLE,
   EMPTY_VALUE,
   FINANCE_COLUMNS,
-  money,
   NEW_REGISTRATION,
   PAGE_DESCRIPTION,
   PAGE_TITLE,
@@ -42,107 +44,127 @@ import { RegistrationDrawer } from './registration-drawer';
 /*
  * P13 登记台账（第一阶段，PRD P13「第一阶段」、S13；参照图 design/spec/shots/phase1/P13_AfterSalesLog.png 与 _agent）。
  * 待办 19 是最简列表：页头（标题、说明、右上「新建登记」）+ 表格（售后单号 · 客户 · 店铺与站点 · 处理方式 · 责任 · 状态 ·
- * 产品成本 · 运费 · 额外赔偿，金额为原币），按售后单号先后（后端排好）。坐席只读：没有「新建登记」与金额列，说明换成只读的写法。
- * 完整率（21）、列设置与导出 Excel（22）、筛选与「已隐藏 N 列」（22）、快递单号 / 费用合计 / FSH 与工厂承担 / 行尾「更多」与合计行（20–22）、
- * 点售后单号打开「编辑登记」（21）随后续待办加在原型的位置上；表下的说明写的是汇率折算与承担计算，随 20、22 一起加。
- * 表格照原型 table_span()：外框圆角 8、表头 11 / 700 次要色、行上下 8；列宽照第一阶段的模板换算（含单元格内边距），
- * 还没有的「快递单号」那一列先空着占位，金额列靠右。
+ * 快递单号 · 产品成本 · 运费 · 额外赔偿，金额为原币），按售后单号先后（后端排好）。坐席只读：没有「新建登记」与金额列，说明换成只读的写法。
+ * 完整率（21）、列设置与导出 Excel（22）、筛选与「已隐藏 N 列」（22）、费用合计 / FSH 与工厂承担 / 行尾「更多」与合计行（20–22）、
+ * 快递单号的「待回填」与补登（21）、点售后单号打开「编辑登记」（21）随后续待办加在原型的位置上；表下的说明写的是汇率折算与
+ * 承担计算，随 20、22 一起加。表格照原型 table_span()：外框圆角 8、表头 11 / 700 次要色、行上下 8；列宽照第一阶段的两个模板
+ * （售后负责人：列间距 8；坐席：列间距 12）换算，含单元格内边距；快递单号这一列占剩余宽度（原型 minmax(0, 1fr)）。
  */
 
 const LOADING_ROWS = 8;
 
-function LedgerHead({
-  finance,
-  canRegister,
-  onNew,
-}: {
-  finance: boolean;
-  canRegister: boolean;
-  onNew: () => void;
-}) {
-  return (
-    <div className="flex shrink-0 items-end justify-between gap-4 px-6 pt-4 pb-0.5">
-      <div className="flex min-w-0 flex-col gap-1">
-        <h1 className="text-20 font-bold tracking-[-0.015em] text-foreground">{PAGE_TITLE}</h1>
-        <p className="text-13 text-muted-foreground">
-          {finance ? PAGE_DESCRIPTION.finance : PAGE_DESCRIPTION.readOnly}
-        </p>
+const EMPTY = <span className="text-body text-subtle-foreground">{EMPTY_VALUE}</span>;
+
+/** 一列：表头、对齐、两种视角的列宽（空串为占剩余宽度）、单元格 */
+interface Column {
+  readonly key: string;
+  readonly title: string;
+  readonly align: 'left' | 'right';
+  /** 售后负责人、客服主管视角（有金额列）与坐席视角的列宽 */
+  readonly width: { readonly finance: string; readonly readOnly: string };
+  readonly cell: (item: LedgerItem) => ReactNode;
+}
+
+const BASE_COLUMNS: readonly Column[] = [
+  {
+    key: 'number',
+    title: COLUMNS.number,
+    align: 'left',
+    width: { finance: 'w-37.5', readOnly: 'w-45.5' },
+    cell: (item) => (
+      <span className="text-body font-semibold whitespace-nowrap text-primary">{item.number}</span>
+    ),
+  },
+  {
+    key: 'customer',
+    title: COLUMNS.customer,
+    align: 'left',
+    width: { finance: 'w-26', readOnly: 'w-38' },
+    cell: (item) => (
+      <div className="truncate text-body text-foreground" title={item.customerName ?? undefined}>
+        {item.customerName ?? EMPTY_VALUE}
       </div>
-      {canRegister && (
-        <div className="flex shrink-0 items-center gap-2">
-          <Button onClick={onNew}>
-            <Plus />
-            {NEW_REGISTRATION}
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FeeCell({ fee }: { fee: Fee | null }) {
-  return (
-    <TableCell className="py-2 text-right">
-      {fee ? (
-        <span className="text-body whitespace-nowrap text-foreground tabular-nums">
-          {money(fee.amount, fee.currency)}
-        </span>
+    ),
+  },
+  {
+    key: 'storeSite',
+    title: COLUMNS.storeSite,
+    align: 'left',
+    width: { finance: 'w-33', readOnly: 'w-48' },
+    cell: (item) => (
+      <div className="truncate text-minor text-ink-2" title={storeSite(item.store.name, item.site)}>
+        {storeSite(item.store.name, item.site)}
+      </div>
+    ),
+  },
+  {
+    key: 'method',
+    title: COLUMNS.method,
+    align: 'left',
+    width: { finance: 'w-27', readOnly: 'w-38' },
+    cell: (item) =>
+      item.method ? <CategoryBadge>{handlingMethodLabels[item.method]}</CategoryBadge> : EMPTY,
+  },
+  {
+    key: 'responsibility',
+    title: COLUMNS.responsibility,
+    align: 'left',
+    width: { finance: 'w-24', readOnly: 'w-35.5' },
+    cell: (item) =>
+      item.responsibility ? (
+        <CategoryBadge>{responsibilityLabels[item.responsibility]}</CategoryBadge>
       ) : (
-        <span className="text-body text-subtle-foreground">{EMPTY_VALUE}</span>
-      )}
-    </TableCell>
+        EMPTY
+      ),
+  },
+  {
+    key: 'status',
+    title: COLUMNS.status,
+    align: 'left',
+    width: { finance: 'w-18', readOnly: 'w-28' },
+    cell: (item) => <AftersalesStatusBadge status={item.status} />,
+  },
+  {
+    // 原型 p1_tracking()：有单号写单号（12 主色、过长省略），没有写「—」；已完成缺单号的「待回填」与补登随 21
+    key: 'trackingNumber',
+    title: COLUMNS.trackingNumber,
+    align: 'left',
+    width: { finance: '', readOnly: '' },
+    cell: (item) =>
+      item.trackingNumber ? (
+        <div className="truncate text-12 text-primary tabular-nums" title={item.trackingNumber}>
+          {item.trackingNumber}
+        </div>
+      ) : (
+        EMPTY
+      ),
+  },
+];
+
+function feeCell(fee: Fee | null | undefined): ReactNode {
+  return fee ? (
+    <span className="text-body whitespace-nowrap text-foreground tabular-nums">
+      {formatMoney(fee.amount, fee.currency)}
+    </span>
+  ) : (
+    EMPTY
   );
 }
 
-function LedgerRow({ item, finance }: { item: LedgerItem; finance: boolean }) {
-  return (
-    <TableRow data-testid="ledger-row">
-      <TableCell className="py-2">
-        <span className="text-body font-semibold whitespace-nowrap text-primary">
-          {item.number}
-        </span>
-      </TableCell>
-      <TableCell className="py-2">
-        <div className="truncate text-body text-foreground" title={item.customerName ?? undefined}>
-          {item.customerName ?? EMPTY_VALUE}
-        </div>
-      </TableCell>
-      <TableCell className="py-2">
-        <div
-          className="truncate text-minor text-ink-2"
-          title={storeSite(item.store.name, item.site)}
-        >
-          {storeSite(item.store.name, item.site)}
-        </div>
-      </TableCell>
-      <TableCell className="py-2">
-        {item.method ? (
-          <CategoryBadge>{handlingMethodLabels[item.method]}</CategoryBadge>
-        ) : (
-          <span className="text-body text-subtle-foreground">{EMPTY_VALUE}</span>
-        )}
-      </TableCell>
-      <TableCell className="py-2">
-        {item.responsibility ? (
-          <CategoryBadge>{responsibilityLabels[item.responsibility]}</CategoryBadge>
-        ) : (
-          <span className="text-body text-subtle-foreground">{EMPTY_VALUE}</span>
-        )}
-      </TableCell>
-      <TableCell className="py-2">
-        <AftersalesStatusBadge status={item.status} />
-      </TableCell>
-      <TableCell aria-hidden className="py-2" />
-      {finance && (
-        <>
-          <FeeCell fee={item.fees?.productCost ?? null} />
-          <FeeCell fee={item.fees?.freight ?? null} />
-          <FeeCell fee={item.fees?.compensation ?? null} />
-        </>
-      )}
-    </TableRow>
-  );
-}
+/** 金额列（原币；美元折算与汇率日期随 20） */
+const feeColumn = (key: Extract<FeeItem, keyof typeof FINANCE_COLUMNS>, width: string): Column => ({
+  key,
+  title: FINANCE_COLUMNS[key],
+  align: 'right',
+  width: { finance: width, readOnly: width },
+  cell: (item) => feeCell(item.fees?.[key]),
+});
+
+const FINANCE_ONLY: readonly Column[] = [
+  feeColumn('productCost', 'w-19.5'),
+  feeColumn('freight', 'w-17.5'),
+  feeColumn('compensation', 'w-41'),
+];
 
 function LedgerTable({
   items,
@@ -151,11 +173,8 @@ function LedgerTable({
   items: readonly LedgerItem[] | null;
   finance: boolean;
 }) {
-  const columns = [
-    ...Object.values(COLUMNS),
-    '',
-    ...(finance ? Object.values(FINANCE_COLUMNS) : []),
-  ];
+  const columns = finance ? [...BASE_COLUMNS, ...FINANCE_ONLY] : BASE_COLUMNS;
+  const view = finance ? 'finance' : 'readOnly';
   return (
     <Table
       aria-label={A11Y.table}
@@ -163,42 +182,22 @@ function LedgerTable({
       containerClassName="rounded-md"
       className={cn(finance && '[&_td]:px-1 [&_th]:px-1')}
     >
-      {finance ? (
-        <colgroup>
-          <col className="w-37.5" />
-          <col className="w-26" />
-          <col className="w-33" />
-          <col className="w-27" />
-          <col className="w-24" />
-          <col className="w-18" />
-          <col />
-          <col className="w-19.5" />
-          <col className="w-17.5" />
-          <col className="w-41" />
-        </colgroup>
-      ) : (
-        <colgroup>
-          <col className="w-45.5" />
-          <col className="w-38" />
-          <col className="w-48" />
-          <col className="w-38" />
-          <col className="w-35.5" />
-          <col className="w-28" />
-          <col />
-        </colgroup>
-      )}
+      <colgroup>
+        {columns.map((column) => (
+          <col key={column.key} className={column.width[view] || undefined} />
+        ))}
+      </colgroup>
       <TableHeader>
         <TableRow>
-          {columns.map((title, index) => (
+          {columns.map((column) => (
             <TableHead
-              key={title || `blank-${index}`}
-              aria-hidden={title === '' || undefined}
+              key={column.key}
               className={cn(
                 'font-bold text-muted-foreground',
-                index > Object.keys(COLUMNS).length && 'text-right',
+                column.align === 'right' && 'text-right',
               )}
             >
-              {title}
+              {column.title}
             </TableHead>
           ))}
         </TableRow>
@@ -207,9 +206,9 @@ function LedgerTable({
         {items === null ? (
           Array.from({ length: LOADING_ROWS }, (_, i) => (
             <TableRow key={i}>
-              {columns.map((title, index) => (
-                <TableCell key={title || `blank-${index}`} className="py-2.5">
-                  {title && <Skeleton className="h-3.5 rounded-sm" />}
+              {columns.map((column) => (
+                <TableCell key={column.key} className="py-2.5">
+                  <Skeleton className="h-3.5 rounded-sm" />
                 </TableCell>
               ))}
             </TableRow>
@@ -221,7 +220,18 @@ function LedgerTable({
             </TableCell>
           </TableRow>
         ) : (
-          items.map((item) => <LedgerRow key={item.id} item={item} finance={finance} />)
+          items.map((item) => (
+            <TableRow key={item.id} data-testid="ledger-row">
+              {columns.map((column) => (
+                <TableCell
+                  key={column.key}
+                  className={cn('py-2', column.align === 'right' && 'text-right')}
+                >
+                  {column.cell(item)}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))
         )}
       </TableBody>
     </Table>
@@ -236,7 +246,18 @@ export function LedgerPage() {
   const [creating, setCreating] = useState(false);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <LedgerHead finance={finance} canRegister={canRegister} onNew={() => setCreating(true)} />
+      <PageHead
+        title={PAGE_TITLE}
+        description={finance ? PAGE_DESCRIPTION.finance : PAGE_DESCRIPTION.readOnly}
+        actions={
+          canRegister && (
+            <Button onClick={() => setCreating(true)}>
+              <Plus />
+              {NEW_REGISTRATION}
+            </Button>
+          )
+        }
+      />
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-6 pt-3.5 pb-3.5">
         {ledger.isError ? (
           <LoadError onRetry={() => void ledger.refetch()} />

@@ -166,6 +166,8 @@ export const demoFixtureSchema = z.object({
   responsibilityRatios: z.array(z.object({ responsibility: z.string(), ratios: ratiosSchema })),
   tickets: z.array(fixtureTicketSchema),
   ledger: z.array(fixtureLedgerRowSchema),
+  /** 原型用过的最大售后单序号（含第一期丢弃的待确认单）；示例台账之后新发的单号接在它后面 */
+  aftersalesLastSequence: z.int().positive(),
   ticketTimeline: fixtureTicketTimelineSchema,
 });
 

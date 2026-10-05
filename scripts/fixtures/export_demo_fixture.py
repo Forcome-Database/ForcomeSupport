@@ -273,6 +273,8 @@ def build():
         'responsibilityRatios': responsibility_ratios(),
         'tickets': tickets(),
         'ledger': ledger(),
+        # 原型用过的最大售后单序号（含第一期丢弃的待确认单 S-20260911-0022）：加载示例台账后新单号接在它之后，不与原型撞号
+        'aftersalesLastSequence': max(int(a['no'][-4:]) for a in d.AFTERSALES),
         'ticketTimeline': ticket_timeline(),
     }
 

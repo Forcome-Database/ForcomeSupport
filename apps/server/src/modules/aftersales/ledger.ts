@@ -1,36 +1,16 @@
-import {
-  ratioPairsOf,
-  type Currency,
-  type Fee,
-  type Fees,
-  type LedgerItem,
-  type Ratios,
-} from '@forcome/contracts';
+import { ratioPairsOf, type LedgerItem, type Ratios } from '@forcome/contracts';
 import { asc } from 'drizzle-orm';
 import { storeNamesById } from '../channel';
 import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
+import { feesOf } from './fees';
 import { aftersales } from './schema';
 
 /*
  * 登记台账 P13 的查询（店铺范围内，ADR 0010）。待办 19 是最简列表：售后单号、客户、店铺与站点、处理方式、责任、状态、
- * 费用列（原币）；筛选、合计行、列设置与导出随 22，汇率与美元折算随 20，完整率与「缺 N 项」随 21。
+ * 快递单号、费用列（原币）；筛选、合计行、列设置与导出随 22，汇率与美元折算随 20，完整率与「缺 N 项」随 21。
  */
 
 export type AftersalesRow = typeof aftersales.$inferSelect;
-
-function feeOf(amount: string | null, currency: Currency | null): Fee | null {
-  return amount === null ? null : { amount, currency: currency ?? 'USD' };
-}
-
-/** 四项费用（原币）；没填的为 null */
-export function feesOf(row: AftersalesRow): Fees {
-  return {
-    productCost: feeOf(row.productCost, row.productCostCurrency),
-    freight: feeOf(row.freight, row.freightCurrency),
-    compensation: feeOf(row.compensation, row.compensationCurrency),
-    otherCost: feeOf(row.otherCost, row.otherCostCurrency),
-  };
-}
 
 /** 三组承担比例；历史导入缺比例时为 null */
 export function ratiosOf(row: AftersalesRow): Ratios | null {
@@ -54,6 +34,7 @@ export function toLedgerItem(
     site: row.site,
     method: row.method,
     responsibility: row.responsibility,
+    trackingNumber: row.trackingNumber,
     fees: feesOf(row),
     ratios: ratiosOf(row),
   };

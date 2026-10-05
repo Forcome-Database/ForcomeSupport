@@ -23,7 +23,6 @@ export const factoryPartsFixtureStep = defineFixtureStep({
         .values({
           sku: fixturePart.sku,
           name: fixturePart.name,
-          category: fixturePart.category,
           factoryId: owner.id,
           createdAt: new Date(tx.now.getTime() + index),
         })
