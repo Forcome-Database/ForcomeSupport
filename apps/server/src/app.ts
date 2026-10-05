@@ -3,6 +3,7 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import type { ServerDeps } from './deps';
+import { createAftersalesRoutes } from './modules/aftersales';
 import { createChannelRoutes } from './modules/channel';
 import {
   AccessDeniedError,
@@ -85,6 +86,7 @@ export function createApp(deps: ServerDeps) {
   app.route('/', createOrgRoutes({ runtime, appEnv: config.appEnv }));
   app.route('/', createChannelRoutes({ runtime, appEnv: config.appEnv, clients }));
   app.route('/', createTicketRoutes({ runtime, appEnv: config.appEnv }));
+  app.route('/', createAftersalesRoutes({ runtime, appEnv: config.appEnv }));
   if (devLoginAvailable(config)) {
     app.route('/', createDevLoginRoutes({ runtime, appEnv: config.appEnv }));
   }

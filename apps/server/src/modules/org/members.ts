@@ -1,4 +1,10 @@
-import { roles as allRoles, type Density, type MemberStatus, type Role } from '@forcome/contracts';
+import {
+  roles as allRoles,
+  type Density,
+  type MemberStatus,
+  type OwnerOption,
+  type Role,
+} from '@forcome/contracts';
 import { and, arrayContains, eq } from 'drizzle-orm';
 import type { DbExecutor, Tx } from '../core';
 import { member } from './schema';
@@ -60,6 +66,29 @@ export async function listAdmins(db: DbExecutor): Promise<{ id: string; name: st
     .from(member)
     .where(and(eq(member.status, 'active'), arrayContains(member.roles, ['admin'])));
   return rows.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+}
+
+/**
+ * 在职的售后负责人与各自的店铺数据范围（售后单负责人的候选，D-24：只能选有该店铺数据范围的售后负责人），按姓名排序。
+ * 成员与角色不属于店铺，不带店铺范围；哪些人能负责哪个店铺的单由调用方按范围筛（contracts 的 ownersForStore）。
+ */
+export async function listAftersalesOwners(db: DbExecutor): Promise<OwnerOption[]> {
+  const rows = await db
+    .select({
+      id: member.id,
+      name: member.name,
+      allStores: member.allStores,
+      storeIds: member.storeIds,
+    })
+    .from(member)
+    .where(and(eq(member.status, 'active'), arrayContains(member.roles, ['aftersales_owner'])));
+  return rows
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      stores: row.allStores ? { all: true } : { all: false, storeIds: [...row.storeIds] },
+    }));
 }
 
 /**

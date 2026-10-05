@@ -1,5 +1,6 @@
 import {
   isTicketSource,
+  type Site,
   type TicketDetail,
   type TicketListItem,
   type TicketMessage,
@@ -83,6 +84,39 @@ export async function findTicketByNumber(
     .where(and(eq(ticket.number, number), storeScopeCondition(scope, ticket.storeId)))
     .limit(1);
   return row ?? null;
+}
+
+/** 售后单的来源工单要带入的内容（新建登记，待办 19：店铺、站点、订单号、客户） */
+export interface TicketReference {
+  readonly id: string;
+  readonly number: string;
+  readonly storeId: string;
+  readonly site: Site;
+  readonly orderNumber: string | null;
+  readonly customerId: string;
+  readonly customerName: string;
+}
+
+/**
+ * 按工单号取来源工单（店铺范围内；新建登记经 access.findOwned 调用，先取出再判断归属，越权记审计）。
+ * 工单号不分大小写，按规范写法（T-日期-序号）查。
+ */
+export async function findTicketReference(
+  db: DbExecutor,
+  scope: StoreScope,
+  number: string,
+): Promise<TicketReference | null> {
+  const row = await findTicketByNumber(db, scope, number.trim().toUpperCase());
+  if (!row) return null;
+  return {
+    id: row.id,
+    number: row.number,
+    storeId: row.storeId,
+    site: row.site,
+    orderNumber: row.orderNumber,
+    customerId: row.customerId,
+    customerName: row.customerName,
+  };
 }
 
 /** 工单与它的消息（按到达时间先后）；row 已按店铺范围取出 */

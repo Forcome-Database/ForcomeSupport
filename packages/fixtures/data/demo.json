@@ -673,7 +673,7 @@
       "shipDate": null,
       "tracking": null,
       "claim": {
-        "target": "向 USPS 索赔",
+        "target": "承运商",
         "state": "索赔中"
       },
       "fees": {
@@ -1333,7 +1333,7 @@
       "shipDate": null,
       "tracking": null,
       "claim": {
-        "target": "向易仓索赔（错发）",
+        "target": "易仓",
         "state": "待发起"
       },
       "fees": {

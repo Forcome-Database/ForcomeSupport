@@ -4,8 +4,13 @@ import {
   channelSettingsSchema,
   currentMemberSchema,
   devMembersResponseSchema,
+  ledgerItemSchema,
+  ledgerSchema,
   loginDeniedSchema,
   preferencesSchema,
+  registrationOptionsSchema,
+  sourceTicketSchema,
+  storeOptionsSchema,
   storeSchema,
   ticketListSchema,
   type AdminContacts,
@@ -13,10 +18,15 @@ import {
   type CurrentMember,
   type DevMember,
   type FieldErrors,
+  type LedgerItem,
   type LoginDenialReason,
   type Preferences,
+  type RegistrationInput,
+  type RegistrationOptions,
+  type SourceTicket,
   type Store,
   type StoreInput,
+  type StoreOption,
   type StoreUpdate,
   type TicketListItem,
 } from '@forcome/contracts';
@@ -136,7 +146,27 @@ export const api = {
   updateStore: (id: string, input: StoreUpdate): Promise<Store> =>
     call(`/api/channel/stores/${id}`, storeSchema, jsonBody('PUT', input)),
 
+  /** 当前成员店铺范围内的店铺（各页面的店铺筛选与选择） */
+  storeOptions: async (): Promise<StoreOption[]> =>
+    (await call('/api/channel/store-options', storeOptionsSchema)).stores,
+
   /** P04 工单列表（店铺范围内） */
   tickets: async (): Promise<TicketListItem[]> =>
     (await call('/api/tickets', ticketListSchema)).tickets,
+
+  /** P13 登记台账（店铺范围内；坐席拿到的没有财务字段） */
+  ledger: async (): Promise<LedgerItem[]> =>
+    (await call('/api/aftersales/ledger', ledgerSchema)).items,
+
+  /** 新建登记抽屉的选项：可选负责人、责任类型的默认比例、生产厂、配件与所属生产厂 */
+  registrationOptions: (): Promise<RegistrationOptions> =>
+    call('/api/aftersales/registration-options', registrationOptionsSchema),
+
+  /** 按工单号取来源工单；没有这张工单 404，在别的店铺 403 */
+  sourceTicket: (number: string): Promise<SourceTicket> =>
+    call(`/api/aftersales/source-tickets/${encodeURIComponent(number)}`, sourceTicketSchema),
+
+  /** 新建登记；字段填错时抛 ApiRequestError（fields 为各字段的错误） */
+  register: (input: RegistrationInput): Promise<LedgerItem> =>
+    call('/api/aftersales/registrations', ledgerItemSchema, jsonBody('POST', input)),
 };

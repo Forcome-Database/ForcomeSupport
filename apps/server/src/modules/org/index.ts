@@ -10,6 +10,6 @@ export {
 } from './access';
 export { createDevLoginRoutes, devLoginAvailable } from './dev-login';
 export { orgMembersFixtureStep } from './fixtures';
-export { createMember, type NewMember } from './members';
+export { createMember, listAftersalesOwners, type NewMember } from './members';
 export { createOrgRoutes } from './routes';
 export { SESSION_COOKIE, SESSION_IDLE_TIMEOUT_MS } from './session';

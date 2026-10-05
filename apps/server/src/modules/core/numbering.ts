@@ -44,6 +44,25 @@ export async function nextBusinessNumber(
 }
 
 /**
+ * 带着既有编号写入的对象（示例数据、历史导入的原编号）占用的序号：把全局递增的计数推到至少 value，
+ * 之后发的号接在它们后面，不会与它们重号。只用于序号全局递增、不按日重置的编号（售后单）；已经更大时不变。
+ */
+export async function reserveBusinessNumbers(
+  tx: Tx,
+  kind: BusinessNumberKind,
+  value: number,
+): Promise<void> {
+  if (RULES[kind].perDay) throw new Error(`${kind} 的序号按日重置，不能整体预留`);
+  await tx.db
+    .insert(businessNumberCounter)
+    .values({ kind, period: 'all', lastValue: value })
+    .onConflictDoUpdate({
+      target: [businessNumberCounter.kind, businessNumberCounter.period],
+      set: { lastValue: sql`GREATEST(${businessNumberCounter.lastValue}, ${value})` },
+    });
+}
+
+/**
  * 清掉某类业务编号的计数，之后从 0001 重新发号。只用于非生产环境的「重放来信」（该类对象已全部清掉时），
  * 生产环境的编号不回收、不重用。
  */

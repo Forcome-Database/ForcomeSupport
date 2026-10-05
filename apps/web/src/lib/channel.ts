@@ -11,6 +11,12 @@ export const channelSettingsQuery = queryOptions({
   queryFn: api.channelSettings,
 });
 
+/** 当前成员店铺范围内的店铺（各页面的店铺筛选与选择）；保存店铺后随这一组失效 */
+export const storeOptionsQuery = queryOptions({
+  queryKey: [...CHANNEL_QUERY_KEY, 'store-options'],
+  queryFn: api.storeOptions,
+});
+
 const clock = new Intl.DateTimeFormat('zh-CN', {
   timeZone: BUSINESS_TIME_ZONE,
   hour: '2-digit',

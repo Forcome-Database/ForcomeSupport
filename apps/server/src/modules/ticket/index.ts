@@ -1,5 +1,6 @@
 // ticket：归并、工单、消息、客户、状态机、回复识别、SLA（ADR 0005；第一期起）。
 // 其他模块只能经本文件调用本模块，不能引用内部文件或读写本模块的表。
 export { createTicketJobHandlers } from './jobs';
+export { findTicketReference, type TicketReference } from './queries';
 export { clearTickets } from './reset';
 export { createTicketRoutes } from './routes';

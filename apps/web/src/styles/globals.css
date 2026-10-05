@@ -60,6 +60,7 @@
   --success-card: #f4fbf7; /* 成功色调卡片底（ui.card tone=success） */
   --warning-card: #fdf8f0; /* 警示色调卡片底（ui.card tone=warning） */
   --destructive-card: #fdf5f6; /* 危险色调卡片底（ui.card tone=danger） */
+  --destructive-banner: #fdf2f3; /* 危险横幅底色（ui.banner danger；图标圆底同 --destructive-soft-active） */
   --flow: #6d28d9;
   --flow-soft: #f4f1fe;
   --flow-line: #ddd6fe;
@@ -156,6 +157,7 @@
   --color-success-card: var(--success-card);
   --color-warning-card: var(--warning-card);
   --color-destructive-card: var(--destructive-card);
+  --color-destructive-banner: var(--destructive-banner);
   --color-scrim: var(--scrim);
   --color-flow: var(--flow);
   --color-flow-soft: var(--flow-soft);

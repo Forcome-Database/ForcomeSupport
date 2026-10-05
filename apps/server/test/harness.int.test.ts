@@ -217,7 +217,13 @@ describe('按角色建会话', () => {
 
 describe('灌示例数据', () => {
   it('按各模块登记的加载步骤灌库，重复加载不报错（测试工具启动时已灌过示例成员）', async () => {
-    const steps = ['org.members', 'channel.stores', 'channel.sender_rules'];
+    const steps = [
+      'org.members',
+      'channel.stores',
+      'channel.sender_rules',
+      'factory.parts',
+      'aftersales.ledger',
+    ];
     await expect(t.loadFixtures()).resolves.toEqual({ steps });
     await expect(t.loadFixtures()).resolves.toEqual({ steps });
   });

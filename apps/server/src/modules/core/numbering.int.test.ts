@@ -5,7 +5,12 @@ import {
   type TestDatabase,
   type TestRuntime,
 } from '../../../test/database';
-import { nextBusinessNumber, transaction, type BusinessNumberKind } from './index';
+import {
+  nextBusinessNumber,
+  reserveBusinessNumbers,
+  transaction,
+  type BusinessNumberKind,
+} from './index';
 
 let database: TestDatabase;
 let t: TestRuntime;
@@ -38,6 +43,20 @@ describe('业务编号（事务内生成）', () => {
     expect(await next('aftersales', '2026-08-04T02:00:00Z')).toBe('S-20260804-0002');
     // 历史导入：日期取原登记日期，序号照样全局递增
     expect(await next('aftersales', '2026-05-20T02:00:00Z')).toBe('S-20260520-0003');
+  });
+
+  it('带着既有编号写入的售后单（示例数据、历史导入）预留序号后，新发的号接在它们后面；已经更大时不回退', async () => {
+    const reserve = (value: number) =>
+      transaction(t.runtime, (tx) => reserveBusinessNumbers(tx, 'aftersales', value));
+    // 上一个用例已发到 0003
+    await reserve(21);
+    expect(await next('aftersales', '2026-09-11T02:00:00Z')).toBe('S-20260911-0022');
+    await reserve(5);
+    expect(await next('aftersales', '2026-09-11T02:00:00Z')).toBe('S-20260911-0023');
+    // 工单编号按日计数，不能整体预留
+    await expect(
+      transaction(t.runtime, (tx) => reserveBusinessNumbers(tx, 'ticket', 9)),
+    ).rejects.toThrow(/按日重置/);
   });
 
   it('事务回滚时编号不被占用', async () => {

@@ -184,6 +184,11 @@ def fee(r, field, orig_field=None):
     return {'amount': money(usd), 'currency': 'USD', 'usd': money(usd), 'rateDate': None}
 
 
+def claim_target(text):
+    """原型的索赔对象写成一句话（「向 USPS 索赔」「向易仓索赔（错发）」）；R-AS-08 的取值只有承运商与易仓"""
+    return '易仓' if '易仓' in text else '承运商'
+
+
 def ledger():
     out = []
     for r in d.p1_ledger_rows():
@@ -205,7 +210,7 @@ def ledger():
             'carrier': r.get('carrier'),
             'shipDate': date(r.get('ship_date')),
             'tracking': r.get('tracking'),
-            'claim': {'target': r['claim'], 'state': r['claim_state']} if r.get('claim') else None,
+            'claim': {'target': claim_target(r['claim']), 'state': r['claim_state']} if r.get('claim') else None,
             'fees': {
                 'product': fee(r, 'product'),
                 'freight': fee(r, 'freight'),

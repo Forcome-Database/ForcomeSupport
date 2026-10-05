@@ -88,11 +88,17 @@ export const fixtureLedgerRowSchema = z.object({
   responsibilityReason: z.string().nullable(),
   part: z.object({ sku: z.string(), qty: z.int().positive() }).nullable(),
   factory: z.string().nullable(),
-  shipper: z.string().nullable(),
+  shipper: z.enum(['易仓', '生产厂']).nullable(),
   carrier: z.string().nullable(),
   shipDate: day.nullable(),
   tracking: z.string().nullable(),
-  claim: z.object({ target: z.string(), state: z.string() }).nullable(),
+  /** 索赔对象与状态（责任为物流问题时，R-AS-08 的取值） */
+  claim: z
+    .object({
+      target: z.enum(['承运商', '易仓']),
+      state: z.enum(['待发起', '索赔中', '已赔付', '已拒赔']),
+    })
+    .nullable(),
   fees: z.object({
     product: fixtureFeeSchema.nullable(),
     freight: fixtureFeeSchema.nullable(),

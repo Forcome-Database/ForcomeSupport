@@ -48,7 +48,12 @@ export {
   type WorkerOptions,
 } from './jobs';
 export { createLogger, silentLogger, type Logger } from './logger';
-export { nextBusinessNumber, resetBusinessNumbers, type BusinessNumberKind } from './numbering';
+export {
+  nextBusinessNumber,
+  reserveBusinessNumbers,
+  resetBusinessNumbers,
+  type BusinessNumberKind,
+} from './numbering';
 export {
   isStoreInScope,
   memberStoreScope,

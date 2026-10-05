@@ -8,14 +8,16 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router';
-import { createContext, useContext, useEffect, type ComponentType, type ReactNode } from 'react';
+import { useEffect, type ComponentType, type ReactNode } from 'react';
 import { AppShell } from '@/components/app-shell';
 import { Forbidden } from '@/components/forbidden';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { LoadError } from '@/components/load-error';
+import { CurrentMemberContext, useCurrentMember } from '@/lib/current-member';
 import { pages, sectionPaths, type PageDefinition } from '@/lib/pages';
 import { applyDensity, currentMemberQuery, devMembersQuery } from '@/lib/session';
+import { LedgerPage } from '@/pages/aftersales/ledger-page';
 import { DevLoginPage } from '@/pages/dev-login';
 import { ChannelsPage } from '@/pages/settings/channels-page';
 import { TeamPage } from '@/pages/settings/team-page';
@@ -25,8 +27,8 @@ import { TicketsPage } from '@/pages/tickets/tickets-page';
  * 路由（ADR 0007：TanStack Router，代码定义）。登录后的页面都挂在 app 布局下：
  * 没登录（含会话 7 天无操作过期）时，开启了开发登录就去开发登录页；钉钉扫码登录页（G11）随 05 号待办。
  * 「/」按角色进入默认首页（PRD 4.1）；各页面按能力把关，没有权限时在原地址显示 G2。
- * 第一期各页面的内容随各自的待办加进来（P05 17、P13 19、P17 24、P20 06、P27 30），在那之前内容区为空；
- * P18 已有（07），P04 先是最简列表（08，完整版随 18）。
+ * 第一期各页面的内容随各自的待办加进来（P05 17、P17 24、P20 06、P27 30），在那之前内容区为空；
+ * P18 已有（07），P04 先是最简列表（08，完整版随 18），P13 先是最简列表与新建登记（19，完整版随 20–22）。
  */
 
 interface RouterContext {
@@ -72,15 +74,6 @@ const appRoute = createRoute({
   },
   component: AppLayout,
 });
-
-/** 外壳里的页面取当前成员（外壳只在已登录时渲染，这里一定有） */
-const CurrentMemberContext = createContext<CurrentMember | null>(null);
-
-function useCurrentMember(): CurrentMember {
-  const member = useContext(CurrentMemberContext);
-  if (!member) throw new Error('只能在登录后的外壳里使用当前成员');
-  return member;
-}
 
 function AppLayout() {
   // 读缓存而不是路由上下文：切换密度后缓存里的成员会先变（useSaveDensity），会话结束时会被置空（createQueryClient）
@@ -158,7 +151,7 @@ const routeTree = rootRoute.addChildren([
     homeRoute,
     pageRoute(pages.tickets, TicketsPage),
     aftersalesRoute,
-    pageRoute(pages.aftersalesLedger),
+    pageRoute(pages.aftersalesLedger, LedgerPage),
     pageRoute(pages.reports),
     settingsRoute,
     pageRoute(pages.settingsChannels, ChannelsPage),
