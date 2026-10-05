@@ -95,19 +95,19 @@ export async function mergeInbound(
     logger.warn({ messageId }, '不是要归并的来信，跳过');
     return;
   }
-  const { storeId, channel, site, source } = mail;
-  if (!storeId || !channel || !site || !source) {
+  const { storeId, recognition } = mail;
+  if (!storeId || !recognition) {
     // 未归属店铺的来信队列随 15 号待办
     logger.warn({ messageId }, '来信没有识别出店铺，暂不归并');
     return;
   }
+  const { channel, site, source, sender } = recognition;
   if (!isTicketSource(source)) {
     // channel 不会为归档的来信发「来信已接收」；万一收到也不建工单
     logger.warn({ messageId, source }, '平台通知或营销邮件已归档，不归并');
     return;
   }
   // 客户渠道身份：亚马逊中转地址、Shopify 联系表单的回复邮箱，其余为发件地址（channel 识别，R-TK-08）
-  const sender = { address: mail.senderAddress ?? '', name: mail.senderName ?? '' };
   if (!sender.address) {
     logger.warn({ messageId }, '来信没有客户渠道身份（发件地址），无法确定客户，暂不归并');
     return;

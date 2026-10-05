@@ -2,12 +2,15 @@
 //
 //   node deploy/deploy.mjs staging [deploy]     部署：构建镜像 → 起数据库 → 先跑 migrate → 灌示例数据
 //                                               → 起 api、worker、caddy → 用根证书核对 HTTPS → Playwright 冒烟 → 报告
+//   node deploy/deploy.mjs staging deploy --reset-inbound
+//                                               同上，灌示例数据之后、起服务之前「重放来信」（识别或归并口径变了的
+//                                               版本用它部署，冒烟在按新口径重新回放的数据上跑；只用于非生产环境）
 //   node deploy/deploy.mjs staging smoke        对当前运行的版本重跑「用根证书核对 HTTPS」与冒烟
 //   node deploy/deploy.mjs staging cert         导出 caddy 根证书（发给员工浏览器安装）并显示指纹
 //   node deploy/deploy.mjs staging compose …    带上项目名、Compose 文件、环境文件与当前版本执行 docker compose
 //   node deploy/deploy.mjs staging down         停止并删除容器（保留数据卷）
-//   node deploy/deploy.mjs staging reset-inbound 重放来信：停 worker → 清空收信与工单 → 起 worker（按当前口径重新回放
-//                                               示例来信；只用于非生产环境，docs/部署说明.md「重放来信」）
+//   node deploy/deploy.mjs staging reset-inbound 对当前部署的版本重放来信：停 worker → 清空收信与工单 → 起 worker
+//                                               （按当前口径重新回放示例来信；只用于非生产环境，docs/部署说明.md）
 //
 // 只依赖 Node（≥ 22）、git 与 Docker（含 compose），不需要 pnpm install；Linux 服务器与 Windows 本机通用。
 // 环境文件默认 deploy/.env.<环境>，可用 FORCOME_ENV_FILE 指到别处；部署产物（根证书、报告）在 deploy/.state/<环境>/。
@@ -30,7 +33,7 @@ import { capture, mustRun, run } from './lib/process.mjs';
 import { formatReport, summarizePlaywright } from './lib/report.mjs';
 
 const ROOT_CERT_IN_CADDY = '/data/caddy/pki/authorities/local/root.crt';
-const USAGE = `用法：node deploy/deploy.mjs <环境> [deploy | smoke | cert | compose <参数…> | down | reset-inbound]
+const USAGE = `用法：node deploy/deploy.mjs <环境> [deploy [--reset-inbound] | smoke | cert | compose <参数…> | down | reset-inbound]
 环境：${Object.keys(ENVIRONMENTS).join('、')}`;
 
 // 所有路径相对仓库根目录（Docker 在 Windows 上把「盘符:」当成容器名，所以不用绝对路径）
@@ -225,7 +228,20 @@ function publishReport(report) {
   console.log(`\n${report}\n报告：${stateDir}/report.md`);
 }
 
-async function deploy({ smokeOnly }) {
+/**
+ * 重放来信（待办 10，ADR 0013 修订）：先停 worker，再用 compose 当前指向的镜像执行 dist/reset-inbound.mjs，
+ * 清掉收取的邮件、邮箱游标、工单与客户；worker 再起来时重新 watch，Fake Gmail 按当前口径重新回放示例来信。
+ * 生产环境拒绝（镜像里的入口与清理函数也各拒绝一次）。
+ */
+function resetInbound(compose) {
+  if (environment.appEnv === 'production') {
+    throw new Error('生产环境不能清空收信与工单');
+  }
+  compose.run('stop', 'worker');
+  compose.run('run', '--rm', '--no-deps', 'migrate', 'node', 'dist/reset-inbound.mjs');
+}
+
+async function deploy({ smokeOnly, resetInboundData = false }) {
   const { step, results } = stepRunner();
   let deployEnv;
   let release;
@@ -248,6 +264,10 @@ async function deploy({ smokeOnly }) {
     await step('执行迁移（migrate）', () => compose.run('run', '--rm', '--no-deps', 'migrate'));
     if (environment.seed) {
       await step('灌示例数据（seed）', () => compose.run('run', '--rm', '--no-deps', 'seed'));
+    }
+    if (resetInboundData) {
+      // 用本次构建的镜像清空；下一步起 worker 时按新口径重新回放
+      await step('重放来信（清空收信与工单）', () => resetInbound(compose));
     }
     await step('启动 api、worker、caddy', () => {
       compose.run('up', '-d', '--wait', '--no-deps', 'api', 'worker', 'caddy');
@@ -278,8 +298,21 @@ async function deploy({ smokeOnly }) {
 
 async function main() {
   switch (command) {
-    case 'deploy':
-      return deploy({ smokeOnly: false });
+    case 'deploy': {
+      const unknown = commandArgs.filter((arg) => arg !== '--reset-inbound');
+      if (unknown.length > 0) {
+        console.error(`不认识的参数：${unknown.join(' ')}\n${USAGE}`);
+        return false;
+      }
+      if (commandArgs.includes('--reset-inbound') && environment.appEnv === 'production') {
+        console.error('生产环境不能清空收信与工单');
+        return false;
+      }
+      return deploy({
+        smokeOnly: false,
+        resetInboundData: commandArgs.includes('--reset-inbound'),
+      });
+    }
     case 'smoke':
       return deploy({ smokeOnly: true });
     case 'cert': {
@@ -296,17 +329,15 @@ async function main() {
       return true;
     }
     case 'reset-inbound': {
-      // 重放来信（待办 10）：用当前部署的镜像清空收信与工单；镜像里的入口自己也拒绝生产环境
+      // 对当前部署的版本重放来信：清空后把 worker 起回来
       if (environment.appEnv === 'production') {
         console.error('生产环境不能清空收信与工单');
         return false;
       }
       const compose = composeFor(loadDeployEnv(), deployedRelease());
-      compose.run('stop', 'worker');
       try {
-        compose.run('run', '--rm', '--no-deps', 'migrate', 'node', 'dist/reset-inbound.mjs');
+        resetInbound(compose);
       } finally {
-        // worker 重启后重新 watch 各邮箱，Fake Gmail 按当前口径重新回放示例来信
         compose.run('start', 'worker');
       }
       console.log('已清空收信与工单，worker 已重启，示例来信几十秒内重新归并成工单');

@@ -1,7 +1,8 @@
 import type { Platform } from '@forcome/contracts';
 import type { FixtureStore } from '@forcome/fixtures';
 import { defineFixtureStep } from '../core';
-import { senderRule, store, storeMailbox } from './schema';
+import { store, storeMailbox } from './schema';
+import { registerSenderRule } from './sender-rules';
 
 const PLATFORM: Record<FixtureStore['platform'], Platform> = {
   亚马逊: 'amazon',
@@ -56,17 +57,13 @@ export const channelSenderRulesFixtureStep = defineFixtureStep({
   async load(tx, fixture) {
     for (const factory of fixture.factories) {
       for (const address of factory.mailboxes) {
-        await tx.db
-          .insert(senderRule)
-          .values({
-            kind: 'address',
-            pattern: address.trim().toLowerCase(),
-            headerValue: null,
-            source: 'producer',
-            label: `${factory.code} 生产厂`,
-            createdAt: tx.now,
-          })
-          .onConflictDoNothing();
+        await registerSenderRule(tx, {
+          kind: 'address',
+          pattern: address,
+          headerValue: null,
+          source: 'producer',
+          label: `${factory.code} 生产厂`,
+        });
       }
     }
   },

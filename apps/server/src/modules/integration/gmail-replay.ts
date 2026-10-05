@@ -1,3 +1,4 @@
+import { amazonDomains, SHOPIFY_CONTACT_FORM_SENDER } from '@forcome/contracts';
 import type { DemoFixture } from '@forcome/fixtures';
 import type { FakeMailInput } from './gmail-mime';
 
@@ -10,15 +11,6 @@ import type { FakeMailInput } from './gmail-mime';
  * mailer@shopify.com 代发、Reply-To 是客户邮箱、正文是表单各栏；主题沿用原型的主题（真实通知的主题是 Shopify 的固定写法）。
  * Message-ID 与 Gmail 消息 ID 由工单号推出，重启后回放的是同样的信。
  */
-
-const AMAZON_RELAY: Record<string, string> = {
-  US: 'marketplace.amazon.com',
-  CA: 'marketplace.amazon.ca',
-  MX: 'marketplace.amazon.com.mx',
-};
-
-/** Shopify 联系表单通知的发件地址 */
-const SHOPIFY_CONTACT_FORM_SENDER = 'mailer@shopify.com';
 
 /** Shopify 联系表单通知的正文（默认模板的各栏） */
 function contactFormText(customer: { name: string; address: string }, site: string, body: string) {
@@ -49,7 +41,7 @@ export function fixtureMails(fixture: DemoFixture): FakeMailInput[] {
   return fixture.tickets.flatMap((ticket) => {
     const store = storeOf.get(ticket.storeKey);
     if (!store) throw new Error(`示例工单 ${ticket.no} 的店铺 ${ticket.storeKey} 不在夹具里`);
-    const domain = ticket.channel === '亚马逊' ? AMAZON_RELAY[ticket.site] : 'example.com';
+    const domain = ticket.channel === '亚马逊' ? amazonDomains[ticket.site].relay : 'example.com';
     const from = {
       name: ticket.customer,
       address: ticket.from ?? `${localPart(ticket.customer)}@${domain}`,

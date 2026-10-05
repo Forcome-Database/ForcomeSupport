@@ -6,9 +6,13 @@ export { createChannelFeeds, createChannelJobHandlers, storeChangedJob } from '.
 export {
   findInboundMessage,
   listMessageSummaries,
+  listReceivedMail,
   type InboundMessage,
   type MessageSummary,
+  type ReceivedMail,
 } from './messages';
+export { type MailAddress, type Recognition, type SenderRule } from './recognition';
 export { clearInboundMail } from './reset';
 export { createChannelRoutes } from './routes';
+export { registerSenderRule } from './sender-rules';
 export { storeNamesById } from './stores';

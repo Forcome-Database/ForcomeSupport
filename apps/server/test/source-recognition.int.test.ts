@@ -80,6 +80,11 @@ describe('来源识别与亚马逊站点', () => {
     return (await ticketList(agent)).filter((ticket) => ticket.customer.name === customer);
   }
 
+  /** 归档（不建工单）的来信，按到达时间先后 */
+  async function archivedMail() {
+    return (await t.receivedMail()).filter((mail) => mail.archived);
+  }
+
   it('亚马逊平台通知邮件归档，不建工单（AC-P1-05）；同一批到的客户来信照常建工单', async () => {
     const notices: FakeMailInput[] = [
       {
@@ -125,6 +130,11 @@ describe('来源识别与亚马逊站点', () => {
     const tickets = await ticketList(agent);
     expect(tickets.map((ticket) => ticket.customer.name)).toEqual(['Hannah Price']);
     expect(tickets.map((ticket) => ticket.subject)).not.toContain(notices[0]!.subject);
+    // 归档不丢信：平台通知照样入库，可以查到（协调者 10-05）
+    const archived = await archivedMail();
+    expect(archived.map((mail) => [mail.subject, mail.recognition?.source])).toEqual(
+      notices.map((notice) => [notice.subject, 'platform_notification']),
+    );
   });
 
   it('营销邮件归档，不建工单：带 List-Unsubscribe 头，或 Precedence 为 bulk', async () => {
@@ -148,6 +158,40 @@ describe('来源识别与亚马逊站点', () => {
 
     expect(await ticketsOf('Vacuum Deals Weekly')).toEqual([]);
     expect(await ticketsOf('Proveedor Promociones')).toEqual([]);
+    expect(
+      (await archivedMail())
+        .filter((mail) => mail.recognition?.source === 'marketing')
+        .map((mail) => mail.from.address),
+    ).toEqual(['news@vacuum-deals.example', 'promo@ofertas.example']);
+  });
+
+  it('mailer@shopify.com 发来、找不到客户邮箱的来信（如只留电话的联系表单）按 Shopify 系统邮件归档，不建工单，但照样入库可查（协调者 10-05 决定）', async () => {
+    gmail.deliver({
+      to: SHOP_COM.mailbox,
+      from: { name: 'forcome.com', address: 'mailer@shopify.com' },
+      headers: { 'Reply-To': 'no-reply@shopify.com' },
+      subject: 'New customer message on 2026-09-10',
+      text: [
+        "You received a new message from your online store's contact form.",
+        'Name: Ryan Ortiz',
+        'Phone Number: +1 787 555 0101',
+        'Body:',
+        'Please call me about my order.',
+      ].join('\n'),
+      at: '2026-09-10T10:30:00+08:00',
+    });
+    await t.runJobs();
+
+    expect(await ticketsOf('Ryan Ortiz')).toEqual([]);
+    expect(await ticketsOf('forcome.com')).toEqual([]);
+    const [stored] = (await archivedMail()).filter(
+      (mail) => mail.from.address === 'mailer@shopify.com',
+    );
+    expect(stored).toMatchObject({
+      mailbox: SHOP_COM.mailbox,
+      subject: 'New customer message on 2026-09-10',
+      recognition: { channel: 'email', source: 'platform_notification' },
+    });
   });
 
   it('已登记生产厂邮箱的来信建工单，来源标「生产厂」，状态待回复（AC-P1-04 的建单部分）', async () => {
@@ -206,6 +250,35 @@ describe('来源识别与亚马逊站点', () => {
     expect((await ticketsOf('陈工')).map((ticket) => ticket.source)).toEqual(['producer']);
     expect((await ticketsOf('FZJ 客服')).map((ticket) => ticket.source)).toEqual(['producer']);
     expect((await ticketsOf('FQD 销售')).map((ticket) => ticket.source)).toEqual(['customer']);
+  });
+
+  it('登记过的其他供应商来信照常建工单，来源标「其他供应商」，详情里的消息同样标注', async () => {
+    // 第一期没有其他供应商的种子（名单由业务提供后用迁移补，协调者 10-05）：测试里登记一条按发件域的规则
+    await t.addSenderRule({
+      kind: 'domain',
+      pattern: 'eccang.example',
+      headerValue: null,
+      source: 'other_supplier',
+      label: '易仓（测试）',
+    });
+    gmail.deliver({
+      to: SHOP_COM.mailbox,
+      from: { name: '易仓客服', address: 'support@eccang.example' },
+      subject: '售后出库单 RO-1029 已出库',
+      text: '售后出库单 RO-1029 已出库，单号见附件。',
+      at: '2026-09-11T09:20:00+08:00',
+    });
+    await t.runJobs();
+
+    const [ticket] = await ticketsOf('易仓客服');
+    expect(ticket).toMatchObject({
+      source: 'other_supplier',
+      channel: 'email',
+      status: 'awaiting_reply',
+    });
+    expect((await ticketDetail(agent, ticket!.number)).messages.map((m) => m.source)).toEqual([
+      'other_supplier',
+    ]);
   });
 
   it('amz-direct@forcome.com 收到发件域 amazon.com.mx 的买家来信 → Forcome Direct、站点 MX、渠道亚马逊（AC-TK-14）', async () => {
@@ -332,6 +405,48 @@ describe('来源识别与亚马逊站点', () => {
     ]);
     expect(await ticketsOf('Lucía Herrera')).toEqual([
       expect.objectContaining({ channel: 'email', site: 'MX', source: 'customer' }),
+    ]);
+  });
+
+  it('Shopify 店铺收到亚马逊域的直邮：渠道邮件，站点取店铺默认站点（站点按发件域只用于亚马逊店铺）', async () => {
+    gmail.deliver({
+      to: SHOP_MX.mailbox,
+      from: { name: 'Camila Torres', address: 'camila.t.3k9x@marketplace.amazon.com' },
+      subject: '¿Venden también en su tienda en línea?',
+      text: 'Compré en Amazon y quiero comprar otro en su tienda.',
+      at: '2026-09-10T13:00:00+08:00',
+    });
+    await t.runJobs();
+
+    expect(await ticketsOf('Camila Torres')).toEqual([
+      expect.objectContaining({ channel: 'email', site: 'MX', source: 'customer' }),
+    ]);
+  });
+
+  it('客户用 @amazon.com 或 @shopify.com 邮箱填 Shopify 联系表单：照常建工单，不按平台通知归档（协调者 10-05 决定）', async () => {
+    gmail.deliver(
+      contactForm(
+        SHOP_COM.mailbox,
+        { name: 'Grace Kim', address: 'grace.kim@amazon.com' },
+        'Is the V2 compatible with 24V trucks?',
+        '2026-09-10T14:00:00+08:00',
+      ),
+    );
+    gmail.deliver(
+      contactForm(
+        SHOP_COM.mailbox,
+        { name: 'Noah Patel', address: 'noah.patel@shopify.com' },
+        'Do you offer bulk discounts?',
+        '2026-09-10T14:05:00+08:00',
+      ),
+    );
+    await t.runJobs();
+
+    expect(await ticketsOf('Grace Kim')).toEqual([
+      expect.objectContaining({ channel: 'shopify', source: 'customer' }),
+    ]);
+    expect(await ticketsOf('Noah Patel')).toEqual([
+      expect.objectContaining({ channel: 'shopify', source: 'customer' }),
     ]);
   });
 });

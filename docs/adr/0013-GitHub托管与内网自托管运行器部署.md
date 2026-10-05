@@ -63,4 +63,8 @@ status: accepted
 
 ## 修订（2026-10-05，待办 10 落地）
 
-- **重放来信**（协调者 10-05 要求做成可重复的步骤）：识别或归并的口径变了，已入库的示例来信不会回头重新识别。非生产环境用 `pnpm staging reset-inbound`（部署脚本：停 worker → 用当前部署的镜像执行 `node dist/reset-inbound.mjs` → 起 worker）或本机 `pnpm db:reset-inbound`（先停 `dev:worker`）清掉收取的邮件、邮箱游标、工单与客户，并把工单编号从 0001 重新发号；worker 重启后重新 watch，Fake Gmail 按新口径重新回放。成员、店铺、来源规则、会话、审计与根证书不动。生产环境三处拒绝：部署脚本、入口（`APP_ENV=production` 时报错退出）、组合函数本身。口径变更后先部署新版本，再重放，再跑一次 `pnpm staging smoke`（或重新部署）核对。
+- **重放来信**（协调者 10-05 要求做成可重复的步骤）：识别或归并的口径变了，已入库的示例来信不会回头重新识别。非生产环境清掉收取的邮件、邮箱游标、工单与客户，并把工单编号从 0001 重新发号；worker 重启后重新 watch，Fake Gmail 按新口径重新回放。成员、店铺、来源规则、会话、审计与根证书不动。三个入口：
+  - 口径变更的版本用 `pnpm deploy:staging --reset-inbound` 部署：在「灌示例数据」之后、「启动 api、worker、caddy」之前多一步「重放来信」（停 worker → 用本次构建的镜像执行 `node dist/reset-inbound.mjs`），起服务后按新口径回放，冒烟在新数据上跑；
+  - 对已部署的版本重放：`pnpm staging reset-inbound`（停 worker → 清空 → 起 worker），再 `pnpm staging smoke`；
+  - 本机开发库：先停 `dev:worker`，`pnpm db:reset-inbound`，再启动 `dev:worker`。
+  生产环境三处拒绝：部署脚本（两个入口都查 `APP_ENV`）、镜像入口 `reset-inbound.mjs`（连数据库之前）、组合函数 `resetInboundData` 本身。

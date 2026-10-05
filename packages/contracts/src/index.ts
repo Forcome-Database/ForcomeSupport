@@ -39,6 +39,7 @@ export {
   type StoreScopeValue,
 } from './auth';
 export {
+  amazonDomains,
   channelCardSchema,
   channelKinds,
   channelKindSchema,
@@ -53,6 +54,7 @@ export {
   platforms,
   platformSchema,
   platformTerms,
+  SHOPIFY_CONTACT_FORM_SENDER,
   siteSchema,
   sites,
   storeConnectionSchema,

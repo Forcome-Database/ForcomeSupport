@@ -6,6 +6,12 @@ import { createApp } from '../src/app';
 import type { ServerDeps } from '../src/deps';
 import { fixtureSteps } from '../src/fixture-steps';
 import { createFeeds, createJobHandlers } from '../src/jobs';
+import {
+  listReceivedMail,
+  registerSenderRule,
+  type ReceivedMail,
+  type SenderRule,
+} from '../src/modules/channel';
 import { findAuditRecords, type AuditQuery, type AuditRecord } from '../src/modules/core/audit';
 import {
   ensureQueues,
@@ -13,6 +19,7 @@ import {
   ManualClock,
   silentLogger,
   startRuntime,
+  SYSTEM_STORE_SCOPE,
   transaction,
   type AnyJobHandler,
   type AppEnv,
@@ -28,6 +35,7 @@ import {
   type AccessVariables,
   type NewMember,
 } from '../src/modules/org';
+import { resetInboundData, type InboundResetReport } from '../src/reset-inbound-data';
 import { createApiClient, type ApiClient, type RequestHandler } from './api-client';
 import { createTestDatabase } from './database';
 import { runQueuedJobs, type JobRunReport, type RunJobsOptions } from './run-jobs';
@@ -105,6 +113,14 @@ export interface TestHarness {
   loadFixtures(): Promise<FixtureLoadReport>;
   /** 按动作或对象取审计记录（P27 的查询接口随 30 号待办；在那之前用它核对审计） */
   auditRecords(query?: AuditQuery): Promise<AuditRecord[]>;
+  /**
+   * 登记一条来源规则（第一期没有维护页面，规则随迁移与示例数据登记；测试里登记示例数据没有的，例如其他供应商）
+   */
+  addSenderRule(rule: SenderRule & { readonly label: string }): Promise<void>;
+  /** 收取的邮件（含归档的平台通知与营销，按到达时间先后；第一期没有查看页面，用它核对「归档不丢信」） */
+  receivedMail(filter?: { readonly mailbox?: string }): Promise<ReceivedMail[]>;
+  /** 重放来信（运维命令 reset-inbound 的同一个函数，按本测试的运行环境：生产环境拒绝） */
+  resetInbound(): Promise<InboundResetReport>;
   /** 关闭连接并删除本测试的库 */
   close(): Promise<void>;
 }
@@ -235,6 +251,12 @@ export async function startTestHarness(
       loadFixtures(runtime, { appEnv: setupEnv, fixture: getDemoFixture(), steps: fixtureSteps }),
 
     auditRecords: (query) => findAuditRecords(runtime.db, query),
+
+    addSenderRule: (rule) => transaction(runtime, (tx) => registerSenderRule(tx, rule)),
+
+    receivedMail: (filter) => listReceivedMail(runtime.db, SYSTEM_STORE_SCOPE, filter),
+
+    resetInbound: () => resetInboundData(runtime, appEnv),
 
     close,
   };

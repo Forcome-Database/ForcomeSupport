@@ -137,7 +137,7 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 | `pnpm test:unit` · `pnpm test:integration` | 单元测试 · 集成测试（需要 `pnpm db:up`；CI 经 `TEST_DATABASE_URL` 指向服务容器） |
 | `pnpm test:e2e` | Playwright 端到端（需要 `pnpm db:up`；自己起 4518、4519 两个服务，用 e2e 专用库 `forcome_e2e`） |
 | `pnpm ci:local` | 本机跑一遍与 CI 相同的检查（先 `pnpm db:up`，并且需要 Docker 构建镜像） |
-| `pnpm deploy:staging` | 部署到开发测试环境（本机 Docker）：构建镜像 → migrate → 示例数据 → 起服务 → 用根证书核对 HTTPS → Playwright 冒烟，报告在 `deploy/.state/staging/`（`docs/部署说明.md`） |
+| `pnpm deploy:staging` | 部署到开发测试环境（本机 Docker）：构建镜像 → migrate → 示例数据 → 起服务 → 用根证书核对 HTTPS → Playwright 冒烟，报告在 `deploy/.state/staging/`（`docs/部署说明.md`）；识别或归并口径变了的版本加 `--reset-inbound`，起服务前先重放来信 |
 | `pnpm staging smoke` · `cert` · `compose …` · `down` · `reset-inbound` | 对开发测试环境：重跑 HTTPS 核对与冒烟 · 导出根证书 · 执行 docker compose · 停止（保留数据） · 重放来信（停 worker、清空收信与工单、起 worker，`docs/部署说明.md`） |
 | `pnpm deploy:verify` | 部署配置检查：Compose 文件、前端镜像、Caddyfile（CI 与 `ci:local` 执行） |
 

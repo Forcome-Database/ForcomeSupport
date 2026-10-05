@@ -16,6 +16,8 @@ import {
 const AMAZON_STORE: StoreFacts = { platform: 'amazon', defaultSite: 'US' };
 const SHOPIFY_STORE: StoreFacts = { platform: 'shopify', defaultSite: 'US' };
 const SHOPIFY_MX_STORE: StoreFacts = { platform: 'shopify', defaultSite: 'MX' };
+/** 默认站点是 MX 的亚马逊店铺：区分「按发件域定站点」与「取默认站点」 */
+const AMAZON_MX_STORE: StoreFacts = { platform: 'amazon', defaultSite: 'MX' };
 
 /** 迁移 0009 的种子：平台通知（发件域精确等于）与营销（头） */
 const SEED_RULES: readonly SenderRule[] = [
@@ -134,7 +136,12 @@ describe('渠道识别（R-TK-08）', () => {
     const relayed = mail({
       from: { address: 'buyer.x@marketplace.amazon.com', name: 'Buyer' },
     });
-    expect(recognizeInbound(relayed, SHOPIFY_STORE, RULES).channel).toBe('email');
+    // Shopify 店铺不按发件域定站点：取店铺默认站点
+    expect(recognizeInbound(relayed, SHOPIFY_MX_STORE, RULES)).toMatchObject({
+      channel: 'email',
+      site: 'MX',
+      source: 'customer',
+    });
     expect(recognizeInbound(contactForm(), AMAZON_STORE, RULES)).toMatchObject({
       channel: 'email',
       // 不是联系表单，就是 Shopify 的系统邮件
@@ -143,12 +150,20 @@ describe('渠道识别（R-TK-08）', () => {
     });
   });
 
-  it('mailer@shopify.com 发来、却找不到客户邮箱（不是联系表单通知）→ 邮件，按 Shopify 系统邮件归档', () => {
+  it('mailer@shopify.com 发来、却找不到客户邮箱（系统邮件，或只留电话的表单）→ 邮件，按 Shopify 系统邮件归档（协调者 10-05 决定）', () => {
     const system = contactForm({ replyTo: [], text: 'Your store has a new payout.' });
-    expect(recognizeInbound(system, SHOPIFY_STORE, RULES)).toMatchObject({
-      channel: 'email',
-      source: 'platform_notification',
+    const phoneOnly = contactForm({
+      replyTo: [{ address: 'no-reply@shopify.com', name: '' }],
+      text: ['Name: Ryan Ortiz', 'Phone Number: +1 787 555 0101', 'Body:', 'Call me please.'].join(
+        '\n',
+      ),
     });
+    for (const facts of [system, phoneOnly]) {
+      expect(recognizeInbound(facts, SHOPIFY_STORE, RULES)).toMatchObject({
+        channel: 'email',
+        source: 'platform_notification',
+      });
+    }
   });
 });
 
@@ -161,16 +176,28 @@ describe('站点识别（R-ST-02，AC-TK-14）', () => {
     expect(siteOf('mateo.r.8k3p@marketplace.amazon.com.mx')).toBe('MX');
   });
 
-  it('发件域不是亚马逊的取店铺默认站点（Shopify 按订单收件国家随待办 14）', () => {
-    expect(recognizeInbound(contactForm(), SHOPIFY_MX_STORE, RULES).site).toBe('MX');
-    expect(recognizeInbound(mail(), SHOPIFY_MX_STORE, RULES).site).toBe('MX');
+  it('亚马逊平台通知也按发件域定站点（amazon.ca → CA）', () => {
+    const notice = mail({ from: { address: 'donotreply@amazon.ca', name: '' } });
+    expect(recognizeInbound(notice, AMAZON_MX_STORE, RULES).site).toBe('CA');
   });
 
-  it('只认这几个域本身，形似的域不算（amazon.com.example、notamazon.ca）', () => {
+  it('亚马逊店铺收到发件域不是亚马逊的来信，取店铺默认站点', () => {
+    expect(recognizeInbound(mail(), AMAZON_MX_STORE, RULES).site).toBe('MX');
+  });
+
+  it('Shopify 店铺一律取店铺默认站点（按订单收件国家随待办 14），即使发件域是亚马逊的域', () => {
+    expect(recognizeInbound(contactForm(), SHOPIFY_MX_STORE, RULES).site).toBe('MX');
+    expect(recognizeInbound(mail(), SHOPIFY_MX_STORE, RULES).site).toBe('MX');
+    const amazonDomain = mail({ from: { address: 'buyer@marketplace.amazon.com', name: '' } });
+    expect(recognizeInbound(amazonDomain, SHOPIFY_MX_STORE, RULES).site).toBe('MX');
+  });
+
+  it('只认这几个域本身，形似的域不算（amazon.com.example、notamazon.ca、子域）', () => {
     const siteOf = (address: string) =>
-      recognizeInbound(mail({ from: { address, name: '' } }), SHOPIFY_MX_STORE, RULES).site;
+      recognizeInbound(mail({ from: { address, name: '' } }), AMAZON_MX_STORE, RULES).site;
     expect(siteOf('x@marketplace.amazon.com.example')).toBe('MX');
     expect(siteOf('x@notamazon.ca')).toBe('MX');
+    expect(siteOf('x@mail.amazon.com')).toBe('MX');
   });
 });
 
@@ -255,12 +282,37 @@ describe('来源规则匹配（规格 channel「来源识别」，PRD 1.4）', (
     ).toBe('customer');
   });
 
-  it('联系表单按填表人判来源：生产厂用登记的邮箱填表，来源是生产厂', () => {
-    const form = contactForm({ replyTo: [{ address: 'qc@fqd-forcome.com', name: '' }] });
-    expect(recognizeInbound(form, SHOPIFY_STORE, RULES)).toMatchObject({
+  it('联系表单按填表人判来源：生产厂用登记的邮箱填表是生产厂，其他供应商按发件域登记的也算', () => {
+    const producer = contactForm({ replyTo: [{ address: 'qc@fqd-forcome.com', name: '' }] });
+    expect(recognizeInbound(producer, SHOPIFY_STORE, RULES)).toMatchObject({
       channel: 'shopify',
       source: 'producer',
     });
+    const supplier = contactForm({ replyTo: [{ address: 'ops@eccang.example', name: '' }] });
+    expect(recognizeInbound(supplier, SHOPIFY_STORE, RULES).source).toBe('other_supplier');
+  });
+
+  it('经平台中转的来信不套用平台通知与营销规则：客户用 @amazon.com、@shopify.com 邮箱填联系表单仍是客户（协调者 10-05 决定）', () => {
+    for (const address of ['jane.doe@amazon.com', 'jane.doe@shopify.com']) {
+      const form = contactForm({ replyTo: [{ address, name: 'Jane Doe' }] });
+      expect(recognizeInbound(form, SHOPIFY_STORE, RULES)).toMatchObject({
+        channel: 'shopify',
+        source: 'customer',
+        sender: { address },
+      });
+    }
+    // 亚马逊买家消息中转地址即使被登记成平台通知，也不归档
+    const rules: SenderRule[] = [
+      ...RULES,
+      {
+        kind: 'address',
+        pattern: 'buyer@marketplace.amazon.com',
+        headerValue: null,
+        source: 'platform_notification',
+      },
+    ];
+    const relayed = mail({ from: { address: 'buyer@marketplace.amazon.com', name: 'Buyer' } });
+    expect(recognizeInbound(relayed, AMAZON_STORE, rules).source).toBe('customer');
   });
 
   it('优先级：精确地址 > 发件域 > 头（协调者 10-05）——登记的生产厂邮箱发来带 List-Unsubscribe 的信仍是生产厂', () => {

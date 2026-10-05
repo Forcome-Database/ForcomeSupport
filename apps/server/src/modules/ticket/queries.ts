@@ -109,16 +109,17 @@ export async function ticketDetail(
     if (!s) {
       throw new Error(`工单 ${row.number} 的消息 ${link.channelMessageId} 在当前店铺范围里读不到`);
     }
-    // 工单里的来信都识别过（归档的来源不进工单）：客户渠道身份与来源不为空
-    if (s.senderAddress === null || s.source === null || !isTicketSource(s.source)) {
+    // 工单里的来信都识别过，来源也不会是归档的平台通知与营销
+    const recognized = s.recognition;
+    if (!recognized || !isTicketSource(recognized.source)) {
       throw new Error(`工单 ${row.number} 的消息 ${s.id} 没有识别结果`);
     }
     return {
       id: s.id,
       direction: s.direction,
       mailbox: s.mailbox,
-      from: { name: s.senderName ?? '', address: s.senderAddress },
-      source: s.source,
+      from: { name: recognized.sender.name, address: recognized.sender.address },
+      source: recognized.source,
       subject: s.subject,
       arrivedAt: s.receivedAt.toISOString(),
       alsoSentTo: [...s.alsoSentTo],

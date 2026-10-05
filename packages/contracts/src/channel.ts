@@ -17,6 +17,18 @@ export const sites = ['US', 'CA', 'MX'] as const;
 export const siteSchema = z.enum(sites);
 export type Site = z.infer<typeof siteSchema>;
 
+/**
+ * 平台的邮件约定（R-TK-08、R-ST-02；channel 识别来信与 Fake Gmail 仿真来信共用，待办 10）：
+ * - 亚马逊各站点的域：平台通知从站点域发出（amazon.com …），买家消息经中转域转到店铺绑定的邮箱（marketplace.amazon.com …）；
+ * - Shopify 联系表单的通知由这个地址代发，Reply-To 是填表客户的邮箱。
+ */
+export const amazonDomains: Record<Site, { readonly site: string; readonly relay: string }> = {
+  US: { site: 'amazon.com', relay: 'marketplace.amazon.com' },
+  CA: { site: 'amazon.ca', relay: 'marketplace.amazon.ca' },
+  MX: { site: 'amazon.com.mx', relay: 'marketplace.amazon.com.mx' },
+};
+export const SHOPIFY_CONTACT_FORM_SENDER = 'mailer@shopify.com';
+
 /** 各平台的平台标识（亚马逊卖家 ID、Shopify 店铺域名）与进线邮箱的叫法：店铺表、抽屉与报错共用 */
 export const platformTerms: Record<
   Platform,

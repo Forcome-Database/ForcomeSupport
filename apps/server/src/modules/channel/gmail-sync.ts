@@ -26,7 +26,8 @@ import {
   type IntegrationClients,
 } from '../integration';
 import { recognizeInbound, type MailAddress, type SenderRule } from './recognition';
-import { mailboxSync, message, senderRule, store, storeMailbox } from './schema';
+import { mailboxSync, message, store, storeMailbox } from './schema';
+import { loadSenderRules } from './sender-rules';
 
 /*
  * 收信（规格 channel「Gmail 客户端」「去重」，ADR 0008 修订；待办 08 是最小形态）：
@@ -192,18 +193,6 @@ function firstMailbox(address: Address | undefined): MailAddress {
 /** 地址列表展开成「地址 + 显示名」（含地址组的成员；Reply-To 用） */
 function mailboxesOf(list: readonly Address[] | undefined): MailAddress[] {
   return (list ?? []).flatMap((a) => (a.group ?? [a]).map((m) => firstMailbox(m)));
-}
-
-/** 来源规则表（每次同步读一次：规则只在迁移与示例数据里变，读一次足够新） */
-async function loadSenderRules(db: DbExecutor): Promise<SenderRule[]> {
-  return db
-    .select({
-      kind: senderRule.kind,
-      pattern: senderRule.pattern,
-      headerValue: senderRule.headerValue,
-      source: senderRule.source,
-    })
-    .from(senderRule);
 }
 
 /** References 等头里的 Message-ID 列表（各自带尖括号） */
