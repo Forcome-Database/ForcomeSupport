@@ -255,9 +255,10 @@ describe('编辑登记的表单（S14 编辑登记、补充小样之三）', () 
     expect(lockedFields('backfill', refund, ['fees.compensation'])('fees.compensation')).toBe(
       false,
     );
-    // 「配件 × 数量」缺：配件与数量两项都可填
-    const part = lockedFields('backfill', base, ['part']);
-    expect([part('partSku'), part('partQuantity')]).toEqual([false, false]);
+    // 「配件 × 数量」缺：空着的那一项可填，已填的配件不跟着解锁
+    const noQuantity = { ...base, partSku: 'FC-V2-HF01', partQuantity: '' };
+    const part = lockedFields('backfill', noQuantity, ['part']);
+    expect([part('partSku'), part('partQuantity')]).toEqual([true, false]);
     const open = lockedFields('edit', base);
     expect(open('customerName')).toBe(false);
     const readonly = lockedFields('readonly', base);

@@ -84,6 +84,7 @@ import { api, ApiRequestError } from '@/lib/api';
 import { formatClock, storeOptionsQuery } from '@/lib/channel';
 import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { endSessionIfUnauthenticated } from '@/lib/session';
+import { formatUsdCents } from '@/lib/cents';
 import { cn } from '@/lib/utils';
 import {
   BACKFILL_RESULT,
@@ -103,7 +104,6 @@ import {
   factoryPercents,
   feeTotalCents,
   fieldLabel,
-  formatUsdCents,
   FORM_ORDER,
   formErrorsOf,
   formValuesOf,

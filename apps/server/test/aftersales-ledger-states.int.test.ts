@@ -511,19 +511,19 @@ describe('编辑登记、设为已完成与撤销（6.5、10.1「○」）', () 
   });
 
   it('AC-AS-22：进行中、尚未寄出的单不标缺、不计完整率；没有补登——不是登记人或负责人的售后负责人也改不了', async () => {
+    const before = (await ledger(owner)).completion;
     const item = await register(
       supervisor,
       shippedParts({ customerName: 'Not Shipped', shipDate: null, trackingNumber: '' }),
     );
-    const before = await ledger(owner);
-    expect(before.items.find((i) => i.number === item.number)).toMatchObject({
+    const after = await ledger(owner);
+    expect(after.items.find((i) => i.number === item.number)).toMatchObject({
       status: 'in_progress',
       trackingNumber: null,
       missing: [],
     });
-    expect(before.completion.completed).toBe(
-      (await ledger(owner, '?missing=1')).completion.completed,
-    );
+    // 不计入完整率：登记前后完整率不变
+    expect(after.completion).toEqual(before);
     expect((await ledger(owner, '?missing=1')).items.map((i) => i.number)).not.toContain(
       item.number,
     );

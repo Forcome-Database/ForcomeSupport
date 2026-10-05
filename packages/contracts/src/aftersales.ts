@@ -180,9 +180,12 @@ export const registrationItems = [
 ] as const;
 export type RegistrationItem = (typeof registrationItems)[number];
 
-/** R-AS-08 的一个字段对应的登记项（「配件 × 数量」是配件与数量两项，其余同名） */
-export function itemsOfField(field: RegistrationField): RegistrationItem[] {
-  return field === 'part' ? ['partSku', 'partQuantity'] : [field];
+/**
+ * 补登时还能改的已填项：按 R-AS-08 算缺、却已经有值的字段（例如「退款或部分补偿」的额外赔偿登记成 0）。
+ * 「配件 × 数量」缺只会是配件或数量空着，空着的那一项本来就能填，已填的那一项不跟着解锁。
+ */
+export function refillableItems(missing: readonly RegistrationField[]): RegistrationItem[] {
+  return missing.filter((field): field is Exclude<RegistrationField, 'part'> => field !== 'part');
 }
 
 /** 字段的叫法（S14 抽屉的字段名；台账「缺 N 项」的悬停说明也用它） */
@@ -713,8 +716,6 @@ export interface AftersalesActions {
   readonly cancel: boolean;
   readonly backfill: boolean;
   readonly changeRate: boolean;
-  /** 撤销刚做的「设为已完成」（能设为已完成的人；时限由服务端判断） */
-  readonly undoComplete: boolean;
 }
 
 /** 判断权限要看的：单的状态、登记人与负责人 */
@@ -725,11 +726,12 @@ export interface AftersalesActionTarget {
 }
 
 /**
- * 编辑进行中的单、设为已完成（10.1「○」）：客服主管只能对自己登记的，售后负责人对自己登记或负责的；多角色取并集
+ * 这张单算不算查看者的（10.1「编辑进行中的手工登记单、设为已完成」的「○」）：客服主管是自己登记的，售后负责人是自己登记或负责的；
+ * 多角色取并集。只看归属，不看状态（设为已完成的撤销也按它）
  */
-function editsOpen(
+export function ownsRegistration(
   viewer: { readonly id: string; readonly roles: readonly Role[] },
-  target: AftersalesActionTarget,
+  target: Pick<AftersalesActionTarget, 'registeredById' | 'ownerId'>,
 ): boolean {
   if (!can(viewer.roles, 'aftersales.edit_open')) return false;
   const registered = target.registeredById === viewer.id;
@@ -750,12 +752,10 @@ export function aftersalesActions(
   target: AftersalesActionTarget,
 ): AftersalesActions {
   const open = target.status === 'in_progress';
-  const owns = editsOpen(viewer, target);
-  const editor = open && owns;
+  const editor = open && ownsRegistration(viewer, target);
   return {
     edit: editor,
     complete: editor,
-    undoComplete: target.status === 'completed' && owns,
     cancel: open && can(viewer.roles, 'aftersales.cancel'),
     backfill: target.status === 'completed' && can(viewer.roles, 'aftersales.backfill'),
     changeRate: target.status !== 'cancelled' && can(viewer.roles, 'aftersales.backfill'),
@@ -1016,6 +1016,7 @@ export const ledgerActionMessages = {
   keptNotRegistered: '只能保留已登记的费用',
   /** 没有编辑权限（403） */
   editDenied: '只有登记人或负责人可以修改进行中的单',
+  cancelDenied: '只有客服主管或售后负责人可以取消售后单',
   backfillDenied: '只有售后负责人可以补登已完成的单',
   rateDenied: '只有售后负责人可以修改汇率',
 } as const;

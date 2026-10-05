@@ -30,6 +30,7 @@ import { findTicketReference, type TicketReference } from '../ticket';
 import { actorName, auditSnapshot } from './audit';
 import { convertFees, feeColumnValues, type FeeValue } from './fees';
 import { type AftersalesRow } from './ledger';
+import { ledgerTransition } from './lifecycle';
 import { aftersales, responsibilityRatio } from './schema';
 
 /*
@@ -223,6 +224,13 @@ export function registrationColumns(
   };
 }
 
+/** 新建登记的状态：问迁移表（ADR 0008） */
+const REGISTERED_STATUS = (() => {
+  const result = ledgerTransition(null, 'register');
+  if ('error' in result) throw new Error('迁移表里没有「新建登记」');
+  return result.to;
+})();
+
 /** 新建的售后单与它的店铺名 */
 export interface Registered {
   readonly row: AftersalesRow;
@@ -275,7 +283,7 @@ export async function createRegistration(
       .insert(aftersales)
       .values({
         number: await nextBusinessNumber(tx, 'aftersales', tx.now),
-        status: 'in_progress',
+        status: REGISTERED_STATUS,
         origin: 'manual_registration',
         ...registrationColumns(input, ratios, converted.values, sourceTicketColumns(ticket)),
         registeredById: registrar?.memberId ?? null,

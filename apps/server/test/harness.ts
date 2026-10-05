@@ -129,8 +129,8 @@ export interface TestHarness {
   /** 重放来信（运维命令 reset-inbound 的同一个函数，按本测试的运行环境：生产环境拒绝） */
   resetInbound(): Promise<InboundResetReport>;
   /**
-   * 写一张历史导入的售后单（AC-P1-07 等）：售后登记表的导入命令随待办 27，在那之前测试工具直接写售后单表（与 t.addMember
-   * 同理，是测试准备；断言仍经接口）。27 落地后改调导入命令。
+   * 写一张历史导入的售后单（AC-P1-07 等）：售后登记表的导入命令随待办 27，在那之前测试工具直接写售后单表——ADR 0005
+   * 「待办 21 落地」修订登记的例外，是测试准备，断言仍经接口。27 落地后改调导入命令。
    */
   addHistoryImport(row: HistoryImportRow): Promise<void>;
   /** 关闭连接并删除本测试的库 */

@@ -6,7 +6,6 @@ import {
   formatRate,
   formatRateDate,
   handlingMethodLabels,
-  ledgerActionMessages,
   missingItemLabels,
   responsibilityLabels,
   type CurrentMember,
@@ -371,20 +370,27 @@ function useInlineBackfill(): InlineBackfill {
     await refresh();
   }
 
+  /**
+   * 这一格刚被别人改过或补过：409，或快递单号上有字段错误（行内只交快递单号，补登时它唯一会报的就是「只能补登缺失的字段」）。
+   * 是的话收起编辑、刷新成最新
+   */
+  async function collapseIfStale(error: unknown): Promise<boolean> {
+    const stale =
+      error instanceof ApiRequestError &&
+      (error.status === 409 || error.fields?.trackingNumber !== undefined);
+    if (!stale) return false;
+    setEditing(null);
+    await refresh();
+    return true;
+  }
+
   async function save(item: LedgerItem): Promise<void> {
     const tracking = draft.trim();
     try {
       await saveOnce(item, tracking);
     } catch (error) {
       if (endSessionIfUnauthenticated(queryClient, error)) return;
-      // 这一格刚被别人改过或补过（409，或「已完成的单只能补登缺失的字段」）：刷新成最新，收起编辑
-      const stale =
-        error instanceof ApiRequestError &&
-        (error.status === 409 ||
-          error.fields?.trackingNumber === ledgerActionMessages.backfillFilled);
-      if (stale) {
-        setEditing(null);
-        await refresh();
+      if (await collapseIfStale(error)) {
         showError({
           id: BACKFILL_TOAST,
           action: BACKFILL_RESULT.failedAction,
@@ -397,7 +403,11 @@ function useInlineBackfill(): InlineBackfill {
         id: BACKFILL_TOAST,
         action: BACKFILL_RESULT.failedAction,
         error,
-        retry: () => saveOnce(item, tracking),
+        retry: () =>
+          saveOnce(item, tracking).catch(async (retryError: unknown) => {
+            await collapseIfStale(retryError);
+            throw retryError;
+          }),
       });
     }
   }

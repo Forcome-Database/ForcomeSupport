@@ -39,12 +39,12 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AFTERSALES_QUERY_KEY } from '@/lib/aftersales';
+import { centsOf, formatUsdCents } from '@/lib/cents';
 import { api, ApiRequestError } from '@/lib/api';
 import { dismissToast, showError, showSuccess, showUndo } from '@/lib/notify';
 import { endSessionIfUnauthenticated } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { A11Y, CANCEL, COMPLETE_RESULT, COMPLETION, MISSING_FILTER, MORE, STALE } from './p13-copy';
-import { centsOf, formatUsdCents } from './registration-form';
 
 /*
  * P13 台账上的状态操作与完整率（PRD P13「第一阶段」、S13、S15 及其补充小样）：页头的当月登记完整率、点它筛出缺字段的

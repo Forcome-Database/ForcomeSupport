@@ -19,13 +19,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatUsdCents } from '@/lib/cents';
 import { cn } from '@/lib/utils';
 import { A11Y, DRAWER, EDIT, EMPTY_VALUE } from './p13-copy';
 import {
   amountText,
   rateText,
   factoryPercents,
-  formatUsdCents,
   shareCents,
   type FeeForm,
   type RatioSideForm,

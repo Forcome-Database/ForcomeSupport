@@ -1,6 +1,7 @@
 import {
   aftersalesActions,
   CANCEL_REASON_MAX,
+  ownsRegistration,
   feeItems,
   ledgerActionMessages,
   type CancelInput,
@@ -61,20 +62,20 @@ function targetOf(runtime: Runtime, found: AftersalesRow, event: LedgerEvent) {
   return result.to;
 }
 
-/** 写新状态（与这次的其他列）并记审计 */
+/** 写新状态（与这次的其他列，按事务时间给出）并记审计；完成、取消时刻与更新时间、审计时间同一个 tx.now */
 function changeStatus(
   runtime: Runtime,
   access: Access,
   found: AftersalesRow,
   action: string,
-  values: Partial<typeof aftersales.$inferInsert>,
+  values: (now: Date) => Partial<typeof aftersales.$inferInsert>,
 ): Promise<AftersalesRow> {
   return transaction(runtime, async (tx) => {
     const updated = await updateWithVersion(
       tx,
       aftersales,
       { id: found.id, version: found.version },
-      { ...values, updatedAt: tx.now, updatedByName: actorName(access) },
+      { ...values(tx.now), updatedAt: tx.now, updatedByName: actorName(access) },
     );
     const ownerName = await ownerNameOf(tx.db, found.ownerId);
     await recordAudit(tx, access.actor, {
@@ -101,10 +102,10 @@ export async function completeAftersales(
   if (!found) return null;
   const status = targetOf(runtime, found, 'complete');
   if (!aftersalesActions(access.member, found).complete) throw new AccessDeniedError(m.editDenied);
-  return changeStatus(runtime, access, found, 'aftersales.complete', {
+  return changeStatus(runtime, access, found, 'aftersales.complete', (now) => ({
     status,
-    completedAt: runtime.clock.now(),
-  });
+    completedAt: now,
+  }));
 }
 
 /**
@@ -119,18 +120,17 @@ export async function undoComplete(
 ): Promise<AftersalesRow | null> {
   const found = await loadForChange(runtime, access, number, input.version);
   if (!found) return null;
+  // 先看是不是这张单的登记人或负责人（与状态无关），再问迁移表
+  if (!ownsRegistration(access.member, found)) throw new AccessDeniedError(m.editDenied);
   const status = targetOf(runtime, found, 'undo_complete');
-  if (!aftersalesActions(access.member, found).undoComplete) {
-    throw new AccessDeniedError(m.editDenied);
-  }
-  return changeStatus(runtime, access, found, 'aftersales.undo_complete', {
+  return changeStatus(runtime, access, found, 'aftersales.undo_complete', () => ({
     status,
     completedAt: null,
-  });
+  }));
 }
 
 /**
- * 取消售后单（S15 ②、AC-AS-16）：客服主管或售后负责人（接口按能力把关）；原因必填（最多 200 字），keptFees 是确认保留的
+ * 取消售后单（S15 ②、AC-AS-16）：客服主管或售后负责人；原因必填（最多 200 字），keptFees 是确认保留的
  * 已产生费用（只能是已登记的项）。保留的照常计入售后成本，没保留的不计（R-AS-08），原登记额仍在费用列里。已取消不能恢复。
  */
 export async function cancelAftersales(
@@ -142,6 +142,7 @@ export async function cancelAftersales(
   const found = await loadForChange(runtime, access, number, input.version);
   if (!found) return null;
   const status = targetOf(runtime, found, 'cancel');
+  if (!aftersalesActions(access.member, found).cancel) throw new AccessDeniedError(m.cancelDenied);
 
   const errors: FieldErrors = {};
   const reason = input.reason.trim();
@@ -155,13 +156,13 @@ export async function cancelAftersales(
 
   // 已登记的项记保留与否，没登记的项为空
   const keptColumn = (item: FeeItem) => (found[item] === null ? null : kept.has(item));
-  return changeStatus(runtime, access, found, 'aftersales.cancel', {
+  return changeStatus(runtime, access, found, 'aftersales.cancel', (now) => ({
     status,
     cancelReason: reason,
-    cancelledAt: runtime.clock.now(),
+    cancelledAt: now,
     productCostKept: keptColumn('productCost'),
     freightKept: keptColumn('freight'),
     compensationKept: keptColumn('compensation'),
     otherCostKept: keptColumn('otherCost'),
-  });
+  }));
 }

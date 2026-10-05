@@ -11,12 +11,19 @@ const NOW = new Date('2026-09-11T02:20:00Z');
 const seconds = (n: number) => new Date(NOW.getTime() - n * 1000);
 
 describe('第一阶段台账状态的迁移表（6.5）', () => {
-  it('合法的迁移只有三行', () => {
-    expect(ledgerTransitions).toEqual([
-      { from: 'in_progress', event: 'complete', to: 'completed' },
-      { from: 'completed', event: 'undo_complete', to: 'in_progress' },
-      { from: 'in_progress', event: 'cancel', to: 'cancelled' },
+  it('合法的迁移只有四行：新建登记、设为已完成、撤销（带撤销时限的守卫）、取消', () => {
+    expect(ledgerTransitions.map(({ from, event, to }) => [from, event, to])).toEqual([
+      [null, 'register', 'in_progress'],
+      ['in_progress', 'complete', 'completed'],
+      ['completed', 'undo_complete', 'in_progress'],
+      ['in_progress', 'cancel', 'cancelled'],
     ]);
+    expect(ledgerTransitions.filter((t) => t.guard).map((t) => t.event)).toEqual(['undo_complete']);
+  });
+
+  it('新建登记的单是进行中；已有状态的单不能再「新建」', () => {
+    expect(ledgerTransition(null, 'register')).toEqual({ to: 'in_progress' });
+    expect(ledgerTransition('in_progress', 'register')).toEqual({ error: 'not_allowed' });
   });
 
   it('进行中可以设为已完成、取消', () => {
@@ -48,6 +55,8 @@ describe('第一阶段台账状态的迁移表（6.5）', () => {
       ['cancelled', 'cancel'],
       ['cancelled', 'undo_complete'],
       ['in_progress', 'undo_complete'],
+      ['completed', 'register'],
+      ['cancelled', 'register'],
     ];
     for (const [from, event] of illegal) {
       expect(

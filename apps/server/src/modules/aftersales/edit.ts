@@ -2,12 +2,12 @@ import {
   aftersalesActions,
   clearInapplicable,
   feeItems,
-  itemsOfField,
   ledgerActionMessages,
   normalizeRegistration,
   registrationErrors,
   registrationItems,
   registrationMessages,
+  refillableItems,
   resolveRatios,
   tidyRegistration,
   type Currency,
@@ -194,8 +194,8 @@ export async function updateRegistration(
   if (backfill) {
     // 补登：只能填原来空着的、或按 R-AS-08 算缺的项（例如退款的额外赔偿登记成 0）；其余已填的不能改，
     // 只清空这次新填、却不适用的字段，原来的值一律不动
-    const missing = new Set(missingOf(found).flatMap(itemsOfField));
-    const locked = (key: ChangeKey) => isFilled(previous, key) && !missing.has(key);
+    const refillable = new Set(refillableItems(missingOf(found)));
+    const locked = (key: ChangeKey) => isFilled(previous, key) && !refillable.has(key);
     for (const key of attempted) if (locked(key)) errors[key] = m.backfillFilled;
     input = clearInapplicable(merged);
     for (const key of registrationItems) if (locked(key)) input = copyKey(input, previous, key);

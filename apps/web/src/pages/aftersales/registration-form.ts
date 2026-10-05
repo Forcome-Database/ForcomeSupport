@@ -3,16 +3,15 @@ import {
   feeItemGroup,
   feeItemLabels,
   feeItems,
-  formatMoney,
   isPercent,
   isValidAmount,
   isValidRate,
-  itemsOfField,
   normalizeRate,
   ratioGroups,
   ratioPairsOf,
   registrationFields,
   registrationItems,
+  refillableItems,
   usdOf,
   type AftersalesDetail,
   type ClaimStatus,
@@ -34,6 +33,7 @@ import {
   type Site,
 } from '@forcome/contracts';
 import type { FieldPath } from 'react-hook-form';
+import { centsOf } from '@/lib/cents';
 import { DRAWER } from './p13-copy';
 
 /*
@@ -271,25 +271,6 @@ export function fieldLabel(field: RegistrationFormPath): string {
 
 // ---------------------------------------------------------------- 比例表与费用合计
 
-/** 金额文字 → 分（整数，不经浮点）；没填为 0，不是合法金额（contracts 的 isValidAmount）为 null */
-export function centsOf(amount: string): number | null {
-  const text = amount.trim();
-  if (text === '') return 0;
-  if (!isValidAmount(text)) return null;
-  const [whole = '0', fraction = ''] = text.split('.');
-  return Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
-}
-
-/** 分 → 金额字符串（两位小数） */
-export function amountOfCents(cents: number): string {
-  return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
-}
-
-/** 分 → 美元写法（「$10.00」）：比例表与费用合计用 */
-export function formatUsdCents(cents: number): string {
-  return formatMoney(amountOfCents(cents), 'USD');
-}
-
 /** 费用发生日可用的各币种汇率（接口 exchange-rates 的 rates）；还没取到为 undefined */
 export type RatesOn = ExchangeRatesOn['rates'] | undefined;
 
@@ -501,8 +482,8 @@ export function changedFieldLabels(
 export type DrawerAccess = 'edit' | 'backfill' | 'readonly';
 
 /**
- * 哪些项锁定（禁用）：只读全锁；编辑都不锁；补登锁原来已填的，但按 R-AS-08 算缺的项（missing，例如退款的额外赔偿登记成 0）
- * 仍可填（同后端 edit.ts 的判断）
+ * 哪些项锁定（禁用）：只读全锁；编辑都不锁；补登锁原来已填的，但按 R-AS-08 算缺、却已经有值的项（例如退款的额外赔偿登记成 0，
+ * contracts 的 refillableItems）仍可填（同后端 edit.ts 的判断）
  */
 export function lockedFields(
   access: DrawerAccess,
@@ -511,6 +492,6 @@ export function lockedFields(
 ): (item: FormItem) => boolean {
   if (access === 'readonly') return () => true;
   if (access === 'edit') return () => false;
-  const open = new Set(missing.flatMap(itemsOfField));
+  const open = new Set(refillableItems(missing));
   return (item) => isFilledItem(base, item) && !open.has(item);
 }
