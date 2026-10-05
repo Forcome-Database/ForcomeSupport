@@ -10,12 +10,15 @@ import {
   shipperLabels,
 } from '@forcome/contracts';
 import type { DemoFixture, FixtureFee, FixtureLedgerRow } from '@forcome/fixtures';
-import { isNotNull, isNull, or, and } from 'drizzle-orm';
+import { and, isNotNull, isNull, or } from 'drizzle-orm';
 import { businessNumberSequence, defineFixtureStep, reserveBusinessNumbers } from '../core';
 import { convertedFee, feeColumnValues, NO_FEE, usdFee, type FeeValue } from './fees';
+import { aftersales } from './schema';
 
 /** 费用项列里汇率与冻结美元值那几列（补齐旧行时只动它们，原币金额与币种不动） */
-function conversionColumns(values: ReturnType<typeof feeColumnValues>) {
+function conversionColumns(
+  values: ReturnType<typeof feeColumnValues>,
+): Partial<ReturnType<typeof feeColumnValues>> {
   return Object.fromEntries(
     feeItems.flatMap((item) =>
       (['Usd', 'Rate', 'RateDate', 'RateSource'] as const).map((suffix) => [
@@ -25,7 +28,6 @@ function conversionColumns(values: ReturnType<typeof feeColumnValues>) {
     ),
   );
 }
-import { aftersales } from './schema';
 
 /** 示例数据里的中文取值换成枚举（夹具保留原型与 PRD 的写法，加载步骤自己映射） */
 function byLabel<K extends string>(labels: Record<K, string>, label: string, what: string): K {

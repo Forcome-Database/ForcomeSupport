@@ -62,10 +62,11 @@ const ecbParser = new XMLParser({
   isArray: (name) => name === 'Cube',
 });
 
-function unrecognized(operation: string, detail: string): ExternalCallFailedError {
+function unrecognized(operation: string, detail: string, cause?: unknown): ExternalCallFailedError {
   return new ExternalCallFailedError('exchange_rate', operation, {
     message: `返回内容不认识：${detail}`,
     retryable: false,
+    cause,
   });
 }
 
@@ -91,7 +92,7 @@ export function parseEcbRates(xml: string, operation: string): EurReferenceRates
   try {
     parsed = ecbParser.parse(xml);
   } catch (error) {
-    throw unrecognized(operation, String(error));
+    throw unrecognized(operation, String(error), error);
   }
   const document = ecbDocumentSchema.safeParse(parsed);
   if (!document.success) throw unrecognized(operation, '不是欧洲央行的参考汇率文件');

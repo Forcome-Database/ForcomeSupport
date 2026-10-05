@@ -114,7 +114,7 @@ const rateChangeRoute = createRoute({
     200: json(ledgerItemSchema, '已修改'),
     400: json(
       apiErrorSchema,
-      '填错（fields 的键为 rates.<费用项>：汇率格式、美元金额、没登记的费用；rates：已取消的单、没有要改的）',
+      '填错（fields 的键为 rates.<费用项>：汇率格式、美元金额、没登记的费用、这张单没有费用发生日；rates：已取消的单、没有要改的）',
     ),
     401: unauthenticated,
     403: json(apiErrorSchema, '不是售后负责人，或这张单不在店铺范围内（E-24，记审计）'),

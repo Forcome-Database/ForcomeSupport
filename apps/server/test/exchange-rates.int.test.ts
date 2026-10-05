@@ -406,6 +406,21 @@ describe('修改汇率：只有售后负责人，记审计（PRD 10.1「补登�
     expect(await c.t.auditRecords({ action: 'aftersales.change_rate' })).toHaveLength(1);
   });
 
+  it('这张单没有费用发生日（例如历史导入缺这一项）：改汇率报错，不修改', async () => {
+    const other = await register(c.supervisor, refund('2026-09-11'));
+    await c.t.runtime.db.execute(
+      sql`UPDATE aftersales.aftersales SET fee_date = NULL WHERE id = ${other.id}`,
+    );
+    const res = await c.owner.put(`/api/aftersales/${other.number}/rates`, {
+      version: other.version,
+      rates: { compensation: '19' },
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { fields?: unknown }).fields).toEqual({
+      'rates.compensation': '这张单还没有费用发生日，先补费用发生日再改汇率',
+    });
+  });
+
   it('不在店铺范围内的单：越权（403）并记 access.denied', async () => {
     const outsider = await c.t.addMember({
       name: '赵敏',
