@@ -67,7 +67,7 @@ export function createTicketRoutes(deps: { runtime: Runtime; appEnv: AppEnv }) {
       }),
     );
     if (!found) return c.json({ error: 'not_found', message: '没有这张工单' }, 404);
-    return c.json(await ticketDetail(runtime.db, found), 200);
+    return c.json(await ticketDetail(runtime.db, c.get('access').stores, found), 200);
   });
 
   return routes;

@@ -3,7 +3,7 @@
 目标：PRD 与原型整体定稿，可直接进入研发。预算 3 个子代理。
 
 ## 产出物
-- `spec/prd_a.md–prd_d.md` → `build_prd.py` 生成 `forcome-blueprint-guide.html`（当前 PRD v2.13 定稿评审稿）
+- `spec/prd_a.md–prd_d.md` → `build_prd.py` 生成 `forcome-blueprint-guide.html`（当前 PRD v2.14 定稿评审稿）
 - `spec/data.py` 统一示例数据（所有原型只从这里取数）
 - `spec/shot_phase1.py` → `spec/phase1/*.dc.html` 与 `spec/shots/phase1/*.png`：第一期 7 个页面的全尺寸参照图（前端严格照做，见仓库根目录 CLAUDE.md）
 - `spec/ui.py` 组件库（所有高保真页面只用这里的组件）
@@ -46,6 +46,7 @@
 - [x] 实现依据与第一期参照图（10-03）：CLAUDE.md 补「实现依据」（参照 claude01，按本仓库调整）并改为「界面严格按原型」；新增 AGENTS.md、docs/agents/prototype.md；shot_phase1.py 生成第一期 7 个页面的全尺寸参照图；补 P20、P27 第一阶段整页
 - [x] 文档漂移审查（10-03）：两个审查代理检查入口、技术与过程文档（34 条全部属实并处理）：ADR 0002、0008–0010、0012、0014 补修订；技术方案版本行、金额汇率、用途数、时限清单；README、domain、issue-tracker 跟上现状；tech-plan 过程文档标注历史记录；积加问题清单补第 15、16 条；新建第一期待办 32 统一跟踪外部资质与先决条件
 - [x] 第一期实现回写（10-05，待办 07，用户确认）：P18 新建店铺「数据来源」默认模拟数据；「进线识别」说明去掉与 D-26 冲突的「每店一个」、第一阶段不写「不生成草稿」；K8 补亚马逊店铺、邮箱重复、必填项、编辑抽屉、保存结果、空状态与 G8 小样，K20 补钉钉卡第一阶段已连接的说明行；PRD v2.13；重新生成 Settings、StatesAdmin 与第一期 P18 参照页（画布与 PRD 尚未重新发布）
+- [x] 第一期实现回写（10-05，待办 08，用户确认）：R-TK-07「最早到达」明确为最早收到（同步入库）的一封，已归并后才收到的副本即使到达时间更早也只记「同时发送到」、不改工单店铺；PRD v2.14（只改 PRD 文字，原型不涉及；画布与 PRD 尚未重新发布）
 
 ## 已发布
 - 设计画布：https://claude.ai/artifact/UNVKrFXP8ZfwDJrMhyW2Jp（v38，10-03）

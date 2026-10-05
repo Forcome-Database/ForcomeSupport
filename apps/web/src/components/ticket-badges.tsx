@@ -34,7 +34,7 @@ export function channelLabel(channel: TicketChannel, site: Site): string {
   return `${ticketChannelLabels[channel]} ${site}`;
 }
 
-/** 渠道与店铺（原型 channel(平台, 站点, 店铺)）：渠道徽标 + 12 次要色店铺名 */
+/** 渠道与店铺（原型 channel(平台, 站点, 店铺)）：渠道徽标 + 次要字号（舒适 12、紧凑 11）次要色店铺名 */
 export function TicketChannelStore({
   channel,
   site,
@@ -47,7 +47,7 @@ export function TicketChannelStore({
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5">
       <ChannelBadge channel={CHANNEL_TONE[channel]}>{channelLabel(channel, site)}</ChannelBadge>
-      <span className="truncate text-12 text-muted-foreground" title={store}>
+      <span className="truncate text-minor text-muted-foreground" title={store}>
         {store}
       </span>
     </span>

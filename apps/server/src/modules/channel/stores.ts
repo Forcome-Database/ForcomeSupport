@@ -11,6 +11,7 @@ import {
 } from '@forcome/contracts';
 import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
 import {
+  advisoryLock,
   FieldValidationError,
   OptimisticLockError,
   recordAudit,
@@ -137,7 +138,7 @@ function snapshot(record: StoreContent) {
 
 /** 店铺配置的保存串行化（见文件头） */
 async function lockStoreConfig(tx: Tx): Promise<void> {
-  await tx.db.execute(sql`SELECT pg_advisory_xact_lock(hashtext('channel.store_config'))`);
+  await advisoryLock(tx, 'channel.store_config');
 }
 
 /** 要查库才知道的错误：店铺名被其他店铺用了、进线邮箱已登记在其他店铺 */

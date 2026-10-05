@@ -1,4 +1,10 @@
-import { adapterModes, platforms, sites, ticketChannels } from '@forcome/contracts';
+import {
+  adapterModes,
+  messageDirections,
+  platforms,
+  sites,
+  ticketChannels,
+} from '@forcome/contracts';
 import { sql } from 'drizzle-orm';
 import {
   index,
@@ -104,7 +110,7 @@ export const message = channelSchema.table(
     gmailMessageId: text('gmail_message_id').notNull(),
     gmailThreadId: text('gmail_thread_id').notNull(),
     /** 方向：来信 inbound / 我方发出 outbound（09） */
-    direction: text('direction', { enum: ['inbound', 'outbound'] }).notNull(),
+    direction: text('direction', { enum: messageDirections }).notNull(),
     /** RFC Message-ID（带尖括号）；邮件没写时为空 */
     rfcMessageId: text('rfc_message_id'),
     inReplyTo: text('in_reply_to'),

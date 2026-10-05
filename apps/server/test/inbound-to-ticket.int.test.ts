@@ -95,13 +95,15 @@ describe('来信到工单', () => {
     ]);
   });
 
-  it('同一消息重复投递只入库一次（E-15）：同一封信在 Gmail 的 history 里再次出现，不会再入库、再归并', async () => {
+  it('同一消息重复投递只入库一次（E-15）：同一封信在 Gmail 的 history 里再次出现，按「邮箱 + Gmail 消息 ID」去重，不会再入库、再归并', async () => {
+    // 不带 Message-ID：去重只能靠「邮箱 + Gmail 消息 ID」，不会被 R-TK-07 的跨邮箱判重顶替
     const customer = { name: 'Marcus Lee', address: 'marcus.lee@example.com' };
     const [gmailId] = gmail.deliver(
       letter({
         from: customer,
         subject: 'Received the wrong color',
         at: '2026-09-08T21:30:00+08:00',
+        messageId: null,
       }),
     );
     await t.runJobs();
@@ -116,7 +118,7 @@ describe('来信到工单', () => {
     ]);
   });
 
-  it('同一消息重复投递只入库一次（E-15）：Pub/Sub 的通知没确认成功、再次投递，来信仍只入库一次', async () => {
+  it('Pub/Sub 的通知没确认成功、再次投递：来信仍只入库、归并一次', async () => {
     const customer = { name: 'Laura Bennett', address: 'laura.bennett@example.com' };
     gmail.deliver(
       letter({ from: customer, subject: 'Filter turned yellow', at: '2026-09-08T08:01:00+08:00' }),
@@ -158,7 +160,7 @@ describe('来信到工单', () => {
     ]);
   });
 
-  it('同一封邮件的副本晚到另一个店铺邮箱：仍归在先到的那张工单上，晚到的邮箱记「同时发送到」', async () => {
+  it('同一封邮件的副本晚入库（另一个邮箱同步滞后），即使它的到达时间更早，也只记「同时发送到」，不改工单的店铺（R-TK-07，10-05 用户确认）', async () => {
     const customer = { name: 'Sofía Márquez', address: 'sofia.marquez@example.com' };
     const mail = letter({
       to: DIRECT.mailbox,
@@ -169,11 +171,14 @@ describe('来信到工单', () => {
     });
     gmail.deliver(mail);
     await t.runJobs();
-    gmail.deliver({ ...mail, to: AUTO.mailbox });
+    // 另一个邮箱里的副本 internalDate 早 2 分钟，但同步得晚
+    gmail.deliver({ ...mail, to: AUTO.mailbox, at: '2026-09-06T17:18:00+08:00' });
     await t.runJobs();
 
     const tickets = await ticketsOf(agent, 'Sofía Márquez');
-    expect(tickets.map((ticket) => ticket.store.name)).toEqual(['Forcome Direct']);
+    expect(tickets.map((ticket) => [ticket.store.name, ticket.lastInboundAt])).toEqual([
+      ['Forcome Direct', '2026-09-06T09:20:00.000Z'],
+    ]);
     expect((await ticketDetail(agent, tickets[0]!.number)).messages).toEqual([
       expect.objectContaining({ mailbox: DIRECT.mailbox, alsoSentTo: [AUTO.mailbox] }),
     ]);
@@ -268,6 +273,60 @@ describe('来信到工单', () => {
     expect(rerun.completed.map((job) => job.name)).toEqual([inboundReceivedJob.name]);
     expect(await ticketsOf(agent, 'Ethan Brooks')).toEqual([before]);
     expect(await ticketDetail(agent, before!.number)).toEqual(detailBefore);
+  });
+});
+
+describe('并发归并（规格「需要覆盖的场景·并发」）', () => {
+  let t: TestHarness;
+  let gmail: FakeGmail;
+  let agent: ApiClient;
+
+  beforeAll(async () => {
+    t = await startTestHarness();
+    await t.loadFixtures();
+    gmail = t.clients.fake(gmailClient);
+    await t.runJobs();
+    agent = await t.loginAs('坐席');
+  });
+
+  afterAll(async () => {
+    await t.close();
+  });
+
+  it('同一位新客户的两封无订单来信同时归并：只建一位客户、一张工单，另一封追加（R-TK-02 加锁后再查再写）', async () => {
+    const customer = { name: 'Priya Raman', address: 'priya.raman@example.com' };
+    gmail.deliver(
+      letter({ from: customer, subject: 'Change my address', at: '2026-09-10T10:05:00+08:00' }),
+    );
+    gmail.deliver(
+      letter({ from: customer, subject: 'Re: Change my address', at: '2026-09-10T10:07:00+08:00' }),
+    );
+    const report = await t.runJobs({ concurrently: true });
+    expect(report.completed.filter((job) => job.name === inboundReceivedJob.name)).toHaveLength(2);
+
+    const tickets = await ticketsOf(agent, 'Priya Raman');
+    expect(tickets).toHaveLength(1);
+    expect((await ticketDetail(agent, tickets[0]!.number)).messages).toHaveLength(2);
+  });
+
+  it('同一封邮件的两份副本在两个店铺邮箱同时入库：只建一张工单（R-TK-07 按 Message-ID 加锁）', async () => {
+    const customer = { name: 'Emily Chen', address: 'emily.chen@example.com' };
+    gmail.deliver(
+      letter({
+        to: [AUTO.mailbox, DIRECT.mailbox],
+        from: customer,
+        subject: 'Does the V2 fit a Tesla Model Y?',
+        at: '2026-09-10T11:48:00+08:00',
+        messageId: '<tesla-fit@mail.example.com>',
+      }),
+    );
+    const report = await t.runJobs({ concurrently: true });
+    expect(report.completed.filter((job) => job.name === 'channel.gmail_sync')).toHaveLength(2);
+
+    const tickets = await ticketsOf(agent, 'Emily Chen');
+    expect(tickets).toHaveLength(1);
+    const [message] = (await ticketDetail(agent, tickets[0]!.number)).messages;
+    expect(message!.alsoSentTo).toHaveLength(1);
   });
 });
 
@@ -419,6 +478,14 @@ describe('工单状态只能经迁移表改变（ADR 0008）', () => {
     expect((await ticketList(agent)).map((ticket) => ticket.status)).toEqual(['awaiting_reply']);
   });
 
+  it('绕过迁移表直接写关闭原因也被拒绝（关闭原因只随迁移到已关闭写入）', async () => {
+    await expect(
+      t.runtime.db.execute(
+        sql`UPDATE ticket.ticket SET close_reason = 'customer_no_reply' WHERE number = ${number}`,
+      ),
+    ).rejects.toMatchObject({ cause: { message: expect.stringContaining(GUARD) as string } });
+  });
+
   it('不写状态变更记录直接插入工单也被拒绝', async () => {
     const [existing] = (
       await t.runtime.db.execute<{ store_id: string; customer_id: string }>(
@@ -490,7 +557,7 @@ describe('开发测试环境的示例来信回放（ADR 0009 修订）', () => {
     t.clients.replayFixtures(getDemoFixture());
     // 已有游标的邮箱不再 watch，回放的信等续订 watch（09）时才送达；这里模拟续订后同步一次
     const gmail = t.clients.fake(gmailClient);
-    for (const store of stores) await gmail.client(store.id).watch(store.mailbox);
+    for (const store of stores) await gmail.client().watch(store.mailbox);
     await t.runJobs();
     expect(await ticketList(await t.loginAs('客服主管'))).toEqual(before);
   });

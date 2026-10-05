@@ -1,6 +1,17 @@
-import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, ne } from 'drizzle-orm';
 import { findInboundMessage, type InboundMessage } from '../channel';
-import { nextBusinessNumber, systemActor, transaction, type JobContext, type Tx } from '../core';
+import {
+  advisoryLock,
+  nextBusinessNumber,
+  storeScopeCondition,
+  SYSTEM_STORE_SCOPE,
+  systemActor,
+  transaction,
+  updateWithVersion,
+  type JobContext,
+  type StoreScope,
+  type Tx,
+} from '../core';
 import { customer, customerIdentity, ticket, ticketMessage } from './schema';
 import { applyTransition, createTicket } from './ticket-status';
 
@@ -11,10 +22,6 @@ import { applyTransition, createTicket } from './ticket-status';
  * 任务幂等：一封信只归并一次（工单消息按邮件 id 唯一），重跑结果不变。
  * 带订单号的来信按 R-TK-01 追加、重开或新建随 14；未归属店铺的来信进队列随 15。
  */
-
-async function lock(tx: Tx, key: string): Promise<void> {
-  await tx.db.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${key}))`);
-}
 
 async function alreadyMerged(tx: Tx, channelMessageId: string): Promise<boolean> {
   const [row] = await tx.db
@@ -31,7 +38,7 @@ async function alreadyMerged(tx: Tx, channelMessageId: string): Promise<boolean>
  */
 async function customerOf(tx: Tx, mail: InboundMessage): Promise<string> {
   const address = mail.fromAddress;
-  await lock(tx, `ticket.customer:${address}`);
+  await advisoryLock(tx, `ticket.customer:${address}`);
   const [identity] = await tx.db
     .select({ customerId: customerIdentity.customerId })
     .from(customerIdentity)
@@ -49,12 +56,37 @@ async function customerOf(tx: Tx, mail: InboundMessage): Promise<string> {
   return created.id;
 }
 
-/** 把一封来信归并成工单（「来信已接收」的处理器） */
+/** R-TK-02：同店铺同客户的未关闭无订单工单（取最近来信的一张），锁住它再追加 */
+async function openTicketWithoutOrder(
+  tx: Tx,
+  scope: StoreScope,
+  storeId: string,
+  customerId: string,
+): Promise<typeof ticket.$inferSelect | null> {
+  const [open] = await tx.db
+    .select()
+    .from(ticket)
+    .where(
+      and(
+        storeScopeCondition(scope, ticket.storeId),
+        eq(ticket.storeId, storeId),
+        eq(ticket.customerId, customerId),
+        isNull(ticket.orderNumber),
+        ne(ticket.status, 'closed'),
+      ),
+    )
+    .orderBy(desc(ticket.lastInboundAt))
+    .limit(1)
+    .for('update');
+  return open ?? null;
+}
+
+/** 把一封来信归并成工单（「来信已接收」的处理器；系统操作，不受店铺范围限制） */
 export async function mergeInbound(
   { messageId }: { messageId: string },
   { runtime, logger }: JobContext,
 ): Promise<void> {
-  const mail = await findInboundMessage(runtime.db, messageId);
+  const mail = await findInboundMessage(runtime.db, SYSTEM_STORE_SCOPE, messageId);
   if (!mail) throw new Error(`没有这封来信：${messageId}`);
   if (mail.direction !== 'inbound' || mail.duplicateOfId) {
     logger.warn({ messageId }, '不是要归并的来信，跳过');
@@ -74,39 +106,21 @@ export async function mergeInbound(
   await transaction(runtime, async (tx) => {
     if (await alreadyMerged(tx, messageId)) return;
     const customerId = await customerOf(tx, mail);
-    await lock(tx, `ticket.merge:${storeId}:customer:${mail.fromAddress}`);
+    await advisoryLock(tx, `ticket.merge:${storeId}:customer:${mail.fromAddress}`);
     // 加锁后再查一次：同一封信的归并任务可能被重复执行
     if (await alreadyMerged(tx, messageId)) return;
 
-    const [open] = await tx.db
-      .select()
-      .from(ticket)
-      .where(
-        and(
-          eq(ticket.storeId, storeId),
-          eq(ticket.customerId, customerId),
-          isNull(ticket.orderNumber),
-          ne(ticket.status, 'closed'),
-        ),
-      )
-      .orderBy(desc(ticket.lastInboundAt))
-      .limit(1)
-      .for('update');
-
-    let target;
+    const open = await openTicketWithoutOrder(tx, SYSTEM_STORE_SCOPE, storeId, customerId);
+    let target: { id: string; number: string };
     if (open) {
-      // 追加（R-TK-02）：状态按迁移表变化（待回复保持待回复）
+      // 追加（R-TK-02）：状态按迁移表变化（待回复保持待回复），最近来信取较晚的一封（来信可能乱序到达）
       const current = await applyTransition(tx, open, 'inbound', systemActor);
-      const [touched] = await tx.db
-        .update(ticket)
-        .set({
-          lastInboundAt: sql`greatest(${ticket.lastInboundAt}, ${mail.receivedAt.toISOString()}::timestamptz)`,
-          updatedAt: tx.now,
-          version: sql`${ticket.version} + 1`,
-        })
-        .where(eq(ticket.id, current.id))
-        .returning({ id: ticket.id, number: ticket.number });
-      target = touched;
+      const latest =
+        mail.receivedAt > current.lastInboundAt ? mail.receivedAt : current.lastInboundAt;
+      target = await updateWithVersion(tx, ticket, current, {
+        lastInboundAt: latest,
+        updatedAt: tx.now,
+      });
     } else {
       const created = await createTicket(
         tx,
@@ -124,9 +138,8 @@ export async function mergeInbound(
         'inbound',
         systemActor,
       );
-      target = { id: created.id, number: created.number };
+      target = created;
     }
-    if (!target) throw new Error(`工单更新失败：${messageId}`);
 
     await tx.db.insert(ticketMessage).values({
       ticketId: target.id,

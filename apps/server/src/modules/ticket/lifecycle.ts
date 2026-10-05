@@ -14,7 +14,7 @@ import {
  * - 14：已关闭（30 天内）同一订单来信 → 待回复（重开）；
  * - 16：待回复 → 等客户（识别到我方回复）、等客户 / 已解决 → 待回复（新来信）、三条按时关闭；
  * - 17：待回复 → 已解决（全部未回复来信被标记无需回复）及其 5 秒内撤销。
- * 写库只经 tickets.ts 的 applyTransition（同一事务写状态变更记录；数据库约束保证状态与最近一条记录一致）。
+ * 写库只经 ticket-status.ts 的 createTicket / applyTransition（同一事务写状态变更记录；数据库约束保证状态与最近一条记录一致）。
  */
 
 interface TransitionRule {

@@ -28,7 +28,4 @@ export const EMPTY_TITLE = '没有符合条件的工单';
 export const EMPTY_VALUE = '—';
 
 /** 只给读屏器的说明（原型不画、不核对） */
-export const A11Y = {
-  table: '工单列表',
-  loading: '正在加载工单',
-} as const;
+export const A11Y = { table: '工单列表' } as const;

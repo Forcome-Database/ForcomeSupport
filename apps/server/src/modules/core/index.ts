@@ -59,6 +59,7 @@ export {
   type StoreScope,
 } from './store-scope';
 export {
+  advisoryLock,
   startRuntime,
   transaction,
   type RunningRuntime,

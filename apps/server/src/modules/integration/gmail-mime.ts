@@ -13,8 +13,8 @@ export interface FakeMailInput {
   readonly text: string;
   /** 到达时间（Gmail internalDate），带时区的 ISO 8601 或 Date */
   readonly at: string | Date;
-  /** RFC Message-ID（带尖括号）；不给时 Fake 生成一个 */
-  readonly messageId?: string;
+  /** RFC Message-ID（带尖括号）；不给时 Fake 生成一个，null 为不写这个头（有的邮件确实没有） */
+  readonly messageId?: string | null;
   /** Gmail 消息 ID；只发给一个邮箱时可以指定（回放示例数据用确定的 ID，重启后不变） */
   readonly gmailId?: string;
   /** 另加的头字段（如 In-Reply-To、Auto-Submitted、List-Unsubscribe），值为原文 */
@@ -54,7 +54,7 @@ export function buildFakeMail(mail: FakeMailInput, defaultMessageId: string): Bu
     throw new RangeError(`到达时间无效：${String(mail.at)}`);
   const to: readonly string[] = typeof mail.to === 'string' ? [mail.to] : mail.to;
   const lines = [
-    `Message-ID: ${mail.messageId ?? defaultMessageId}`,
+    ...(mail.messageId === null ? [] : [`Message-ID: ${mail.messageId ?? defaultMessageId}`]),
     `Date: ${internalDate.toUTCString()}`,
     `From: ${mailbox(mail.from)}`,
     `To: ${to.join(', ')}`,

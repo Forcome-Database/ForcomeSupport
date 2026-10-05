@@ -107,6 +107,8 @@ export { currencies, currencySchema, type Currency } from './money';
 export { homeFor, navFor, navSections, navSectionSchema, type NavSection } from './navigation';
 export { roleByLabel, roleLabels, roleNames, roles, roleSchema, type Role } from './roles';
 export {
+  messageDirections,
+  messageDirectionSchema,
   ticketChannelLabels,
   ticketChannels,
   ticketChannelSchema,
@@ -125,6 +127,7 @@ export {
   ticketStatusSchema,
   ticketTriggers,
   ticketTriggerSchema,
+  type MessageDirection,
   type TicketChannel,
   type TicketCloseReason,
   type TicketDetail,

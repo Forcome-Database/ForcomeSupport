@@ -1,4 +1,5 @@
 import {
+  messageDirections,
   sites,
   ticketChannels,
   ticketCloseReasons,
@@ -42,7 +43,7 @@ export const customerIdentity = ticketSchema.table(
 
 /**
  * 工单（PRD 11.1 Ticket，第一期用到的字段）：编号 T-首封来信日期-当日序号；店铺、渠道、站点取首封来信的识别结果；
- * 状态只能经迁移表改变（lifecycle.ts → tickets.ts 的 applyTransition，同一事务写 status_change），
+ * 状态只能经迁移表改变（lifecycle.ts → ticket-status.ts 的 createTicket / applyTransition，同一事务写 status_change），
  * 数据库约束保证状态等于最近一条状态变更记录的目标状态（迁移 0007）。
  * 来源（10）、订单号的取值（14）、SLA（16）随后续待办；负责人第一期为空，不建列。
  */
@@ -95,7 +96,7 @@ export const ticketMessage = ticketSchema.table(
       .references(() => ticket.id),
     /** channel.message 的 id（跨模块不设外键） */
     channelMessageId: uuid('channel_message_id').notNull(),
-    direction: text('direction', { enum: ['inbound', 'outbound'] }).notNull(),
+    direction: text('direction', { enum: messageDirections }).notNull(),
     /** 到达时间（Gmail internalDate） */
     receivedAt: timestamptz('received_at').notNull(),
     createdAt: timestamptz('created_at').notNull(),
@@ -108,7 +109,7 @@ export const ticketMessage = ticketSchema.table(
 
 /**
  * 状态变更记录（6.1「每次迁移记录时间、事件与触发方」，P05 状态流转逐步显示）：新建也是一条（从「无」到待回复）。
- * 只由 tickets.ts 的 applyTransition 写入（lint 限制引用，见 eslint-boundaries.js）。
+ * 只由 ticket-status.ts 的 createTicket / applyTransition 写入（lint 限制引用，见 eslint-boundaries.js）。
  */
 export const statusChange = ticketSchema.table(
   'status_change',

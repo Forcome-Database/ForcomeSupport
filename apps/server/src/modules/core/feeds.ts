@@ -38,12 +38,6 @@ export function defineFeed(name: string, pull: (context: FeedContext) => Promise
 
 export interface StartFeedsOptions {
   readonly logger: Logger;
-  /** 长轮询最多等多久（秒），默认 20 */
-  readonly waitSeconds?: number;
-  /** 拉空后歇多久再拉（毫秒），默认 1000；Fake 不做长轮询，靠它免得空转 */
-  readonly idleMs?: number;
-  /** 出错后第一次重试前等多久（毫秒），之后翻倍，最多 60 秒；默认 2000 */
-  readonly errorBackoffMs?: number;
 }
 
 export interface RunningFeeds {
@@ -51,6 +45,12 @@ export interface RunningFeeds {
   stop(): Promise<void>;
 }
 
+/** 长轮询最多等多久（秒） */
+const WAIT_SECONDS = 20;
+/** 拉空后歇多久再拉：Fake 不做长轮询，靠它免得空转 */
+const IDLE_MS = 1_000;
+/** 出错后第一次重试前等多久，之后翻倍，最多 60 秒 */
+const ERROR_BACKOFF_MS = 2_000;
 const MAX_BACKOFF_MS = 60_000;
 
 async function pause(ms: number, signal: AbortSignal): Promise<void> {
@@ -65,21 +65,18 @@ export function startFeeds(
 ): RunningFeeds {
   const controller = new AbortController();
   const { signal } = controller;
-  const waitSeconds = options.waitSeconds ?? 20;
-  const idleMs = options.idleMs ?? 1_000;
-  const errorBackoffMs = options.errorBackoffMs ?? 2_000;
 
   const loops = feeds.map(async (feed) => {
     const logger = options.logger.child({ feed: feed.name });
     let failures = 0;
     while (!signal.aborted) {
       try {
-        const count = await feed.pull({ runtime, logger, signal, waitSeconds });
+        const count = await feed.pull({ runtime, logger, signal, waitSeconds: WAIT_SECONDS });
         failures = 0;
-        if (count === 0) await pause(idleMs, signal);
+        if (count === 0) await pause(IDLE_MS, signal);
       } catch (error) {
         failures += 1;
-        const backoff = Math.min(errorBackoffMs * 2 ** (failures - 1), MAX_BACKOFF_MS);
+        const backoff = Math.min(ERROR_BACKOFF_MS * 2 ** (failures - 1), MAX_BACKOFF_MS);
         logger.error({ err: error, failures, retryInMs: backoff }, '常驻拉取出错，稍后重试');
         await pause(backoff, signal);
       }

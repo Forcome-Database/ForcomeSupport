@@ -1,7 +1,9 @@
+import type { AdapterMode, MessageDirection, Site } from '@forcome/contracts';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import PostalMime, { type Address, type Email } from 'postal-mime';
 import { z } from 'zod';
 import {
+  advisoryLock,
   defineFeed,
   defineJob,
   transaction,
@@ -48,18 +50,20 @@ export const inboundReceivedJob = defineJob(
 interface MailboxTarget {
   readonly address: string;
   readonly storeId: string;
-  readonly adapterMode: 'real' | 'fake';
-  readonly defaultSite: 'US' | 'CA' | 'MX';
+  readonly adapterMode: AdapterMode;
+  readonly defaultSite: Site;
 }
+
+const mailboxTargetColumns = {
+  address: storeMailbox.address,
+  storeId: store.id,
+  adapterMode: store.adapterMode,
+  defaultSite: store.defaultSite,
+};
 
 async function mailboxTarget(db: DbExecutor, address: string): Promise<MailboxTarget | null> {
   const [row] = await db
-    .select({
-      address: storeMailbox.address,
-      storeId: store.id,
-      adapterMode: store.adapterMode,
-      defaultSite: store.defaultSite,
-    })
+    .select(mailboxTargetColumns)
     .from(storeMailbox)
     .innerJoin(store, eq(store.id, storeMailbox.storeId))
     .where(eq(storeMailbox.address, address))
@@ -88,13 +92,8 @@ async function ensureWatches(
   logger: Logger,
   retries: WatchRetries,
 ): Promise<void> {
-  const unwatched = await runtime.db
-    .select({
-      address: storeMailbox.address,
-      storeId: store.id,
-      adapterMode: store.adapterMode,
-      defaultSite: store.defaultSite,
-    })
+  const unwatched: MailboxTarget[] = await runtime.db
+    .select(mailboxTargetColumns)
     .from(storeMailbox)
     .innerJoin(store, eq(store.id, storeMailbox.storeId))
     .leftJoin(mailboxSync, eq(mailboxSync.address, storeMailbox.address))
@@ -158,7 +157,7 @@ export function createGmailPushFeed(clients: IntegrationClients): Feed {
 }
 
 /** Gmail 标签判断方向：「已发送」为我方发出（09），草稿、垃圾邮件、已删除不收，其余为来信 */
-function directionOf(labelIds: readonly string[]): 'inbound' | 'outbound' | null {
+function directionOf(labelIds: readonly string[]): MessageDirection | null {
   if (labelIds.some((l) => l === 'DRAFT' || l === 'SPAM' || l === 'TRASH' || l === 'CHAT')) {
     return null;
   }
@@ -205,9 +204,7 @@ async function ingestInbound(
   await transaction(runtime, async (tx) => {
     if (rfcMessageId) {
       // 同一封邮件的几份副本可能同时在几个邮箱入库：按 Message-ID 串行，最早入库的一封为准
-      await tx.db.execute(
-        sql`SELECT pg_advisory_xact_lock(hashtext(${`channel.rfc_message_id:${rfcMessageId}`}))`,
-      );
+      await advisoryLock(tx, `channel.rfc_message_id:${rfcMessageId}`);
     }
     const [canonical] = rfcMessageId
       ? await tx.db

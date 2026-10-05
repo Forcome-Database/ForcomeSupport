@@ -78,8 +78,12 @@ export async function findTicketByNumber(
   return row ?? null;
 }
 
-/** 工单与它的消息（按到达时间先后） */
-export async function ticketDetail(db: DbExecutor, row: TicketRow): Promise<TicketDetail> {
+/** 工单与它的消息（按到达时间先后）；row 已按店铺范围取出 */
+export async function ticketDetail(
+  db: DbExecutor,
+  scope: StoreScope,
+  row: TicketRow,
+): Promise<TicketDetail> {
   const links = await db
     .select({ channelMessageId: ticketMessage.channelMessageId })
     .from(ticketMessage)
@@ -87,6 +91,7 @@ export async function ticketDetail(db: DbExecutor, row: TicketRow): Promise<Tick
     .orderBy(asc(ticketMessage.receivedAt), asc(ticketMessage.createdAt));
   const summaries = await listMessageSummaries(
     db,
+    scope,
     links.map((l) => l.channelMessageId),
   );
   const byId = new Map(summaries.map((s) => [s.id, s]));

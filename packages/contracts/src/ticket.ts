@@ -75,6 +75,11 @@ export const ticketCloseReasonLabels: Record<TicketCloseReason, string> = {
   reply_not_detected: '未识别到回复',
 };
 
+/** 消息的方向：来信 inbound（不论来源）/ 我方发出 outbound（「已发送」，09 起） */
+export const messageDirections = ['inbound', 'outbound'] as const;
+export const messageDirectionSchema = z.enum(messageDirections);
+export type MessageDirection = z.infer<typeof messageDirectionSchema>;
+
 /** 工单号 T-日期-4 位当日序号（11.2；日期取首封来信日期，北京时间） */
 export const ticketNumberSchema = z.string().regex(/^T-\d{8}-\d{4}$/, '工单号的格式是 T-日期-序号');
 
@@ -100,7 +105,7 @@ export type TicketList = z.infer<typeof ticketListSchema>;
 /** 工单里的一封消息（待办 08 只有来信；正文、我方回复、SLA 与「无需回复」随 09、16、17） */
 export const ticketMessageSchema = z.object({
   id: z.uuid(),
-  direction: z.enum(['inbound', 'outbound']),
+  direction: messageDirectionSchema,
   /** 收到这封信的店铺邮箱（进线邮箱） */
   mailbox: z.string(),
   from: z.object({ name: z.string(), address: z.string() }),

@@ -1,17 +1,18 @@
-import type { Site, TicketChannel } from '@forcome/contracts';
-import { eq, inArray } from 'drizzle-orm';
-import type { DbExecutor } from '../core';
+import type { MessageDirection, Site, TicketChannel } from '@forcome/contracts';
+import { and, eq, inArray } from 'drizzle-orm';
+import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
 import { message } from './schema';
 
 /*
  * 收取的邮件对外的读服务（ADR 0005：别的模块只经 index.ts 读 channel 的数据）：
- * ticket 归并时取一封来信的识别结果，工单详情取消息摘要。
+ * ticket 归并时取一封来信的识别结果（系统操作，SYSTEM_STORE_SCOPE），工单详情取消息摘要（成员的店铺范围）。
+ * 都带店铺范围（ADR 0010）；店铺为空的邮件（未归属店铺，15）只在不受限的范围里看得到。
  */
 
 /** 归并要用的一封来信：识别出的店铺、渠道、站点与发件人 */
 export interface InboundMessage {
   readonly id: string;
-  readonly direction: 'inbound' | 'outbound';
+  readonly direction: MessageDirection;
   /** 识别出的店铺；未归属店铺（15）为空 */
   readonly storeId: string | null;
   readonly channel: TicketChannel | null;
@@ -28,6 +29,7 @@ export interface InboundMessage {
 
 export async function findInboundMessage(
   db: DbExecutor,
+  scope: StoreScope,
   id: string,
 ): Promise<InboundMessage | null> {
   const [row] = await db
@@ -44,7 +46,7 @@ export async function findInboundMessage(
       duplicateOfId: message.duplicateOfId,
     })
     .from(message)
-    .where(eq(message.id, id))
+    .where(and(eq(message.id, id), storeScopeCondition(scope, message.storeId)))
     .limit(1);
   return row ?? null;
 }
@@ -52,7 +54,7 @@ export async function findInboundMessage(
 /** 工单详情里一封消息的摘要（正文、我方回复等随 09、17） */
 export interface MessageSummary {
   readonly id: string;
-  readonly direction: 'inbound' | 'outbound';
+  readonly direction: MessageDirection;
   readonly mailbox: string;
   readonly fromAddress: string;
   readonly fromName: string;
@@ -64,6 +66,7 @@ export interface MessageSummary {
 
 export async function listMessageSummaries(
   db: DbExecutor,
+  scope: StoreScope,
   ids: readonly string[],
 ): Promise<MessageSummary[]> {
   if (ids.length === 0) return [];
@@ -79,5 +82,5 @@ export async function listMessageSummaries(
       alsoSentTo: message.alsoSentTo,
     })
     .from(message)
-    .where(inArray(message.id, [...ids]));
+    .where(and(inArray(message.id, [...ids]), storeScopeCondition(scope, message.storeId)));
 }

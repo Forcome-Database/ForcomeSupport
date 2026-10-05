@@ -50,6 +50,14 @@ export async function transaction<T>(runtime: Runtime, fn: (tx: Tx) => Promise<T
   });
 }
 
+/**
+ * 事务级咨询锁（pg_advisory_xact_lock）：同一个键的事务排队执行，提交或回滚时自动释放。
+ * 「先查再写」要互斥时用它（店铺配置的查重、同一客户或同一封邮件的归并），键写成「模块.用途:对象」。
+ */
+export async function advisoryLock(tx: Tx, key: string): Promise<void> {
+  await tx.db.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${key}))`);
+}
+
 export interface RuntimeOptions {
   role: JobQueueRole;
   logger: Logger;

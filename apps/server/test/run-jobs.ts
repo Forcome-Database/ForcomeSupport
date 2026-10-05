@@ -35,6 +35,11 @@ export interface RunJobsOptions {
   readonly allowFailures?: boolean;
   /** 最多跑几轮，防止任务互相触发、永远跑不完；默认 50 */
   readonly maxRounds?: number;
+  /**
+   * 同一轮取到的任务同时处理（像几个 worker 并行），用来验证并发场景：同一客户或同一订单的几封来信同时归并、
+   * 同一封邮件的几份副本在几个邮箱同时入库（规格「需要覆盖的场景·并发」）。默认按先后逐个处理
+   */
+  readonly concurrently?: boolean;
 }
 
 const BATCH_SIZE = 100;
@@ -100,9 +105,9 @@ export async function runQueuedJobs(
         a.startAfter.getTime() - b.startAfter.getTime() ||
         a.createdOn.getTime() - b.createdOn.getTime(),
     );
-    for (const job of batch) {
+    const run = async (job: JobWithMetadata<unknown>) => {
       const handler = byName.get(job.name);
-      if (!handler) continue; // 只取了这些处理器的队列，不会发生
+      if (!handler) return; // 只取了这些处理器的队列，不会发生
       try {
         await runJob(runtime, handler, job, logger);
         await runtime.boss.complete(job.name, job.id);
@@ -110,6 +115,11 @@ export async function runQueuedJobs(
       } catch (error) {
         failed.push({ name: job.name, id: job.id, data: job.data, error });
       }
+    };
+    if (options.concurrently) {
+      await Promise.all(batch.map(run));
+    } else {
+      for (const job of batch) await run(job);
     }
   }
 
