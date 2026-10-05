@@ -7,3 +7,8 @@ import { z } from 'zod';
 export const adapterModes = ['real', 'fake'] as const;
 export const adapterModeSchema = z.enum(adapterModes);
 export type AdapterMode = z.infer<typeof adapterModeSchema>;
+/** 数据来源的叫法（P18 店铺抽屉「数据来源」、P27 店铺记录的前后值） */
+export const adapterModeLabels: Record<AdapterMode, string> = {
+  real: '真实接口',
+  fake: '模拟数据',
+};

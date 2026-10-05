@@ -152,7 +152,12 @@ export { apiErrorSchema, type ApiError } from './api';
 export {
   ACCESS_DENIED_ACTION,
   SYSTEM_ACTOR_NAME,
+  auditActionFilterKeys,
+  auditActionFilterLabel,
+  auditActionFilterOptions,
+  auditActionFilterSchema,
   auditActions,
+  auditActionsOfFilter,
   auditObjectTypeLabels,
   auditObjectTypeSchema,
   auditSnapshotSchemas,
@@ -161,41 +166,44 @@ export {
   loginMethods,
   phase1AuditObjectTypes,
   type AuditAction,
+  type AuditActionObjectType,
   type AuditObjectType,
   type AuditSnapshot,
   type AuditSnapshotKind,
 } from './audit';
 export {
+  auditNameIds,
+  describeAuditRecord,
+  type AuditNames,
+  type AuditRecordInput,
+} from './audit-describe';
+export {
   AUDIT_PAGE_SIZE,
   AUDIT_SEARCH_MAX,
   SYSTEM_ACTOR,
-  auditActionOptions,
-  auditActionsLabelled,
+  auditConditionWords,
   auditLogEntrySchema,
   auditLogFieldSchema,
   auditLogFilterSchema,
   auditLogOptionsSchema,
   auditLogQuerySchema,
   auditLogSchema,
-  auditNameIds,
   auditPeriodLabels,
   auditPeriodSchema,
   auditPeriods,
   auditRange,
   auditRangeSchema,
   auditScope,
+  auditTimeWords,
   dateRangeWords,
-  describeAuditRecord,
+  type AuditLog,
   type AuditLogEntry,
   type AuditLogField,
-  type AuditLog,
   type AuditLogFilter,
   type AuditLogOptions,
   type AuditLogQuery,
-  type AuditNames,
   type AuditPeriod,
   type AuditRange,
-  type AuditRecordInput,
 } from './audit-log';
 export {
   adminContactsSchema,
@@ -315,7 +323,12 @@ export {
   type RateSource,
 } from './exchange-rate';
 export { healthResponseSchema, type HealthResponse } from './health';
-export { adapterModeSchema, adapterModes, type AdapterMode } from './integration';
+export {
+  adapterModeLabels,
+  adapterModeSchema,
+  adapterModes,
+  type AdapterMode,
+} from './integration';
 export { currencies, currencySchema, formatMoney, type Currency } from './money';
 export { homeFor, navFor, navSections, navSectionSchema, type NavSection } from './navigation';
 export { roleByLabel, roleLabels, roleNames, roles, roleSchema, type Role } from './roles';

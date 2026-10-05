@@ -96,3 +96,10 @@ status: accepted
 - **合计在应用层求和**：「缺字段」筛选在应用层判断（ADR 本文「待办 21 落地」），合计行也就在应用层用 big.js 把视图逐行的美元值相加；承担金额 `costShares` 逐行四舍五入到分（ROUND_HALF_UP），两方之和恒等于费用合计，合计行为各行之和。
 - **默认的费用发生日按服务端时钟**：台账查询没给的一端由接口按注入的时钟取本月（`contracts` 的 `defaultFeeDateRange(businessDate(now))`），响应的 `range` 写这次按的起止，另带 `defaultRange`（本月），界面据它判断条件是否就是默认（选回本月时地址栏不写起止、不出「清除筛选」）；「今天」以服务端为准（演示的 `CLOCK_START`、测试的手动时钟都跟着走），前端不自己算。
 - **导出文件**：exceljs（规格指定）在内存里同步生成，响应类型 `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`，文件名放 `Content-Disposition` 的 `filename*`（UTF-8 编码），行数放 `X-Export-Rows`（`contracts` 的 `EXPORT_ROWS_HEADER`），`Cache-Control: no-store`；不落盘、不留存。导出记一条审计：动作 `ledger.export`（「对象.动词」，报表随 25 为 `report.export`）、对象类型「导出」、对象 `aftersales.ledger`（「登记台账」），后值写文件名、筛选条件（含这次按的起止）、行数与是否含财务字段，店铺为筛选的店铺（没筛为空）。被拒的导出（店铺范围外 403、条件写错 400）没有文件，不记导出。exceljs 4.4 的几个间接依赖已标弃用（fstream、rimraf 2 等），只在生成文件时用，后续有维护更好的同类库再换。
+
+## 修订（2026-10-06，待办 30 落地）
+
+- **审计动作登记表**：写审计只能用 `contracts` 的 `auditActions` 登记过的动作（叫法、对象类型、快照种类、筛选键）；每种快照的结构在 `contracts/audit.ts` 的 `auditSnapshotSchemas`（财务字段用 `financeField` 标出）。`core` 的 `recordAudit` 按登记表做类型检查：动作必须登记过、登记了对象类型的只能写那一种（越权访问可以是任何对象）、前后值要合快照结构。新增一种审计动作：登记动作与快照结构，并在 `contracts/audit-describe.ts` 补字段表（列哪些字段、顺序、写法）；没登记的动作与结构里没声明的键在 P27 一律不显示（失败封闭）。
+- **对象名是写入时的快照**：`object_label` 写对象的编号或名称（售后单号、店铺名、「登记台账」等），P27 的「对象」列与对象编号搜索按它；越权访问的对象是店铺时写店铺名（`requireStores` 的 `objectLabel` 可给取名函数，只在越权时才查一次，`aftersales` 的 `storeAccessTarget`）。较早没写名字的店铺记录在显示时按 ID 补上店铺名。
+- **按日期区间查时刻列**：北京时间没有夏令时，区间写成「≥ 起始日北京时间 0 点、< 截止日次日北京时间 0 点」（`calendar` 的 `startOfBusinessDate`、`addDays`），不在 SQL 里做时区换算。
+- **P27 的查询**：`core.audit_log` 按时间倒序（同一时刻按 ID），一页 10 条，另一个计数查询给总条数与其中越权访问的条数；页码超过最后一页时给最后一页。对象编号搜索是 `ILIKE` 包含，`%` `_` `\` 按字面匹配。现有索引（时刻倒序、操作人、店铺、对象）够用，第一期不加。

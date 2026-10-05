@@ -47,6 +47,7 @@ import {
   type Control,
   type FieldErrors,
 } from 'react-hook-form';
+import { DisabledReason } from '@/components/disabled-reason';
 import { AffixInput } from '@/components/affix-input';
 import { AftersalesStatusBadge } from '@/components/aftersales-badges';
 import { DateField } from '@/components/date-field';
@@ -72,7 +73,6 @@ import {
 import { Sheet, SheetBody, SheetContent, SheetFooter, SheetHeader } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { UnsavedChangesDialog } from '@/components/unsaved-changes-dialog';
 import {
   AFTERSALES_QUERY_KEY,
@@ -1023,21 +1023,9 @@ function RegistrationForm({
                     note={ownerHint}
                     error={errorOf('ownerId')}
                   >
-                    {storeId ? (
-                      ownerSelect
-                    ) : (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span
-                            tabIndex={0}
-                            className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          >
-                            {ownerSelect}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>{DRAWER.ownerNeedsStore}</TooltipContent>
-                      </Tooltip>
-                    )}
+                    <DisabledReason reason={storeId ? null : DRAWER.ownerNeedsStore}>
+                      {ownerSelect}
+                    </DisabledReason>
                   </FormField>
                 </div>
               </div>

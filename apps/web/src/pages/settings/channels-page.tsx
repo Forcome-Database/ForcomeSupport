@@ -43,7 +43,7 @@ function ChannelsSkeleton() {
 
 export function ChannelsPage() {
   const settings = useQuery(channelSettingsQuery);
-  const [opened, setDrawer] = useState<StoreDrawerTarget | null>(null);
+  const [opened, setOpened] = useState<StoreDrawerTarget | null>(null);
   const search = channelsSearchSchema.parse(useSearch({ strict: false }));
   const navigate = useNavigate();
   const linked = search.store
@@ -52,7 +52,7 @@ export function ChannelsPage() {
   const drawer: StoreDrawerTarget | null =
     opened ?? (linked ? { mode: 'edit', store: linked } : null);
   const closeDrawer = () => {
-    setDrawer(null);
+    setOpened(null);
     if (search.store) void navigate({ to: pages.settingsChannels.path, search: {} });
   };
 
@@ -79,8 +79,8 @@ export function ChannelsPage() {
           <ChannelCards channels={settings.data.channels} stores={settings.data.stores} />
           <StoreTable
             stores={settings.data.stores}
-            onCreate={() => setDrawer({ mode: 'create' })}
-            onEdit={(store) => setDrawer({ mode: 'edit', store })}
+            onCreate={() => setOpened({ mode: 'create' })}
+            onEdit={(store) => setOpened({ mode: 'edit', store })}
           />
           <StoreDrawer
             target={drawer}

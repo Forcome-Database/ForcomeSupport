@@ -32,7 +32,13 @@ import type { Access } from '../org';
 import type { TicketReference } from '../ticket';
 import { actorName, auditSnapshot, ownerNameOf } from './audit';
 import { convertFees, feeColumnValues } from './fees';
-import { factoryRatiosOfRow, findOwnedAftersales, missingOf, type AftersalesRow } from './ledger';
+import {
+  factoryRatiosOfRow,
+  findOwnedAftersales,
+  missingOf,
+  storeAccessTarget,
+  type AftersalesRow,
+} from './ledger';
 import { applyRateChanges, feeValuesOf } from './rates';
 import {
   findSourceTicket,
@@ -206,11 +212,7 @@ export async function updateRegistration(
 
   // 换店铺、换来源工单：越权与工单查询在事务之外（同新建登记）
   if (changed('storeId') && input.storeId) {
-    await access.requireStores({
-      storeIds: [input.storeId],
-      objectType: 'store',
-      objectId: input.storeId,
-    });
+    await access.requireStores(storeAccessTarget(runtime.db, input.storeId));
   }
   const lookUpTicket = input.sourceTicket && (changed('sourceTicket') || changed('storeId'));
   const ticket: TicketReference | null = lookUpTicket

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import {
+  auditConditionWords,
   auditObjectTypeLabels,
   describeAuditRecord,
   type AuditNames,
@@ -160,7 +161,10 @@ describe('K18 补充小样（待办 30，10-05 用户确认）', () => {
     expectText(STATES_ADMIN, EMPTY.title);
     expectIn(
       STATES_ADMIN,
-      EMPTY.description([PERIODS.week, EMPTY.actor('王磊'), auditObjectTypeLabels.store], true),
+      EMPTY.description(
+        [PERIODS.week, ...auditConditionWords({ actorName: '王磊', type: 'store' })],
+        true,
+      ),
     );
     expectIn(STATES_ADMIN, `>${FILTERS.clear}<`);
   });

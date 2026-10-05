@@ -27,7 +27,7 @@ import { listAftersalesOwners, type Access } from '../org';
 import { findTicketReference, type TicketReference } from '../ticket';
 import { actorName, auditSnapshot } from './audit';
 import { convertFees, feeColumnValues, type FeeValue } from './fees';
-import { ownerWithinScope, type AftersalesRow } from './ledger';
+import { ownerWithinScope, storeAccessTarget, type AftersalesRow } from './ledger';
 import { ledgerTransition } from './lifecycle';
 import { aftersales, responsibilityRatio } from './schema';
 
@@ -231,11 +231,7 @@ export async function createRegistration(
 
   // 越权在写事务之外判断：越权审计单独提交，不随业务事务回滚
   if (input.storeId) {
-    await access.requireStores({
-      storeIds: [input.storeId],
-      objectType: 'store',
-      objectId: input.storeId,
-    });
+    await access.requireStores(storeAccessTarget(runtime.db, input.storeId));
   }
   const ticket = input.sourceTicket
     ? await findSourceTicket(runtime, access, input.sourceTicket)

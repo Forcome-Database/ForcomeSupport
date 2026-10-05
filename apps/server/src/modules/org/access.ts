@@ -50,8 +50,11 @@ export interface StoreAccessTarget {
   readonly storeIds: readonly string[];
   readonly objectType: AuditObjectType;
   readonly objectId: string;
-  /** 对象编号或名称（P27「对象」列） */
-  readonly objectLabel?: string | null;
+  /**
+   * 对象编号或名称（P27「对象」列，对象编号搜索也按它）。要查库才知道的名字（如店铺名）给一个取名函数，只在越权时才调用，
+   * 放行时不多查一次
+   */
+  readonly objectLabel?: string | null | (() => Promise<string | null>);
 }
 
 /** 成员表的一行在访问控制里用到的部分：当前成员与店铺范围 */
@@ -132,12 +135,16 @@ function buildAccess(runtime: Runtime, c: Context, sessionId: string, row: Membe
   async function requireStores(target: StoreAccessTarget): Promise<void> {
     const outside = storesOutsideScope(stores, target.storeIds);
     if (outside.length === 0) return;
+    const objectLabel =
+      typeof target.objectLabel === 'function'
+        ? await target.objectLabel()
+        : (target.objectLabel ?? null);
     await transaction(runtime, (tx) =>
       recordAudit(tx, actor, {
         action: 'access.denied',
         objectType: target.objectType,
         objectId: target.objectId,
-        objectLabel: target.objectLabel ?? null,
+        objectLabel,
         storeId: outside[0],
         after: {
           reason: 'store_scope',

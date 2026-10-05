@@ -1,5 +1,6 @@
 import {
-  auditActionOptions,
+  AUDIT_SEARCH_MAX,
+  auditActionFilterOptions,
   auditObjectTypeLabels,
   auditPeriods,
   phase1AuditObjectTypes,
@@ -9,6 +10,7 @@ import {
 import { Link2, Search } from 'lucide-react';
 import { useEffect, useEffectEvent, useState } from 'react';
 import { ChoiceChip, LockedChip, RangeCalendar, type FilterOption } from '@/components/filter-chip';
+import { Input } from '@/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
@@ -103,24 +105,23 @@ function SearchBox({ value, onSearch }: { value: string; onSearch: (q: string) =
     const timer = setTimeout(() => search(draft.trim()), SEARCH_DELAY_MS);
     return () => clearTimeout(timer);
   }, [draft, value]);
+  // 原型 search_box() 与 input_box() 不同：边线是浅的一档（--border），没填时浅灰底，左侧搜索图标
   return (
-    <label
-      className={cn(
-        'flex h-8 w-50 items-center gap-2 rounded-md border pr-2 pl-2.5 focus-within:border-primary focus-within:ring-3 focus-within:ring-primary/14',
-        draft ? 'bg-card' : 'bg-muted',
-      )}
-    >
-      <Search className="size-3.75 shrink-0 text-subtle-foreground" />
-      <input
+    <div className="relative w-50">
+      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.75 -translate-y-1/2 text-subtle-foreground" />
+      <Input
         type="search"
         value={draft}
-        maxLength={60}
+        maxLength={AUDIT_SEARCH_MAX}
         placeholder={FILTERS.search}
         aria-label={FILTERS.search}
         onChange={(event) => setDraft(event.target.value)}
-        className="min-w-0 flex-1 bg-transparent text-13 text-foreground outline-none placeholder:text-placeholder [&::-webkit-search-cancel-button]:hidden"
+        className={cn(
+          'border-border pr-2 pl-8.5 [&::-webkit-search-cancel-button]:hidden',
+          draft ? 'bg-card' : 'bg-muted',
+        )}
       />
-    </label>
+    </div>
   );
 }
 
@@ -139,7 +140,7 @@ export function AuditFilterBar({
   lockedActor: string | null;
   onChange: (next: AuditSearch) => void;
 }) {
-  const actions = auditActionOptions(search.type).map((label) => ({ value: label, label }));
+  const actions = auditActionFilterOptions(search.type);
   return (
     <div className="flex items-center justify-between gap-3" data-testid="audit-filters">
       <div className="flex flex-wrap items-center gap-2">
@@ -164,7 +165,9 @@ export function AuditFilterBar({
           onSelect={(value) => {
             const type = typeOptions.find((option) => option.value === value)?.value as
               AuditSearch['type'] | undefined;
-            const keep = search.action && auditActionOptions(type).includes(search.action);
+            const keep =
+              search.action &&
+              auditActionFilterOptions(type).some((option) => option.value === search.action);
             onChange(withFilter(search, { type, action: keep ? search.action : undefined }));
           }}
         />

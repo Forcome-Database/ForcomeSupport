@@ -138,6 +138,7 @@ export const auditExportAuditSnapshotSchema = z.object({
     to: z.string(),
     actor: z.string().optional(),
     type: auditObjectTypeSchema.optional(),
+    /** 「动作」筛选的键（auditActionFilterKeys） */
     action: z.string().optional(),
     q: z.string().optional(),
   }),
@@ -182,11 +183,13 @@ interface AuditActionDefinition {
   /** 动作作用的对象类型；越权访问可以是任何对象（null） */
   readonly objectType: AuditObjectType | null;
   readonly snapshot: AuditSnapshotKind;
+  /** 「动作」筛选里的项：叫法相同的几种动作合为一项时写同一个键（如两种「导出 Excel」都是 export）；不写即动作本身 */
+  readonly filter?: string;
 }
 
 /**
- * 审计动作（`对象.动词`，ADR 0010）与叫法。写审计只能用这里登记的动作（core 的 recordAudit 按它检查类型），
- * P27 的「动作」筛选也从这里来。叫法相同的动作在筛选里是同一项（如两种「导出 Excel」）。
+ * 审计动作（`对象.动词`，ADR 0010）与叫法。写审计只能用这里登记的动作（core 的 recordAudit 按它检查动作、对象类型与前后值的
+ * 类型），P27 的「动作」筛选也从这里来。新增一种动作：在这里登记，快照结构放上面，字段表与摘要写法放 audit-describe.ts。
  */
 export const auditActions = {
   'store.create': { label: '新增店铺', objectType: 'store', snapshot: 'store' },
@@ -206,8 +209,18 @@ export const auditActions = {
     snapshot: 'aftersales',
   },
   'aftersales.cancel': { label: '取消', objectType: 'aftersales', snapshot: 'aftersales' },
-  'ledger.export': { label: '导出 Excel', objectType: 'export', snapshot: 'ledgerExport' },
-  'audit.export': { label: '导出 Excel', objectType: 'export', snapshot: 'auditExport' },
+  'ledger.export': {
+    label: '导出 Excel',
+    objectType: 'export',
+    snapshot: 'ledgerExport',
+    filter: 'export',
+  },
+  'audit.export': {
+    label: '导出 Excel',
+    objectType: 'export',
+    snapshot: 'auditExport',
+    filter: 'export',
+  },
   'access.denied': { label: '越权访问被拒', objectType: null, snapshot: 'accessDenied' },
   'auth.login': { label: '登录', objectType: 'login', snapshot: 'login' },
   'auth.logout': { label: '退出登录', objectType: 'login', snapshot: 'empty' },
@@ -220,9 +233,52 @@ export type AuditSnapshot<A extends AuditAction> = z.input<
   (typeof auditSnapshotSchemas)[(typeof auditActions)[A]['snapshot']]
 >;
 
+/** 某个动作写审计时的对象类型：登记了对象类型的只能是它，越权访问可以是任何对象 */
+export type AuditActionObjectType<A extends AuditAction> =
+  (typeof auditActions)[A]['objectType'] extends AuditObjectType
+    ? (typeof auditActions)[A]['objectType']
+    : AuditObjectType;
+
 export function isAuditAction(value: string): value is AuditAction {
   return Object.hasOwn(auditActions, value);
 }
 
 /** 越权访问被拒（E-24）：P27 红色标出、可按动作筛选 */
 export const ACCESS_DENIED_ACTION = 'access.denied' satisfies AuditAction;
+
+const actionEntries = Object.entries(auditActions) as [AuditAction, AuditActionDefinition][];
+const filterKeyOf = (action: AuditAction, definition: AuditActionDefinition) =>
+  definition.filter ?? action;
+
+/** 「动作」筛选的键（地址栏与接口里写它，不写叫法：改叫法不影响旧链接与导出记录） */
+export const auditActionFilterKeys = [
+  ...new Set(actionEntries.map(([action, definition]) => filterKeyOf(action, definition))),
+] as [string, ...string[]];
+export const auditActionFilterSchema = z.enum(auditActionFilterKeys);
+
+/** 「动作」筛选的选项（按登记顺序）：选了对象类型时只列该类型的动作，越权访问被拒对任何对象都列 */
+export function auditActionFilterOptions(
+  type?: AuditObjectType,
+): { readonly value: string; readonly label: string }[] {
+  const options = new Map<string, string>();
+  for (const [action, definition] of actionEntries) {
+    if (type && definition.objectType !== null && definition.objectType !== type) continue;
+    options.set(filterKeyOf(action, definition), definition.label);
+  }
+  return [...options].map(([value, label]) => ({ value, label }));
+}
+
+/** 「动作」筛选的一项对应的动作；认不出的键为空列表 */
+export function auditActionsOfFilter(key: string): AuditAction[] {
+  return actionEntries
+    .filter(([action, definition]) => filterKeyOf(action, definition) === key)
+    .map(([action]) => action);
+}
+
+/** 「动作」筛选的一项的叫法（认不出的键原样返回，例如导出记录里的旧值） */
+export function auditActionFilterLabel(key: string): string {
+  return (
+    actionEntries.find(([action, definition]) => filterKeyOf(action, definition) === key)?.[1]
+      .label ?? key
+  );
+}

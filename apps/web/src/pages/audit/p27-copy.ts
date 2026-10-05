@@ -6,8 +6,9 @@ import {
 } from '@forcome/contracts';
 
 /*
- * P27 审计日志的界面文案（PRD P27、K18、K5；参照图 design/spec/shots/phase1/P27_AuditLog.png 与 StatesAdmin 的 K18）。
- * 逐字照原型（p27-copy.test.ts 直接读原型核对）；原型没有画的状态（列表为空、导出中与导出完成）照 P13、K5 的写法拼成。
+ * P27 审计日志的界面文案（PRD P27、K18、K5；参照图 design/spec/shots/phase1/P27_AuditLog.png 与 StatesAdmin 的 K18 及其补充小样：
+ * 第一阶段几种记录、列表为空、导出、自定义时间）。逐字照原型（p27-copy.test.ts 直接读原型核对）。后端写出的摘要、前后值与
+ * 「当前筛选」里时间以外的各项在 contracts（audit-describe.ts、audit-log.ts 的 auditConditionWords），同一个测试一并对照原型。
  */
 
 export const PAGE_TITLE = '审计日志';
@@ -107,9 +108,6 @@ export const PAGER = {
 /** 列表为空（照 P13 与 I10 的写法：标题、当前筛选、清除筛选） */
 export const EMPTY = {
   title: '没有符合条件的操作记录',
-  /** 「当前筛选」里的操作人与对象编号搜索（时间、对象类型、动作直接写叫法） */
-  actor: (name: string) => `操作人 ${name}`,
-  search: (q: string) => `对象编号含「${q}」`,
   description: (filters: readonly string[], clearable: boolean) =>
     `当前筛选：${filters.join(' · ')}。${clearable ? '换个条件试试，或清除筛选。' : ''}`,
 } as const;

@@ -1,3 +1,5 @@
+import { adapterModeLabels } from '@forcome/contracts';
+
 /*
  * P18 渠道与店铺的界面文案（逐字照原型；p18-copy.test.ts 直接读原型生成物核对，原型改了而这里没跟上就失败）：
  * 第一期参照页 design/spec/phase1/P18_Settings.dc.html，状态板 design/StatesAdmin.dc.html 的 K8（含补充小样）与 K20，
@@ -125,7 +127,7 @@ export const DRAWER = {
   defaultSiteHint: '无订单的来信按它归站点',
   mailboxHint: '每个地址都用来识别店铺；寄到这些地址的未归属来信保存后自动归位',
   dataSourceBadge: '仅开发测试环境',
-  dataSourceOptions: { real: '真实接口', fake: '模拟数据' },
+  dataSourceOptions: adapterModeLabels,
   dataSourceNote: '生产环境不显示此项；接模拟数据时渠道卡头标「模拟数据」。',
   /** 下拉没选时的占位（原型 select_box() 的默认占位） */
   placeholder: '请选择',

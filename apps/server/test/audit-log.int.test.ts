@@ -13,6 +13,7 @@ import { getDemoFixture } from '@forcome/fixtures';
 import ExcelJS from 'exceljs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { ApiClient } from './api-client';
+import { recordAudit, transaction } from '../src/modules/core';
 import { startTestHarness, type TestHarness } from './harness';
 
 /*
@@ -288,10 +289,21 @@ describe('P27 审计日志', () => {
       });
       expect(fieldOf(denied, '请求地址')?.after).toBe('/api/aftersales/ledger');
 
-      const filtered = await auditLog(supervisor, `?action=${encodeURIComponent('越权访问被拒')}`);
+      const filtered = await auditLog(supervisor, '?action=access.denied');
       expect(filtered.total).toBe(1);
       expect(filtered.entries.map((entry) => entry.action)).toEqual(['access.denied']);
       expect(filtered.denied).toBe(1);
+    });
+
+    it('越权的店铺写进对象名：按对象编号搜店铺名也能搜到', async () => {
+      const searched = await auditLog(supervisor, `?q=${encodeURIComponent('FORCOME.COM')}`);
+      expect(searched.entries.filter((entry) => entry.denied)).toHaveLength(1);
+      const [record] = await t.auditRecords({ action: 'access.denied' });
+      expect(record).toMatchObject({
+        objectType: 'store',
+        objectId: COM.id,
+        objectLabel: 'forcome.com',
+      });
     });
   });
 
@@ -307,7 +319,7 @@ describe('P27 审计日志', () => {
         '设为已完成',
         '新建登记',
       ]);
-      const logins = await auditLog(supervisor, `?type=login&action=${encodeURIComponent('登录')}`);
+      const logins = await auditLog(supervisor, '?type=login&action=auth.login');
       expect(logins.entries.every((entry) => entry.action === 'auth.login')).toBe(true);
       expect(logins.total).toBe(7);
 
@@ -449,5 +461,78 @@ describe('P27 审计日志', () => {
         },
       });
     });
+  });
+});
+
+/*
+ * 只看自己的角色同样按授权店铺过滤（PRD 10.2「店铺」一行对所有角色适用；协调者 2026-10-06 按 PRD 10.2 字面口径决定，v2.21）：
+ * 越权访问被拒记在越权的那家店铺下，操作者本人看不到；店铺范围收窄后，本人以前在已不在范围内的店铺上的操作也看不到。
+ */
+describe('P27 只看自己的角色的两个边界（10.2）', () => {
+  let t: TestHarness;
+  let supervisor: ApiClient;
+
+  beforeAll(async () => {
+    t = await startTestHarness();
+    await t.loadFixtures();
+    supervisor = await t.loginAs({ member: 'zhoumin' });
+  });
+
+  afterAll(async () => {
+    await t.close();
+  });
+
+  it('坐席自己的越权访问被拒只给对那家店铺有范围的客服主管、管理员看', async () => {
+    const id = await t.addMember({
+      name: '孙丽',
+      dept: 'FSH / 客服部',
+      roles: ['agent'],
+      allStores: false,
+      storeIds: [DIRECT.id],
+    });
+    const agent = await t.loginAs({ memberId: id });
+    expect((await agent.get(`/api/aftersales/ledger?store=${COM.id}`)).status).toBe(403);
+
+    const own = await auditLog(agent);
+    expect(own.scope).toBe('own');
+    expect(own.entries.map((entry) => entry.action)).toEqual(['auth.login']);
+    expect(own.denied).toBe(0);
+
+    const all = await auditLog(supervisor, `?actor=${id}`);
+    expect(all.entries.map((entry) => entry.action)).toEqual(['access.denied', 'auth.login']);
+  });
+
+  it('店铺范围收窄后，本人以前在已不在范围内的店铺上的操作记录看不到，没有店铺属性的照常', async () => {
+    const id = await t.addMember({
+      name: '钱涛',
+      dept: 'FSH / 售后部',
+      roles: ['aftersales_owner'],
+      allStores: false,
+      storeIds: [DIRECT.id],
+    });
+    // 收窄之前在 forcome.com 上做过的一次操作（收窄的入口随待办 06 的 P20，这里直接写一条他的审计）
+    await transaction(t.runtime, (tx) =>
+      recordAudit(
+        tx,
+        {
+          kind: 'member',
+          memberId: id,
+          name: '钱涛',
+          roles: ['aftersales_owner'],
+          ip: '10.20.2.40',
+        },
+        {
+          action: 'aftersales.complete',
+          objectType: 'aftersales',
+          objectId: 'old-com',
+          objectLabel: 'S-20260901-0099',
+          storeId: COM.id,
+        },
+      ),
+    );
+    const owner = await t.loginAs({ memberId: id });
+    const own = await auditLog(owner, '?period=week');
+    expect(own.entries.map((entry) => entry.action)).toEqual(['auth.login']);
+    expect((await auditLog(supervisor, `?actor=${id}`)).total).toBe(2);
   });
 });

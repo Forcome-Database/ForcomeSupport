@@ -24,7 +24,7 @@ import { AFTERSALES_QUERY_KEY, ledgerOptionsQuery, ledgerQuery } from '@/lib/aft
 import { api, ApiRequestError } from '@/lib/api';
 import { storeOptionsQuery } from '@/lib/channel';
 import { useCurrentMember } from '@/lib/current-member';
-import { saveFile } from '@/lib/download';
+import { useFileExport } from '@/lib/export';
 import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { pages } from '@/lib/pages';
 import { endSessionIfUnauthenticated } from '@/lib/session';
@@ -158,31 +158,16 @@ function useInlineBackfill(): InlineBackfill {
  * 「文件名 · N 单，浏览器已开始下载 · 已记入审计日志。」；失败按 G5「导出失败：原因」+「立即重试」
  */
 function useLedgerExport(query: LedgerQuery) {
-  const queryClient = useQueryClient();
-  const mutation = useMutation({ mutationFn: api.exportLedger });
-
-  /** 导出一次：成功下载并提示；失败时抛出（给「立即重试」用） */
-  async function exportOnce(): Promise<void> {
-    const file = await mutation.mutateAsync(query);
-    dismissToast(EXPORT_TOAST);
-    saveFile(file.blob, file.fileName);
-    showSuccess({
-      title: EXPORT.doneTitle,
-      description: EXPORT.doneDescription(file.fileName, file.rows),
-    });
-  }
-
-  return {
-    exporting: mutation.isPending,
-    run: async () => {
-      try {
-        await exportOnce();
-      } catch (error) {
-        if (endSessionIfUnauthenticated(queryClient, error)) return;
-        showError({ id: EXPORT_TOAST, action: EXPORT.failedAction, error, retry: exportOnce });
-      }
-    },
-  };
+  return useFileExport({
+    id: EXPORT_TOAST,
+    action: EXPORT.failedAction,
+    download: () => api.exportLedger(query),
+    done: (file) =>
+      showSuccess({
+        title: EXPORT.doneTitle,
+        description: EXPORT.doneDescription(file.fileName, file.rows),
+      }),
+  });
 }
 
 /** 右上「列设置」（S13 补充小样）：按表格顺序列出能隐藏的列，勾选即显示，底部「恢复默认」 */
@@ -244,7 +229,7 @@ export function LedgerPage() {
   const options = useQuery(ledgerOptionsQuery);
   const columns = useColumnVisibility(member.id);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [opened, setDrawer] = useState<DrawerTarget | null>(null);
+  const [opened, setOpened] = useState<DrawerTarget | null>(null);
   const [cancelling, setCancelling] = useState<LedgerItem | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const backfill = useInlineBackfill();
@@ -264,7 +249,7 @@ export function LedgerPage() {
   const drawer: DrawerTarget | null =
     opened ?? (search.open ? { mode: 'edit', number: search.open } : null);
   const closeDrawer = () => {
-    setDrawer(null);
+    setOpened(null);
     if (search.open) go({ ...search, open: undefined });
   };
   const storeOptions = (stores.data ?? []).map((store) => ({ value: store.id, label: store.name }));
@@ -277,7 +262,7 @@ export function LedgerPage() {
   const ctx: CellContext = {
     member,
     backfill,
-    open: (number) => setDrawer({ mode: 'edit', number }),
+    open: (number) => setOpened({ mode: 'edit', number }),
   };
   const empty = {
     description: EMPTY.description(
@@ -323,7 +308,7 @@ export function LedgerPage() {
               {exporter.exporting ? EXPORT.busy : EXPORT.button}
             </Button>
             {canRegister && (
-              <Button onClick={() => setDrawer({ mode: 'create' })}>
+              <Button onClick={() => setOpened({ mode: 'create' })}>
                 <Plus />
                 {NEW_REGISTRATION}
               </Button>

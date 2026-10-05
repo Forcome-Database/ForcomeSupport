@@ -20,7 +20,7 @@ import {
 } from '@forcome/contracts';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { storeNamesById } from '../channel';
-import { exchangeRatesOn, type AppEnv, type Runtime } from '../core';
+import { exchangeRatesOn, xlsxDownloadHeaders, type AppEnv, type Runtime } from '../core';
 import { listParts } from '../factory';
 import {
   memberNamesById,
@@ -37,6 +37,7 @@ import {
   ledgerItemOf,
   ledgerOptions,
   listLedger,
+  storeAccessTarget,
   toDetail,
   type AftersalesRow,
 } from './ledger';
@@ -298,7 +299,7 @@ export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv 
   /** 店铺筛选：范围外的店铺记越权审计并 403（E-24） */
   async function requireStoreFilter(access: Access, store: string | undefined) {
     if (!store) return;
-    await access.requireStores({ storeIds: [store], objectType: 'store', objectId: store });
+    await access.requireStores(storeAccessTarget(runtime.db, store));
   }
 
   /** 一张单的完整登记（财务字段按查看者的权限过滤） */
@@ -340,12 +341,11 @@ export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv 
     const query = c.req.valid('query');
     await requireStoreFilter(access, query.store);
     const file = await exportLedger(runtime, access, query);
-    return c.body(file.body, 200, {
-      'Content-Type': XLSX_CONTENT_TYPE,
-      'Content-Disposition': `attachment; filename="ledger.xlsx"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,
-      [EXPORT_ROWS_HEADER]: String(file.count),
-      'Cache-Control': 'no-store',
-    });
+    return c.body(
+      file.body,
+      200,
+      xlsxDownloadHeaders({ fileName: file.fileName, rows: file.count }, 'ledger.xlsx'),
+    );
   });
 
   routes.openapi(ledgerOptionsRoute, async (c) =>

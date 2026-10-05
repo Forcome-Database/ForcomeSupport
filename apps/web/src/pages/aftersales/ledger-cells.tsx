@@ -16,11 +16,11 @@ import {
   type RegistrationField,
 } from '@forcome/contracts';
 import type { ReactNode } from 'react';
+import { DisabledReason } from '@/components/disabled-reason';
 import { AftersalesStatusBadge, CategoryBadge } from '@/components/aftersales-badges';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { A11Y, EMPTY_VALUE, FOREIGN_AMOUNT, MISSING, NOT_KEPT, SHARE, storeSite } from './p13-copy';
 
@@ -180,21 +180,7 @@ function InlineTrackingEditor({ item, ctx }: { item: LedgerItem; ctx: CellContex
           if (event.key === 'Escape') cancel();
         }}
       />
-      {empty ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span
-              tabIndex={0}
-              className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {saveButton}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{MISSING.saveNeedsValue}</TooltipContent>
-        </Tooltip>
-      ) : (
-        saveButton
-      )}
+      <DisabledReason reason={empty ? MISSING.saveNeedsValue : null}>{saveButton}</DisabledReason>
     </div>
   );
 }

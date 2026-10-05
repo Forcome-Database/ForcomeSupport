@@ -1,27 +1,27 @@
 import {
-  auditObjectTypeLabels,
+  auditConditionWords,
   auditScope,
   canViewFinance,
   type AuditLogFilter,
   type AuditRange,
 } from '@forcome/contracts';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Banknote, Download, Lock, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { DisabledReason } from '@/components/disabled-reason';
 import { LoadError } from '@/components/load-error';
 import { PageHead } from '@/components/page-head';
+import { SectionLabel } from '@/components/section-label';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { api } from '@/lib/api';
 import { AUDIT_QUERY_KEY, auditLogOptionsQuery, auditLogQuery } from '@/lib/audit';
 import { useCurrentMember } from '@/lib/current-member';
-import { saveFile } from '@/lib/download';
-import { dismissToast, showError, showSuccess } from '@/lib/notify';
+import { useFileExport } from '@/lib/export';
+import { showSuccess } from '@/lib/notify';
 import { pages } from '@/lib/pages';
-import { endSessionIfUnauthenticated } from '@/lib/session';
 import { AuditFilterBar } from './audit-filters';
 import {
   auditFilterOf,
@@ -32,7 +32,6 @@ import {
 } from './audit-search';
 import { AuditTable } from './audit-table';
 import {
-  EMPTY,
   EXPORT,
   FILTERS,
   LIST_HEAD,
@@ -42,6 +41,7 @@ import {
   PAGE_TITLE,
   PAGER,
   PERIODS,
+  EMPTY,
   rangeHead,
 } from './p27-copy';
 
@@ -49,7 +49,7 @@ import {
  * P27 审计日志（PRD P27「第一阶段」、10.2、K18 与补充小样、K5；参照图 design/spec/shots/phase1/P27_AuditLog.png）：
  * 所有角色从头像菜单进入，管理员另可从 P18 页头进入。页头（标题、说明、右上「导出」）→ 只看自己的角色的横幅（K18 ①）或
  * 没有财务权限的说明（K18 ②）→ 筛选行（条件在地址栏）→ 表头上方的时间、计数与图例 → 表格（点行展开两栏对照）→ 分页。
- * 查看范围与财务字段由后端按角色过滤（10.2），这里只照接口返回的写法显示。
+ * 查看范围与财务字段由后端按角色过滤（10.2），这里照接口返回的写法显示；加载前先按角色算出查看范围，免得横幅闪一下。
  */
 
 const EXPORT_TOAST = 'audit-export';
@@ -57,65 +57,19 @@ const EXPORT_TOAST = 'audit-export';
 /** 导出（K5）：生成中按钮转圈并写「正在生成，约 3 秒」；完成后浏览器直接下载，浮层「已导出 文件名 · 已记入审计日志」；失败按 G5 */
 function useAuditExport(filter: AuditLogFilter) {
   const queryClient = useQueryClient();
-  const mutation = useMutation({ mutationFn: api.exportAuditLog });
-
-  async function exportOnce(): Promise<void> {
-    const file = await mutation.mutateAsync(filter);
-    dismissToast(EXPORT_TOAST);
-    saveFile(file.blob, file.fileName);
-    showSuccess({ title: EXPORT.done(file.fileName) });
-    // 导出本身新写了一条审计
-    await queryClient.invalidateQueries({ queryKey: AUDIT_QUERY_KEY });
-  }
-
-  return {
-    exporting: mutation.isPending,
-    run: async () => {
-      try {
-        await exportOnce();
-      } catch (error) {
-        if (endSessionIfUnauthenticated(queryClient, error)) return;
-        showError({ id: EXPORT_TOAST, action: EXPORT.failedAction, error, retry: exportOnce });
-      }
+  return useFileExport({
+    id: EXPORT_TOAST,
+    action: EXPORT.failedAction,
+    download: () => api.exportAuditLog(filter),
+    done: async (file) => {
+      showSuccess({ title: EXPORT.done(file.fileName) });
+      // 导出本身新写了一条审计
+      await queryClient.invalidateQueries({ queryKey: AUDIT_QUERY_KEY });
     },
-  };
+  });
 }
 
-/** 不可用的分页按钮：禁用的样子，悬停写原因（禁用的按钮收不到悬停，外面包一层） */
-function PagerButton({
-  label,
-  disabledReason,
-  onClick,
-}: {
-  label: string;
-  disabledReason: string | null;
-  onClick: () => void;
-}) {
-  if (disabledReason === null) {
-    return (
-      <Button variant="outline" size="sm" onClick={onClick}>
-        {label}
-      </Button>
-    );
-  }
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          tabIndex={0}
-          className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <Button variant="outline" size="sm" disabled>
-            {label}
-          </Button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>{disabledReason}</TooltipContent>
-    </Tooltip>
-  );
-}
-
-/** 列表为空时「当前筛选：…」里的各项（时间总写；只看自己的不写操作人） */
+/** 列表为空时「当前筛选：…」里的各项：时间总写（自定义写起止），其余照 contracts 的写法；只看自己的不写操作人 */
 function filterParts(
   search: AuditSearch,
   range: AuditRange | null,
@@ -123,31 +77,29 @@ function filterParts(
   actorName: string | undefined,
 ): string[] {
   const period = search.period ?? 'today';
-  const parts = [period === 'custom' && range && today ? rangeHead(range, today) : PERIODS[period]];
-  if (actorName) parts.push(EMPTY.actor(actorName));
-  if (search.type) parts.push(auditObjectTypeLabels[search.type]);
-  if (search.action) parts.push(search.action);
-  if (search.q) parts.push(EMPTY.search(search.q));
-  return parts;
+  const time = period === 'custom' && range && today ? rangeHead(range, today) : PERIODS[period];
+  return [time, ...auditConditionWords({ ...search, actorName })];
 }
 
 export function AuditPage() {
   const member = useCurrentMember();
-  const own = auditScope(member.roles) !== 'all';
-  const finance = canViewFinance(member.roles);
   const search = auditSearchSchema.parse(useSearch({ strict: false }));
   const navigate = useNavigate();
-  const query = auditQueryOf(search);
-  const log = useQuery({ ...auditLogQuery(query), placeholderData: keepPreviousData });
+  const log = useQuery({
+    ...auditLogQuery(auditQueryOf(search)),
+    placeholderData: keepPreviousData,
+  });
+  const data = log.data;
+  const own = (data?.scope ?? auditScope(member.roles)) === 'own';
+  const finance = data?.financeVisible ?? canViewFinance(member.roles);
   const options = useQuery({ ...auditLogOptionsQuery, enabled: !own });
   const [expanded, setExpanded] = useState<string | null>(null);
   const exporter = useAuditExport(auditFilterOf(search));
 
   const go = (next: AuditSearch) => void navigate({ to: pages.audit.path, search: next });
-  const data = log.data;
-  const actors = (options.data?.actors ?? []).map((actor) => ({ ...actor }));
+  const actors = options.data?.actors ?? [];
   const clearable = !isDefaultSearch(search);
-  const pages_ = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  const pageCount = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   const page = data?.page ?? 1;
   const actorName = own ? undefined : actors.find((actor) => actor.value === search.actor)?.label;
 
@@ -197,9 +149,7 @@ export function AuditPage() {
           <div className="flex flex-col gap-2.5">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <h2 className="text-12 font-semibold tracking-[0.03em] text-muted-foreground">
-                  {data ? rangeHead(data.range, data.today) : ''}
-                </h2>
+                <SectionLabel>{data ? rangeHead(data.range, data.today) : ''}</SectionLabel>
                 {data && (
                   <span className="text-12 text-muted-foreground">
                     {LIST_HEAD.count(data.total, data.denied)}
@@ -224,10 +174,10 @@ export function AuditPage() {
             <AuditTable
               entries={data?.entries ?? null}
               member={member}
-              oneDay={data ? data.range.from === data.range.to : true}
+              withDate={(search.period ?? 'today') !== 'today'}
               today={data?.today ?? ''}
               expandedId={expanded}
-              onToggle={(id) => setExpanded((current) => (current === id ? null : id))}
+              onExpandedChange={setExpanded}
               empty={{
                 description: EMPTY.description(
                   filterParts(search, data?.range ?? null, data?.today ?? null, actorName),
@@ -247,19 +197,29 @@ export function AuditPage() {
           <div className="flex items-center justify-between gap-3">
             <span className="text-12 text-muted-foreground">{PAGER.summary(data.total)}</span>
             <div className="flex items-center gap-2">
-              <PagerButton
-                label={PAGER.prev}
-                disabledReason={page <= 1 ? PAGER.first : null}
-                onClick={() => go({ ...search, page: page - 1 > 1 ? page - 1 : undefined })}
-              />
+              <DisabledReason reason={page <= 1 ? PAGER.first : null}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => go({ ...search, page: page - 1 > 1 ? page - 1 : undefined })}
+                >
+                  {PAGER.prev}
+                </Button>
+              </DisabledReason>
               <span className="text-12 text-ink-2 tabular-nums">
-                {PAGER.position(page, pages_)}
+                {PAGER.position(page, pageCount)}
               </span>
-              <PagerButton
-                label={PAGER.next}
-                disabledReason={page >= pages_ ? PAGER.last : null}
-                onClick={() => go({ ...search, page: page + 1 })}
-              />
+              <DisabledReason reason={page >= pageCount ? PAGER.last : null}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= pageCount}
+                  onClick={() => go({ ...search, page: page + 1 })}
+                >
+                  {PAGER.next}
+                </Button>
+              </DisabledReason>
             </div>
           </div>
         )}

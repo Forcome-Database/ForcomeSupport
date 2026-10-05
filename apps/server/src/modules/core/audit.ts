@@ -2,6 +2,7 @@ import {
   ACCESS_DENIED_ACTION,
   SYSTEM_ACTOR_NAME,
   type AuditAction,
+  type AuditActionObjectType,
   type AuditObjectType,
   type AuditSnapshot,
   type Role,
@@ -45,7 +46,8 @@ export const systemActor: Actor = { kind: 'system' };
 interface AuditEntryOf<A extends AuditAction> {
   /** `对象.动词`，如 store.create、aftersales.complete、auth.login；只能用 contracts 的 auditActions 登记过的 */
   readonly action: A;
-  readonly objectType: AuditObjectType;
+  /** 登记了对象类型的动作只能写那一种（越权访问可以是任何对象） */
+  readonly objectType: AuditActionObjectType<A>;
   readonly objectId: string;
   /** 对象编号或名称，P27 显示用 */
   readonly objectLabel?: string | null;
@@ -132,8 +134,8 @@ export interface AuditLogConditions {
   /** 操作人：系统，或某位成员 */
   readonly actor?: { readonly kind: 'system' } | { readonly kind: 'member'; readonly id: string };
   readonly objectType?: AuditObjectType;
-  /** 动作（叫法相同的几种）；给了空列表时什么都不列 */
-  readonly actions?: readonly string[];
+  /** 动作（「动作」筛选的一项可以是几种动作）；给了空列表时什么都不列 */
+  readonly actions?: readonly AuditAction[];
   /** 对象编号搜索：对象编号或名称包含它（不分大小写） */
   readonly objectLabel?: string;
 }
