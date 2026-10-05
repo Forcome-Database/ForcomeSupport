@@ -17,3 +17,8 @@ Blocked by: 05, 08, 31
 ## Comments
 
 - 2026-10-05（待办 07）：P18 的 Gmail 卡与钉钉卡已有骨架（`apps/web/src/pages/settings/channel-cards.tsx`，后端 `GET /api/channel/settings` 的 `channels`）。状态目前只由数据来源决定（`apps/server/src/modules/channel/connections.ts` 的 `statusOf`：模拟数据为已连接、真实接口为未连接，`lastSyncAt` 恒为 null），本待办按同步记录替换它，补上同步延迟、连接异常、最近同步时间与「列出异常的邮箱」；「测试连接」在 07 先隐藏，由本待办加上（K20）；连接异常的卡片底色已按状态写好（`statusCard`）。店铺表「状态」列取 `Store.connections` 的 gmail 一项。
+- 2026-10-05（待办 08）：收信的最小形态已就位，本待办在它上面补健壮性。
+  - Gmail 客户端在 `apps/server/src/modules/integration/gmail.ts`：邮箱 `gmailClient`（店铺级：`watch`、`listHistory`、`getMessage`）与推送 `gmailPushClient`（全局，`CLIENT_MODE_GMAIL_PUSH`：`pull`、`acknowledge`）。两者的真实现现在是调用即「尚未接入」失败的占位（`realGmail`、`realGmailPush`），服务账号 + 全域委派、Pub/Sub 订阅、出站 HTTP 客户端工厂与调用记录由本待办接入。推送是环境级的，同一环境里店铺有真有假时只能二选一，另一类靠本待办的每 5 分钟兜底。
+  - 收信流程在 `apps/server/src/modules/channel/gmail-sync.ts`：常驻拉取 `channel.gmail_push` 每轮先给没有游标的进线邮箱 watch（`channel.mailbox_sync`，失败按进程内退避重试），再拉通知、按邮箱排 `channel.gmail_sync`（stately + singletonKey）；同步任务 history.list → messages.get → postal-mime 解析 → 入库，全部入库后才推进游标（已是「水位只在持久化成功后推进」，本待办补故障注入测试）。要补的：每天续订 watch（`mailbox_sync.watch_expires_at` 已存）、每 5 分钟 history.list 兜底（排 `channel.gmail_sync` 即可）、`listHistory` 抛 `CursorExpiredError` 时按 internalDate 区间补拉（Fake 还没有区间查询，要在 `FakeGmail` 里加）、「已发送」入库（`directionOf` 已把 SENT 判为 outbound，`syncMailbox` 现在跳过）、最近同步成功时间与连接状态（替换 `connections.ts` 的 `statusOf`，也可替换 watch 失败的进程内退避）、常驻拉取的 advisory lock 选主（`core/feeds.ts`）。
+  - Fake 的 watch 到期时间按最后一封信推算（Fake 没有时钟），做续订时按需改成可注入时间。
+  - 测试写法见 `apps/server/test/inbound-to-ticket.int.test.ts`：灌店铺后先 `t.runJobs()` 一次（开始监听），再 `t.clients.fake(gmailClient).deliver(…)`；`t.runJobs()` 会先拉 Fake 推送。

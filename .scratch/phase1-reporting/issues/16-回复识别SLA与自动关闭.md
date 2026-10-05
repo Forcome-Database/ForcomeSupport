@@ -19,3 +19,7 @@ Blocked by: 09, 10, 14
 ## Comments
 
 - 2026-10-02：按 PRD v2.11（D-24）改为「未回复来信不论来源驱动状态」、三种关闭原因、回复匹配顺序与乱序处理。
+- 2026-10-05（待办 08，协调者要求留衔接说明）：
+  - 迁移表 `apps/server/src/modules/ticket/lifecycle.ts` 现在只有新建与「待回复 + 新来信 → 不变（追加）」两行；事件、触发方、关闭原因的取值已在 `contracts/ticket.ts` 定好，本待办补 6.1 的其余各行并补齐单元测试。状态只经 `ticket/ticket-status.ts` 的 `createTicket` / `applyTransition` 写（同一事务写 `ticket.status_change`）；数据库约束（迁移 0007）在提交时核对工单的状态与关闭原因等于最近一条记录，`applyTransition` 状态有变化的分支 08 还没有用到，本待办是第一个使用者。
+  - 「已发送」入库随 09，`channel.message` 的 `in_reply_to`、`references`、`gmail_thread_id` 已存，回复识别直接用；SLA 字段加在 `ticket.ticket_message` 上。7 天、14 天从 `ticket.ticket.last_inbound_at` 起算（追加时取较晚的一封）。
+  - 开发测试环境的示例来信回放（`integration/gmail-replay.ts`）只放了来信，我方回复与「等客户」等状态要在这里补；示例数据的时间在 9 月，开发测试环境用真实时钟，14 天规则上线后这些工单会被自动关闭，e2e `apps/web/e2e/tickets.spec.ts` 断言的「待回复」要随之调整（或把回放时间平移到当前）。

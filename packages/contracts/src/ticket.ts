@@ -112,7 +112,7 @@ export const ticketMessageSchema = z.object({
   subject: z.string(),
   /** 到达时间（Gmail internalDate） */
   arrivedAt: z.iso.datetime({ offset: true }),
-  /** 同一封邮件（Message-ID 相同）同时发到的其他店铺邮箱（R-TK-07）：只按最早到达的一封归并，其余记在这里 */
+  /** 同一封邮件（Message-ID 相同）同时发到的其他店铺邮箱（R-TK-07）：只按最早收到（同步入库）的一封归并，其余记在这里 */
   alsoSentTo: z.array(z.string()),
 });
 export type TicketMessage = z.infer<typeof ticketMessageSchema>;

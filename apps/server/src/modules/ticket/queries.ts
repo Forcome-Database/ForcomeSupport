@@ -95,21 +95,22 @@ export async function ticketDetail(
     links.map((l) => l.channelMessageId),
   );
   const byId = new Map(summaries.map((s) => [s.id, s]));
-  const messages: TicketMessage[] = links.flatMap((link) => {
+  const messages: TicketMessage[] = links.map((link) => {
     const s = byId.get(link.channelMessageId);
-    return s
-      ? [
-          {
-            id: s.id,
-            direction: s.direction,
-            mailbox: s.mailbox,
-            from: { name: s.fromName, address: s.fromAddress },
-            subject: s.subject,
-            arrivedAt: s.receivedAt.toISOString(),
-            alsoSentTo: [...s.alsoSentTo],
-          },
-        ]
-      : [];
+    // 工单里的消息与工单同一个店铺（归并时取的就是来信识别出的店铺；15 指定店铺时一并回填来信的店铺），
+    // 读不到说明数据不一致：报错，不悄悄少给几封
+    if (!s) {
+      throw new Error(`工单 ${row.number} 的消息 ${link.channelMessageId} 在当前店铺范围里读不到`);
+    }
+    return {
+      id: s.id,
+      direction: s.direction,
+      mailbox: s.mailbox,
+      from: { name: s.fromName, address: s.fromAddress },
+      subject: s.subject,
+      arrivedAt: s.receivedAt.toISOString(),
+      alsoSentTo: [...s.alsoSentTo],
+    };
   });
   const names = await storeNamesById(db, [row.storeId]);
   return { ticket: toListItem(row, names), messages };
