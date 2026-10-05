@@ -21,7 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ConnectionBadge } from './channel-cards';
-import { EMPTY_STORES, RULE_ROUTE } from './p18-copy';
+import { A11Y, EMPTY_STORES, RULE_ROUTE, STORE_SECTION, STORE_TABLE } from './p18-copy';
 
 /*
  * P18 店铺表（第一阶段，K20；原型 build_settings.p18_stores(phase1=True)）：
@@ -32,12 +32,12 @@ import { EMPTY_STORES, RULE_ROUTE } from './p18-copy';
 function SiteCell({ store }: { store: Store }) {
   return (
     <div
-      title={`默认站点 ${store.defaultSite}`}
+      title={STORE_TABLE.defaultSiteTitle(store.defaultSite)}
       className="text-13 whitespace-nowrap text-subtle-foreground"
     >
       {store.sites.map((site, index) => (
         <Fragment key={site}>
-          {index > 0 && ' · '}
+          {index > 0 && STORE_TABLE.separator}
           <span
             className={
               site === store.defaultSite ? 'font-bold text-foreground' : 'text-muted-foreground'
@@ -66,7 +66,7 @@ function CopyValue({ value }: { value: string }) {
       </span>
       <button
         type="button"
-        aria-label={copied ? '已复制' : `复制 ${value}`}
+        aria-label={copied ? A11Y.copied : A11Y.copy(value)}
         onClick={() => {
           void navigator.clipboard?.writeText(value).then(() => setCopied(true));
         }}
@@ -84,7 +84,7 @@ function CopyValue({ value }: { value: string }) {
  */
 function StoreStatus({ store }: { store: Store }) {
   const names: Record<StoreConnection['kind'], string> = {
-    gmail: 'Gmail',
+    gmail: STORE_TABLE.gmail,
     orders: platformTerms[store.platform].ordersApi,
   };
   const [first] = store.connections;
@@ -93,7 +93,7 @@ function StoreStatus({ store }: { store: Store }) {
       <div className="flex flex-col items-start gap-0.75">
         <ConnectionBadge status={first.status} />
         <span className="text-11 whitespace-nowrap text-subtle-foreground">
-          {store.connections.map((c) => names[c.kind]).join(' · ')}
+          {store.connections.map((c) => names[c.kind]).join(STORE_TABLE.separator)}
         </span>
       </div>
     );
@@ -149,10 +149,10 @@ function StoreRow({ store, onEdit }: { store: Store; onEdit: (store: Store) => v
         <Button
           variant="text-link"
           size="text"
-          aria-label={`编辑 ${store.name}`}
+          aria-label={A11Y.edit(store.name)}
           onClick={() => onEdit(store)}
         >
-          编辑
+          {STORE_TABLE.edit}
         </Button>
       </TableCell>
     </TableRow>
@@ -169,19 +169,19 @@ export function StoreTable({
   onEdit: (store: Store) => void;
 }) {
   return (
-    <section aria-label="店铺" className="flex flex-col gap-2.5">
+    <section aria-label={A11Y.storesRegion} className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between gap-2.5">
         <div className="flex items-center gap-2.5">
-          <SectionLabel>店铺</SectionLabel>
+          <SectionLabel>{STORE_SECTION.label}</SectionLabel>
           <span className="text-12 whitespace-nowrap text-muted-foreground">
-            {stores.length} 个
+            {STORE_SECTION.count(stores.length)}
           </span>
           <span aria-hidden className="h-3 w-px bg-border" />
-          <InfoTip label="进线识别" tip={RULE_ROUTE} />
+          <InfoTip label={STORE_SECTION.ruleLabel} tip={RULE_ROUTE} />
         </div>
         <Button variant="outline" size="sm" onClick={onCreate}>
           <Plus />
-          新增店铺
+          {STORE_SECTION.create}
         </Button>
       </div>
       {stores.length === 0 ? (
@@ -193,7 +193,7 @@ export function StoreTable({
             action={
               <Button variant="outline" onClick={onCreate}>
                 <Plus />
-                新增店铺
+                {STORE_SECTION.create}
               </Button>
             }
           />
@@ -210,13 +210,13 @@ export function StoreTable({
           </colgroup>
           <TableHeader>
             <TableRow>
-              <TableHead>店铺</TableHead>
-              <TableHead>站点（加粗为默认）</TableHead>
-              <TableHead>进线邮箱</TableHead>
-              <TableHead>平台标识</TableHead>
-              <TableHead>状态</TableHead>
+              <TableHead>{STORE_TABLE.columns.store}</TableHead>
+              <TableHead>{STORE_TABLE.columns.sites}</TableHead>
+              <TableHead>{STORE_TABLE.columns.mailboxes}</TableHead>
+              <TableHead>{STORE_TABLE.columns.platformId}</TableHead>
+              <TableHead>{STORE_TABLE.columns.status}</TableHead>
               <TableHead>
-                <span className="sr-only">操作</span>
+                <span className="sr-only">{A11Y.actionsColumn}</span>
               </TableHead>
             </TableRow>
           </TableHeader>

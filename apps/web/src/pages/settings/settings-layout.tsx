@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { Store, Users, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { pages, type PageDefinition } from '@/lib/pages';
-import { MENU_NOTE } from './p18-copy';
+import { A11Y, MENU_NOTE, MENU_TITLE } from './p18-copy';
 
 /*
  * 设置页外壳（原型 build_settings.spage() 与 as_common.settings_menu()，第一阶段：PRD 4.1、P18）：
@@ -20,10 +20,10 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-0 flex-1">
       <nav
-        aria-label="设置"
+        aria-label={A11Y.settingsNav}
         className="mt-2.5 mb-3 ml-3.5 flex w-52 shrink-0 flex-col gap-0.5 overflow-hidden rounded-xl border bg-card px-2.5 py-3.5 shadow-xs"
       >
-        <div className="px-2.5 pb-2.5 text-16 font-bold text-foreground">设置</div>
+        <div className="px-2.5 pb-2.5 text-16 font-bold text-foreground">{MENU_TITLE}</div>
         {MENU.map(({ page, icon: Icon }) => (
           <Link
             key={page.path}

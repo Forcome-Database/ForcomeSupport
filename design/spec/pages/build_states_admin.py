@@ -148,8 +148,10 @@ def k8_more():
     mails = ('<div style="display: flex; flex-direction: column; gap: 6px;"><div style="font-size: 12px; font-weight: 600; color: %s;">进线邮箱（可填多个，含别名）<span style="color: %s; margin-left: 2px;">*</span></div>%s%s%s</div>' % (
         T['ink2'], T['bad'], row(err_chip('support@forcome.mx') + chip('ventas@forcome.mx', 'outline', 11), 6), input_box('ventas@forcome.mx', st='error'),
         err_lines(['ventas@forcome.mx 已经填过', 'support@forcome.mx 已是 forcome.mx 的进线邮箱'])))
-    required = col(''.join(row(icon('alert', 13, T['bad'], 2) + nowrap(t, 12, T['bad']), 4) for t in
-                           ('请选择平台', '请填写店铺名', '请选择站点', '请选择默认站点', '至少填写一个进线邮箱', '请填写平台标识')), 6)
+    empty_selects = grid(field('平台', select_box(st='error'), True, error='请选择平台') +
+                         field('默认站点', select_box(st='error'), True, error='请选择默认站点'), 2, 12, extra='align-items: start;')
+    required = empty_selects + col(''.join(row(icon('alert', 13, T['bad'], 2) + nowrap(t, 12, T['bad']), 4) for t in
+                                           ('请填写店铺名', '请选择站点', '至少填写一个进线邮箱', '请填写平台标识')), 6)
     edit_head = ('<div style="background: #ffffff; border: 1px solid %s; border-radius: 12px; padding: 16px 20px 14px 20px; display: flex; gap: 12px; align-items: flex-start;">'
                  '<div style="flex: 1; display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 16px; font-weight: 600; color: %s;">编辑店铺</div>'
                  '<div style="font-size: 12px; color: %s; line-height: 1.5;">保存记入审计日志；未归属队列中收件地址与新店铺进线邮箱匹配的来信自动归位。</div></div>%s</div>') % (
@@ -162,7 +164,7 @@ def k8_more():
     return frame(cap('进线邮箱 · 没有错误时字段下方写提示') + hint +
                  cap('亚马逊店铺 · 平台标识为空') + amz +
                  cap('进线邮箱重复 · 输入框里的与已填的重复、已加入的被其他店铺占用') + mails +
-                 cap('其余必填项为空（未选平台时平台标识写「平台标识」）') + required +
+                 cap('其余必填项为空：下拉没选时写占位「请选择」（未选平台时平台标识写「平台标识」）') + required +
                  cap('编辑店铺 · 抽屉标题') + edit_head +
                  cap('保存结果') + grid(ok + fail, 2, 12, extra='align-items: start;') +
                  cap('店铺表为空（生产环境上线初期）') + none +

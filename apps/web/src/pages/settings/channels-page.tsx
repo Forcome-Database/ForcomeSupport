@@ -4,7 +4,7 @@ import { LoadError } from '@/components/load-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { channelSettingsQuery } from '@/lib/channel';
 import { ChannelCards } from './channel-cards';
-import { PAGE_DESCRIPTION } from './p18-copy';
+import { PAGE_DESCRIPTION, PAGE_TITLE } from './p18-copy';
 import { SettingsHeader, SettingsLayout } from './settings-layout';
 import { StoreDrawer, type StoreDrawerTarget } from './store-drawer';
 import { StoreTable } from './store-table';
@@ -39,7 +39,7 @@ export function ChannelsPage() {
 
   return (
     <SettingsLayout>
-      <SettingsHeader title="渠道与店铺" description={PAGE_DESCRIPTION} />
+      <SettingsHeader title={PAGE_TITLE} description={PAGE_DESCRIPTION} />
       {settings.isPending ? (
         <ChannelsSkeleton />
       ) : settings.isError ? (

@@ -5,6 +5,7 @@ import {
   platforms,
   platformTerms,
   sites as allSites,
+  SYSTEM_ACTOR_NAME,
   type Site,
   type Store,
 } from '@forcome/contracts';
@@ -42,7 +43,7 @@ import { CHANNEL_QUERY_KEY, channelSettingsQuery, formatClock } from '@/lib/chan
 import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { endSessionIfUnauthenticated } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { DRAWER, LEAVE, SAVE_RESULT } from './p18-copy';
+import { A11Y, DRAWER, LEAVE, SAVE_RESULT } from './p18-copy';
 import {
   changedFields,
   defaultSiteAfter,
@@ -101,7 +102,7 @@ function SitesSelect({
         >
           <span className="flex min-w-0 items-center gap-1">
             {value.length === 0 ? (
-              <span className="pl-1 text-placeholder">请选择</span>
+              <span className="pl-1 text-placeholder">{DRAWER.placeholder}</span>
             ) : (
               value.map((site) => (
                 <span
@@ -201,7 +202,7 @@ function MailboxesField({ id, form }: { id: string; form: UseFormReturn<StoreFor
                   {mailbox}
                   <button
                     type="button"
-                    aria-label={`移除 ${mailbox}`}
+                    aria-label={A11Y.removeMailbox(mailbox)}
                     onClick={() => {
                       field.onChange(field.value.filter((_, i) => i !== index));
                       clearErrors('mailboxes');
@@ -304,7 +305,7 @@ function StoreDrawerContent({
       title: SAVE_RESULT.savedTitle,
       description: SAVE_RESULT.savedDescription(
         store.name,
-        store.updatedBy ?? '系统',
+        store.updatedBy ?? SYSTEM_ACTOR_NAME,
         formatClock(store.updatedAt),
       ),
     });
@@ -320,7 +321,7 @@ function StoreDrawerContent({
     if (!latest) return;
     setConflict({
       latest,
-      who: latest.updatedBy ?? '系统',
+      who: latest.updatedBy ?? SYSTEM_ACTOR_NAME,
       at: formatClock(latest.updatedAt),
       fields: changedFields(base, latest),
     });
@@ -354,7 +355,7 @@ function StoreDrawerContent({
       if (handledInDrawer(error, values)) return;
       showError({
         id: SAVE_TOAST,
-        action: '保存',
+        action: SAVE_RESULT.failedAction,
         error,
         description: SAVE_RESULT.failedDescription,
         retry: async () => {
@@ -434,7 +435,7 @@ function StoreDrawerContent({
                           fieldState.invalid ? `${fieldId('platform')}-error` : undefined
                         }
                       >
-                        <SelectValue placeholder="请选择" />
+                        <SelectValue placeholder={DRAWER.placeholder} />
                       </SelectTrigger>
                       <SelectContent>
                         {platforms.map((p) => (
@@ -518,7 +519,7 @@ function StoreDrawerContent({
                           fieldState.invalid ? `${fieldId('defaultSite')}-error` : undefined
                         }
                       >
-                        <SelectValue placeholder="请选择" />
+                        <SelectValue placeholder={DRAWER.placeholder} />
                       </SelectTrigger>
                       <SelectContent>
                         {selectedSites.map((site) => (
@@ -593,10 +594,10 @@ function StoreDrawerContent({
           </SheetBody>
           <SheetFooter>
             <Button type="button" variant="outline" onClick={requestClose}>
-              取消
+              {DRAWER.cancel}
             </Button>
             <Button type="submit" loading={save.isPending}>
-              保存
+              {DRAWER.save}
             </Button>
           </SheetFooter>
         </form>

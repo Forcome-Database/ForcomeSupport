@@ -20,7 +20,17 @@ import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { formatClock } from '@/lib/channel';
 import { cn } from '@/lib/utils';
-import { CARD_LINES, NOT_AUTHORIZED, PHASE2_CARDS, RULE_CARD_STATE } from './p18-copy';
+import {
+  A11Y,
+  CARD_LINES,
+  CHANNEL_CARDS,
+  CHANNEL_SECTION,
+  LAST_SYNC,
+  NOT_AUTHORIZED,
+  PHASE2_CARDS,
+  RULE_CARD_STATE,
+  SIMULATED,
+} from './p18-copy';
 
 /*
  * P18 渠道卡（第一阶段，K20；原型 build_settings.p18_channels_p1()）：3 × 2 网格，间距 10。
@@ -74,45 +84,36 @@ const statusCard: Record<ConnectionStatus, string> = {
   not_connected: '',
 };
 
-const CARD_META: Record<ChannelKind, { name: string; icon: LucideIcon }> = {
-  amazon: { name: '亚马逊 SP-API', icon: StoreIcon },
-  shopify: { name: 'Shopify Admin API', icon: StoreIcon },
-  gmail: { name: 'Gmail', icon: MessageSquare },
-  dingtalk: { name: '钉钉', icon: Users },
+const CARD_ICONS: Record<ChannelKind, LucideIcon> = {
+  amazon: StoreIcon,
+  shopify: StoreIcon,
+  gmail: MessageSquare,
+  dingtalk: Users,
 };
 
-/** Gmail 卡的邮箱数：「4 个邮箱：2 个亚马逊买家消息、2 个 Shopify 客服」（某一类没有就不写） */
-function mailboxLine(stores: readonly Store[]): string {
-  const count = (platform: Store['platform']) =>
-    stores.filter((s) => s.platform === platform).reduce((n, s) => n + s.mailboxes.length, 0);
-  const amazon = count('amazon');
-  const shopify = count('shopify');
-  const parts = [
-    amazon > 0 ? `${amazon} 个亚马逊买家消息` : null,
-    shopify > 0 ? `${shopify} 个 Shopify 客服` : null,
-  ].filter(Boolean);
-  const total = amazon + shopify;
-  return parts.length > 0 ? `${total} 个邮箱：${parts.join('、')}` : `${total} 个邮箱`;
-}
-
-/** 各卡的说明行（第一期能力，K20） */
+/** 各卡的说明行（第一期能力，K20）：店铺数、邮箱数按数据写 */
 function cardLines(kind: ChannelKind, stores: readonly Store[]): string[] {
   const storeCount = (platform: Store['platform']) =>
     stores.filter((s) => s.platform === platform).length;
+  const mailboxCount = (platform: Store['platform']) =>
+    stores.filter((s) => s.platform === platform).reduce((n, s) => n + s.mailboxes.length, 0);
   switch (kind) {
     case 'amazon':
-      return [`${storeCount('amazon')} 个店铺 · 订单经 SP-API 准实时同步`];
+      return [CHANNEL_CARDS.amazon.stores(storeCount('amazon'))];
     case 'shopify':
-      return [`${storeCount('shopify')} 个店铺 · 订单经 Admin API 准实时同步`];
+      return [CHANNEL_CARDS.shopify.stores(storeCount('shopify'))];
     case 'gmail':
-      return [mailboxLine(stores), CARD_LINES.gmailSent];
+      return [
+        CHANNEL_CARDS.gmail.mailboxes(mailboxCount('amazon'), mailboxCount('shopify')),
+        CARD_LINES.gmailSent,
+      ];
     case 'dingtalk':
       return [...CARD_LINES.dingtalk];
   }
 }
 
 function subtitle(card: ChannelCard): string | null {
-  if (card.lastSyncAt) return `最近同步 ${formatClock(card.lastSyncAt)}`;
+  if (card.lastSyncAt) return LAST_SYNC(formatClock(card.lastSyncAt));
   return card.status === 'not_connected' ? NOT_AUTHORIZED : null;
 }
 
@@ -153,20 +154,20 @@ function CardHead({
 }
 
 function ConnectedCard({ card, stores }: { card: ChannelCard; stores: readonly Store[] }) {
-  const meta = CARD_META[card.kind];
+  const icon = CARD_ICONS[card.kind];
   return (
     <Card
       data-testid={`channel-card-${card.kind}`}
       className={cn('h-full gap-2 px-3.5 py-2.5', statusCard[card.status])}
     >
       <CardHead
-        icon={meta.icon}
+        icon={icon}
         tone={connectionTones[card.status]}
-        name={meta.name}
+        name={CHANNEL_CARDS[card.kind].name}
         sub={subtitle(card)}
         right={
           <>
-            {card.simulated && <Badge tone="info">模拟数据</Badge>}
+            {card.simulated && <Badge tone="info">{SIMULATED}</Badge>}
             <ConnectionBadge status={card.status} />
           </>
         }
@@ -215,10 +216,10 @@ export function ChannelCards({
   stores: readonly Store[];
 }) {
   return (
-    <section aria-label="渠道连接" className="flex flex-col gap-2.5">
+    <section aria-label={A11Y.channelsRegion} className="flex flex-col gap-2.5">
       <div className="flex items-center gap-2.5">
-        <SectionLabel>渠道连接</SectionLabel>
-        <InfoTip label="卡片状态按店铺计算" tip={RULE_CARD_STATE} />
+        <SectionLabel>{CHANNEL_SECTION.label}</SectionLabel>
+        <InfoTip label={CHANNEL_SECTION.ruleLabel} tip={RULE_CARD_STATE} />
       </div>
       <div className="grid grid-cols-3 items-stretch gap-2.5">
         {channels.map((card) => (
