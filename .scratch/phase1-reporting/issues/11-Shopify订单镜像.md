@@ -18,3 +18,5 @@ Blocked by: 07, 09, 31
 ## Comments
 
 - 2026-10-05（待办 07）：P18 的 Shopify 卡已有骨架（`channel-cards.tsx`），状态由 `channel/connections.ts` 的 `statusOf` 按数据来源给出、没有最近同步时间；本待办按订单同步记录替换（含 PRD 6.9「卡片列出异常的店铺」，`channelCardSchema` 要加字段），并加上「测试连接」与回补窗口行（例「订单回补 60 天 · 未开通 read_all_orders」，与 13 号待办分工）。店铺的数据来源在 `channel.store.adapter_mode`，`forStore(定义, { id, adapterMode })` 取客户端；店铺表「状态」列的订单一项写作「Admin API」。
+
+- 2026-10-06（待办 31）：订单同步连接异常与恢复的站内通知同 09 的写法：`notifyMembers(tx, { type: 'channel_disconnected' | 'channel_recovered', …, object: { type: 'channel', id: 'shopify', label: 'P18 · Shopify' } })`（对象 id 用 `contracts` 的 `channelKinds`），不传 `storeId`，连接异常另发钉钉工作通知；标题与说明原型只画了 Gmail，写 Shopify 的文案时照 Gmail 的写法并按 CLAUDE.md 核对。
