@@ -145,6 +145,8 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 
 **开发登录**：只在非生产环境、`DEV_LOGIN_ENABLED=true` 时开启（`dev.env` 已开启），从成员表里的在职成员（示例数据灌入）里选一位直接登录，换出与钉钉扫码登录相同的会话，能不能进入与正式登录同一套判断（第一期只有生产厂对接人角色的陈工、张工会看到「暂时无法进入」）；生产环境配置了就拒绝启动（ADR 0010 修订）。
 
+**演示时刻**：非生产环境可设 `CLOCK_START`（带时区的 ISO 时刻，例如 `CLOCK_START=2026-09-11T10:20:00+08:00 pnpm --filter @forcome/server dev:api`，worker 同样设），api 与 worker 的时钟从该时刻起随系统时钟前进，本机截图与演示对上原型的演示时刻（例如当月登记完整率落在 9 月）；生产环境配置了就拒绝启动，开发测试环境不设（ADR 0008「待办 21 落地」修订）。
+
 **CI 与合并**：`.github/workflows/ci.yml` 在 PR 与 main 上跑类型检查、lint、迁移一致性、示例数据夹具一致性、构建、单元与集成测试、镜像构建与部署配置检查，最后由「CI 通过」汇总。仓库推到 GitHub 后，在 Settings → Branches 为 `main` 加保护规则：Require a pull request before merging（至少 1 个批准）、Require status checks to pass（必需检查选「CI 通过」）。仓库暂不上 GitHub，期间用 `pnpm ci:local` 代替。
 
 **部署**：main 上 CI 通过后，`.github/workflows/deploy-staging.yml` 在内网的开发测试运行器上执行 `deploy/deploy.mjs`，部署后对开发测试环境跑 Playwright（`apps/web/e2e` 全部用例）并在作业摘要里报告。仓库暂不上 GitHub，期间在本机用 `pnpm deploy:staging` 部署与冒烟；启用步骤、根证书安装与运维清单见 `docs/部署说明.md`。本机开发时的端到端用 `pnpm test:e2e`。
