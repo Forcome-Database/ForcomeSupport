@@ -128,6 +128,7 @@ test('保存时校验全部：额外赔偿为 0、比例 130、「其他」未�
     drawer(page).getByText('部分补偿、免退货退款的款项记在额外赔偿，须大于 0'),
   ).toBeVisible();
   await expect(drawer(page).getByRole('textbox', { name: '责任理由' })).toBeFocused();
+  await expect(drawer(page).getByText('责任为「其他」时须填写理由')).toBeInViewport({ ratio: 1 });
   await expect(drawer(page).getByText('保存按钮保持可点，点击后定位到第一个错误')).toBeVisible();
 
   // 改了哪个字段就撤掉它的错误
@@ -141,6 +142,37 @@ test('保存时校验全部：额外赔偿为 0、比例 130、「其他」未�
   await leave.getByRole('button', { name: '放弃修改' }).click();
   await expect(drawer(page)).toBeHidden();
   await expect(page.getByTestId('ledger-row')).toHaveCount(rowsBefore);
+});
+
+test('保存后定位到靠近底部的错误：横幅出现后，出错的金额框与下方的报错都完整可见（S14、AC-P1-17）', async ({
+  page,
+}) => {
+  await loginAs(page, '王磊');
+  await page.goto('/aftersales/ledger');
+  await page.getByRole('button', { name: '新建登记' }).click();
+  await drawer(page)
+    .getByRole('radio', { name: /退款或部分补偿/ })
+    .click();
+  await choose(page, '店铺', 'forcome.com');
+  await textbox(page, '订单号').fill('#2002');
+  await textbox(page, '客户').fill('E2E 定位');
+  await choose(page, '责任类型', '客户使用问题');
+  for (const fee of ['产品成本', '运费', '额外赔偿', '其他']) await textbox(page, fee).fill('0');
+
+  // 只有最下面一节的「额外赔偿」不对：保存后顶部出横幅，定位到它
+  await drawer(page).getByRole('button', { name: '保存登记' }).click();
+  await expect(drawer(page).getByText('有 1 项需要修改')).toBeVisible();
+  const compensation = textbox(page, '额外赔偿');
+  await expect(compensation).toBeFocused();
+  await expect(compensation).toBeInViewport({ ratio: 1 });
+  await expect(
+    drawer(page).getByText('部分补偿、免退货退款的款项记在额外赔偿，须大于 0'),
+  ).toBeInViewport({ ratio: 1 });
+
+  // 不保存：关闭时放弃
+  await page.keyboard.press('Escape');
+  await page.getByRole('alertdialog').getByRole('button', { name: '放弃修改' }).click();
+  await expect(drawer(page)).toBeHidden();
 });
 
 /** 抽屉里一个下拉的位置（左上角与尺寸） */

@@ -18,7 +18,7 @@ import {
   OverwriteDialog,
   type EditConflictInfo,
 } from '@/components/edit-conflict';
-import { FieldError, FormField } from '@/components/form-field';
+import { FieldError, FormField, useFocusField } from '@/components/form-field';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -281,8 +281,7 @@ function StoreDrawerContent({
     defaultValues: base ? storeFormOf(base) : emptyStoreForm(),
     shouldFocusError: false,
   });
-  const { control, register, handleSubmit, formState, setError, clearErrors, setFocus, reset } =
-    form;
+  const { control, register, handleSubmit, formState, setError, clearErrors, reset } = form;
   // formState 是按读取订阅的代理：要在渲染时读，G8 才拿得到最新的未保存状态
   const { isDirty, dirtyFields } = formState;
   const platform = useWatch({ control, name: 'platform' });
@@ -327,10 +326,13 @@ function StoreDrawerContent({
     });
   }
 
+  /** 定位到第一个错误：等字段下方的报错渲染出来再滚动（进线邮箱落到输入框，id 同字段） */
+  const focusField = useFocusField();
+
   function showFieldErrors(errors: readonly FormError[]) {
     for (const { field, message } of errors) setError(field, { type: 'server', message });
     const first = firstErrorField(errors);
-    if (first) setFocus(first === 'mailboxes' ? 'mailboxDraft' : first, { shouldSelect: false });
+    if (first) focusField(fieldId(first));
   }
 
   /** 保存失败的处理；字段错误与冲突留在抽屉里显示，返回 true 表示已处理 */

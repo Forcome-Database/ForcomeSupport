@@ -157,8 +157,11 @@ test('费用发生日及之前没有汇率：金额框下说明，保存时报�
 
   await drawer(page).getByRole('button', { name: '保存登记' }).click();
   await expect(drawer(page).getByText('有 1 项需要修改')).toBeVisible();
-  await expect(drawer(page).getByText(noRate)).toBeVisible();
   await expect(textbox(page, '额外赔偿')).toHaveAttribute('aria-invalid', 'true');
+  // 定位到靠近底部的「额外赔偿」：输入框与下方的报错都完整落在可见区里（不被横幅压短的滚动区或底栏挡住）
+  await expect(textbox(page, '额外赔偿')).toBeFocused();
+  await expect(textbox(page, '额外赔偿')).toBeInViewport({ ratio: 1 });
+  await expect(drawer(page).getByText(noRate)).toBeInViewport({ ratio: 1 });
 
   await page.keyboard.press('Escape');
   await page.getByRole('alertdialog').getByRole('button', { name: '放弃修改' }).click();

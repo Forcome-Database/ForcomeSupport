@@ -43,7 +43,7 @@ import {
 } from 'react-hook-form';
 import { AffixInput } from '@/components/affix-input';
 import { DateField } from '@/components/date-field';
-import { FieldError, FormField } from '@/components/form-field';
+import { FieldError, FormField, useFocusField } from '@/components/form-field';
 import { LoadError } from '@/components/load-error';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -368,16 +368,9 @@ function RegistrationForm({
     onClose();
   }
 
-  /** 定位到字段：处理方式落到第一张卡片，其余落到控件本身（字段都有 id） */
-  function focusField(field: RegistrationFormPath) {
-    const element = document.getElementById(fieldId(field));
-    const target =
-      element?.getAttribute('role') === 'radiogroup'
-        ? element.querySelector<HTMLElement>('button')
-        : element;
-    target?.focus({ preventScroll: true });
-    target?.scrollIntoView({ block: 'center' });
-  }
+  /** 定位到字段（字段都有 id）：等错误横幅与字段下方的报错渲染出来再滚动，处理方式落到第一张卡片 */
+  const focusAfterRender = useFocusField();
+  const focusField = (field: RegistrationFormPath) => focusAfterRender(fieldId(field));
 
   /** 保存失败的处理；字段错误留在抽屉里显示，返回 true 表示已处理 */
   function handledInDrawer(error: unknown): boolean {

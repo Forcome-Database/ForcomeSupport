@@ -48,6 +48,37 @@ test('管理员打开 P18：渠道卡与示例数据的 4 个店铺', async ({ p
   await expect(page.getByRole('button', { name: '查看审计日志' })).toHaveCount(0);
 });
 
+test('新增店铺：只有最下面的「平台标识」没填时，定位到它，输入框与下方的报错都完整可见（K8）', async ({
+  page,
+}) => {
+  const stamp = Date.now();
+  await loginAs(page, '刘洋');
+  await page.goto('/settings/channels');
+  await page.getByRole('button', { name: '新增店铺' }).click();
+  await chooseOption(page, '平台', 'Shopify');
+  await drawer(page).getByRole('textbox', { name: '店铺名' }).fill(`E2E 定位 ${stamp}`);
+  await drawer(page).getByRole('button', { name: '站点（多选）' }).click();
+  await page.getByRole('menuitemcheckbox', { name: 'MX' }).click();
+  await page.keyboard.press('Escape');
+  const mailboxes = drawer(page).getByRole('textbox', { name: '进线邮箱（可填多个，含别名）' });
+  await mailboxes.fill(`e2e-locate-${stamp}@forcome.test`);
+  await mailboxes.press('Enter');
+
+  await drawer(page).getByRole('button', { name: '保存', exact: true }).click();
+  const platformId = drawer(page).getByRole('textbox', { name: '平台标识 · Shopify 店铺域名' });
+  await expect(platformId).toBeFocused();
+  await expect(platformId).toBeInViewport({ ratio: 1 });
+  await expect(drawer(page).getByText('请填写店铺域名')).toBeInViewport({ ratio: 1 });
+
+  // 不保存：关闭时放弃，店铺表不多出店铺
+  await page.keyboard.press('Escape');
+  await page.getByRole('alertdialog').getByRole('button', { name: '放弃修改' }).click();
+  await expect(drawer(page)).toHaveCount(0);
+  await expect(page.getByTestId('store-row').filter({ hasText: `E2E 定位 ${stamp}` })).toHaveCount(
+    0,
+  );
+});
+
 test('新增店铺：字段下方逐项报错、定位到第一个错误；改正后保存出现在店铺表（K8、AC-ST-01）', async ({
   page,
 }) => {
