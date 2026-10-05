@@ -9,7 +9,7 @@ import {
   stripFinanceFields,
 } from './finance';
 
-// 示范用的售后单输出结构（真正的结构随 19 号待办）：成本、承担比例、承担金额标为财务字段
+// 示范用的售后单输出结构（真正的台账行是 aftersales.ts 的 ledgerItemSchema，待办 19 起；这里用精简结构测过滤本身）：成本、承担比例、承担金额标为财务字段
 const ratio = z.object({ fsh: z.int(), factory: z.int() });
 const ledgerRow = z.object({
   no: z.string(),

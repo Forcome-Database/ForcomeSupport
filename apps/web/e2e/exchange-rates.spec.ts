@@ -116,7 +116,7 @@ test('非美元金额：抽屉里即时折算成美元，保存后台账写美�
     row.getByTitle('汇率取费用发生日的欧洲央行日汇率；售后负责人可修改并记审计'),
   ).toHaveCount(2);
 
-  // 售后负责人改汇率（接口；界面入口随待办 21 的编辑登记）：美元值按新汇率重算，悬停说明写手工修改的汇率（S14 补充小样之二）
+  // 售后负责人改汇率（这里经接口改；界面入口在编辑登记抽屉，见 ledger-states.spec.ts）：美元值按新汇率重算，悬停说明写手工修改的汇率（S14 补充小样之二）
   const changed = await page.evaluate(async (name) => {
     const ledger = (await (await fetch('/api/aftersales/ledger')).json()) as {
       items: { number: string; version: number; customerName: string | null }[];

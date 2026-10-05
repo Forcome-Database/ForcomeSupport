@@ -118,7 +118,10 @@ export interface TestHarness {
   resetFakes(): void;
   /** 灌示例数据夹具（按各模块登记的加载步骤） */
   loadFixtures(): Promise<FixtureLoadReport>;
-  /** 按动作或对象取审计记录（P27 的查询接口随 30 号待办；在那之前用它核对审计） */
+  /**
+   * 按动作或对象取原始审计记录（core.audit_log 的行，不经查看范围与财务字段过滤），核对写入了什么。
+   * P27 看到的样子（10.2 过滤、写成中文、「已隐藏」）经接口 GET /api/audit 断言，见 audit-log.int.test.ts
+   */
   auditRecords(query?: AuditQuery): Promise<AuditRecord[]>;
   /**
    * 登记一条来源规则（第一期没有维护页面，规则随迁移与示例数据登记；测试里登记示例数据没有的，例如其他供应商）

@@ -44,8 +44,10 @@ test('管理员打开 P18：渠道卡与示例数据的 4 个店铺', async ({ p
   await expect(direct).toContainText('卖家 ID');
   await expect(direct).toContainText('A1FD7Q2M9XK3LC');
   await expect(direct).toContainText('已连接');
-  // 「查看审计日志」随 30 号待办（P27）加上，在那之前不显示
-  await expect(page.getByRole('button', { name: '查看审计日志' })).toHaveCount(0);
+  // 页头右上「查看审计日志」（管理员进入 P27 的另一个入口，待办 30）
+  await page.getByRole('link', { name: '查看审计日志' }).click();
+  await expect(page).toHaveURL(/\/audit$/);
+  await expect(page.getByRole('heading', { name: '审计日志' })).toBeVisible();
 });
 
 test('新增店铺：只有最下面的「平台标识」没填时，定位到它，输入框与下方的报错都完整可见（K8）', async ({

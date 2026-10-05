@@ -33,7 +33,7 @@ export const fixtureMemberSchema = z.object({
   key: z.string(),
   name: z.string(),
   avatar: z.string(),
-  /** 原型里的角色名（中文），04 号待办映射到角色枚举 */
+  /** 原型里的角色名（中文）；加载时经 contracts 的 roleByLabel 映射到角色枚举（待办 04） */
   role: z.string(),
   dept: z.string(),
   email: z.string().nullable(),

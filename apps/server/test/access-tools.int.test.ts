@@ -24,7 +24,7 @@ const storeId = (name: string) => stores.find((s) => s.name === name)!.id;
 const DIRECT = storeId('Forcome Direct');
 const MX = storeId('forcome.mx');
 
-// 示范的台账表与仓储（真正的台账随 19 号待办）：店铺范围是必需参数
+// 示范的台账表与仓储（真正的台账在 aftersales，待办 19 起；这里用最小的示范表只测公共工具本身）：店铺范围是必需参数
 const demo = pgSchema('demo');
 const demoLedger = demo.table('ledger', {
   id: uuid('id').primaryKey().defaultRandom(),

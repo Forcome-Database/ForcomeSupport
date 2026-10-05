@@ -97,7 +97,7 @@ export const aftersales = aftersalesSchema.table(
     freightFactoryPct: pct('freight_factory_pct'),
     otherFactoryPct: pct('other_factory_pct'),
     // 取消时确认保留的已产生费用（一个费用项一列，键为 `${费用项}Kept`）：只在已取消的单上有值，没登记的项为空；
-    // 保留的照常计入售后成本，没保留的不计（R-AS-08，售后成本视图随 22），原登记额仍在费用列里（悬停显示）
+    // 保留的照常计入售后成本，没保留的不计（R-AS-08，售后成本视图 aftersales_cost，待办 22），原登记额仍在费用列里（悬停显示）
     productCostKept: boolean('product_cost_kept'),
     freightKept: boolean('freight_kept'),
     compensationKept: boolean('compensation_kept'),

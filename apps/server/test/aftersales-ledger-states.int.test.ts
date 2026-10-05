@@ -622,7 +622,7 @@ describe('取消售后单（AC-AS-16）与补登已完成的单（AC-P1-19）', 
         keptFees: ['productCost', 'compensation', 'otherCost'],
       },
     });
-    // 原登记的费用照样在（计入售后成本的口径随待办 22 的售后成本视图）
+    // 原登记的费用照样在（计入售后成本的只是保留的部分，见待办 22 的售后成本视图与台账行的 cost）
     expect(cancelled.fees?.productCost).toMatchObject({ amount: '18.00', usd: '18.00' });
     expect(cancelled.fees?.freight).toMatchObject({ amount: '8.40' });
 
