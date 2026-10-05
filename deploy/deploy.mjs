@@ -336,7 +336,9 @@ async function main() {
       try {
         resetInbound(compose);
       } finally {
-        compose.run('start', 'worker');
+        // 不能用 compose start：worker 依赖一次性的 migrate（已 --rm 删掉），start 会报「缺少依赖」；
+        // 与部署时一样用 up --no-deps 起它
+        compose.run('up', '-d', '--wait', '--no-deps', 'worker');
       }
       console.log('已清空收信与工单，worker 已重启，示例来信几十秒内重新归并成工单');
       return true;
