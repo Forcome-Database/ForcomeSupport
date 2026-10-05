@@ -108,6 +108,33 @@ test('非美元金额：抽屉里即时折算成美元，保存后台账写美�
   await expect(row).toContainText(new RegExp(`CA\\$12\\.00 · ${date}`));
   // 美元的运费只写美元，没有原币一行
   await expect(row.getByText(/^汇率 /)).toHaveCount(2);
+  await expect(
+    row.getByTitle('汇率取费用发生日的欧洲央行日汇率；售后负责人可修改并记审计'),
+  ).toHaveCount(2);
+
+  // 售后负责人改汇率（接口；界面入口随待办 21 的编辑登记）：美元值按新汇率重算，悬停说明写手工修改的汇率（S14 补充小样之二）
+  const changed = await page.evaluate(async (name) => {
+    const ledger = (await (await fetch('/api/aftersales/ledger')).json()) as {
+      items: { number: string; version: number; customerName: string | null }[];
+    };
+    const item = ledger.items.find((i) => i.customerName === name);
+    if (!item) return 0;
+    const res = await fetch(`/api/aftersales/${item.number}/rates`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ version: item.version, rates: { compensation: '17.5' } }),
+    });
+    return res.status;
+  }, customer);
+  expect(changed).toBe(200);
+  await page.reload();
+  await expect(row).toContainText('$50.80');
+  await expect(
+    row.getByTitle('汇率为手工修改：1 USD = 17.50 MXN（售后负责人修改，已记入审计日志）'),
+  ).toBeVisible();
+  await expect(
+    row.getByTitle('汇率取费用发生日的欧洲央行日汇率；售后负责人可修改并记审计'),
+  ).toHaveCount(1);
 });
 
 test('费用发生日及之前没有汇率：金额框下说明，保存时报在该金额下方、不保存（E-20 的极端情形）', async ({

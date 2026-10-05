@@ -2,6 +2,7 @@ import {
   can,
   canViewFinance,
   formatMoney,
+  formatRate,
   formatRateDate,
   handlingMethodLabels,
   responsibilityLabels,
@@ -146,7 +147,7 @@ const BASE_COLUMNS: readonly Column[] = [
 
 /**
  * 金额（原型 p1_val()、p1_comp()，R-FL-06）：写冻结的美元值（13 正文色）；非美元在下方另起一行写原币与汇率日期
- * （11 浅灰，例「MX$889.00 · 汇率 09-10」），悬停说明汇率怎么来的。列窄时这一行在「·」处换行（原型只在宽的「额外赔偿」
+ * （11 浅灰，例「MX$889.00 · 汇率 09-10」），悬停说明汇率怎么来的（手工修改的另写，S14 补充小样之二）。列窄时这一行在「·」处换行（原型只在宽的「额外赔偿」
  * 列画过一行写完的样子）。没登记写「—」。
  */
 function feeCell(fee: Fee | null | undefined): ReactNode {
@@ -158,7 +159,14 @@ function feeCell(fee: Fee | null | undefined): ReactNode {
   );
   if (!fee.rate) return usd;
   return (
-    <div className="flex flex-col items-end" title={FOREIGN_AMOUNT.title}>
+    <div
+      className="flex flex-col items-end"
+      title={
+        fee.rate.source === 'manual'
+          ? FOREIGN_AMOUNT.manualTitle(formatRate(fee.rate.rate), fee.currency)
+          : FOREIGN_AMOUNT.publishedTitle
+      }
+    >
       {usd}
       <span className="text-right text-11 text-subtle-foreground tabular-nums">
         <span className="whitespace-nowrap">{formatMoney(fee.amount, fee.currency)}</span>

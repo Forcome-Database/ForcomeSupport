@@ -40,13 +40,18 @@ export const FINANCE_COLUMNS = {
 
 /**
  * 非美元金额（原型 p1_comp()、S13、R-FL-06）：美元值下方一行写原币与汇率日期（例「MX$889.00 · 汇率 09-10」），
- * 悬停说明汇率怎么来的
+ * 悬停说明汇率怎么来的——按来源区分（S14 补充小样之二，PRD v2.17）：欧洲央行与备用源（数据同样来自欧洲央行）写取汇率的口径，
+ * 售后负责人手工修改的写明是手工修改的汇率
  */
 export const FOREIGN_AMOUNT = {
   /** 原币与汇率日期之间（窄的金额列里在这里换行） */
   separator: ' · ',
   rateDate: (date: string) => `汇率 ${date}`,
-  title: '汇率取费用发生日的欧洲央行日汇率；售后负责人可修改并记审计',
+  /** 欧洲央行、备用源 */
+  publishedTitle: '汇率取费用发生日的欧洲央行日汇率；售后负责人可修改并记审计',
+  /** 手工修改（rate 是两位小数的写法，如「17.50」） */
+  manualTitle: (rate: string, currency: string) =>
+    `汇率为手工修改：1 USD = ${rate} ${currency}（售后负责人修改，已记入审计日志）`,
 } as const;
 
 /** 店铺与站点（原型 store_site()：「Forcome Direct · US」） */

@@ -110,7 +110,7 @@ describe('P13 第一期参照页', () => {
         FOREIGN_AMOUNT.separator +
         FOREIGN_AMOUNT.rateDate(formatRateDate('2026-09-10')),
     );
-    expectIn(P13, `title="${FOREIGN_AMOUNT.title}"`);
+    expectIn(P13, `title="${FOREIGN_AMOUNT.publishedTitle}"`);
   });
 });
 
@@ -184,6 +184,13 @@ describe('S10 列表为空、S14 新建登记抽屉', () => {
         'MXN',
       ),
     );
+  });
+
+  it('汇率（S14 补充小样之二，PRD v2.17）：没有汇率时的说明与报错、P13 悬停说明按来源区分', () => {
+    expectText(STATES, DRAWER.feeNoRate);
+    expectText(STATES, FOREIGN_AMOUNT.publishedTitle);
+    expectText(STATES, FOREIGN_AMOUNT.manualTitle(formatRate('17.5'), 'MXN'));
+    expectText(STATES, formatMoney('50.80', 'USD'));
   });
 
   it('比例表：表头、三组的叫法、合计与比例有误时的写法', () => {
