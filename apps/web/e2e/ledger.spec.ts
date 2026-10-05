@@ -143,6 +143,60 @@ test('保存时校验全部：额外赔偿为 0、比例 130、「其他」未�
   await expect(page.getByTestId('ledger-row')).toHaveCount(rowsBefore);
 });
 
+/** 抽屉里一个下拉的位置（左上角与尺寸） */
+async function boxOf(page: Page, name: RegExp) {
+  const box = await drawer(page).getByRole('combobox', { name }).boundingBox();
+  if (!box) throw new Error(`找不到下拉 ${String(name)}`);
+  return box;
+}
+
+test('责任与承担比例一节的布局：物流问题时索赔对象与索赔状态另起一行并排，责任类型右侧是生产厂或留空（S14 补充小样）', async ({
+  page,
+}) => {
+  await loginAs(page, '王磊');
+  await page.goto('/aftersales/ledger');
+  await page.getByRole('button', { name: '新建登记' }).click();
+  await drawer(page)
+    .getByRole('radio', { name: /调整安装方式/ })
+    .click();
+
+  // 其他处理方式不受影响：产品质量问题时生产厂在责任类型右侧同一行，没有索赔字段
+  await choose(page, '责任类型', '产品质量问题');
+  let responsibility = await boxOf(page, /^责任类型/);
+  const factory = await boxOf(page, /^生产厂/);
+  expect(Math.abs(factory.y - responsibility.y)).toBeLessThan(1);
+  expect(factory.x).toBeGreaterThan(responsibility.x + responsibility.width);
+  await expect(drawer(page).getByRole('combobox', { name: /^索赔/ })).toHaveCount(0);
+
+  // 物流问题：三组都是 FSH 100，生产厂不显示，责任类型右侧留空；两个索赔下拉在下一行并排
+  await choose(page, '责任类型', '物流问题');
+  await expect(drawer(page).getByRole('combobox', { name: /^生产厂/ })).toHaveCount(0);
+  responsibility = await boxOf(page, /^责任类型/);
+  let target = await boxOf(page, /^索赔对象/);
+  let status = await boxOf(page, /^索赔状态/);
+  expect(target.y).toBeGreaterThan(responsibility.y + responsibility.height);
+  expect(Math.abs(target.x - responsibility.x)).toBeLessThan(1);
+  expect(Math.abs(status.y - target.y)).toBeLessThan(1);
+  expect(status.x).toBeGreaterThan(target.x + target.width);
+
+  // 改出工厂比例：生产厂出现在责任类型右侧，两个索赔下拉仍在下一行并排
+  await textbox(page, '产品成本 工厂 %').fill('50');
+  const shown = await boxOf(page, /^生产厂/);
+  responsibility = await boxOf(page, /^责任类型/);
+  target = await boxOf(page, /^索赔对象/);
+  status = await boxOf(page, /^索赔状态/);
+  expect(Math.abs(shown.y - responsibility.y)).toBeLessThan(1);
+  expect(shown.x).toBeGreaterThan(responsibility.x + responsibility.width);
+  expect(target.y).toBeGreaterThan(responsibility.y + responsibility.height);
+  expect(Math.abs(target.x - responsibility.x)).toBeLessThan(1);
+  expect(Math.abs(status.y - target.y)).toBeLessThan(1);
+
+  // 不保存：关闭时放弃
+  await page.keyboard.press('Escape');
+  await page.getByRole('alertdialog').getByRole('button', { name: '放弃修改' }).click();
+  await expect(drawer(page)).toBeHidden();
+});
+
 test('坐席只读查看台账：没有「新建登记」，不显示金额列（P13「第一阶段」）', async ({ page }) => {
   await loginAs(page, '李婷');
   await page.goto('/aftersales/ledger');

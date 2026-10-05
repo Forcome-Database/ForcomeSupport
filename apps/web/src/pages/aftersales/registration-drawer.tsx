@@ -726,7 +726,9 @@ function RegistrationForm({
                 )}
                 {applicable.has('claimTarget') && (
                   <>
-                    <div className="col-span-2">
+                    {/* 两个索赔下拉另起一行并排（原型 S14 补充小样 s14_more）：责任类型那一行右侧是生产厂，
+                        生产厂不显示时留空，索赔对象不挤到责任类型旁边 */}
+                    <div className="col-span-2 col-start-1">
                       <FormField
                         label={DRAWER.labels.claimTarget}
                         htmlFor={fieldId('claimTarget')}
