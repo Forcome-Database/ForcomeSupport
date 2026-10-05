@@ -27,7 +27,7 @@ import {
 import { listFactories, listParts } from '../factory';
 import { listAftersalesOwners, type Access } from '../org';
 import { findTicketReference, type TicketReference } from '../ticket';
-import { auditSnapshot } from './audit';
+import { actorName, auditSnapshot } from './audit';
 import { convertFees, feeColumnValues, type FeeValue } from './fees';
 import { type AftersalesRow } from './ledger';
 import { aftersales, responsibilityRatio } from './schema';
@@ -227,11 +227,6 @@ export function registrationColumns(
 export interface Registered {
   readonly row: AftersalesRow;
   readonly storeName: string;
-}
-
-/** 审计与「最近保存的人」里的操作人姓名（系统写入为空） */
-export function actorName(access: Access): string | null {
-  return access.actor.kind === 'member' ? access.actor.name : null;
 }
 
 /**

@@ -3,6 +3,7 @@ import { getDemoFixture } from '@forcome/fixtures';
 import type { Hono } from 'hono';
 import type { JobOptions } from 'pg-boss';
 import { createApp } from '../src/app';
+import { aftersales } from '../src/modules/aftersales/schema';
 import type { ServerDeps } from '../src/deps';
 import { fixtureSteps } from '../src/fixture-steps';
 import { createFeeds, createJobHandlers } from '../src/jobs';
@@ -45,6 +46,12 @@ import { runQueuedJobs, type JobRunReport, type RunJobsOptions } from './run-job
  * 在测试进程内直接调用 Hono 应用，外部客户端全部是 Fake，时间由手动时钟控制，后台任务由测试同步跑完。
  * 用法见 dev-login.int.test.ts（示范用例）与 harness.int.test.ts。
  */
+
+/** 历史导入的售后单（单号、状态、店铺必给，其余按需；创建路径固定为历史导入） */
+export type HistoryImportRow = Omit<
+  typeof aftersales.$inferInsert,
+  'origin' | 'createdAt' | 'updatedAt'
+>;
 
 /** 测试请求的来源 IP（经 X-Forwarded-For 传给应用，审计里记它） */
 export const TEST_CLIENT_IP = '10.20.3.27';
@@ -121,6 +128,11 @@ export interface TestHarness {
   receivedMail(filter?: { readonly mailbox?: string }): Promise<ReceivedMail[]>;
   /** 重放来信（运维命令 reset-inbound 的同一个函数，按本测试的运行环境：生产环境拒绝） */
   resetInbound(): Promise<InboundResetReport>;
+  /**
+   * 写一张历史导入的售后单（AC-P1-07 等）：售后登记表的导入命令随待办 27，在那之前测试工具直接写售后单表（与 t.addMember
+   * 同理，是测试准备；断言仍经接口）。27 落地后改调导入命令。
+   */
+  addHistoryImport(row: HistoryImportRow): Promise<void>;
   /** 关闭连接并删除本测试的库 */
   close(): Promise<void>;
 }
@@ -257,6 +269,13 @@ export async function startTestHarness(
     receivedMail: (filter) => listReceivedMail(runtime.db, SYSTEM_STORE_SCOPE, filter),
 
     resetInbound: () => resetInboundData(runtime, appEnv),
+
+    async addHistoryImport(row) {
+      const now = clock.now();
+      await runtime.db
+        .insert(aftersales)
+        .values({ origin: 'history_import', createdAt: now, updatedAt: now, ...row });
+    },
 
     close,
   };

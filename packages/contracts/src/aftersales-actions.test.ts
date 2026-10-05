@@ -27,6 +27,7 @@ const NOTHING: AftersalesActions = {
   cancel: false,
   backfill: false,
   changeRate: false,
+  undoComplete: false,
 };
 
 describe('台账一张单上能做的事（PRD 10.1、6.5）', () => {
@@ -42,10 +43,12 @@ describe('台账一张单上能做的事（PRD 10.1、6.5）', () => {
       ...NOTHING,
       cancel: true,
     });
-    // AC-P1-19：已完成的单客服主管没有补登入口
-    expect(aftersalesActions(supervisor, row('completed', { registeredById: ME }))).toEqual(
-      NOTHING,
-    );
+    // AC-P1-19：已完成的单客服主管没有补登入口；自己登记的单刚设为已完成可以撤销
+    expect(aftersalesActions(supervisor, row('completed', { registeredById: ME }))).toEqual({
+      ...NOTHING,
+      undoComplete: true,
+    });
+    expect(aftersalesActions(supervisor, row('completed'))).toEqual(NOTHING);
   });
 
   it('售后负责人：自己登记或负责的进行中单可编辑、设为已完成；进行中可取消、可改汇率', () => {

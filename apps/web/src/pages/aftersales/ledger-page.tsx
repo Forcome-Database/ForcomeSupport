@@ -6,6 +6,7 @@ import {
   formatRate,
   formatRateDate,
   handlingMethodLabels,
+  ledgerActionMessages,
   missingItemLabels,
   responsibilityLabels,
   type CurrentMember,
@@ -358,22 +359,29 @@ function useInlineBackfill(): InlineBackfill {
   });
   const refresh = () => queryClient.invalidateQueries({ queryKey: AFTERSALES_QUERY_KEY });
 
+  /** 补登一次：成功收起编辑并提示；失败时抛出（重试再失败时浮层留着，同 notify 的约定） */
+  async function saveOnce(item: LedgerItem, tracking: string): Promise<void> {
+    const saved = await mutation.mutateAsync({ item, tracking });
+    dismissToast(BACKFILL_TOAST);
+    setEditing(null);
+    showSuccess({
+      title: BACKFILL_RESULT.title,
+      description: BACKFILL_RESULT.inline(saved.number, saved.trackingNumber ?? tracking),
+    });
+    await refresh();
+  }
+
   async function save(item: LedgerItem): Promise<void> {
     const tracking = draft.trim();
     try {
-      const saved = await mutation.mutateAsync({ item, tracking });
-      dismissToast(BACKFILL_TOAST);
-      setEditing(null);
-      await refresh();
-      showSuccess({
-        title: BACKFILL_RESULT.title,
-        description: BACKFILL_RESULT.inline(saved.number, saved.trackingNumber ?? tracking),
-      });
+      await saveOnce(item, tracking);
     } catch (error) {
       if (endSessionIfUnauthenticated(queryClient, error)) return;
-      // 这一格刚被别人补了（409 或「只能补登缺失的字段」）：刷新成最新，收起编辑
+      // 这一格刚被别人改过或补过（409，或「已完成的单只能补登缺失的字段」）：刷新成最新，收起编辑
       const stale =
-        error instanceof ApiRequestError && (error.status === 409 || error.status === 400);
+        error instanceof ApiRequestError &&
+        (error.status === 409 ||
+          error.fields?.trackingNumber === ledgerActionMessages.backfillFilled);
       if (stale) {
         setEditing(null);
         await refresh();
@@ -389,7 +397,7 @@ function useInlineBackfill(): InlineBackfill {
         id: BACKFILL_TOAST,
         action: BACKFILL_RESULT.failedAction,
         error,
-        retry: () => save(item),
+        retry: () => saveOnce(item, tracking),
       });
     }
   }

@@ -13,7 +13,6 @@ import { getDemoFixture } from '@forcome/fixtures';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { syncExchangeRatesJob } from '../src/modules/core';
 import { exchangeRateClient } from '../src/modules/integration';
-import { aftersales } from '../src/modules/aftersales/schema';
 import type { ApiClient } from './api-client';
 import { startTestHarness, TEST_CLIENT_IP, type TestHarness } from './harness';
 
@@ -177,18 +176,22 @@ describe('当月登记完整率（R-AS-08、AC-P1-06、AC-P1-07）', () => {
     });
   });
 
-  it('点完整率筛出缺字段的已完成单：只列当月缺字段的已完成单，完整率不变', async () => {
+  it('点完整率筛出缺字段的已完成单：只列当月缺字段的已完成单，完整率不变；与完整率同口径，不叠日期条件、只随店铺', async () => {
     const filtered = await ledger(owner, '?missing=1');
     expect(filtered.items.map((i) => i.number)).toEqual(['S-20260909-0016']);
     expect(filtered.completion).toEqual({ month: '2026-09', completed: 8, complete: 7 });
+    // 0016 的费用发生日是 09-09，日期条件不影响「缺字段」筛选
+    expect(
+      (await ledger(owner, '?missing=1&from=2026-09-10&to=2026-09-11')).items.map((i) => i.number),
+    ).toEqual(['S-20260909-0016']);
+    expect((await ledger(owner, `?missing=1&store=${DIRECT.id}`)).items).toEqual([]);
   });
 
   it('AC-P1-07：历史导入的已完成单缺字段，不计入完整率的分子与分母，也不在「缺字段」筛选里', async () => {
-    // 历史导入命令随待办 27；在那之前测试直接写一张历史导入的已完成单（缺快递单号与费用）
-    await t.runtime.db.insert(aftersales).values({
+    // 历史导入的已完成单（缺快递单号与费用）；导入命令随待办 27，在那之前经测试工具写入
+    await t.addHistoryImport({
       number: 'S-20260801-9001',
       status: 'completed',
-      origin: 'history_import',
       storeId: COM.id,
       site: 'US',
       orderNumber: '#0901',
@@ -197,8 +200,6 @@ describe('当月登记完整率（R-AS-08、AC-P1-06、AC-P1-07）', () => {
       responsibility: 'customer_use',
       feeDate: '2026-09-05',
       completedAt: new Date('2026-09-06T02:00:00Z'),
-      createdAt: new Date('2026-09-06T02:00:00Z'),
-      updatedAt: new Date('2026-09-06T02:00:00Z'),
     });
     const { completion, items } = await ledger(owner);
     expect(completion).toEqual({ month: '2026-09', completed: 8, complete: 7 });
@@ -509,6 +510,39 @@ describe('编辑登记、设为已完成与撤销（6.5、10.1「○」）', () 
     ).toHaveLength(1);
   });
 
+  it('AC-AS-22：进行中、尚未寄出的单不标缺、不计完整率；没有补登——不是登记人或负责人的售后负责人也改不了', async () => {
+    const item = await register(
+      supervisor,
+      shippedParts({ customerName: 'Not Shipped', shipDate: null, trackingNumber: '' }),
+    );
+    const before = await ledger(owner);
+    expect(before.items.find((i) => i.number === item.number)).toMatchObject({
+      status: 'in_progress',
+      trackingNumber: null,
+      missing: [],
+    });
+    expect(before.completion.completed).toBe(
+      (await ledger(owner, '?missing=1')).completion.completed,
+    );
+    expect((await ledger(owner, '?missing=1')).items.map((i) => i.number)).not.toContain(
+      item.number,
+    );
+    // 别人登记、别人负责的进行中单：另一位售后负责人既不能编辑（补寄件），也不能补登
+    const id = await t.addMember({
+      name: '孙杰',
+      dept: 'FSH / 售后',
+      roles: ['aftersales_owner'],
+      allStores: true,
+    });
+    const other = await t.loginAs({ memberId: id });
+    const res = await update(other, item.number, {
+      version: item.version,
+      changes: { trackingNumber: '1Z-OTHER' },
+    });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ message: '只有登记人或负责人可以修改进行中的单' });
+  });
+
   it('过了撤销时限不能撤销：保持已完成', async () => {
     const item = await register(supervisor, shippedParts({ customerName: 'Too Late' }));
     const done = await complete(supervisor, item);
@@ -637,6 +671,7 @@ describe('取消售后单（AC-AS-16）与补登已完成的单（AC-P1-19）', 
       changes: { trackingNumber: '1Z4R28830358229088' },
     });
     expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({ message: '只有售后负责人可以补登已完成的单' });
 
     const res = await update(owner, 'S-20260909-0016', {
       version: before.version,
@@ -656,6 +691,45 @@ describe('取消售后单（AC-AS-16）与补登已完成的单（AC-P1-19）', 
       month: '2026-09',
       completed: 8,
       complete: 8,
+    });
+  });
+
+  it('补登历史导入的退款单：额外赔偿登记成 0 按 R-AS-08 算缺，可以补；补齐后不再缺', async () => {
+    const usd = (column: 'productCost' | 'freight' | 'compensation' | 'otherCost') => ({
+      [column]: '0.00',
+      [`${column}Currency`]: 'USD' as const,
+      [`${column}Usd`]: '0.00',
+    });
+    await t.addHistoryImport({
+      number: 'S-20260801-9002',
+      status: 'completed',
+      storeId: COM.id,
+      site: 'US',
+      orderNumber: '#0902',
+      customerName: 'History Refund',
+      ownerId: WANG.id,
+      method: 'refund_or_compensation',
+      responsibility: 'customer_use',
+      feeDate: '2026-08-01',
+      ...usd('productCost'),
+      ...usd('freight'),
+      ...usd('compensation'),
+      ...usd('otherCost'),
+      productFactoryPct: 0,
+      freightFactoryPct: 0,
+      otherFactoryPct: 0,
+      completedAt: new Date('2026-08-02T02:00:00Z'),
+    });
+    const before = await detail(owner, 'S-20260801-9002');
+    expect(before.missing).toEqual(['fees.compensation']);
+    const res = await update(owner, 'S-20260801-9002', {
+      version: before.version,
+      changes: { fees: { compensation: { amount: '12.00', currency: 'USD' } } },
+    });
+    expect(res.status, await res.clone().text()).toBe(200);
+    expect(aftersalesDetailSchema.parse(await res.json())).toMatchObject({
+      missing: [],
+      fees: { compensation: { amount: '12.00', usd: '12.00' } },
     });
   });
 
@@ -681,29 +755,106 @@ describe('两人同时编辑同一张单（G7 乐观锁）', () => {
     await t.close();
   });
 
-  it('后保存者收到 409，先保存的内容不被覆盖', async () => {
+  it('登记人（客服主管）与负责人（售后负责人）同时编辑：后保存者收到 409，先保存的内容不被覆盖', async () => {
+    const supervisor = await t.loginAs('客服主管');
     const owner = await t.loginAs('售后负责人');
-    const ownerAgain = await t.loginAs('售后负责人');
-    const read = await detail(owner, 'S-20260911-0018');
+    const item = await register(
+      supervisor,
+      shippedParts({ customerName: 'Both Editing', shipDate: null, trackingNumber: '' }),
+    );
+    const read = await detail(owner, item.number);
 
-    const first = await update(owner, 'S-20260911-0018', {
+    const first = await update(supervisor, item.number, {
       version: read.version,
       changes: { shipDate: '2026-09-11' },
     });
     expect(first.status, await first.clone().text()).toBe(200);
-    const second = await update(ownerAgain, 'S-20260911-0018', {
+    const second = await update(owner, item.number, {
       version: read.version,
       changes: { trackingNumber: '1Z-LATE' },
     });
     expect(second.status).toBe(409);
     expect(await second.json()).toMatchObject({ error: 'optimistic_lock' });
 
-    const latest = await detail(owner, 'S-20260911-0018');
-    expect(latest).toMatchObject({ shipDate: '2026-09-11', trackingNumber: null });
-    // 设为已完成、取消同样带版本：过期的版本被拒绝
+    const latest = await detail(owner, item.number);
+    expect(latest).toMatchObject({
+      shipDate: '2026-09-11',
+      trackingNumber: null,
+      updatedBy: '周敏',
+    });
+    // 设为已完成、取消同样带版本：过期的版本被拒绝，不改状态
     expect(
-      (await owner.post('/api/aftersales/S-20260911-0018/complete', { version: read.version }))
+      (await owner.post(`/api/aftersales/${item.number}/complete`, { version: read.version }))
         .status,
     ).toBe(409);
+    expect(
+      (
+        await owner.post(`/api/aftersales/${item.number}/cancel`, {
+          version: read.version,
+          reason: '客户撤回',
+          keptFees: [],
+        })
+      ).status,
+    ).toBe(409);
+    expect((await detail(owner, item.number)).status).toBe('in_progress');
+  });
+});
+
+describe('店铺范围（E-24、ADR 0010）：范围外的单与店铺筛选被拒绝并记越权审计', () => {
+  let t: TestHarness;
+  let limited: ApiClient;
+
+  beforeAll(async () => {
+    t = await startTestHarness();
+    await t.loadFixtures();
+    // 只授权 Forcome Direct 的售后负责人；S-20260909-0016（forcome.com）在范围外
+    const id = await t.addMember({
+      name: '赵敏',
+      dept: 'FSH / 售后',
+      roles: ['aftersales_owner'],
+      allStores: false,
+      storeIds: [DIRECT.id],
+    });
+    limited = await t.loginAs({ memberId: id });
+  });
+
+  afterAll(async () => {
+    await t.close();
+  });
+
+  it('台账只列范围内的单；按范围外的店铺筛选 403 并记审计', async () => {
+    const { items } = await ledger(limited);
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.every((i) => i.store.id === DIRECT.id)).toBe(true);
+    expect((await limited.get(`/api/aftersales/ledger?store=${COM.id}`)).status).toBe(403);
+    const [record] = await t.auditRecords({ action: 'access.denied', objectId: COM.id });
+    expect(record).toMatchObject({ storeId: COM.id });
+  });
+
+  it('范围外的单：详情、编辑与补登、设为已完成、撤销、取消都 403，各记一条越权审计，单不变', async () => {
+    const number = 'S-20260909-0016';
+    const owner = await t.loginAs('售后负责人');
+    const before = await detail(owner, number);
+    const version = { version: before.version };
+    const attempts = [
+      () => limited.get(`/api/aftersales/${number}`),
+      () => update(limited, number, { ...version, changes: { trackingNumber: '1Z-OUTSIDE' } }),
+      () => limited.post(`/api/aftersales/${number}/complete`, version),
+      () => limited.post(`/api/aftersales/${number}/undo-complete`, version),
+      () =>
+        limited.post(`/api/aftersales/${number}/cancel`, {
+          ...version,
+          reason: '越权',
+          keptFees: [],
+        }),
+    ];
+    for (const attempt of attempts) expect((await attempt()).status).toBe(403);
+    const denied = await t.auditRecords({ action: 'access.denied', objectId: before.id });
+    expect(denied).toHaveLength(attempts.length);
+    expect(denied.every((r) => r.objectLabel === number && r.storeId === COM.id)).toBe(true);
+    expect(await detail(owner, number)).toMatchObject({
+      version: before.version,
+      trackingNumber: null,
+    });
   });
 });

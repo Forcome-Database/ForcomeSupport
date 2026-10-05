@@ -6,7 +6,6 @@ import {
   completionLabel,
   feeItemLabels,
   feeItems,
-  formatMoney,
   formatRateDate,
   handlingMethodLabels,
   missingItemLabels,
@@ -19,7 +18,7 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, CircleCheck, CircleX, Ellipsis, Filter, X } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
-import { FieldError } from '@/components/form-field';
+import { FormField, useFocusField } from '@/components/form-field';
 import {
   AlertDialog,
   AlertDialogBody,
@@ -45,6 +44,7 @@ import { dismissToast, showError, showSuccess, showUndo } from '@/lib/notify';
 import { endSessionIfUnauthenticated } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { A11Y, CANCEL, COMPLETE_RESULT, COMPLETION, MISSING_FILTER, MORE, STALE } from './p13-copy';
+import { centsOf, formatUsdCents } from './registration-form';
 
 /*
  * P13 台账上的状态操作与完整率（PRD P13「第一阶段」、S13、S15 及其补充小样）：页头的当月登记完整率、点它筛出缺字段的
@@ -278,15 +278,25 @@ function showActionError(
 
 /**
  * 设为已完成（S15 ①）：直接执行，弹撤销浮层（缺字段时第二行写「缺 N 项，已标黄待回填」）；5 秒内点「撤销」回到进行中。
- * 失败给失败浮层；这张单刚被别人改过时写「已刷新为最新内容」，台账随之刷新。
+ * 撤销的时限从服务端的完成时间起算，所以先弹撤销浮层、台账在后面刷新。失败给失败浮层：这张单刚被别人改过时写
+ * 「已刷新为最新内容」，其余给「立即重试」（重试再失败时抛出，浮层留着，同 notify 的约定）。
  */
 export function useCompleteAction() {
   const queryClient = useQueryClient();
-  const refresh = () => queryClient.invalidateQueries({ queryKey: AFTERSALES_QUERY_KEY });
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: AFTERSALES_QUERY_KEY });
 
-  async function undo(done: LedgerItem) {
+  /** 撤销一次：不论成败都刷新台账；失败时抛出 */
+  async function undoOnce(done: LedgerItem): Promise<void> {
     try {
       await api.undoComplete(done.number, done.version);
+    } finally {
+      refresh();
+    }
+  }
+
+  async function undo(done: LedgerItem): Promise<void> {
+    try {
+      await undoOnce(done);
       dismissToast(UNDO_FAILED_TOAST(done.number));
     } catch (error) {
       if (endSessionIfUnauthenticated(queryClient, error)) return;
@@ -294,36 +304,37 @@ export function useCompleteAction() {
         id: UNDO_FAILED_TOAST(done.number),
         action: COMPLETE_RESULT.undoFailedAction,
         error,
-        retry: () => api.undoComplete(done.number, done.version).finally(refresh),
+        retry: () => undoOnce(done),
       });
-    } finally {
-      await refresh();
     }
   }
 
-  async function complete(item: LedgerItem) {
+  /** 设为已完成一次：成功就弹撤销浮层；失败时抛出 */
+  async function completeOnce(item: LedgerItem): Promise<void> {
+    const done = await api.completeAftersales(item.number, item.version);
+    dismissToast(COMPLETE_FAILED_TOAST(item.number));
+    const missing = missingItemLabels(done.missing).length;
+    showUndo({
+      id: UNDO_TOAST(item.number),
+      title: COMPLETE_RESULT.title(done.number),
+      description: missing > 0 ? COMPLETE_RESULT.missing(missing) : undefined,
+      seconds: COMPLETE_UNDO_SECONDS,
+      onUndo: () => undo(done),
+    });
+    refresh();
+  }
+
+  return async function complete(item: LedgerItem): Promise<void> {
     try {
-      const done = await api.completeAftersales(item.number, item.version);
-      dismissToast(COMPLETE_FAILED_TOAST(item.number));
-      await refresh();
-      const missing = missingItemLabels(done.missing).length;
-      showUndo({
-        id: UNDO_TOAST(item.number),
-        title: COMPLETE_RESULT.title(done.number),
-        description: missing > 0 ? COMPLETE_RESULT.missing(missing) : undefined,
-        seconds: COMPLETE_UNDO_SECONDS,
-        onUndo: () => undo(done),
-      });
+      await completeOnce(item);
     } catch (error) {
       if (endSessionIfUnauthenticated(queryClient, error)) return;
-      await refresh();
+      refresh();
       showActionError(COMPLETE_FAILED_TOAST(item.number), COMPLETE_RESULT.failedAction, error, () =>
-        complete(item),
+        completeOnce(item),
       );
     }
-  }
-
-  return complete;
+  };
 }
 
 /**
@@ -333,7 +344,8 @@ export function useCompleteAction() {
  */
 export function CancelDialog({ item, onClose }: { item: LedgerItem; onClose: () => void }) {
   const queryClient = useQueryClient();
-  const ids = useId();
+  const reasonId = `${useId()}-reason`;
+  const focusField = useFocusField();
   const registered = feeItems.filter((fee) => item.fees?.[fee]);
   const [kept, setKept] = useState<ReadonlySet<FeeItem>>(new Set(registered));
   const [reason, setReason] = useState('');
@@ -346,33 +358,39 @@ export function CancelDialog({ item, onClose }: { item: LedgerItem; onClose: () 
         keptFees: registered.filter((fee) => kept.has(fee)),
       }),
   });
+  /** 美元冻结值（分）：已登记的项都有 */
+  const usdCents = (fee: FeeItem) => centsOf(item.fees?.[fee]?.usd ?? '0') ?? 0;
   const keptCents = registered
     .filter((fee) => kept.has(fee))
-    .reduce((sum, fee) => sum + Math.round(Number(item.fees?.[fee]?.usd ?? 0) * 100), 0);
+    .reduce((sum, fee) => sum + usdCents(fee), 0);
+  const refresh = () => queryClient.invalidateQueries({ queryKey: AFTERSALES_QUERY_KEY });
+
+  /** 取消一次：成功关闭弹窗并提示；失败时抛出 */
+  async function cancelOnce(): Promise<void> {
+    const cancelled = await cancel.mutateAsync();
+    dismissToast(CANCEL_TOAST);
+    showSuccess({ title: CANCEL.doneTitle(cancelled.number), description: CANCEL.doneDescription });
+    onClose();
+    await refresh();
+  }
 
   async function submit() {
     setReasonError(null);
     try {
-      const cancelled = await cancel.mutateAsync();
-      dismissToast(CANCEL_TOAST);
-      await queryClient.invalidateQueries({ queryKey: AFTERSALES_QUERY_KEY });
-      showSuccess({
-        title: CANCEL.doneTitle(cancelled.number),
-        description: CANCEL.doneDescription,
-      });
-      onClose();
+      await cancelOnce();
     } catch (error) {
       if (endSessionIfUnauthenticated(queryClient, error)) return;
       if (error instanceof ApiRequestError && error.status === 400 && error.fields?.reason) {
         setReasonError(error.fields.reason);
-        document.getElementById(`${ids}-reason`)?.focus();
+        focusField(reasonId);
         return;
       }
       if (error instanceof ApiRequestError && error.status === 409) {
-        await queryClient.invalidateQueries({ queryKey: AFTERSALES_QUERY_KEY });
+        // 这张单刚被别人改过：关掉弹窗、刷新台账，说明已刷新
         onClose();
+        await refresh();
       }
-      showActionError(CANCEL_TOAST, CANCEL.failedAction, error, () => submit());
+      showActionError(CANCEL_TOAST, CANCEL.failedAction, error, cancelOnce);
     }
   }
 
@@ -393,29 +411,27 @@ export function CancelDialog({ item, onClose }: { item: LedgerItem; onClose: () 
         />
         <AlertDialogBody asChild>
           <div className="flex flex-col gap-3 text-foreground">
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor={`${ids}-reason`} className="text-12 font-semibold text-ink-2">
-                {CANCEL.reason}
-                <span aria-hidden className="ml-0.5 text-destructive-text">
-                  *
-                </span>
-              </label>
+            <FormField
+              label={CANCEL.reason}
+              htmlFor={reasonId}
+              required
+              error={reasonError ?? undefined}
+            >
               <Textarea
-                id={`${ids}-reason`}
+                id={reasonId}
                 rows={2}
                 maxLength={CANCEL_REASON_MAX}
                 placeholder={CANCEL.reasonPlaceholder}
                 counter={`${reason.length} / ${CANCEL_REASON_MAX}`}
                 value={reason}
                 aria-invalid={reasonError ? true : undefined}
-                aria-describedby={reasonError ? `${ids}-reason-error` : undefined}
+                aria-describedby={reasonError ? `${reasonId}-error` : undefined}
                 onChange={(event) => {
                   setReason(event.target.value);
                   setReasonError(null);
                 }}
               />
-              {reasonError && <FieldError id={`${ids}-reason-error`} messages={[reasonError]} />}
-            </div>
+            </FormField>
             {registered.length > 0 && (
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between gap-3">
@@ -445,7 +461,7 @@ export function CancelDialog({ item, onClose }: { item: LedgerItem; onClose: () 
                         {feeItemLabels[fee]}
                       </span>
                       <span className="text-13 font-semibold text-foreground tabular-nums">
-                        {formatMoney(item.fees?.[fee]?.usd ?? '0', 'USD')}
+                        {formatUsdCents(usdCents(fee))}
                       </span>
                     </label>
                   ))}
@@ -454,7 +470,7 @@ export function CancelDialog({ item, onClose }: { item: LedgerItem; onClose: () 
                       {CANCEL.keptTotal(item.feeDate ? formatRateDate(item.feeDate) : '')}
                     </span>
                     <span className="text-13 font-bold text-foreground tabular-nums">
-                      {formatMoney((keptCents / 100).toFixed(2), 'USD')}
+                      {formatUsdCents(keptCents)}
                     </span>
                   </div>
                 </div>

@@ -1,5 +1,18 @@
+import type { DbExecutor } from '../core';
+import { memberNamesById, type Access } from '../org';
 import { feesOf } from './fees';
 import { keptFeesOf, ratiosOf, type AftersalesRow } from './ledger';
+
+/** 审计与「最近保存的人」里的操作人姓名（系统写入为空） */
+export function actorName(access: Access): string | null {
+  return access.actor.kind === 'member' ? access.actor.name : null;
+}
+
+/** 负责人姓名（审计快照用；离职的也取得到） */
+export async function ownerNameOf(db: DbExecutor, ownerId: string | null): Promise<string | null> {
+  if (!ownerId) return null;
+  return (await memberNamesById(db, [ownerId])).get(ownerId) ?? null;
+}
 
 /**
  * 审计里的完整前后值：抽屉能填的全部字段（金额含汇率与冻结美元值）与系统定下的编号、状态、创建路径、登记人，

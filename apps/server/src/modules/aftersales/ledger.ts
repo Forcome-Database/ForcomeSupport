@@ -16,6 +16,7 @@ import {
 import { and, asc, eq, gte, lte, ne, sql, type SQL } from 'drizzle-orm';
 import { storeNamesById } from '../channel';
 import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
+import type { Access } from '../org';
 import { feesOf } from './fees';
 import { aftersales } from './schema';
 
@@ -221,7 +222,7 @@ export async function completionOf(
 
 /**
  * P13 台账（店铺范围内），按售后单号先后（原型 P13 的顺序：创建日期、全局序号）。
- * 筛选：店铺、费用发生日起止；missing 只列当月缺字段的已完成单（与完整率同口径，点页头完整率筛出）。
+ * 筛选：店铺、费用发生日起止；missing 只列当月缺字段的已完成单（与完整率同口径，点页头完整率筛出；不叠日期条件）。
  */
 export async function listLedger(
   db: DbExecutor,
@@ -236,8 +237,9 @@ export async function listLedger(
       and(
         storeScopeCondition(scope, aftersales.storeId),
         storeFilter(query.store),
-        query.from ? gte(aftersales.feeDate, query.from) : undefined,
-        query.to ? lte(aftersales.feeDate, query.to) : undefined,
+        // 「缺字段」筛选与完整率同口径：只随店铺，不叠费用发生日的条件
+        !query.missing && query.from ? gte(aftersales.feeDate, query.from) : undefined,
+        !query.missing && query.to ? lte(aftersales.feeDate, query.to) : undefined,
         query.missing ? completedIn(businessMonth(now)) : undefined,
       ),
     )
@@ -248,6 +250,26 @@ export async function listLedger(
     listed.map((row) => row.storeId),
   );
   return listed.map((row) => toLedgerItem(row, names));
+}
+
+/**
+ * 按售后单号取一张查看或要改的单：不在查看者的店铺范围内时记越权审计并 403（E-24），没有这张单为 null。
+ * 越权审计单独提交，不随业务事务回滚，所以在写事务之外调用。
+ */
+export function findOwnedAftersales(
+  db: DbExecutor,
+  access: Access,
+  number: string,
+): Promise<AftersalesRow | null> {
+  return access.findOwned(
+    (scope) => findAftersales(db, scope, number),
+    (row) => ({
+      storeIds: [row.storeId],
+      objectType: 'aftersales',
+      objectId: row.id,
+      objectLabel: row.number,
+    }),
+  );
 }
 
 /** 按售后单号取一张（店铺范围内；不在范围内或没有为 null） */

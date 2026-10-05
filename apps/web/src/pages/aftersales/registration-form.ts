@@ -7,10 +7,12 @@ import {
   isPercent,
   isValidAmount,
   isValidRate,
+  itemsOfField,
   normalizeRate,
   ratioGroups,
   ratioPairsOf,
   registrationFields,
+  registrationItems,
   usdOf,
   type AftersalesDetail,
   type ClaimStatus,
@@ -26,6 +28,7 @@ import {
   type RatiosInput,
   type RegistrationField,
   type RegistrationInput,
+  type RegistrationItem,
   type Responsibility,
   type Shipper,
   type Site,
@@ -268,8 +271,8 @@ export function fieldLabel(field: RegistrationFormPath): string {
 
 // ---------------------------------------------------------------- 比例表与费用合计
 
-/** 金额文字 → 分；没填为 0，不是合法金额（contracts 的 isValidAmount）为 null */
-function centsOf(amount: string): number | null {
+/** 金额文字 → 分（整数，不经浮点）；没填为 0，不是合法金额（contracts 的 isValidAmount）为 null */
+export function centsOf(amount: string): number | null {
   const text = amount.trim();
   if (text === '') return 0;
   if (!isValidAmount(text)) return null;
@@ -449,34 +452,8 @@ export function formValuesOf(detail: AftersalesDetail): RegistrationFormValues {
   };
 }
 
-/** 抽屉里能单独锁定、单独算改动的一项（比例三组算一项，费用一项一个） */
-export type FormItem =
-  Exclude<keyof RegistrationFormValues, 'ratios' | 'fees'> | 'ratios' | `fees.${FeeItem}`;
-
-/** 抽屉自上而下的各项（同 FORM_ORDER 的顺序） */
-const FORM_ITEMS: readonly FormItem[] = [
-  'method',
-  'storeId',
-  'site',
-  'orderNumber',
-  'customerName',
-  'sourceTicket',
-  'feeDate',
-  'ownerId',
-  'responsibility',
-  'factory',
-  'claimTarget',
-  'claimStatus',
-  'responsibilityReason',
-  'ratios',
-  'partSku',
-  'partQuantity',
-  'shipper',
-  'carrier',
-  'shipDate',
-  'trackingNumber',
-  ...feeItems.map((item) => `fees.${item}` as const),
-];
+/** 抽屉里能单独锁定、单独算改动的一项（contracts 的 registrationItems：比例三组算一项，费用一项一个；后端 edit.ts 同一份） */
+export type FormItem = RegistrationItem;
 
 const feeItemOf = (item: `fees.${FeeItem}`) => item.slice('fees.'.length) as FeeItem;
 const isFeeItem = (item: FormItem): item is `fees.${FeeItem}` => item.startsWith('fees.');
@@ -515,20 +492,25 @@ export function changedFieldLabels(
   before: RegistrationFormValues,
   after: RegistrationFormValues,
 ): string[] {
-  return FORM_ITEMS.filter((item) => comparable(before, item) !== comparable(after, item)).map(
-    itemLabel,
-  );
+  return registrationItems
+    .filter((item) => comparable(before, item) !== comparable(after, item))
+    .map(itemLabel);
 }
 
 /** 编辑登记抽屉的三种形态（S14 补充小样之三）：进行中编辑全部字段 · 已完成补登空着的字段 · 只读 */
 export type DrawerAccess = 'edit' | 'backfill' | 'readonly';
 
-/** 哪些项锁定（禁用）：只读全锁；补登锁原来已填的；编辑都不锁 */
+/**
+ * 哪些项锁定（禁用）：只读全锁；编辑都不锁；补登锁原来已填的，但按 R-AS-08 算缺的项（missing，例如退款的额外赔偿登记成 0）
+ * 仍可填（同后端 edit.ts 的判断）
+ */
 export function lockedFields(
   access: DrawerAccess,
   base: RegistrationFormValues,
+  missing: readonly RegistrationField[] = [],
 ): (item: FormItem) => boolean {
   if (access === 'readonly') return () => true;
   if (access === 'edit') return () => false;
-  return (item) => isFilledItem(base, item);
+  const open = new Set(missing.flatMap(itemsOfField));
+  return (item) => isFilledItem(base, item) && !open.has(item);
 }

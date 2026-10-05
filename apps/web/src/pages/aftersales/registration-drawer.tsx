@@ -428,7 +428,10 @@ function RegistrationForm({
   const access: DrawerAccess | 'create' = base ? accessOf(registrar, base) : 'create';
   const changeRate = base ? actionsOn(registrar, base).changeRate : false;
   const finance = editing?.finance ?? true;
-  const locked = baseValues && access !== 'create' ? lockedFields(access, baseValues) : () => false;
+  const locked =
+    base && baseValues && access !== 'create'
+      ? lockedFields(access, baseValues, base.missing)
+      : () => false;
   const isLocked = (item: FormItem) => locked(item);
 
   const form = useForm<RegistrationFormValues>({
@@ -1319,7 +1322,14 @@ function RegistrationForm({
                             error={rateErrors[`rates.${item}`]}
                             onChange={(value) => {
                               setRateDrafts({ ...rateDrafts, [item]: value });
-                              setRateErrors({});
+                              // 改了哪一项就只撤掉这一项的错误（ADR 0007）
+                              setRateErrors((current) =>
+                                Object.fromEntries(
+                                  Object.entries(current).filter(
+                                    ([key]) => key !== `rates.${item}`,
+                                  ),
+                                ),
+                              );
                             }}
                           />
                         )}

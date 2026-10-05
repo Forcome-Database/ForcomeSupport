@@ -249,6 +249,15 @@ describe('编辑登记的表单（S14 编辑登记、补充小样之三）', () 
     expect(locked('fees.otherCost')).toBe(false);
     expect(locked('trackingNumber')).toBe(false);
     expect(locked('sourceTicket')).toBe(false);
+    // 按 R-AS-08 算缺的项照样可填：退款的额外赔偿登记成 0（历史导入）
+    const refund = formValuesOf({ ...DETAIL, status: 'completed' });
+    expect(lockedFields('backfill', refund)('fees.compensation')).toBe(true);
+    expect(lockedFields('backfill', refund, ['fees.compensation'])('fees.compensation')).toBe(
+      false,
+    );
+    // 「配件 × 数量」缺：配件与数量两项都可填
+    const part = lockedFields('backfill', base, ['part']);
+    expect([part('partSku'), part('partQuantity')]).toEqual([false, false]);
     const open = lockedFields('edit', base);
     expect(open('customerName')).toBe(false);
     const readonly = lockedFields('readonly', base);

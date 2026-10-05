@@ -15,11 +15,10 @@ import {
   updateWithVersion,
   type Runtime,
 } from '../core';
-import { memberNamesById, type Access } from '../org';
+import type { Access } from '../org';
 import { convertedFee, feeColumnValues, feesOf, NO_FEE, type FeeValue } from './fees';
-import { findAftersales, type AftersalesRow } from './ledger';
-import { auditSnapshot } from './audit';
-import { actorName } from './registration';
+import { findOwnedAftersales, type AftersalesRow } from './ledger';
+import { actorName, auditSnapshot, ownerNameOf } from './audit';
 import { aftersales } from './schema';
 
 /*
@@ -76,16 +75,7 @@ export async function changeFeeRates(
   number: string,
   input: RateChangeInput,
 ): Promise<AftersalesRow | null> {
-  // 越权在写事务之外判断：越权审计单独提交，不随业务事务回滚（E-24）
-  const found = await access.findOwned(
-    (scope) => findAftersales(runtime.db, scope, number),
-    (row) => ({
-      storeIds: [row.storeId],
-      objectType: 'aftersales',
-      objectId: row.id,
-      objectLabel: row.number,
-    }),
-  );
+  const found = await findOwnedAftersales(runtime.db, access, number);
   if (!found) return null;
   if (found.version !== input.version) throw new OptimisticLockError('aftersales', found.id);
 
@@ -117,13 +107,4 @@ export async function changeFeeRates(
     });
     return updated;
   });
-}
-
-/** 负责人姓名（审计快照用；离职的也取得到） */
-export async function ownerNameOf(
-  db: Parameters<typeof memberNamesById>[0],
-  ownerId: string | null,
-): Promise<string | null> {
-  if (!ownerId) return null;
-  return (await memberNamesById(db, [ownerId])).get(ownerId) ?? null;
 }

@@ -2,9 +2,11 @@ import {
   aftersalesActions,
   clearInapplicable,
   feeItems,
+  itemsOfField,
   ledgerActionMessages,
   normalizeRegistration,
   registrationErrors,
+  registrationItems,
   registrationMessages,
   resolveRatios,
   tidyRegistration,
@@ -14,6 +16,7 @@ import {
   type RatiosInput,
   type RegistrationChanges,
   type RegistrationInput,
+  type RegistrationItem,
   type RegistrationUpdate,
 } from '@forcome/contracts';
 import {
@@ -27,12 +30,11 @@ import {
 } from '../core';
 import type { Access } from '../org';
 import type { TicketReference } from '../ticket';
-import { auditSnapshot } from './audit';
+import { actorName, auditSnapshot, ownerNameOf } from './audit';
 import { convertFees, feeColumnValues } from './fees';
-import { factoryRatiosOfRow, findAftersales, type AftersalesRow } from './ledger';
-import { applyRateChanges, feeValuesOf, ownerNameOf } from './rates';
+import { factoryRatiosOfRow, findOwnedAftersales, missingOf, type AftersalesRow } from './ledger';
+import { applyRateChanges, feeValuesOf } from './rates';
 import {
-  actorName,
   findSourceTicket,
   registrationColumns,
   registrationLookups,
@@ -93,32 +95,8 @@ export function registrationInputOf(row: AftersalesRow): RegistrationInput {
   };
 }
 
-/** 登记内容的一项（费用项一项一个键，比例三组算一个键） */
-type ChangeKey = Exclude<keyof RegistrationInput, 'fees'> | `fees.${FeeItem}`;
-
-const KEYS: readonly ChangeKey[] = [
-  'method',
-  'storeId',
-  'site',
-  'orderNumber',
-  'customerName',
-  'sourceTicket',
-  'feeDate',
-  'ownerId',
-  'responsibility',
-  'responsibilityReason',
-  'factory',
-  'ratios',
-  'claimTarget',
-  'claimStatus',
-  'partSku',
-  'partQuantity',
-  'shipper',
-  'carrier',
-  'shipDate',
-  'trackingNumber',
-  ...feeItems.map((item) => `fees.${item}` as const),
-];
+/** 登记内容的一项（contracts 的 registrationItems：费用项一项一个，比例三组算一项） */
+type ChangeKey = RegistrationItem;
 
 function valueOf(input: RegistrationInput, key: ChangeKey): unknown {
   if (key.startsWith('fees.')) return input.fees[key.slice('fees.'.length) as FeeItem];
@@ -136,14 +114,14 @@ function sameRatios(a: RatiosInput, b: RatiosInput): boolean {
 
 /** 两份登记内容不同的项（都已整理写法） */
 function changedKeys(before: RegistrationInput, after: RegistrationInput): ChangeKey[] {
-  return KEYS.filter((key) =>
+  return registrationItems.filter((key) =>
     key === 'ratios'
       ? !sameRatios(before.ratios, after.ratios)
       : JSON.stringify(valueOf(before, key)) !== JSON.stringify(valueOf(after, key)),
   );
 }
 
-/** 这一项原来有没有填（补登只能填原来空着的） */
+/** 这一项原来有没有填 */
 function isFilled(input: RegistrationInput, key: ChangeKey): boolean {
   if (key === 'ratios') return resolveRatios(input.ratios).ratios !== null;
   if (key.startsWith('fees.')) {
@@ -181,15 +159,7 @@ export async function updateRegistration(
 ): Promise<AftersalesRow | null> {
   const m = ledgerActionMessages;
   // 越权在写事务之外判断：越权审计单独提交，不随业务事务回滚（E-24）
-  const found = await access.findOwned(
-    (scope) => findAftersales(runtime.db, scope, number),
-    (row) => ({
-      storeIds: [row.storeId],
-      objectType: 'aftersales',
-      objectId: row.id,
-      objectLabel: row.number,
-    }),
-  );
+  const found = await findOwnedAftersales(runtime.db, access, number);
   if (!found) return null;
   if (found.version !== update.version) throw new OptimisticLockError('aftersales', found.id);
 
@@ -200,17 +170,18 @@ export async function updateRegistration(
   const rates = update.rates ?? {};
   const changesRates = feeItems.some((item) => rates[item] !== undefined);
 
+  // 改字段的权限按状态：进行中要登记人或负责人，已完成要售后负责人（补登），已取消只读
+  const fieldDenied =
+    found.status === 'cancelled'
+      ? m.cancelled
+      : found.status === 'completed'
+        ? m.backfillDenied
+        : m.editDenied;
   if (!actions.edit && !actions.backfill && !actions.changeRate) {
-    throw new AccessDeniedError(found.status === 'cancelled' ? m.cancelled : m.editDenied);
+    throw new AccessDeniedError(fieldDenied);
   }
   if (attempted.length > 0 && !actions.edit && !actions.backfill) {
-    throw new AccessDeniedError(
-      found.status === 'cancelled'
-        ? m.cancelled
-        : found.status === 'completed'
-          ? m.backfillDenied
-          : m.editDenied,
-    );
+    throw new AccessDeniedError(fieldDenied);
   }
   if (changesRates && !actions.changeRate) {
     throw new AccessDeniedError(found.status === 'cancelled' ? m.cancelled : m.rateDenied);
@@ -221,10 +192,13 @@ export async function updateRegistration(
   const errors: FieldErrors = {};
   let input: RegistrationInput;
   if (backfill) {
-    // 补登：已填的不能改；只清空这次新填、却不适用的字段，原来的值一律不动
-    for (const key of attempted) if (isFilled(previous, key)) errors[key] = m.backfillFilled;
+    // 补登：只能填原来空着的、或按 R-AS-08 算缺的项（例如退款的额外赔偿登记成 0）；其余已填的不能改，
+    // 只清空这次新填、却不适用的字段，原来的值一律不动
+    const missing = new Set(missingOf(found).flatMap(itemsOfField));
+    const locked = (key: ChangeKey) => isFilled(previous, key) && !missing.has(key);
+    for (const key of attempted) if (locked(key)) errors[key] = m.backfillFilled;
     input = clearInapplicable(merged);
-    for (const key of KEYS) if (isFilled(previous, key)) input = copyKey(input, previous, key);
+    for (const key of registrationItems) if (locked(key)) input = copyKey(input, previous, key);
   } else {
     input = normalizeRegistration(merged);
   }

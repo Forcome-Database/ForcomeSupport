@@ -148,6 +148,43 @@ export const registrationFields = [
 ] as const;
 export type RegistrationField = (typeof registrationFields)[number];
 
+/**
+ * 登记内容自上而下的各项（抽屉顺序；与 registrationFields 的区别：来源工单单列，「配件 × 数量」分成配件与数量两项，
+ * 比例三组算一项，费用一项一个）。编辑登记比较这次改了哪些项、补登锁定已填的项，前后端都按它（edit.ts、registration-form.ts）。
+ */
+export const registrationItems = [
+  'method',
+  'storeId',
+  'site',
+  'orderNumber',
+  'customerName',
+  'sourceTicket',
+  'feeDate',
+  'ownerId',
+  'responsibility',
+  'factory',
+  'claimTarget',
+  'claimStatus',
+  'responsibilityReason',
+  'ratios',
+  'partSku',
+  'partQuantity',
+  'shipper',
+  'carrier',
+  'shipDate',
+  'trackingNumber',
+  'fees.productCost',
+  'fees.freight',
+  'fees.compensation',
+  'fees.otherCost',
+] as const;
+export type RegistrationItem = (typeof registrationItems)[number];
+
+/** R-AS-08 的一个字段对应的登记项（「配件 × 数量」是配件与数量两项，其余同名） */
+export function itemsOfField(field: RegistrationField): RegistrationItem[] {
+  return field === 'part' ? ['partSku', 'partQuantity'] : [field];
+}
+
 /** 字段的叫法（S14 抽屉的字段名；台账「缺 N 项」的悬停说明也用它） */
 export const registrationFieldLabels: Record<RegistrationField, string> = {
   method: '处理方式',
@@ -676,6 +713,8 @@ export interface AftersalesActions {
   readonly cancel: boolean;
   readonly backfill: boolean;
   readonly changeRate: boolean;
+  /** 撤销刚做的「设为已完成」（能设为已完成的人；时限由服务端判断） */
+  readonly undoComplete: boolean;
 }
 
 /** 判断权限要看的：单的状态、登记人与负责人 */
@@ -711,10 +750,12 @@ export function aftersalesActions(
   target: AftersalesActionTarget,
 ): AftersalesActions {
   const open = target.status === 'in_progress';
-  const editor = open && editsOpen(viewer, target);
+  const owns = editsOpen(viewer, target);
+  const editor = open && owns;
   return {
     edit: editor,
     complete: editor,
+    undoComplete: target.status === 'completed' && owns,
     cancel: open && can(viewer.roles, 'aftersales.cancel'),
     backfill: target.status === 'completed' && can(viewer.roles, 'aftersales.backfill'),
     changeRate: target.status !== 'cancelled' && can(viewer.roles, 'aftersales.backfill'),
@@ -964,7 +1005,6 @@ export const ledgerActionMessages = {
   /** 已完成的单补登时改了已填的字段 */
   backfillFilled: '已完成的单只能补登缺失的字段',
   cancelled: '已取消的单只读',
-  completed: '这张单已完成',
   notOpen: '只有进行中的单可以这样操作',
   /** 撤销设为已完成：这张单不是刚设为已完成的 */
   undoExpired: '已超过撤销时限，这张单保持已完成',

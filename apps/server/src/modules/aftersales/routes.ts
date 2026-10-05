@@ -29,7 +29,7 @@ import {
 import { updateRegistration } from './edit';
 import {
   completionOf,
-  findAftersales,
+  findOwnedAftersales,
   listLedger,
   toDetail,
   toLedgerItem,
@@ -349,15 +349,7 @@ export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv 
   routes.openapi(detailRoute, async (c) => {
     const access = c.get('access');
     const { number } = c.req.valid('param');
-    const row = await access.findOwned(
-      (scope) => findAftersales(runtime.db, scope, number),
-      (found) => ({
-        storeIds: [found.storeId],
-        objectType: 'aftersales',
-        objectId: found.id,
-        objectLabel: found.number,
-      }),
-    );
+    const row = await findOwnedAftersales(runtime.db, access, number);
     if (!row) return c.json({ error: 'not_found', message: '没有这张售后单' }, 404);
     return c.json(await detailOf(access, row), 200);
   });

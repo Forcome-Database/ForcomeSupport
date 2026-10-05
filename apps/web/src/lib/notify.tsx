@@ -91,28 +91,45 @@ export function dismissAllToasts(): void {
   toast.dismiss();
 }
 
-/** 浮层卡片（原型 toast()）：宽 360、12 圆角、1px 边线、md 阴影、内边距 12 / 14；左侧 18 的图标，右上角 × */
+/**
+ * 浮层卡片（原型 toast()）：宽 360、12 圆角、1px 边线、md 阴影、内边距 12 / 14；左侧 18 的图标，右上角 ×。
+ * 撤销浮层（toast(undo=)）的右侧是剩余秒数与「撤销」（aside 代替 ×）、底部是倒计时条（footer），只有标题时内容竖向居中
+ */
 function ToastCard({
   id,
   icon,
   children,
+  aside,
+  footer,
+  centered = false,
 }: {
   id: string | number;
   icon: ReactNode;
   children: ReactNode;
+  aside?: ReactNode;
+  footer?: ReactNode;
+  centered?: boolean;
 }) {
   return (
-    <div className="flex w-90 items-start gap-2.5 rounded-lg border bg-card px-3.5 py-3 shadow-md">
+    <div
+      className={cn(
+        'relative flex w-90 gap-2.5 overflow-hidden rounded-lg border bg-card px-3.5 py-3 shadow-md',
+        centered ? 'items-center' : 'items-start',
+      )}
+    >
       {icon}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">{children}</div>
-      <button
-        type="button"
-        aria-label="关闭"
-        onClick={() => toast.dismiss(id)}
-        className="rounded-sm text-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <X className="size-3.5" />
-      </button>
+      {aside ?? (
+        <button
+          type="button"
+          aria-label="关闭"
+          onClick={() => toast.dismiss(id)}
+          className="rounded-sm text-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <X className="size-3.5" />
+        </button>
+      )}
+      {footer}
     </div>
   );
 }
@@ -168,32 +185,32 @@ function UndoToast({
   }
 
   return (
-    <div
-      className={cn(
-        'relative flex w-90 gap-2.5 overflow-hidden rounded-lg border bg-card px-3.5 py-3 shadow-md',
-        description ? 'items-start' : 'items-center',
-      )}
+    <ToastCard
+      id={toastId}
+      centered={!description}
+      icon={<CircleCheck className="size-4.5 shrink-0 text-success" strokeWidth={2} />}
+      aside={
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-12 text-subtle-foreground tabular-nums">{`${Math.max(left, 0)}s`}</span>
+          <Button variant="outline" size="sm" loading={pending} onClick={() => void undo()}>
+            {!pending && <History />}
+            撤销
+          </Button>
+        </div>
+      }
+      footer={
+        <div
+          aria-hidden
+          className="absolute bottom-0 left-0 h-0.75 bg-primary transition-[width] duration-1000 ease-linear"
+          style={{ width: `${(Math.max(left, 0) * 100) / seconds}%` }}
+        />
+      }
     >
-      <CircleCheck className="size-4.5 shrink-0 text-success" strokeWidth={2} />
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="text-13 font-semibold text-foreground">{title}</div>
-        {description && (
-          <div className="text-12 leading-normal text-muted-foreground">{description}</div>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <span className="text-12 text-subtle-foreground tabular-nums">{`${Math.max(left, 0)}s`}</span>
-        <Button variant="outline" size="sm" loading={pending} onClick={() => void undo()}>
-          {!pending && <History />}
-          撤销
-        </Button>
-      </div>
-      <div
-        aria-hidden
-        className="absolute bottom-0 left-0 h-0.75 bg-primary transition-[width] duration-1000 ease-linear"
-        style={{ width: `${(Math.max(left, 0) * 100) / seconds}%` }}
-      />
-    </div>
+      <div className="text-13 font-semibold text-foreground">{title}</div>
+      {description && (
+        <div className="text-12 leading-normal text-muted-foreground">{description}</div>
+      )}
+    </ToastCard>
   );
 }
 
