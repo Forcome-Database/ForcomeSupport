@@ -635,12 +635,8 @@ export type Ledger = z.infer<typeof ledgerSchema>;
  */
 export const rateChangeInputSchema = z.object({
   version: z.int(),
-  rates: z.object({
-    productCost: z.string().optional(),
-    freight: z.string().optional(),
-    compensation: z.string().optional(),
-    otherCost: z.string().optional(),
-  }),
+  /** 要改的费用项 → 新汇率（1 USD = 汇率 原币） */
+  rates: z.partialRecord(z.enum(feeItems), z.string()),
 });
 export type RateChangeInput = z.infer<typeof rateChangeInputSchema>;
 
@@ -651,6 +647,7 @@ export const rateChangeMessages = {
   feeMissing: '这项费用还没登记，没有汇率可改',
   nothing: '没有要修改的汇率',
   cancelled: '已取消的单只读，不能修改汇率',
+  noFeeDate: '这张单还没有费用发生日，先补费用发生日再改汇率',
 } as const;
 
 /** 新建登记抽屉要用的选项：可选的负责人、责任类型的默认比例（种子数据）、生产厂、配件与所属生产厂 */

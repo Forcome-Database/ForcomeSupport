@@ -59,7 +59,9 @@ describe('欧洲央行（主源）：按要取的区间挑最小的文件', () =
       .intercept({ path: `${ECB_PATH}eurofxref-daily.xml` })
       .reply(200, ecbXml([SEP_11]));
     const days = await client().ecbRates({ from: '2026-09-11', to: '2026-09-11' });
-    expect(days).toEqual([{ date: '2026-09-11', usd: '1.0844', cad: '1.4750', mxn: '19.6532' }]);
+    expect(days).toEqual([
+      { date: '2026-09-11', usd: '1.0844', quotes: { CAD: '1.4750', MXN: '19.6532' } },
+    ]);
     agent.assertNoPendingInterceptors();
   });
 
@@ -125,7 +127,7 @@ describe('欧洲央行（主源）：按要取的区间挑最小的文件', () =
     expect(error).toMatchObject({ status: 503, retryable: true, system: 'exchange_rate' });
   });
 
-  it('返回的不是参考汇率文件（例如代理的错误页）、或缺了 MXN：不可重试的「返回内容不认识」', async () => {
+  it('返回的不是参考汇率文件（例如代理的错误页）、一天都没有、或缺了 MXN：不可重试的「返回内容不认识」', async () => {
     ecb()
       .intercept({ path: `${ECB_PATH}eurofxref-daily.xml` })
       .reply(200, '<html><body>Access denied</body></html>');
@@ -136,12 +138,20 @@ describe('欧洲央行（主源）：按要取的区间挑最小的文件', () =
     expect(String(page)).toContain('返回内容不认识');
     ecb()
       .intercept({ path: `${ECB_PATH}eurofxref-daily.xml` })
+      .reply(200, ecbXml([]));
+    const empty = await client()
+      .ecbRates({ from: '2026-09-11', to: '2026-09-11' })
+      .catch((e: unknown) => e);
+    expect(empty).toMatchObject({ retryable: false });
+    expect(String(empty)).toContain('返回内容不认识');
+    ecb()
+      .intercept({ path: `${ECB_PATH}eurofxref-daily.xml` })
       .reply(200, ecbXml([{ date: '2026-09-11', usd: '1.0844', cad: '1.4750' }]));
     const noPeso = await client()
       .ecbRates({ from: '2026-09-11', to: '2026-09-11' })
       .catch((e: unknown) => e);
     expect(noPeso).toMatchObject({ retryable: false });
-    expect(String(noPeso)).toContain('缺 USD、CAD 或 MXN');
+    expect(String(noPeso)).toContain('2026-09-11 缺 MXN');
   });
 });
 
@@ -169,8 +179,8 @@ describe('Frankfurter（备用源）：v2/rates 只取欧洲央行的数据', ()
       ]);
     const days = await client().frankfurterRates({ from: '2026-09-10', to: '2026-09-11' });
     expect(days).toEqual([
-      { date: '2026-09-10', usd: '1.0851', cad: '1.4761', mxn: '19.701' },
-      { date: '2026-09-11', usd: '1.0844', cad: '1.475', mxn: '19.6532' },
+      { date: '2026-09-10', usd: '1.0851', quotes: { CAD: '1.4761', MXN: '19.701' } },
+      { date: '2026-09-11', usd: '1.0844', quotes: { CAD: '1.475', MXN: '19.6532' } },
     ]);
   });
 
@@ -210,7 +220,7 @@ describe('Fake：两个来源给同一份数据，可分别注入故障', () => 
     const fake = new FakeExchangeRates();
     fake.publish('2026-09-10', { MXN: '18.00', CAD: '1.36' });
     expect(await fake.client().ecbRates({ from: '2026-09-01', to: '2026-09-30' })).toEqual([
-      { date: '2026-09-10', usd: '1.10', cad: '1.496', mxn: '19.8' },
+      { date: '2026-09-10', usd: '1.10', quotes: { CAD: '1.496', MXN: '19.8' } },
     ]);
     fake.faults.failNext({ kind: 'error', status: 503 }, { operation: 'ecb' });
     await expect(

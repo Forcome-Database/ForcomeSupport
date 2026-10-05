@@ -13,6 +13,18 @@ import type { DemoFixture, FixtureFee, FixtureLedgerRow } from '@forcome/fixture
 import { isNotNull, isNull, or, and } from 'drizzle-orm';
 import { businessNumberSequence, defineFixtureStep, reserveBusinessNumbers } from '../core';
 import { convertedFee, feeColumnValues, NO_FEE, usdFee, type FeeValue } from './fees';
+
+/** 费用项列里汇率与冻结美元值那几列（补齐旧行时只动它们，原币金额与币种不动） */
+function conversionColumns(values: ReturnType<typeof feeColumnValues>) {
+  return Object.fromEntries(
+    feeItems.flatMap((item) =>
+      (['Usd', 'Rate', 'RateDate', 'RateSource'] as const).map((suffix) => [
+        `${item}${suffix}`,
+        values[`${item}${suffix}`],
+      ]),
+    ),
+  );
+}
 import { aftersales } from './schema';
 
 /** 示例数据里的中文取值换成枚举（夹具保留原型与 PRD 的写法，加载步骤自己映射） */
@@ -91,7 +103,11 @@ export const aftersalesLedgerFixtureStep = defineFixtureStep({
           createdAt: at,
           updatedAt: at,
         })
-        .onConflictDoUpdate({ target: aftersales.number, set: fees, setWhere: missingUsd });
+        .onConflictDoUpdate({
+          target: aftersales.number,
+          set: conversionColumns(fees),
+          setWhere: missingUsd,
+        });
     }
     const last = Math.max(
       fixture.aftersalesLastSequence,

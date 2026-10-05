@@ -69,7 +69,9 @@ test('非美元金额：抽屉里即时折算成美元，保存后台账写美�
   const sample = page.getByTestId('ledger-row').filter({ hasText: 'S-20260911-0020' });
   await expect(sample).toContainText('$49.39');
   await expect(sample).toContainText('MX$889.00 · 汇率 09-10');
-  await expect(sample.getByTitle('汇率取费用发生日的欧洲央行日汇率；售后负责人可修改并记审计')).toBeVisible();
+  await expect(
+    sample.getByTitle('汇率取费用发生日的欧洲央行日汇率；售后负责人可修改并记审计'),
+  ).toBeVisible();
 
   await fillRefund(page, customer);
   await textbox(page, '额外赔偿').fill('889.00');

@@ -157,6 +157,32 @@ describe('同步：主源失败走备用源（R-FL-06）', () => {
   });
 });
 
+describe('第一次同步：装入欧洲央行 1999 年起的全量历史', () => {
+  it('库里还没有汇率时从 1999-01-04 取到今天，上万行分批写入；之后只取新的日子', async () => {
+    const c = await setUp('2026-09-11T10:20:00+08:00');
+    try {
+      let weekdays = 0;
+      for (let day = new Date('1999-01-04T00:00:00Z'); day <= new Date('2026-09-10T00:00:00Z');) {
+        if (day.getUTCDay() !== 0 && day.getUTCDay() !== 6) {
+          c.rates.publish(day.toISOString().slice(0, 10), DEMO);
+          weekdays += 1;
+        }
+        day = new Date(day.getTime() + 86_400_000);
+      }
+      const report = await sync(c.t);
+      expect(report.failed).toEqual([]);
+      expect((await ratesOn(c.owner, '1999-01-04')).rates.MXN?.date).toBe('1999-01-04');
+      expect((await ratesOn(c.owner, '2026-09-11')).rates.CAD?.date).toBe('2026-09-10');
+      const [counted] = (
+        await c.t.runtime.db.execute(sql`SELECT count(*)::int AS n FROM core.exchange_rate`)
+      ).rows as { n: number }[];
+      expect(counted?.n).toBe(weekdays * 2);
+    } finally {
+      await c.t.close();
+    }
+  });
+});
+
 describe('两个来源都取不到：取此前最近一个有汇率的日期（E-20）', () => {
   let c: Context;
 

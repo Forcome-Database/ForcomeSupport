@@ -5,6 +5,7 @@ import {
   type ExchangeRate,
   type ExchangeRatesOn,
   type ForeignCurrency,
+  type PublishedRateSource,
 } from '@forcome/contracts';
 import { and, desc, eq, lte, max } from 'drizzle-orm';
 import { z } from 'zod';
@@ -25,14 +26,13 @@ import { exchangeRate } from './schema';
  */
 
 /** 欧洲央行最早的参考汇率日期：库里还没有汇率时，第一次同步从这里取全量历史（历史导入也能按原日期折算） */
-export const RATE_HISTORY_START = '1999-01-04';
+const RATE_HISTORY_START = '1999-01-04';
 
-/** 欧洲央行一天的参考汇率：1 EUR = 这么多 USD、CAD、MXN（十进制字符串） */
+/** 欧洲央行一天的参考汇率：1 EUR = usd 美元，1 EUR = quotes[币种] 该币种（十进制字符串） */
 export interface EurReferenceRates {
   readonly date: string;
   readonly usd: string;
-  readonly cad: string;
-  readonly mxn: string;
+  readonly quotes: Readonly<Record<ForeignCurrency, string>>;
 }
 
 /** 日期区间（含两端，YYYY-MM-DD） */
@@ -49,10 +49,8 @@ export interface ExchangeRateSource {
   frankfurterRates(range: DateRange): Promise<EurReferenceRates[]>;
 }
 
-const eurRateOf: Record<ForeignCurrency, keyof Omit<EurReferenceRates, 'date' | 'usd'>> = {
-  CAD: 'cad',
-  MXN: 'mxn',
-};
+/** 每条 INSERT 写的行数 */
+const INSERT_BATCH = 2000;
 
 /**
  * 某币种在某日可用的汇率：当天有就取当天，否则取此前最近一个有汇率的日期（E-20）；一个都没有为 null
@@ -73,15 +71,17 @@ export async function exchangeRateOn(
 
 /** 某日可用的各币种汇率（新建登记抽屉即时折算用） */
 export async function exchangeRatesOn(db: DbExecutor, date: string): Promise<ExchangeRatesOn> {
-  const [CAD, MXN] = await Promise.all(foreignCurrencies.map((c) => exchangeRateOn(db, c, date)));
-  return { date, rates: { CAD: CAD ?? null, MXN: MXN ?? null } };
+  const rates = await Promise.all(
+    foreignCurrencies.map(async (currency) => [currency, await exchangeRateOn(db, currency, date)]),
+  );
+  return { date, rates: Object.fromEntries(rates) as ExchangeRatesOn['rates'] };
 }
 
 /** 一次同步的结果 */
-export interface ExchangeRateSyncReport {
+interface ExchangeRateSyncReport {
   readonly range: DateRange | null;
   /** 用了哪个来源；区间为空（已是最新）时为 null */
-  readonly source: 'ecb' | 'frankfurter' | null;
+  readonly source: PublishedRateSource | null;
   /** 新写入的汇率行数（每天每币种一行） */
   readonly stored: number;
 }
@@ -91,7 +91,7 @@ export interface ExchangeRateSyncReport {
  * 先欧洲央行、失败改 Frankfurter，两者都失败抛错（不写任何数据，按日期取汇率时自然回退到此前的日期）。
  * 已有的日期不覆盖：汇率只增不改，已保存的金额冻结了自己的汇率，不受影响（E-20「恢复后不回改」）。
  */
-export async function syncExchangeRates(
+async function syncExchangeRates(
   runtime: Runtime,
   source: ExchangeRateSource,
   logger: Logger,
@@ -102,7 +102,7 @@ export async function syncExchangeRates(
   if (from > to) return { range: null, source: null, stored: 0 };
   const range = { from, to };
 
-  let used: 'ecb' | 'frankfurter' = 'ecb';
+  let used: PublishedRateSource = 'ecb';
   let days: EurReferenceRates[];
   try {
     days = await source.ecbRates(range);
@@ -125,18 +125,25 @@ export async function syncExchangeRates(
       foreignCurrencies.map((currency) => ({
         date: day.date,
         currency,
-        rate: crossRate(day.usd, day[eurRateOf[currency]]),
+        rate: crossRate(day.usd, day.quotes[currency]),
         source: used,
       })),
     );
   if (rows.length === 0) return { range, source: used, stored: 0 };
+  // 第一次同步是 1999 年起的全量（上万行）：分批写，一条 INSERT 的参数不能超过 PostgreSQL 的 65535 个
   const stored = await transaction(runtime, async (tx) => {
-    const inserted = await tx.db
-      .insert(exchangeRate)
-      .values(rows.map((row) => ({ ...row, createdAt: tx.now })))
-      .onConflictDoNothing({ target: [exchangeRate.date, exchangeRate.currency] })
-      .returning({ id: exchangeRate.id });
-    return inserted.length;
+    let count = 0;
+    for (let start = 0; start < rows.length; start += INSERT_BATCH) {
+      const inserted = await tx.db
+        .insert(exchangeRate)
+        .values(
+          rows.slice(start, start + INSERT_BATCH).map((row) => ({ ...row, createdAt: tx.now })),
+        )
+        .onConflictDoNothing({ target: [exchangeRate.date, exchangeRate.currency] })
+        .returning({ id: exchangeRate.id });
+      count += inserted.length;
+    }
+    return count;
   });
   return { range, source: used, stored };
 }

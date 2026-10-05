@@ -100,8 +100,8 @@ export function feesOf(row: AftersalesRow): Fees {
 
 /**
  * 按费用发生日折算四个费用项（R-FL-06、E-20、AC-P1-08）：美元不折算；非美元取当天、缺失时取此前最近一个有汇率的日期，
- * 冻结美元值四舍五入到分。没填的项为空；金额格式不对的项跳过（报错由 registrationErrors 给出）；某币种在该日及之前
- * 都没有汇率时，在该项上报错（同一次保存的其他错误一起列出）。
+ * 冻结美元值四舍五入到分。没填的项为空；金额格式不对、或某币种在该日及之前都没有汇率时，在该项上报错
+ * （errors 的键为 fees.<费用项>，调用方与其他错误一起列出，有错时不能保存）。
  */
 export async function convertFees(
   db: DbExecutor,
@@ -123,6 +123,7 @@ export async function convertFees(
     const { amount, currency } = fees[item];
     if (amount === null || !isValidAmount(amount)) {
       values[item] = NO_FEE;
+      if (amount !== null) errors[`fees.${item}`] = registrationMessages.amountFormat;
       continue;
     }
     if (currency === 'USD') {

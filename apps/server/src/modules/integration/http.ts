@@ -67,6 +67,7 @@ export function createHttpClient(
     const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
     return new ExternalCallFailedError(system, operation, {
       message: `网络错误：${cause instanceof Error ? cause.message : String(cause)}`,
+      cause: error,
     });
   }
 
@@ -92,10 +93,11 @@ export function createHttpClient(
       const text = await read(request, signal, () => response.text());
       try {
         return JSON.parse(text) as unknown;
-      } catch {
+      } catch (error) {
         throw new ExternalCallFailedError(system, request.operation, {
-          message: '返回的不是 JSON',
+          message: `返回的不是 JSON：${error instanceof Error ? error.message : String(error)}`,
           retryable: false,
+          cause: error,
         });
       }
     },

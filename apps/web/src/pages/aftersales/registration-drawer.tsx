@@ -72,14 +72,7 @@ import { storeOptionsQuery } from '@/lib/channel';
 import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { endSessionIfUnauthenticated } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import {
-  DRAWER,
-  EMPTY_VALUE,
-  LEAVE,
-  RATE_LOOKUP,
-  SAVE_RESULT,
-  SOURCE_TICKET_LOOKUP,
-} from './p13-copy';
+import { DRAWER, EMPTY_VALUE, LEAVE, LOOKUP, SAVE_RESULT } from './p13-copy';
 import { FormSection, MoneyInput, RatioTable } from './registration-parts';
 import {
   conversionOf,
@@ -351,7 +344,7 @@ function RegistrationForm({
     if (ratesError instanceof ApiRequestError && ratesError.status === 401) return;
     showError({
       id: RATES_TOAST,
-      action: RATE_LOOKUP.failedAction,
+      action: LOOKUP.failedAction,
       error: ratesError,
       retry: async () => {
         const result = await refetchRates();
@@ -483,7 +476,7 @@ function RegistrationForm({
       setLookedUpTicket('');
       showError({
         id: LOOKUP_TOAST,
-        action: SOURCE_TICKET_LOOKUP.failedAction,
+        action: LOOKUP.failedAction,
         error,
         // 重试前用户改了工单号就不再带入旧号（失败浮层随之撤掉）；查成功后记下这个号，离开输入框不再重复查
         retry: async () => {

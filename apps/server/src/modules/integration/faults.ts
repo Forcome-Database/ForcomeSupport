@@ -13,8 +13,15 @@ export class ExternalServiceError extends Error {
   /** 原样重试是否可能成功（限流、5xx、超时、断线可以；4xx、游标过期不行） */
   readonly retryable: boolean;
 
-  constructor(system: string, operation: string, message: string, retryable: boolean) {
-    super(`${system} ${operation}：${message}`);
+  constructor(
+    system: string,
+    operation: string,
+    message: string,
+    retryable: boolean,
+    /** 真实现翻译前的原始错误（网络错误、解析错误），留着排错 */
+    cause?: unknown,
+  ) {
+    super(`${system} ${operation}：${message}`, cause === undefined ? undefined : { cause });
     this.system = system;
     this.operation = operation;
     this.retryable = retryable;
@@ -30,12 +37,23 @@ export class ExternalCallFailedError extends ExternalServiceError {
   constructor(
     system: string,
     operation: string,
-    options: { status?: number | null; message?: string; retryable?: boolean } = {},
+    options: {
+      status?: number | null;
+      message?: string;
+      retryable?: boolean;
+      cause?: unknown;
+    } = {},
   ) {
     const status = options.status ?? null;
     // 没说明时：限流与服务端错误可重试，其余 4xx 不可重试
     const retryable = options.retryable ?? (status === null || status === 429 || status >= 500);
-    super(system, operation, options.message ?? `调用失败（${status ?? '无状态码'}）`, retryable);
+    super(
+      system,
+      operation,
+      options.message ?? `调用失败（${status ?? '无状态码'}）`,
+      retryable,
+      options.cause,
+    );
     this.status = status;
   }
 }

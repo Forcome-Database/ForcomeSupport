@@ -18,7 +18,7 @@ import {
 import { listAftersalesOwners, type Access } from '../org';
 import { convertedFee, feeColumnValues, feesOf, NO_FEE, type FeeValue } from './fees';
 import { findAftersales, type AftersalesRow } from './ledger';
-import { auditSnapshot } from './registration';
+import { auditSnapshot } from './audit';
 import { aftersales } from './schema';
 
 /*
@@ -65,16 +65,13 @@ export async function changeFeeRates(
     if (fee.amount === null || fee.currency === null) errors[at] = m.feeMissing;
     else if (fee.currency === 'USD') errors[at] = m.usdNoRate;
     else if (!isValidRate(text)) errors[at] = m.rateFormat;
+    else if (!found.feeDate) errors[at] = m.noFeeDate;
     else {
-      const date = found.feeDate ?? fee.rate?.date;
-      if (!date) errors[at] = m.feeMissing;
-      else {
-        fees[item] = convertedFee(fee.amount, fee.currency, {
-          rate: normalizeRate(text),
-          date,
-          source: 'manual',
-        });
-      }
+      fees[item] = convertedFee(fee.amount, fee.currency, {
+        rate: normalizeRate(text),
+        date: found.feeDate,
+        source: 'manual',
+      });
     }
   }
   if (Object.keys(errors).length > 0) throw new FieldValidationError(errors);

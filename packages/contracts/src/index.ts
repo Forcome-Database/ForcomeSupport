@@ -203,14 +203,15 @@ export {
   formatRateDate,
   isValidRate,
   normalizeRate,
+  publishedRateSources,
   RATE_DECIMALS,
-  rateSourceLabels,
   rateSources,
   rateSourceSchema,
   usdOf,
   type ExchangeRate,
   type ExchangeRatesOn,
   type ForeignCurrency,
+  type PublishedRateSource,
   type RateSource,
 } from './exchange-rate';
 export { healthResponseSchema, type HealthResponse } from './health';

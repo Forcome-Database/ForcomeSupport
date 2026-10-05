@@ -42,10 +42,10 @@ export const currency = (name: string) => text(name, { enum: currencies });
 export const version = () => integer('version').notNull().default(1);
 
 /** 汇率 numeric(12,6)：1 USD = 汇率 原币（R-FL-06）；不是金额，迁移测试里登记为例外 */
-export const exchangeRate = (name: string) => numeric(name, { precision: 12, scale: 6 });
+export const rate = (name: string) => numeric(name, { precision: 12, scale: 6 });
 
-/** 汇率来源（欧洲央行、Frankfurter，台账费用项另有「手工修改」） */
-export const exchangeRateSource = (name: string) => text(name, { enum: rateSources });
+/** 费用项的汇率来源（欧洲央行、Frankfurter、手工修改） */
+const rateSource = (name: string) => text(name, { enum: rateSources });
 
 /** 日历日期（北京时间的某一天，如费用发生日、汇率日期）：PostgreSQL date，在 JS 中是 `YYYY-MM-DD` 字符串 */
 const calendarDate = (name: string) => date(name, { mode: 'string' });
@@ -61,14 +61,14 @@ export function feeColumns<K extends string>(key: K, column: string) {
     [key]: amount(column),
     [`${key}Currency`]: currency(`${column}_currency`),
     [`${key}Usd`]: amount(`${column}_usd`),
-    [`${key}Rate`]: exchangeRate(`${column}_rate`),
+    [`${key}Rate`]: rate(`${column}_rate`),
     [`${key}RateDate`]: calendarDate(`${column}_rate_date`),
-    [`${key}RateSource`]: exchangeRateSource(`${column}_rate_source`),
+    [`${key}RateSource`]: rateSource(`${column}_rate_source`),
   } as Record<K | `${K}Usd`, ReturnType<typeof amount>> &
     Record<`${K}Currency`, ReturnType<typeof currency>> &
-    Record<`${K}Rate`, ReturnType<typeof exchangeRate>> &
+    Record<`${K}Rate`, ReturnType<typeof rate>> &
     Record<`${K}RateDate`, ReturnType<typeof calendarDate>> &
-    Record<`${K}RateSource`, ReturnType<typeof exchangeRateSource>>;
+    Record<`${K}RateSource`, ReturnType<typeof rateSource>>;
 }
 
 /** feeColumns 给出的一组列的键 */
@@ -90,20 +90,20 @@ export function feeChecks<K extends string>(
 ) {
   const amountColumn = t[key];
   const currencyColumn = t[`${key}Currency`];
-  const usd = t[`${key}Usd`];
-  const rate = t[`${key}Rate`];
-  const rateDate = t[`${key}RateDate`];
-  const rateSource = t[`${key}RateSource`];
+  const usdColumn = t[`${key}Usd`];
+  const rateColumn = t[`${key}Rate`];
+  const rateDateColumn = t[`${key}RateDate`];
+  const rateSourceColumn = t[`${key}RateSource`];
   return [
     check(`${prefix}_currency_check`, sql`(${amountColumn} IS NULL) = (${currencyColumn} IS NULL)`),
     check(
       `${prefix}_conversion_check`,
-      sql`(${usd} IS NULL OR ${amountColumn} IS NOT NULL)
-        AND ((${rate} IS NULL) = (${rateDate} IS NULL))
-        AND ((${rate} IS NULL) = (${rateSource} IS NULL))
-        AND (${rate} IS NULL OR (${rate} > 0 AND coalesce(${currencyColumn} <> 'USD', false)))
-        AND (${usd} IS NULL OR ${currencyColumn} <> 'USD' OR ${usd} = ${amountColumn})
-        AND (${usd} IS NULL OR ${currencyColumn} = 'USD' OR ${rate} IS NOT NULL)`,
+      sql`(${usdColumn} IS NULL OR ${amountColumn} IS NOT NULL)
+        AND ((${rateColumn} IS NULL) = (${rateDateColumn} IS NULL))
+        AND ((${rateColumn} IS NULL) = (${rateSourceColumn} IS NULL))
+        AND (${rateColumn} IS NULL OR (${rateColumn} > 0 AND coalesce(${currencyColumn} <> 'USD', false)))
+        AND (${usdColumn} IS NULL OR ${currencyColumn} <> 'USD' OR ${usdColumn} = ${amountColumn})
+        AND (${usdColumn} IS NULL OR ${currencyColumn} = 'USD' OR ${rateColumn} IS NOT NULL)`,
     ),
   ];
 }

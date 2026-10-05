@@ -1,4 +1,5 @@
 import { addDays, isWeekday } from '@forcome/calendar';
+import { foreignCurrencies, type ForeignCurrency } from '@forcome/contracts';
 import type { DemoFixture } from '@forcome/fixtures';
 import Big from 'big.js';
 import { XMLParser } from 'fast-xml-parser';
@@ -68,17 +69,20 @@ function unrecognized(operation: string, detail: string): ExternalCallFailedErro
   });
 }
 
-/** 一天的 USD、CAD、MXN 齐了才算数（欧洲央行一直公布这三种），缺了说明格式变了 */
+/** 要取的币种：美元与各个要折算的币种 */
+const CURRENCIES = ['USD', ...foreignCurrencies] as const;
+
+/** 一天里美元与各个要折算的币种齐了才算数（欧洲央行一直公布它们），缺了说明格式变了 */
 function eurRatesOf(
   date: string,
   quotes: ReadonlyMap<string, string>,
   operation: string,
 ): EurReferenceRates {
+  const missing = CURRENCIES.filter((currency) => !quotes.get(currency));
   const usd = quotes.get('USD');
-  const cad = quotes.get('CAD');
-  const mxn = quotes.get('MXN');
-  if (!usd || !cad || !mxn) throw unrecognized(operation, `${date} 缺 USD、CAD 或 MXN`);
-  return { date, usd, cad, mxn };
+  if (missing.length > 0 || !usd) throw unrecognized(operation, `${date} 缺 ${missing.join('、')}`);
+  const foreign = Object.fromEntries(foreignCurrencies.map((c) => [c, quotes.get(c) ?? '']));
+  return { date, usd, quotes: foreign as Record<ForeignCurrency, string> };
 }
 
 /** 解析欧洲央行的参考汇率文件 */
@@ -91,6 +95,7 @@ export function parseEcbRates(xml: string, operation: string): EurReferenceRates
   }
   const document = ecbDocumentSchema.safeParse(parsed);
   if (!document.success) throw unrecognized(operation, '不是欧洲央行的参考汇率文件');
+  // 文件里一天都没有（正常的最近一天文件也总有一天）时结构对不上，同样以「返回内容不认识」失败、改用备用源
   return document.data.Envelope.Cube[0].Cube.map((day) =>
     eurRatesOf(day.time, new Map(day.Cube.map((c) => [c.currency, c.rate])), operation),
   );
@@ -130,8 +135,8 @@ export function createRealExchangeRateClient(http: HttpClient): ExchangeRateClie
       if (range.from >= addDays(range.to, -ECB_RECENT_DAYS)) {
         // 最近一天的文件够用：它的日期之前、区间起点之后没有缺的工作日（或者根本没有新数据）
         const daily = await ecbFile('eurofxref-daily.xml');
-        const latest = daily[0]?.date;
-        if (!latest || noWeekdayBetween(range.from, latest)) return within(daily, range);
+        const latest = daily[0]?.date ?? range.from;
+        if (noWeekdayBetween(range.from, latest)) return within(daily, range);
         const recent = await ecbFile('eurofxref-hist-90d.xml');
         const earliest = recent.reduce<string | null>(
           (min, day) => (min === null || day.date < min ? day.date : min),
@@ -147,7 +152,7 @@ export function createRealExchangeRateClient(http: HttpClient): ExchangeRateClie
         from: range.from,
         to: range.to,
         base: 'EUR',
-        quotes: 'USD,CAD,MXN',
+        quotes: CURRENCIES.join(','),
         providers: 'ECB',
       });
       const json = await http.getJson(`${FRANKFURTER_RATES}?${query.toString()}`, {
@@ -167,19 +172,14 @@ const FAKE_EUR_USD = '1.10';
 const DEMO_RATES_FROM = '2025-01-01';
 
 /** 以美元表示的汇率（1 USD = x 原币） */
-export interface UsdQuotes {
-  readonly MXN: string;
-  readonly CAD: string;
-}
+export type UsdQuotes = Readonly<Record<ForeignCurrency, string>>;
 
 function eurRatesFromUsd(date: string, quotes: UsdQuotes): EurReferenceRates {
   const eur = new Big(FAKE_EUR_USD);
-  return {
-    date,
-    usd: FAKE_EUR_USD,
-    cad: eur.times(quotes.CAD).toString(),
-    mxn: eur.times(quotes.MXN).toString(),
-  };
+  const foreign = Object.fromEntries(
+    foreignCurrencies.map((c) => [c, eur.times(quotes[c]).toString()]),
+  );
+  return { date, usd: FAKE_EUR_USD, quotes: foreign as Record<ForeignCurrency, string> };
 }
 
 /**

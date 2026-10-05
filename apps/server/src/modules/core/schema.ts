@@ -12,8 +12,13 @@ import {
   unique,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { foreignCurrencies, type AuditObjectType, type Role } from '@forcome/contracts';
-import { exchangeRate as rateColumn, exchangeRateSource, primaryId, timestamptz } from './columns';
+import {
+  foreignCurrencies,
+  publishedRateSources,
+  type AuditObjectType,
+  type Role,
+} from '@forcome/contracts';
+import { primaryId, rate, timestamptz } from './columns';
 
 export const coreSchema = pgSchema('core');
 
@@ -86,9 +91,9 @@ export const exchangeRate = coreSchema.table(
     /** 汇率所属的日期（欧洲央行参考汇率的日期） */
     date: date('date', { mode: 'string' }).notNull(),
     currency: text('currency', { enum: foreignCurrencies }).notNull(),
-    rate: rateColumn('rate').notNull(),
+    rate: rate('rate').notNull(),
     /** 欧洲央行（主源）或 Frankfurter（备用源） */
-    source: exchangeRateSource('source').notNull(),
+    source: text('source', { enum: publishedRateSources }).notNull(),
     createdAt: timestamptz('created_at').notNull(),
   },
   (t) => [

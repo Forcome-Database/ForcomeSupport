@@ -14,18 +14,14 @@ export const RATE_DECIMALS = 6;
 export const foreignCurrencies = ['CAD', 'MXN'] as const;
 export type ForeignCurrency = (typeof foreignCurrencies)[number];
 
-/**
- * 汇率来源：欧洲央行（主源）、Frankfurter（备用源，数据同样来自欧洲央行）；台账的费用项另有「手工修改」
- * （售后负责人改汇率，记审计）
- */
-export const rateSources = ['ecb', 'frankfurter', 'manual'] as const;
+/** 汇率表的来源：欧洲央行（主源）、Frankfurter（备用源，数据同样来自欧洲央行） */
+export const publishedRateSources = ['ecb', 'frankfurter'] as const;
+export type PublishedRateSource = (typeof publishedRateSources)[number];
+
+/** 台账费用项的汇率来源：汇率表的两个来源，另有「手工修改」（售后负责人改汇率，记审计） */
+export const rateSources = [...publishedRateSources, 'manual'] as const;
 export const rateSourceSchema = z.enum(rateSources);
 export type RateSource = z.infer<typeof rateSourceSchema>;
-export const rateSourceLabels: Record<RateSource, string> = {
-  ecb: '欧洲央行',
-  frankfurter: '备用源（Frankfurter）',
-  manual: '手工修改',
-};
 
 /** 一个汇率：1 USD = rate 原币；date 是汇率实际所属的日期（当天缺失时为此前最近一个有汇率的日期，E-20） */
 export const exchangeRateSchema = z.object({
@@ -38,7 +34,7 @@ export type ExchangeRate = z.infer<typeof exchangeRateSchema>;
 /** 某个日期可用的汇率（新建登记抽屉即时折算用）：每个币种取当天、缺失时取此前最近一个有汇率的日期；一个都没有为 null */
 export const exchangeRatesOnSchema = z.object({
   date: z.iso.date(),
-  rates: z.object({ CAD: exchangeRateSchema.nullable(), MXN: exchangeRateSchema.nullable() }),
+  rates: z.record(z.enum(foreignCurrencies), exchangeRateSchema.nullable()),
 });
 export type ExchangeRatesOn = z.infer<typeof exchangeRatesOnSchema>;
 

@@ -280,9 +280,10 @@ export type RatesOn = ExchangeRatesOn['rates'] | undefined;
 /** 一个费用项折算成美元（分）：没填按 0，美元原样，非美元按汇率折算（四舍五入到分，同保存时冻结的值）；不能算为 null */
 function usdCentsOf(fee: FeeForm, rates: RatesOn): number | null {
   const cents = centsOf(fee.amount);
-  if (cents === null || cents === 0 || fee.currency === 'USD') return cents;
-  const rate = rates?.[fee.currency];
-  return rate ? centsOf(usdOf(fee.amount.trim(), rate.rate)) : null;
+  // 没填的不登记、不用汇率；填了的非美元金额（0 也是）同保存时一样要有汇率，没有就算不出（保存时报错）
+  if (cents === null || fee.amount.trim() === '' || fee.currency === 'USD') return cents;
+  const conversion = conversionOf(fee, rates);
+  return conversion?.kind === 'converted' ? centsOf(conversion.usd) : null;
 }
 
 /**

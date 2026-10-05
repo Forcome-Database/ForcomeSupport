@@ -128,9 +128,12 @@ describe('新建登记的表单（S14）', () => {
     expect(feeTotalCents(fees, DEMO_RATES)).toBe(882 + 680 + 4939);
     expect(groupCents(fees, undefined)).toEqual({ product: null, freight: 680, other: null });
     expect(feeTotalCents(fees, { ...DEMO_RATES, MXN: null })).toBeNull();
-    // 非美元的 0 不用汇率
+    // 没填的不用汇率；填了 0 的非美元金额与保存时一样也要汇率（没有汇率时保存会报错，这里也算不出）
+    const blank = { ...fees, productCost: { amount: '', currency: 'CAD' as const } };
+    expect(groupCents(blank, undefined).product).toBe(0);
     const zero = { ...fees, productCost: { amount: '0', currency: 'CAD' as const } };
-    expect(groupCents(zero, undefined).product).toBe(0);
+    expect(groupCents(zero, DEMO_RATES).product).toBe(0);
+    expect(groupCents(zero, { ...DEMO_RATES, CAD: null }).product).toBeNull();
   });
 
   it('金额框下的折算：非美元且填了金额才有；汇率取不到时说明原因', () => {

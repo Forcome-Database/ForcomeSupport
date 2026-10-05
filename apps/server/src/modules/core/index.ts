@@ -8,11 +8,10 @@ export { ManualClock, systemClock, type Clock, type Duration } from './clock';
 export {
   amount,
   currency,
-  exchangeRate,
-  exchangeRateSource,
   feeChecks,
   feeColumns,
   primaryId,
+  rate,
   timestamptz,
   version,
 } from './columns';
@@ -30,13 +29,10 @@ export {
   createCoreJobHandlers,
   exchangeRateOn,
   exchangeRatesOn,
-  RATE_HISTORY_START,
-  syncExchangeRates,
   syncExchangeRatesJob,
   type DateRange,
   type EurReferenceRates,
   type ExchangeRateSource,
-  type ExchangeRateSyncReport,
 } from './exchange-rates';
 export {
   defineFeed,

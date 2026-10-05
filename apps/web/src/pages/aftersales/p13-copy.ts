@@ -46,7 +46,6 @@ export const FOREIGN_AMOUNT = {
   /** 原币与汇率日期之间（窄的金额列里在这里换行） */
   separator: ' · ',
   rateDate: (date: string) => `汇率 ${date}`,
-  line: (original: string, date: string) => `${original} · 汇率 ${date}`,
   title: '汇率取费用发生日的欧洲央行日汇率；售后负责人可修改并记审计',
 } as const;
 
@@ -158,11 +157,10 @@ export const SAVE_RESULT = {
   failedDescription: '填写的内容已保留在抽屉里。',
 } as const;
 
-/** 来源工单查询失败（不是没有这张工单，而是接口出错）：G5 失败浮层「查询失败：原因」+「立即重试」 */
-export const SOURCE_TICKET_LOOKUP = { failedAction: '查询' } as const;
-
-/** 费用发生日的汇率查询失败：同来源工单的写法（G5「查询失败：原因」+「立即重试」） */
-export const RATE_LOOKUP = { failedAction: '查询' } as const;
+/**
+ * 抽屉里的查询失败（接口出错，不是查无结果）：来源工单与费用发生日的汇率，G5 失败浮层「查询失败：原因」+「立即重试」
+ */
+export const LOOKUP = { failedAction: '查询' } as const;
 
 /** 关闭抽屉时还有未保存的输入（G8，新建的写法同 P18） */
 export const LEAVE = '「新建登记」填写的内容还没保存，放弃后不保留。';

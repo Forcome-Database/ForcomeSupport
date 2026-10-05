@@ -24,7 +24,7 @@ import {
   PAGE_DESCRIPTION,
   PAGE_TITLE,
   SAVE_RESULT,
-  SOURCE_TICKET_LOOKUP,
+  LOOKUP,
   storeSite,
 } from './p13-copy';
 
@@ -103,12 +103,12 @@ describe('P13 第一期参照页', () => {
 
   it('非美元金额（S-20260911-0020）：美元值下方写原币与汇率日期，悬停说明汇率的来源（R-FL-06）', () => {
     expectText(P13, formatMoney('49.39', 'USD'));
+    // 单元格里原币与汇率日期分成两段（窄列在「·」处换行），拼起来与原型逐字一致
     expectText(
       P13,
-      FOREIGN_AMOUNT.line(formatMoney('889.00', 'MXN'), formatRateDate('2026-09-10')),
-    );
-    expect(FOREIGN_AMOUNT.line('MX$889.00', '09-10')).toBe(
-      `MX$889.00${FOREIGN_AMOUNT.separator}${FOREIGN_AMOUNT.rateDate('09-10')}`,
+      formatMoney('889.00', 'MXN') +
+        FOREIGN_AMOUNT.separator +
+        FOREIGN_AMOUNT.rateDate(formatRateDate('2026-09-10')),
     );
     expectIn(P13, `title="${FOREIGN_AMOUNT.title}"`);
   });
@@ -249,7 +249,7 @@ describe('S14 补充小样（第一阶段实现时确认，10-05 用户确认）
     // 失败浮层的标题由 notify 拼成「<动作>失败：原因」（ADR 0007）
     expectIn(STATES, `>${SAVE_RESULT.failedAction}失败：网络不可用<`);
     expectIn(STATES, SAVE_RESULT.failedDescription);
-    expectIn(STATES, `>${SOURCE_TICKET_LOOKUP.failedAction}失败：网络不可用<`);
+    expectIn(STATES, `>${LOOKUP.failedAction}失败：网络不可用<`);
     expectIn(STATES, LEAVE);
   });
 });
