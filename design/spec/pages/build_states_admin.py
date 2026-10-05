@@ -373,8 +373,8 @@ def k18():
     a = frame(cap('① 李婷 · 坐席') + AU.audit_page_head() +
               banner('info', '你只能看到自己的操作记录', '操作人筛选已锁定为本人；客服主管与管理员可查看全部（10.2）。') +
               AU.audit_filters('李婷', who_locked=True, compact=True) +
-              AU.audit_table(mine, cols=cols, tpl='44px 112px 210px 72px minmax(0, 1fr) 14px') + muted('共 %d 条' % len(mine), 12), w=W)
-    # ② 刘洋（管理员，无财务权限）：展开 S-20260909-0016 的记录，财务字段前后值显示「已隐藏」
+              AU.audit_table(mine, cols=cols, tpl='44px 112px 210px 72px minmax(0, 1fr) 14px', viewer='坐席') + muted('共 %d 条' % len(mine), 12), w=W)
+    # ② 刘洋（管理员，无财务权限）：展开 S-20260909-0016 的记录，财务字段前后值显示「已隐藏」；管理员打不开 P13，售后单编号不可点
     d = AUDIT_EXPAND_DEMO
     role = STAFF[AU.NAME_KEY[d['who']]]['role']
     ip = [r[7] for r in AUDIT_LOG if r[1] == d['who']][0]  # 同一操作人的来源 IP
@@ -384,8 +384,36 @@ def k18():
     b = frame(cap('② 刘洋 · 管理员（没有财务权限）') + AU.audit_page_head() +
               row(icon('lock', 14, T['ink4']) + muted('你的角色没有财务权限：成本、承担比例、结算金额的前后值显示「已隐藏」，其他字段照常显示。', 12), 6) +
               AU.audit_filters(None, '近 7 天', d['obj'], compact=True) +
-              AU.audit_table([rec], 0, exp, len(d['fields']), cols=cols, tpl='76px 128px 200px 80px minmax(0, 1fr) 14px'), w=W)
-    return '<div style="display: flex; gap: 0px; align-items: stretch;">%s<div style="width: 1px; background: %s; margin: 0px 15px 0px 16px;"></div>%s</div>' % (a, T['line'], b)
+              AU.audit_table([rec], 0, exp, AU.changed_count(d['fields']), cols=cols, tpl='76px 128px 200px 80px minmax(0, 1fr) 14px', viewer='管理员'), w=W)
+    pics = '<div style="display: flex; gap: 0px; align-items: stretch;">%s<div style="width: 1px; background: %s; margin: 0px 15px 0px 16px;"></div>%s</div>' % (a, T['line'], b)
+    return col(pics + k18_more(), 16)
+
+
+def k18_more():
+    """K18 的补充小样（第一阶段实现时确认，待办 30，10-05）：第一阶段几种记录的写法、列表为空、导出、自定义时间。"""
+    import build_audit as AU
+    from build_states_as import range_picker
+    rows = AUDIT_P1_MORE
+    count = lambda n, denied: nowrap('共 %d 条 · 越权访问 %d 条 · 点行展开完整前后值' % (n, denied), 12, T['ink3'])
+    week = '09-05 至 09-11 近 7 天'
+    tpl = AU.TPL.replace('64px', '76px', 1)  # 跨天时时间列写「月-日 时:分」，加宽
+    a = frame(cap('① 周敏 · 近 7 天：第一阶段的几种记录。导出审计日志本身也记一条；新建没有前值，摘要写「字段：— → 后」，「等 N 项」为有值的字段数；'
+                  '店铺范围的越权访问写越权的店铺（本例陈晨的店铺范围只有 Forcome Direct）；时间写「月-日 时:分」；周敏打不开 P18，店铺编号不可点') +
+              AU.audit_filters(None, '近 7 天') +
+              col(row(label(week) + count(len(rows), sum(1 for r in rows if r[8])), 8) + AU.audit_table(rows, tpl=tpl, viewer='客服主管'), 10), w=WW)
+    none = '<div style="background: #ffffff;">%s</div>' % empty('search', '没有符合条件的操作记录', '当前筛选：近 7 天 · 操作人 王磊 · 店铺。换个条件试试，或清除筛选。',
+                                                               btn('清除筛选', 'secondary', 'md', 'x'))
+    b = frame(cap('② 列表为空：说明写当前筛选；偏离默认（今天、其余都没选）时给「清除筛选」，没有分页') +
+              AU.audit_filters('王磊', '近 7 天', obj_type='店铺') +
+              col(row(label(week) + count(0, 0), 8) + AU.audit_table([], tpl=tpl, empty_html=none), 10), w=WW)
+    busy = AU.audit_page_head(actions=btn('正在生成，约 3 秒', 'secondary', 'md', loading=True))
+    done = '<div style="display: flex; justify-content: flex-end;">%s</div>' % toast('success', '已导出 %s · 已记入审计日志' % AUDIT_EXPORT_FILE)
+    c = frame(cap('③ 导出（K5）：按当前筛选，不分页；生成中与完成。文件名：今天「审计日志_今天_0911」、近 7 天「审计日志_近7天_0905-0911」、自定义「审计日志_0901-0911」') +
+              busy + done, w=W)
+    picker = '<div style="padding-left: 96px;">%s</div>' % range_picker()
+    e = frame(cap('④ 自定义：点「自定义」弹出区间日历（同 P13 费用发生日），点第二天即生效；表头上方写起止') +
+              AU.audit_filters(None, '自定义', compact=True) + picker + row(label('09-01 至 09-11') + count(17, 1), 8), w=W)
+    return col(a + b + '<div style="display: flex; gap: 0px; align-items: stretch;">%s<div style="width: 1px; background: %s; margin: 0px 15px 0px 16px;"></div>%s</div>' % (c, T['line'], e), 16)
 
 
 # ---------------------------------------------------------------- K19 第一阶段报表
@@ -526,7 +554,7 @@ SPEC = {
     'K10': '二次确认弹窗列出该成员的未关闭工单与进行中售后单，分别选接手人：工单选坐席或客服主管，售后单只列有该店铺范围的售后负责人；选齐后「改派并停用」，变更记审计（AC-ST-02）。成员在钉钉离职后自动停用，其未关闭工单与进行中售后单进入客服主管改派队列（AC-ST-05）。示例：停用李婷，未关闭工单按 data.TICKETS 计 → 接手人陈晨，进行中售后单 0 张；另一张小图：停用王磊，4 张进行中售后单但没有其他售后负责人，「改派并停用」置灰并写原因。',
     'K15': '页签「风险信号 · 7」，7 条风险信号命中即转人工（data.RISK_SIGNALS）。安全事故、平台风险与疑似提示注入（D-21）为硬规则：开关锁定并写「硬规则，不可关闭」。重复联系、高价值行内写明关闭影响「关闭需二次确认：近 30 天约少转人工 N 封」（data.RISK_OFF_IMPACT）；关闭任一可关的信号都是危险开关，二次确认并写明影响（关闭后命中的来信不再转人工，可能自动发送），确认后进入吸底保存栏。「发送方式与阈值」页签名旁圆点表示该页签有未保存修改。',
     'K17': '权限矩阵一张表全部展开（不折叠），按 工单 / 审批 / 售后 / 知识 / 报表 / 设置 / 工厂 分组，能力行照 prd_d 10.1（含第一阶段的标记无需回复、新建与编辑登记、设为已完成，以及指定店铺、补登与汇率、改派售后单负责人、查看成本与结算金额、查看审计日志）；● 有权限、○ 只能看自己发起或负责的（「○ 自己登记的」写明范围）、「—」无权限、文字为部分能力。只读，按角色固定；第一阶段只显示已上线的能力行。',
-    'K18': '两张小图：① 李婷（坐席）视角：页头提示「你只能看到自己的操作记录」，操作人筛选锁定为本人，列表只有李婷的记录；② 刘洋（管理员，没有财务权限）视角：展开 S-20260909-0016 的记录（data.AUDIT_EXPAND_DEMO），产品成本、运费、承担比例的前后值显示灰色「已隐藏」，其他字段照常显示（10.2、D-24）。示例为完整版，第一阶段只有 P27「第一阶段」列出的对象类型。',
+    'K18': '两张小图：① 李婷（坐席）视角：页头提示「你只能看到自己的操作记录」，操作人筛选锁定为本人，列表只有李婷的记录；② 刘洋（管理员，没有财务权限）视角：展开 S-20260909-0016 的记录（data.AUDIT_EXPAND_DEMO），展开列出该单前后任一侧有值的全部字段、变化的标出，产品成本、运费、额外赔偿、其他、承担比例的前后值显示灰色「已隐藏」，其他字段照常显示；摘要「等 N 项」的 N 是变化的字段数；管理员打不开 P13，售后单编号不可点（10.2、D-24）。示例为完整版，第一阶段只有 P27「第一阶段」列出的对象类型。下方为补充小样（待办 30，10-05 用户确认）：第一阶段几种记录的写法、列表为空、导出、自定义时间。',
     'K19': '周敏视角，第一阶段外壳（导航 工单 · 售后 · 报表，无店铺范围与搜索）：筛选 近 7 天 · 本月 · 自定义 · 店铺 · 站点；标题下「数据来源：工单（Gmail）、平台订单、登记台账 · 更新于 %s」（取 Gmail、亚马逊订单、Shopify 订单中最旧的同步）与两条注；指标 3 个；图表 每日工单量 + 售后成本按责任类型（卡头总额即售后成本）。右为管理员视角局部：没有售后成本卡，每日工单量不可点、没有「查看明细」。导出同步生成后直接下载，记入审计（K5）。' % report_updated(),
     'K20': '刘洋视角，第一阶段外壳：亚马逊 SP-API（订单同步与 SQS 状态、订单回补 %d 天已完成）、Shopify Admin API（回补 %d 天 · 未开通 read_all_orders）、Gmail（4 个邮箱，收件与「已发送」）、钉钉（同步延迟 · 最近同步 %s，超过 2 小时，只提醒管理员、不出全站横幅）；积加、易仓为灰色虚线卡「第二阶段接入」，没有同步时间与测试连接；不显示 17TRACK。店铺表没有覆盖项列，没有吸底保存栏。下方为卡头小样（已连接 · 同步延迟 · 连接异常 · 未连接 · 模拟数据）、店铺表状态列写法与钉钉卡第一阶段已连接时的说明行（没有钉钉内免登）。' % (BS.AMZ_BACKFILL_DAYS, SHOPIFY_BACKFILL_DAYS, BS.DINGTALK_LATE_SYNC),
     'K21': '左侧 12 个意图（每项写发布版本，「未收到与异常」选中并标「草稿 v5 未发布」）；上方「发布版本 v4 · 09-08 周敏 · 草稿 v5（未发布）」与店铺下拉；中间四段说明，「何时给哪种方案」一段标「Forcome Direct 覆盖」；右栏结构化部分（只读，代码执行）与回归结果「v5 草稿：18 / 20 通过」，展开 1 条未通过样例（期望「先补发」，实际「先查件」）；「发布 v5」置灰，悬停「还有 2 条回归样例未通过，全部通过后才能发布」。每次发布记入审计，可查看历史版本与对比（D-21）。',
