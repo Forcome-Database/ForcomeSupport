@@ -391,11 +391,13 @@ test('列表为空：说明写当前筛选与「清除筛选查看全部 N 张�
   await expect(page).toHaveURL(/\/aftersales\/ledger$/);
 
   // 默认条件下为空（接口返回空列表）：只写当前筛选，没有按钮
-  await page.route('**/api/aftersales/ledger', async (route) => {
-    const response = await route.fetch();
-    const body = (await response.json()) as Record<string, unknown>;
-    await route.fulfill({ response, json: { ...body, items: [], totals: undefined } });
-  });
+  // 真实的响应在页面里取（开发测试环境的根证书只装进冒烟容器的 Chromium，测试进程直连会验不过证书）
+  const real = await page.evaluate(
+    async () => (await (await fetch('/api/aftersales/ledger')).json()) as Record<string, unknown>,
+  );
+  await page.route('**/api/aftersales/ledger', (route) =>
+    route.fulfill({ json: { ...real, items: [], totals: undefined } }),
+  );
   await page.reload();
   await expect(page.getByText('没有符合条件的售后单')).toBeVisible();
   await expect(

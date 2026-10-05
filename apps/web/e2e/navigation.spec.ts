@@ -69,6 +69,13 @@ async function chooseDensity(page: Page, label: '舒适' | '紧凑'): Promise<vo
 }
 
 const density = (page: Page) => page.locator('html').getAttribute('data-density');
+
+/** 等这次密度保存完：界面先换密度再保存，保存还没回来就刷新会读到旧值（开发测试环境慢一些时出现过） */
+const densitySaved = (page: Page) =>
+  page.waitForResponse(
+    (res) =>
+      res.url().endsWith('/api/me/preferences') && res.request().method() === 'PUT' && res.ok(),
+  );
 const bodyFontSize = (page: Page) => page.evaluate(() => getComputedStyle(document.body).fontSize);
 
 /** 打开头像菜单量「审计日志」菜单项的字号，再关上 */
@@ -89,8 +96,10 @@ test('密度切到紧凑后，刷新与重新登录都保持（AC-ST-04、G9）'
 
   expect(await menuItemFontSize(page)).toBe('13px');
 
+  const savedCompact = densitySaved(page);
   await chooseDensity(page, '紧凑');
   await expect.poll(() => density(page)).toBe('compact');
+  await savedCompact;
   // 设计规范第 12 节紧凑档：正文 12（页面正文与菜单项都随之变化）
   expect(await bodyFontSize(page)).toBe('12px');
   expect(await menuItemFontSize(page)).toBe('12px');
@@ -105,8 +114,10 @@ test('密度切到紧凑后，刷新与重新登录都保持（AC-ST-04、G9）'
   expect(await bodyFontSize(page)).toBe('12px');
 
   // 顶栏「密度」按钮在两档之间切换
+  const savedComfortable = densitySaved(page);
   await page.getByRole('button', { name: /^密度：紧凑/ }).click();
   await expect.poll(() => density(page)).toBe('comfortable');
+  await savedComfortable;
   await page.reload();
   await expect(page.getByRole('banner').getByText('周敏')).toBeVisible();
   expect(await density(page)).toBe('comfortable');
