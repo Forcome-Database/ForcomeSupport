@@ -1,17 +1,12 @@
 import { startOfBusinessDate } from '@forcome/calendar';
-import {
-  feeItemLabels,
-  feeItems,
-  missingFields,
-  type FeeItem,
-  type RegistrationField,
-} from '@forcome/contracts';
-import { eq, inArray } from 'drizzle-orm';
+import { feeItemLabels, feeItems, missingFields, type RegistrationField } from '@forcome/contracts';
+import { and, eq, inArray } from 'drizzle-orm';
 import { listStoreOptions } from '../channel';
 import {
   advisoryLock,
   nextBusinessNumber,
   recordAudit,
+  storeScopeCondition,
   SYSTEM_STORE_SCOPE,
   systemActor,
   transaction,
@@ -22,7 +17,7 @@ import {
 import { listFactories } from '../factory';
 import { listAftersalesOwners } from '../org';
 import { auditSnapshot } from './audit';
-import { convertFees, feeColumnValues, type FeeValue } from './fees';
+import { convertFees, feeColumnValues, keptFeeColumns } from './fees';
 import type { HistoryMapping } from './history-mapping';
 import {
   bindHistoryMapping,
@@ -221,22 +216,14 @@ async function importedRows(
     })
     .from(historyImport)
     .innerJoin(aftersales, eq(aftersales.id, historyImport.aftersalesId))
-    .where(inArray(historyImport.sourceKey, [...new Set(keys)]));
+    .where(
+      and(
+        inArray(historyImport.sourceKey, [...new Set(keys)]),
+        // 导入是系统操作（命令行，操作人「系统」），不受店铺范围限制（ADR 0010 修订）
+        storeScopeCondition(SYSTEM_STORE_SCOPE, aftersales.storeId),
+      ),
+    );
   return new Map(rows.map((row) => [row.key, { number: row.number, notes: notesOf(row) }]));
-}
-
-/** 取消时保留的费用项列：已取消的单上，已登记的项按原表（没写时全部保留），没登记的为空 */
-function keptColumns(record: HistoryRecord, fees: Readonly<Record<FeeItem, FeeValue>>) {
-  const kept = (item: FeeItem): boolean | null => {
-    if (record.status !== 'cancelled' || fees[item].amount === null) return null;
-    return record.keptFees === null || record.keptFees.includes(item);
-  };
-  return {
-    productCostKept: kept('productCost'),
-    freightKept: kept('freight'),
-    compensationKept: kept('compensation'),
-    otherCostKept: kept('otherCost'),
-  };
 }
 
 async function importRow(
@@ -301,7 +288,11 @@ async function importRow(
           productFactoryPct: record.factoryRatios?.product ?? null,
           freightFactoryPct: record.factoryRatios?.freight ?? null,
           otherFactoryPct: record.factoryRatios?.other ?? null,
-          ...keptColumns(record, converted.values),
+          // 只有已取消的单有保留项：已登记的项按原表（原表没写时全部保留），没登记的为空
+          ...keptFeeColumns(
+            (item) => record.status === 'cancelled' && converted.values[item].amount !== null,
+            (item) => record.keptFees === null || record.keptFees.includes(item),
+          ),
           createdAt: tx.now,
           updatedAt: tx.now,
         })

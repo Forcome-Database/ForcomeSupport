@@ -5,7 +5,6 @@ import {
   feeItems,
   ledgerActionMessages,
   type CancelInput,
-  type FeeItem,
   type FieldErrors,
   type VersionInput,
 } from '@forcome/contracts';
@@ -20,6 +19,7 @@ import {
 } from '../core';
 import type { Access } from '../org';
 import { actorName, auditSnapshot, ownerNameOf } from './audit';
+import { keptFeeColumns } from './fees';
 import { findOwnedAftersales, type AftersalesRow } from './ledger';
 import { ledgerTransition, type LedgerEvent } from './lifecycle';
 import { aftersales } from './schema';
@@ -154,15 +154,14 @@ export async function cancelAftersales(
   }
   if (Object.keys(errors).length > 0) throw new FieldValidationError(errors);
 
-  // 已登记的项记保留与否，没登记的项为空
-  const keptColumn = (item: FeeItem) => (found[item] === null ? null : kept.has(item));
   return changeStatus(runtime, access, found, 'aftersales.cancel', (now) => ({
     status,
     cancelReason: reason,
     cancelledAt: now,
-    productCostKept: keptColumn('productCost'),
-    freightKept: keptColumn('freight'),
-    compensationKept: keptColumn('compensation'),
-    otherCostKept: keptColumn('otherCost'),
+    // 已登记的项记保留与否，没登记的项为空
+    ...keptFeeColumns(
+      (item) => found[item] !== null,
+      (item) => kept.has(item),
+    ),
   }));
 }

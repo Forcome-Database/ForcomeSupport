@@ -6,7 +6,8 @@ import type { HistoryImportNote, HistoryImportReport } from './history-import';
  * 跳过的行写当时导入的单号与标注；未导入的行写全部错误。最后合计。
  */
 
-export const historyImportNoteWords: Record<HistoryImportNote, string> = {
+/** 两个标注的写法 */
+const historyImportNoteWords: Record<HistoryImportNote, string> = {
   usd_assumed: '原表没有币种，按美元导入',
   fee_date_from_registered: '原表没有费用发生日，取原登记日期',
 };

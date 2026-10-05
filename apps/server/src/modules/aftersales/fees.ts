@@ -66,6 +66,23 @@ export function feeColumnValues(fees: Readonly<Record<FeeItem, FeeValue>>) {
 }
 
 /**
+ * 取消时确认保留的费用项列（`${费用项}Kept`，AC-AS-16）：已登记的项记保留与否，没登记的项为空。
+ * 取消售后单（status.ts）与历史导入的已取消单（history-import.ts）共用
+ */
+export function keptFeeColumns(
+  registered: (item: FeeItem) => boolean,
+  kept: (item: FeeItem) => boolean,
+) {
+  const column = (item: FeeItem) => (registered(item) ? kept(item) : null);
+  return {
+    productCostKept: column('productCost'),
+    freightKept: column('freight'),
+    compensationKept: column('compensation'),
+    otherCostKept: column('otherCost'),
+  };
+}
+
+/**
  * 售后单表的列 → 四个费用项（没登记的为 null）。表上的 CHECK 保证币种、美元值与汇率的组合；「有金额就有美元值」
  * 由这里把关（加列前的旧数据由迁移与示例数据补齐，ADR 0006 修订）——缺了说明数据坏了，直接报错，不静默按原币或美元处理
  */

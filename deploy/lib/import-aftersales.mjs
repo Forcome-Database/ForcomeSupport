@@ -1,5 +1,7 @@
 // 「售后登记表导入」子命令（待办 27）：node deploy/deploy.mjs <环境> import-aftersales <登记表> [--mapping <映射表>] [--dry-run]
 // 用当前部署的版本起一次性容器执行 dist/import-aftersales.mjs；表格与映射表以只读方式挂进容器的 /import/。
+// 挂载用本机绝对路径：-v 的「D:\…:/import/…」在 Windows 的 Docker Desktop 上可用（本机已验证）；deploy.mjs 开头说的
+// 「盘符被当成容器名」只发生在 docker compose cp 这类「容器:路径」的参数上。
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 

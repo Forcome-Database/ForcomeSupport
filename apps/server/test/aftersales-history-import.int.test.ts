@@ -8,6 +8,9 @@ import {
   type AuditLog,
   type Ledger,
 } from '@forcome/contracts';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { getDemoFixture } from '@forcome/fixtures';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -18,7 +21,7 @@ import {
 import { syncExchangeRatesJob } from '../src/modules/core';
 import { exchangeRateClient } from '../src/modules/integration';
 import type { ApiClient } from './api-client';
-import { SAMPLE_FILE } from './fixtures/history-import/sample';
+import { SAMPLE_FILE, SAMPLE_MAPPING_FILE } from './fixtures/history-import/sample';
 import { SAMPLE_HISTORY_MAPPING, startTestHarness, type TestHarness } from './harness';
 
 /*
@@ -140,6 +143,10 @@ describe('售后登记表导入（合成样本，PRD 第 14 节）', () => {
   });
 
   it('试运行：只报告将导入的行（单号、标注、缺的字段、警告）与错误，不写库——台账、审计、单号都不变', async () => {
+    // 命令行：--dry-run，报告写到标准输出；有未导入的行，退出码为 1
+    expect(
+      await t.runImportCommand([SAMPLE_FILE, '--mapping', SAMPLE_MAPPING_FILE, '--dry-run']),
+    ).toEqual({ exitCode: 1, stdout: `${DRY_RUN_REPORT.join('\n')}\n`, stderr: '' });
     dryRun = await t.importAftersales({ file: SAMPLE_FILE }, { dryRun: true });
     expect(formatHistoryImportReport(dryRun).split('\n')).toEqual(DRY_RUN_REPORT);
     expect((await ledger(owner, SAMPLE_RANGE)).items).toHaveLength(12);
@@ -349,5 +356,97 @@ describe('售后登记表导入（合成样本，PRD 第 14 节）', () => {
     });
     expect(res.status, await res.clone().text()).toBe(201);
     expect(ledgerItemSchema.parse(await res.json()).number).toBe('S-20260911-0035');
+  });
+});
+
+describe('导入命令（命令行参数、退出码、默认映射表）', () => {
+  let t: TestHarness;
+  let owner: ApiClient;
+  const dir = mkdtempSync(path.join(tmpdir(), 'history-import-command-'));
+  /** 随镜像打包的映射表（不带 --mapping 时用它） */
+  const BUNDLED_MAPPING = path.join(
+    import.meta.dirname,
+    '../src/modules/aftersales/history-mapping.json',
+  );
+
+  beforeAll(async () => {
+    t = await startTestHarness();
+    await t.loadFixtures();
+    owner = await t.loginAs('售后负责人');
+  });
+
+  afterAll(async () => {
+    await t.close();
+  });
+
+  it('参数不对、映射表读不了：写到标准错误、退出码 1，一行也不导入', async () => {
+    for (const argv of [[], ['a.xlsx', 'b.xlsx'], ['a.xlsx', '--force']]) {
+      const result = await t.runImportCommand(argv);
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toContain(
+        '用法：import-aftersales <登记表.xlsx|.csv> [--mapping <映射表.json>] [--dry-run]',
+      );
+    }
+    const unreadable = await t.runImportCommand([
+      SAMPLE_FILE,
+      '--mapping',
+      path.join(dir, 'nope.json'),
+    ]);
+    expect(unreadable).toMatchObject({ exitCode: 1, stdout: '' });
+    expect(unreadable.stderr).toContain('读不了映射表');
+  });
+
+  it('不带 --mapping 时用随镜像打包的映射表', async () => {
+    expect(await t.runImportCommand([SAMPLE_FILE, '--dry-run'])).toEqual(
+      await t.runImportCommand([SAMPLE_FILE, '--mapping', BUNDLED_MAPPING, '--dry-run']),
+    );
+  });
+
+  it('CSV 全部导入时退出码 0；寄配件没写生产厂的不按配件 SKU 推出，留空算缺（协调者 2026-10-06 决定）', async () => {
+    const file = path.join(dir, '登记表.csv');
+    writeFileSync(
+      file,
+      [
+        '登记编号,登记日期,店铺,站点,订单号,客户,处理方式,责任,配件 SKU,数量,工厂承担比例,币种,产品成本,状态',
+        'C-001,2026-04-10,forcome.com,US,#1300,No Factory,寄配件,质量问题,FC-V2-HF01,1,100,USD,3.20,完成',
+      ].join('\r\n'),
+      'utf8',
+    );
+    // 另一份只写这几列的映射表（原表没有的字段不写）
+    const mapping = path.join(dir, 'mapping.json');
+    writeFileSync(
+      mapping,
+      JSON.stringify({
+        rowKey: ['登记编号'],
+        columns: {
+          registeredDate: '登记日期',
+          store: '店铺',
+          site: '站点',
+          orderNumber: '订单号',
+          customerName: '客户',
+          method: '处理方式',
+          responsibility: '责任',
+          partSku: '配件 SKU',
+          partQuantity: '数量',
+          factoryPct: '工厂承担比例',
+          currency: '币种',
+          productCost: '产品成本',
+          status: '状态',
+        },
+        values: { responsibility: { 质量问题: '产品质量问题' }, status: { 完成: '已完成' } },
+      }),
+      'utf8',
+    );
+    const result = await t.runImportCommand([file, '--mapping', mapping]);
+    expect(result).toMatchObject({ exitCode: 0, stderr: '' });
+    expect(result.stdout).toContain('第 2 行（C-001）已导入 S-20260410-0023');
+    const imported = await detail(owner, 'S-20260410-0023');
+    expect(imported).toMatchObject({
+      origin: 'history_import',
+      factory: null,
+      part: { sku: 'FC-V2-HF01' },
+    });
+    expect(imported.missing).toContain('factory');
   });
 });

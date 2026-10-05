@@ -262,6 +262,10 @@ describe('一行 → 一张售后单', () => {
     });
   });
 
+  it('寄配件没写生产厂：不按配件 SKU 推出生产厂，留空（导入后算缺；协调者 2026-10-06 决定）', () => {
+    expect(record({ ...SHIPPED, 生产厂: null }).factoryCode).toBeNull();
+  });
+
   it('负责人对不上（不是该店铺的售后负责人、或不在系统）：留空并写警告', () => {
     const other = record({ ...SHIPPED, 店铺: 'forcome.mx', 负责人: '赵倩' });
     expect(other.ownerId).toBeNull();

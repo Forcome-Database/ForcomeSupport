@@ -1,4 +1,6 @@
+import { startOfBusinessDate } from '@forcome/calendar';
 import {
+  feeItemLabels,
   feeItems,
   isValidAmount,
   ownersForStore,
@@ -206,6 +208,16 @@ export function parseHistoryRow(
     const target = aliasOf(mapping.values[kind], written) ?? written;
     return enumByText(historyEnumLabels[kind] as Readonly<Record<EnumValue<K>, string>>, target);
   };
+  /** 按名字认已有数据（店铺名、生产厂代码、负责人姓名）：先查映射表的别名，再不分大小写比名字 */
+  const findNamed = <T>(
+    kind: 'store' | 'factory' | 'owner',
+    written: string,
+    candidates: readonly T[],
+    nameOf: (candidate: T) => string,
+  ): T | undefined => {
+    const wanted = normalizeText(aliasOf(mapping.values[kind], written) ?? written);
+    return candidates.find((candidate) => normalizeText(nameOf(candidate)) === wanted);
+  };
   const choice = <K extends HistoryEnumKind>(field: SingleField, kind: K): EnumValue<K> | null => {
     const written = text(field);
     if (written === null) return null;
@@ -226,8 +238,7 @@ export function parseHistoryRow(
   if (storeWritten === null) {
     fail('store', '没写');
   } else {
-    const name = normalizeText(aliasOf(mapping.values.store, storeWritten) ?? storeWritten);
-    const store = lookups.stores.find((s) => normalizeText(s.name) === name);
+    const store = findNamed('store', storeWritten, lookups.stores, (s) => s.name);
     if (store) storeId = store.id;
     else fail('store', `「${storeWritten}」认不出`);
   }
@@ -244,8 +255,7 @@ export function parseHistoryRow(
   let factoryCode: string | null = null;
   const factoryWritten = text('factory');
   if (factoryWritten !== null) {
-    const code = normalizeText(aliasOf(mapping.values.factory, factoryWritten) ?? factoryWritten);
-    const found = lookups.factories.find((f) => normalizeText(f) === code);
+    const found = findNamed('factory', factoryWritten, lookups.factories, (code) => code);
     if (found) factoryCode = found;
     else fail('factory', `「${factoryWritten}」认不出`);
   }
@@ -292,7 +302,7 @@ export function parseHistoryRow(
     }
     const total = invalid || sum === null ? null : sum.toFixed(2);
     if (total !== null && !isValidAmount(total)) {
-      errors.push(`${item}：合计 ${total} 超出金额范围`);
+      errors.push(`${feeItemLabels[item]}：合计 ${total} 超出金额范围`);
       amounts[item] = null;
     } else {
       amounts[item] = total;
@@ -345,10 +355,8 @@ export function parseHistoryRow(
   let ownerName: string | null = null;
   const ownerWritten = text('owner');
   if (ownerWritten !== null && storeId !== null) {
-    const name = normalizeText(aliasOf(mapping.values.owner, ownerWritten) ?? ownerWritten);
-    const owner = ownersForStore(lookups.owners, storeId).find(
-      (o) => normalizeText(o.name) === name,
-    );
+    const owners = ownersForStore(lookups.owners, storeId);
+    const owner = findNamed('owner', ownerWritten, owners, (o) => o.name);
     if (owner) {
       ownerId = owner.id;
       ownerName = owner.name;
@@ -518,7 +526,9 @@ function dateTimeOf(cell: HistoryCell): CalendarDateTime | null {
 
 /** 原表的日期与时刻按北京时间换成时刻（只有日期的取当天 0 点） */
 function instantOf(value: CalendarDateTime): Date {
-  return new Date(`${value.date}T${value.time ?? '00:00:00'}+08:00`);
+  const [hours = 0, minutes = 0, seconds = 0] = (value.time ?? '00:00:00').split(':').map(Number);
+  const offset = ((hours * 60 + minutes) * 60 + seconds) * 1000;
+  return new Date(startOfBusinessDate(value.date).getTime() + offset);
 }
 
 /**

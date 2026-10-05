@@ -5,6 +5,7 @@ import type { JobOptions } from 'pg-boss';
 import { createApp } from '../src/app';
 import type { ServerDeps } from '../src/deps';
 import { fixtureSteps } from '../src/fixture-steps';
+import { runImportAftersalesCommand } from '../src/import-aftersales-command';
 import { createFeeds, createJobHandlers } from '../src/jobs';
 import {
   importAftersalesHistory,
@@ -173,6 +174,13 @@ export interface TestHarness {
     source: HistoryImportSource,
     options?: HistoryImportRunOptions,
   ): Promise<HistoryImportReport>;
+  /**
+   * 按命令行参数执行售后登记表导入命令（入口 import-aftersales 的同一个函数，连的是本测试的库），返回退出码与输出；
+   * 核对参数、退出码与随镜像打包的默认映射表
+   */
+  runImportCommand(
+    argv: readonly string[],
+  ): Promise<{ exitCode: number; stdout: string; stderr: string }>;
   /** 关闭连接并删除本测试的库 */
   close(): Promise<void>;
 }
@@ -320,6 +328,24 @@ export async function startTestHarness(
             })
           : sheetOfRows(source.rows, mapping);
       return importAftersalesHistory(runtime, sheet, mapping, { dryRun: importOptions.dryRun });
+    },
+
+    async runImportCommand(argv) {
+      let stdout = '';
+      let stderr = '';
+      const exitCode = await runImportAftersalesCommand(
+        argv,
+        () => Promise.resolve({ runtime, stop: () => Promise.resolve() }),
+        {
+          stdout: (text) => {
+            stdout += text;
+          },
+          stderr: (text) => {
+            stderr += text;
+          },
+        },
+      );
+      return { exitCode, stdout, stderr };
     },
 
     close,
