@@ -32,13 +32,13 @@ import { composeEnvironment } from './lib/compose.mjs';
 import { createEnvFile, readDeployEnv } from './lib/env-file.mjs';
 import { ENVIRONMENTS } from './lib/environments.mjs';
 import { httpsGet, verifyCertificate } from './lib/https-check.mjs';
-import { IMPORT_AFTERSALES_USAGE, importAftersalesRun } from './lib/import-aftersales.mjs';
+import { IMPORT_AFTERSALES_SYNOPSIS, importAftersalesRun } from './lib/import-aftersales.mjs';
 import { capture, mustRun, run } from './lib/process.mjs';
 import { formatReport, summarizePlaywright } from './lib/report.mjs';
 
 const ROOT_CERT_IN_CADDY = '/data/caddy/pki/authorities/local/root.crt';
 const USAGE = `用法：node deploy/deploy.mjs <环境> [deploy [--reset-inbound] | smoke | cert | compose <参数…> | down | reset-inbound
-  | ${IMPORT_AFTERSALES_USAGE}]
+  | ${IMPORT_AFTERSALES_SYNOPSIS}]
 环境：${Object.keys(ENVIRONMENTS).join('、')}`;
 
 // 命令行里给的文件（售后登记表导入）按调用者所在的目录解析：pnpm 运行脚本时把它放在 INIT_CWD

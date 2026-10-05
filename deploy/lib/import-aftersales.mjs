@@ -5,7 +5,7 @@
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-export const IMPORT_AFTERSALES_USAGE =
+export const IMPORT_AFTERSALES_SYNOPSIS =
   'import-aftersales <登记表.xlsx|.csv> [--mapping <映射表.json>] [--dry-run]';
 
 /**
@@ -24,10 +24,10 @@ export function importAftersalesRun(args, resolve) {
       options: { mapping: { type: 'string' }, 'dry-run': { type: 'boolean', default: false } },
     });
   } catch (error) {
-    return { error: `${error.message}\n用法：${IMPORT_AFTERSALES_USAGE}` };
+    return { error: `${error.message}\n用法：${IMPORT_AFTERSALES_SYNOPSIS}` };
   }
   const [sheet, ...rest] = parsed.positionals;
-  if (!sheet || rest.length > 0) return { error: `用法：${IMPORT_AFTERSALES_USAGE}` };
+  if (!sheet || rest.length > 0) return { error: `用法：${IMPORT_AFTERSALES_SYNOPSIS}` };
   const inContainer = `/import/${path.basename(sheet)}`;
   const volumes = [`${resolve(sheet)}:${inContainer}:ro`];
   const command = ['node', 'dist/import-aftersales.mjs', inContainer];
