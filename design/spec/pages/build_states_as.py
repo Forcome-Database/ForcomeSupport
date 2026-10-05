@@ -181,7 +181,98 @@ def over_page(dlg_or_drw, h, s=0.6, drawer_=True, w=W):
 def s13():
     a = col(cap('售后负责人 王磊 · 第一阶段外壳（导航 工单 · 售后 · 报表，不显示店铺范围与搜索）') + scaled(BL.p13_p1(), 1440, 900, 0.6), 8)
     b = col(cap('坐席 李婷 · 只读：不显示金额七列与合计行，没有「新建登记」「更多」与补登') + scaled(BL.p13_p1('liting'), 1440, 900, 0.6), 8)
-    return frame(grid(a + b, 2, 32), WIDE)
+    return col(frame(grid(a + b, 2, 32), WIDE) + s13_more(), 0)
+
+
+# S13 补充小样（第一阶段实现时确认，10-05，待办 22）：筛选行、列设置、合计行、已取消的单、承担悬停、导出
+LEDGER_CLEAR = '清除筛选'
+LEDGER_EMPTY_DESC = '当前筛选：费用发生日 2026-09-01 至 09-11 · 店铺 forcome.mx · 责任 其他。换个条件试试，或清除筛选查看全部 %d 张。' % BL.LT['count']
+NOT_KEPT_TITLE = '原登记 %s，取消时没有保留，不计入售后成本'
+CANCEL_DEMO = 'S-20260911-0021'  # 取消时只保留运费（S15 ② 的单）
+
+
+def range_picker():
+    """费用发生日的区间日历（同 date_picker 的样式）：选好起止即生效；2026-09-01 为周二，起止 09-01 至 09-11（今天）。"""
+    cell = 'width: 30px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-variant-numeric: tabular-nums;'
+    wk = ''.join('<div style="%s color: %s; font-weight: 600;">%s</div>' % (cell, T['ink4'], d) for d in '一二三四五六日')
+    days = '<div style="%s"></div>' % cell
+    for d in range(1, 31):
+        if d in (1, 11):
+            st = 'color: #ffffff; font-weight: 700; background: %s; border-radius: 6px;' % T['accent']
+        elif d < 11:
+            st = 'color: %s; background: %s;' % (T['accent_ink'], T['accent_bg'])
+        else:
+            st = 'color: %s;' % T['ink']
+        days += '<div style="%s %s">%d</div>' % (cell, st, d)
+    head = '<div style="display: flex; align-items: center; justify-content: space-between;">%s%s%s</div>' % (icon('chev_l', 14, T['ink3']), nowrap('2026 年 9 月', 13, T['ink'], 600), icon('chev_r', 14, T['ink3']))
+    return '<div style="width: 236px; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; box-shadow: %s; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;">%s<div style="display: grid; grid-template-columns: repeat(7, 30px); row-gap: 2px;">%s%s</div></div>' % (
+        T['line'], SHADOW_MD, head, wk, days)
+
+
+def option_list(items, selected, width=200):
+    """筛选芯片的下拉（Popover 内的 Command 列表，单选）：第一项「全部」清除该条件，选中项右侧打勾。"""
+    out = ''
+    for t in items:
+        on = t == selected
+        out += '<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border-radius: 6px; font-size: 13px; color: %s; %s">%s%s</div>' % (
+            T['accent_ink'] if on else T['ink2'], 'background: %s;' % T['accent_bg'] if on else '', t, icon('check', 14, T['accent']) if on else '')
+    return '<div style="width: %dpx; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; box-shadow: %s; padding: 5px;">%s</div>' % (width, T['line'], SHADOW_MD, out)
+
+
+def column_menu():
+    """「列设置」下拉：按表格顺序列出除「售后单号」外的列，勾选即显示；底部「恢复默认」。默认隐藏 配件 × 数量、负责人、其他、生产厂。"""
+    cols = ['客户', '店铺与站点', '处理方式', '责任', '状态', '负责人', '生产厂', '配件 × 数量', '快递单号', '产品成本', '运费', '额外赔偿', '其他', '费用合计', 'FSH 承担 $', '工厂承担 $']
+    out = ''.join('<div style="padding: 5px 10px;">%s</div>' % checkbox(c, c not in BL.HIDDEN_P1) for c in cols)
+    out += '<div style="height: 1px; background: %s; margin: 4px 0px;"></div>' % T['line2']
+    out += '<div style="display: flex; align-items: center; gap: 8px; padding: 7px 10px; font-size: 13px; color: %s;">%s恢复默认</div>' % (T['ink2'], icon('refresh', 15, T['ink2']))
+    return '<div style="width: 200px; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; box-shadow: %s; padding: 5px;">%s</div>' % (T['line'], SHADOW_MD, out)
+
+
+def s13_more():
+    """S13 的补充小样（第一阶段实现时确认，10-05，待办 22）：筛选行（费用发生日默认本月、单选芯片、清除筛选）、列表为空（S10 的 P13 写法）、
+    筛出缺字段后的筛选行、列设置、合计行随「其他」列显隐、已取消的单只计保留部分、三组比例不同时的承担悬停、导出失败与导出内容。"""
+    width = lambda html: '<div style="width: 864px; display: flex; flex-direction: column; gap: 10px;">%s</div>' % html
+    chips = row(filter_chip('费用发生日', '2026-09-01 至 09-11', True) + filter_chip('店铺', 'forcome.com', True) + filter_chip('处理方式') + filter_chip('责任', '其他', True) +
+                filter_chip('状态') + filter_chip('负责人'), 8)
+    filters = between(chips, link(LEDGER_CLEAR, 12))
+    pops = row(range_picker() + option_list(['全部'] + [s['name'] for s in STORES], 'forcome.com', 180), 16, 'flex-start')
+    head = '<div style="display: grid; grid-template-columns: 130px 96px 124px 100px 88px 64px 1fr; gap: 8px; padding: 9px 16px; background: %s; border-bottom: 1px solid %s; font-size: 11px; font-weight: 700; color: %s;">%s</div>' % (
+        T['subtle'], T['line'], T['ink3'], ''.join('<div>%s</div>' % c for c in ['售后单号', '客户', '店铺与站点', '处理方式', '责任', '状态', '快递单号']))
+    empty_box = '<div style="background: #ffffff; border: 1px solid %s; border-radius: 8px; overflow: hidden; box-shadow: %s;">%s%s</div>' % (
+        T['line'], SHADOW_XS, head, empty('search', '没有符合条件的售后单', LEDGER_EMPTY_DESC, btn(LEDGER_CLEAR, 'secondary', 'md', 'x')))
+    miss_chip = ('<div style="height: 28px; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: %s; background: %s; border: 1px solid %s; border-radius: 8px; padding: 0px 6px 0px 8px; white-space: nowrap;">'
+                 '%s缺字段的已完成单：<span style="font-weight: 600; color: %s;">9 月</span><div title="移除这条筛选" style="display: flex; padding: 2px; border-radius: 4px;">%s</div></div>') % (
+        T['ink3'], T['accent_bg'], T['accent_line'], icon('filter', 13, T['accent_ink']), T['accent_ink'], icon('x', 12, T['accent_ink'], 2))
+    missing_row = between(row(miss_chip + filter_chip('店铺', '全部'), 8), link(LEDGER_CLEAR, 12))
+    left = width(cap('筛选行 · 费用发生日默认本月（北京时间当月 1 日至今天），点开为区间日历，选好起止即生效；其余芯片单选，下拉第一项「全部」清除该条件，选中后写「名称：值」为选中样式；条件偏离默认时右侧「清除筛选」，回到默认（本月、其余清空）') +
+                 filters + pops +
+                 cap('列表为空（S10 的 P13 写法）：说明写当前筛选；N 为清除后会列出的单数（本月、店铺范围内全部），为 0 时只写到「换个条件试试。」；条件就是默认且为空时只有标题与「当前筛选：…。」，没有按钮') + empty_box +
+                 cap('点完整率「筛出缺字段」后：筛选行只有「缺字段的已完成单：9 月」芯片与店铺芯片（与完整率同口径，只随店铺），右侧「清除筛选」') + missing_row)
+
+    r = BL.P1R[CANCEL_DEMO]
+    tip_product = NOT_KEPT_TITLE % money(r['product'])
+    cancel_cols = [('售后单号', 'left'), ('客户', 'left'), ('状态', 'left'), ('产品成本', 'right'), ('运费', 'right'), ('费用合计', 'right'), ('FSH 承担 $', 'right'), ('工厂承担 $', 'right')]
+    cell_0 = '<div title="%s" style="display: flex; justify-content: flex-end;">%s</div>' % (tip_product, nowrap(money(0), 13, T['ink']))
+    cancel_row = [nowrap(CANCEL_DEMO, 13, T['accent'], 600), ellipsis(r['customer'], 13), state('已取消'), cell_0, nowrap(money(r['freight']), 13, T['ink']),
+                  nowrap(money(r['freight']), 13, T['ink'], 600), nowrap(money(r['freight']), 13, T['ink']), nowrap(money(0), 13, T['ink'])]
+    cancel_tbl = table_span(cancel_cols, [cancel_row], '130px 96px 64px 70px 62px 74px 76px 76px', None, gap=8)
+    mixed = {'product': (0, 100), 'freight': (100, 0), 'other': (50, 50)}
+    mixed_tip = '<div style="display: flex; flex-direction: column; gap: 2px;"><div style="font-weight: 600;">按费用项</div>%s</div>' % ''.join(
+        '<div>%s FSH %d / 工厂 %d</div>' % (lab, mixed[k][0], mixed[k][1]) for lab, k in RATIO_LABELS)
+    share = '<div style="width: 96px; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 8px; padding: 8px 12px; display: flex; justify-content: flex-end;">%s</div>' % (
+        T['line'], nowrap('$9.80', 13, T['ink']))
+    totals_shown = row(nowrap('合计 · %d 单' % BL.LT['count'], 13, T['ink'], 700) + nowrap('首列与合计行固定', 11, T['ink4']), 8)
+    fail = toast('error', '导出失败：网络不可用', None, link('立即重试', 12))
+    right = width(cap('列设置 · 下拉菜单按表格顺序列出除「售后单号」外的列（坐席不含七个金额列），勾选即显示，底部「恢复默认」；按人存在本机浏览器，刷新后保留；「已隐藏 N 列：…」随之变化，没有隐藏列时这一行不显示；「在「列设置」中显示」打开同一个菜单') +
+                  row(column_menu() + col(cap('显示「其他」列后，合计行左侧不再写「· 隐藏列「其他」…」') + totals_shown, 8), 24, 'flex-start') +
+                  cap('已取消的单（%s 取消时只保留运费）：没保留的费用项写「$0.00」，悬停原登记额；保留的照常显示；FSH / 工厂承担按保留部分算；没登记的写「—」' % CANCEL_DEMO) +
+                  col(cancel_tbl + '<div style="padding-left: 280px;">%s</div>' % tooltip(tip_product), 6) +
+                  cap('FSH / 工厂承担的悬停：三组相同写「三组均 FSH 0 / 工厂 100」；不同时第一行「按费用项」，下面逐组列出（悬停即展开，不另设点击）') +
+                  row(share + tooltip(mixed_tip), 12, 'center') +
+                  cap('导出 Excel 失败（G5）；筛出缺字段时文件名「登记台账_缺字段的已完成单_2026-09.xlsx」') + fail +
+                  muted('导出文件：一张表，列为台账全部 17 列（含默认隐藏的 4 列，不随列设置变化），坐席不含七个金额列；金额为美元数值；有财务权限时末尾另加「承担比例」「原币与汇率」「取消时未保留」三列（即悬停里的内容）与末行合计；'
+                        '另加「缺失字段」一列（已完成单缺的字段，即「缺 N 项」悬停内容）。', 12))
+    return frame(cap('S13 补充小样（第一阶段实现时确认，10-05）') + grid(left + right, 2, 32, extra='align-items: start;'), WIDE, gap=10)
 
 
 # ---------------------------------------------------------------- S14 新建登记与编辑登记
@@ -375,14 +466,14 @@ def build():
              V('S6 终止流程', '危险弹窗，原因必填；说明已产生的费用照常登记、待审批的报备自动撤回、生产厂任务取消。', s6(), '在售后单详情点「终止流程」'), 2, 32) +
         grid(V('S7 客户改地址', '寄出前：系统自动更新并通知易仓或生产厂，横幅提示即可；寄出后：由售后负责人选择改派或补发（R-AS-05）。', s7(), '客户新来信或坐席修改了收货地址') +
              V('S10 列表为空', '筛选无结果时保留表头与筛选条件，给出清除筛选；快捷筛选（含待协商、待结算）计数随筛选变为 0。', s10(), 'P07 筛选条件组合没有匹配的售后单'), 2, 32) +
-        grid(V('S11 导出', '点击后按钮进入处理中，右上角显示进度；完成后成功浮层给出下载链接。导出按当前筛选。', s11(), 'P13 点「导出 Excel」') +
+        grid(V('S11 导出', '同 K5：点击后按钮转为「导出中」并转圈，服务端按当前筛选与字段权限同步生成；完成后浏览器直接下载，成功浮层写文件名与单数；不留存文件，没有导出记录页；导出记入审计。失败按 G5（见 S13 补充小样）。', s11(), 'P13 点「导出 Excel」') +
              V('S16 第二阶段的手工登记单', 'P07 按当前环节「手工登记」筛选：进行中的单当前环节「手工登记 · 待补登」、等负责人，协商按登记值「已确认」，结算「待结算」只进上线当月的月末批次；'
                '生产厂为空的单结算「未定 · 待补生产厂」；历史导入的单结算「不适用」。点行打开编辑登记抽屉，承担比例只读（prd_b 6.5 边界，D-27）。', s16(),
                '第二阶段王磊在 P07 筛选第一阶段遗留的手工登记单'), 2, 32) +
         VW('S13 第一阶段登记台账', '王磊视角，按 P13「第一阶段」：标题「登记台账」，没有「售后单」「内部结算」页签；右上 新建登记 · 列设置 · 导出 Excel；页头完整率「9 月登记完整率 %s · %d / %d · 目标 ≥ 98%%」；'
            '筛选 日期（费用发生日）· 店铺 · 处理方式 · 责任 · 状态 · 负责人；列 售后单号（S-20260909-0016 带「缺 1 项」）· 客户 · 店铺与站点 · 处理方式 · 责任 · 状态 · 快递单号 · 产品成本 · 运费 · 额外赔偿 · 费用合计 · FSH 承担 $ · 工厂承担 $'
            '（已隐藏 配件 × 数量、负责人、其他、生产厂）；没有报备、协商、结算列与「✦ 积加有单号」，工厂承担不带「≈」；进行中未发生的字段为「—」，已完成缺字段标黄「待回填」；S-20260911-0020 额外赔偿写「$49.39 · MX$889.00 · 汇率 09-10」；'
-           '合计行 12 单，费用合计 %s，与 P17 一致，下方没有结算拆解。另一张小图：坐席视角，金额七列与合计行不显示。' % (BL.COMP['pct'], BL.COMP['ok'], BL.COMP['total'], money(BL.FEE_TOTAL)),
+           '合计行 12 单，费用合计 %s，与 P17 一致，下方没有结算拆解。另一张小图：坐席视角，金额七列与合计行不显示。下方为补充小样（第一阶段实现时确认）。' % (BL.COMP['pct'], BL.COMP['ok'], BL.COMP['total'], money(BL.FEE_TOTAL)),
            s13(), '第一阶段售后负责人打开 P13') +
         VW('S14 新建登记与编辑登记', '右侧抽屉，处理方式三选一（调整安装方式 / 寄配件 / 退款或部分补偿）后按 R-AS-08 列出适用字段，不适用的不显示。示例为寄配件：店铺 forcome.com · 站点 US · 订单号 #1063 · 客户 Olivia Turner · 来源工单 T-20260911-0031（可不填）· '
            '负责人 王磊（该店铺唯一的售后负责人，已默认）· 费用发生日 09-11 · 责任 产品质量问题（三组比例按默认预填 FSH 0 / 工厂 100，可改，两侧互补）· 生产厂 FQD（按配件预填）· 配件 HEPA 滤芯组件 FC-V2-HF01 × 1 · 发货方 易仓 · 承运方式 · 寄出日期 · 快递单号（进行中可后填）· '
