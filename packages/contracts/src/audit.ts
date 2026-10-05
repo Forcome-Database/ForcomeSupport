@@ -195,6 +195,8 @@ export const auditActions = {
   'store.create': { label: '新增店铺', objectType: 'store', snapshot: 'store' },
   'store.update': { label: '编辑店铺', objectType: 'store', snapshot: 'store' },
   'aftersales.create': { label: '新建登记', objectType: 'aftersales', snapshot: 'aftersales' },
+  // 售后登记表导入命令（PRD 第 14 节，待办 27）：每张导入的单一条，操作人「系统」，后值为完整登记（协调者 2026-10-06 决定）
+  'aftersales.import': { label: '历史导入', objectType: 'aftersales', snapshot: 'aftersales' },
   'aftersales.update': { label: '编辑登记', objectType: 'aftersales', snapshot: 'aftersales' },
   'aftersales.backfill': { label: '补登', objectType: 'aftersales', snapshot: 'aftersales' },
   'aftersales.change_rate': {

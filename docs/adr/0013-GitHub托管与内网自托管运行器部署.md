@@ -68,3 +68,7 @@ status: accepted
   - 对已部署的版本重放：`pnpm staging reset-inbound`（停 worker → 清空 → 起 worker），再 `pnpm staging smoke`；
   - 本机开发库：先停 `dev:worker`，`pnpm db:reset-inbound`，再启动 `dev:worker`。
   生产环境三处拒绝：部署脚本（两个入口都查 `APP_ENV`）、镜像入口 `reset-inbound.mjs`（连数据库之前）、组合函数 `resetInboundData` 本身。
+
+## 修订（2026-10-06，待办 27 落地）
+
+- **售后登记表导入是镜像里的一次性命令**：`node dist/import-aftersales.mjs <登记表.xlsx|.csv> [--mapping <映射表.json>] [--dry-run]`，开发测试与生产都用（不像 `seed`、`reset-inbound` 只限非生产）。部署脚本子命令 `node deploy/deploy.mjs <环境> import-aftersales …`（本机 `pnpm staging import-aftersales …`）用当前部署的版本起一次性 `migrate` 容器，表格与映射表只读挂进容器的 `/import/`（本机路径按调用者所在目录解析），报告直接打到终端，有未导入的行时退出码为 1。落地口径（待办 32 上线前事项）：客户的真实登记表到位后只改映射表 → 开发测试环境试运行、正式导入一次并核对台账 → 生产环境同样执行；生产环境随待办 28 加入部署脚本，在那之前在生产机上用 `docker compose run --rm --no-deps -v …:/import/…:ro migrate node dist/import-aftersales.mjs …` 执行同一条命令（`docs/部署说明.md`「售后登记表导入」）。

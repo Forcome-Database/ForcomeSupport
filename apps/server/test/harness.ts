@@ -3,10 +3,18 @@ import { getDemoFixture } from '@forcome/fixtures';
 import type { Hono } from 'hono';
 import type { JobOptions } from 'pg-boss';
 import { createApp } from '../src/app';
-import { aftersales } from '../src/modules/aftersales/schema';
 import type { ServerDeps } from '../src/deps';
 import { fixtureSteps } from '../src/fixture-steps';
 import { createFeeds, createJobHandlers } from '../src/jobs';
+import {
+  importAftersalesHistory,
+  parseHistoryMapping,
+  readHistorySheet,
+  type HistoryCell,
+  type HistoryImportReport,
+  type HistoryMapping,
+  type HistorySheet,
+} from '../src/modules/aftersales';
 import {
   listReceivedMail,
   registerSenderRule,
@@ -39,6 +47,7 @@ import {
 import { resetInboundData, type InboundResetReport } from '../src/reset-inbound-data';
 import { createApiClient, type ApiClient, type RequestHandler } from './api-client';
 import { createTestDatabase } from './database';
+import sampleMappingJson from './fixtures/history-import/mapping.json' with { type: 'json' };
 import { runQueuedJobs, type JobRunReport, type RunJobsOptions } from './run-jobs';
 
 /*
@@ -47,11 +56,36 @@ import { runQueuedJobs, type JobRunReport, type RunJobsOptions } from './run-job
  * 用法见 dev-login.int.test.ts（示范用例）与 harness.int.test.ts。
  */
 
-/** 历史导入的售后单（单号、状态、店铺必给，其余按需；创建路径固定为历史导入） */
-export type HistoryImportRow = Omit<
-  typeof aftersales.$inferInsert,
-  'origin' | 'createdAt' | 'updatedAt'
->;
+/** 售后登记表的合成样本的映射表（test/fixtures/history-import/mapping.json），t.importAftersales 默认用它 */
+export const SAMPLE_HISTORY_MAPPING = parseHistoryMapping(sampleMappingJson, 'mapping.json');
+
+/** 要导入的售后登记表：一个文件（.xlsx / .csv），或测试里现造的几行（按表头给值，没给的列为空） */
+export type HistoryImportSource =
+  { readonly file: string } | { readonly rows: readonly Readonly<Record<string, HistoryCell>>[] };
+
+export interface HistoryImportRunOptions {
+  /** 默认是合成样本的映射表 */
+  readonly mapping?: HistoryMapping;
+  readonly dryRun?: boolean;
+}
+
+/** 现造的几行 → 一张表：表头是映射表用到的全部列加上各行出现过的列，第 1 行是表头，数据从第 2 行起 */
+function sheetOfRows(
+  rows: readonly Readonly<Record<string, HistoryCell>>[],
+  mapping: HistoryMapping,
+): HistorySheet {
+  const mapped = Object.values(mapping.columns).flatMap((names) =>
+    names === undefined ? [] : Array.isArray(names) ? names : [names],
+  );
+  const header = [
+    ...new Set([...mapping.rowKey, ...mapped, ...rows.flatMap((row) => Object.keys(row))]),
+  ];
+  return {
+    name: '测试数据',
+    header,
+    rows: rows.map((row, index) => ({ row: index + 2, cells: header.map((h) => row[h] ?? null) })),
+  };
+}
 
 /** 测试请求的来源 IP（经 X-Forwarded-For 传给应用，审计里记它） */
 export const TEST_CLIENT_IP = '10.20.3.27';
@@ -132,10 +166,13 @@ export interface TestHarness {
   /** 重放来信（运维命令 reset-inbound 的同一个函数，按本测试的运行环境：生产环境拒绝） */
   resetInbound(): Promise<InboundResetReport>;
   /**
-   * 写一张历史导入的售后单（AC-P1-07 等）：售后登记表的导入命令随待办 27，在那之前测试工具直接写售后单表——ADR 0005
-   * 「待办 21 落地」修订登记的例外，是测试准备，断言仍经接口。27 落地后改调导入命令。
+   * 售后登记表导入（运维命令 import-aftersales 的同一个函数，待办 27）：历史导入的售后单都经它进库，效果经主接缝核对
+   * （ADR 0005 修订：运维命令经测试工具调用，同 t.resetInbound）。映射表默认是合成样本的。
    */
-  addHistoryImport(row: HistoryImportRow): Promise<void>;
+  importAftersales(
+    source: HistoryImportSource,
+    options?: HistoryImportRunOptions,
+  ): Promise<HistoryImportReport>;
   /** 关闭连接并删除本测试的库 */
   close(): Promise<void>;
 }
@@ -273,11 +310,16 @@ export async function startTestHarness(
 
     resetInbound: () => resetInboundData(runtime, appEnv),
 
-    async addHistoryImport(row) {
-      const now = clock.now();
-      await runtime.db
-        .insert(aftersales)
-        .values({ origin: 'history_import', createdAt: now, updatedAt: now, ...row });
+    async importAftersales(source, importOptions = {}) {
+      const mapping = importOptions.mapping ?? SAMPLE_HISTORY_MAPPING;
+      const sheet =
+        'file' in source
+          ? await readHistorySheet(source.file, {
+              sheet: mapping.sheet,
+              headerRow: mapping.headerRow,
+            })
+          : sheetOfRows(source.rows, mapping);
+      return importAftersalesHistory(runtime, sheet, mapping, { dryRun: importOptions.dryRun });
     },
 
     close,

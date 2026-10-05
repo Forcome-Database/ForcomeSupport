@@ -120,6 +120,13 @@
       "when": 1791207538173,
       "tag": "0016_aftersales_cost_view",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791223148292,
+      "tag": "0017_aftersales_history_import",
+      "breakpoints": true
     }
   ]
 }

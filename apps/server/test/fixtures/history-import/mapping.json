@@ -1,0 +1,78 @@
+{
+  "$comment": [
+    "合成样本（register-sample.xlsx）的映射表，只给测试用（待办 27）。与随镜像打包的 src/modules/aftersales/history-mapping.json 分开：真实登记表到位后只改那一份，测试不受影响。"
+  ],
+  "headerRow": 1,
+  "rowKey": ["登记编号"],
+  "columns": {
+    "registeredDate": "登记日期",
+    "feeDate": "费用发生日",
+    "status": "状态",
+    "completedAt": "完成日期",
+    "cancelReason": "取消原因",
+    "cancelledAt": "取消日期",
+    "keptFees": "取消时保留的费用",
+    "store": "店铺",
+    "site": "站点",
+    "orderNumber": "订单号",
+    "customerName": "客户",
+    "registeredBy": "登记人",
+    "owner": "负责人",
+    "method": "处理方式",
+    "responsibility": "责任",
+    "responsibilityReason": "责任说明",
+    "factory": "生产厂",
+    "factoryPct": "工厂承担比例",
+    "partSku": "配件 SKU",
+    "partQuantity": "数量",
+    "shipper": "发货方",
+    "carrier": "承运方式",
+    "shipDate": "寄出日期",
+    "trackingNumber": "快递单号",
+    "claimTarget": "索赔对象",
+    "claimStatus": "索赔状态",
+    "currency": "币种",
+    "productCost": "产品成本",
+    "freight": "运费",
+    "compensation": ["退款金额", "补偿金额"],
+    "otherCost": "其他费用"
+  },
+  "values": {
+    "store": {
+      "亚马逊 Forcome Direct": "Forcome Direct",
+      "Auto US": "Forcome Auto"
+    },
+    "site": {
+      "美国": "US",
+      "加拿大": "CA",
+      "墨西哥": "MX"
+    },
+    "status": {
+      "完成": "已完成",
+      "处理中": "进行中",
+      "取消": "已取消"
+    },
+    "method": {
+      "补发配件": "寄配件",
+      "调整安装": "调整安装方式",
+      "退款": "退款或部分补偿",
+      "部分补偿": "退款或部分补偿"
+    },
+    "responsibility": {
+      "质量问题": "产品质量问题",
+      "客户原因": "客户使用问题",
+      "物流": "物流问题"
+    },
+    "shipper": {
+      "工厂": "生产厂"
+    },
+    "currency": {
+      "美元": "USD",
+      "加元": "CAD",
+      "比索": "MXN"
+    }
+  },
+  "defaults": {
+    "status": "已完成"
+  }
+}

@@ -115,6 +115,17 @@ function update(client: ApiClient, number: string, body: RegistrationUpdate) {
   return client.patch(`/api/aftersales/${number}`, body);
 }
 
+/** 经售后登记表导入命令导入一行（合成样本的表头与映射表），返回导入的单号 */
+async function importHistory(
+  harness: TestHarness,
+  row: Readonly<Record<string, string | number | null>>,
+): Promise<string> {
+  const report = await harness.importAftersales({ rows: [row] });
+  const [result] = report.rows;
+  if (result?.outcome !== 'imported') throw new Error(`没有导入：${JSON.stringify(result)}`);
+  return result.number;
+}
+
 async function fieldsOf(res: Response, status = 400) {
   expect(res.status, await res.clone().text()).toBe(status);
   const body = (await res.json()) as { error: string; fields?: Record<string, string> };
@@ -188,22 +199,26 @@ describe('当月登记完整率（R-AS-08、AC-P1-06、AC-P1-07）', () => {
   });
 
   it('AC-P1-07：历史导入的已完成单缺字段，不计入完整率的分子与分母，也不在「缺字段」筛选里', async () => {
-    // 历史导入的已完成单（缺快递单号与费用）；导入命令随待办 27，在那之前经测试工具写入
-    await t.addHistoryImport({
-      number: 'S-20260801-9001',
-      status: 'completed',
-      storeId: COM.id,
-      site: 'US',
-      orderNumber: '#0901',
-      customerName: 'History Row',
-      method: 'send_parts',
-      responsibility: 'customer_use',
-      feeDate: '2026-09-05',
-      completedAt: new Date('2026-09-06T02:00:00Z'),
+    // 历史导入的已完成单（缺负责人、寄件一节、费用与比例），经售后登记表导入命令（待办 27）写入
+    const number = await importHistory(t, {
+      登记编号: 'AC-P1-07',
+      登记日期: '2026-08-01',
+      店铺: 'forcome.com',
+      站点: 'US',
+      订单号: '#0901',
+      客户: 'History Row',
+      处理方式: '寄配件',
+      责任: '客户原因',
+      费用发生日: '2026-09-05',
+      状态: '已完成',
+      完成日期: '2026-09-06 10:00',
     });
     const { completion, items } = await ledger(owner);
     expect(completion).toEqual({ month: '2026-09', completed: 8, complete: 7 });
-    expect(items.some((i) => i.number === 'S-20260801-9001')).toBe(true);
+    expect(items.find((i) => i.number === number)).toMatchObject({
+      origin: 'history_import',
+      status: 'completed',
+    });
     expect((await ledger(owner, '?missing=1')).items.map((i) => i.number)).toEqual([
       'S-20260909-0016',
     ]);
@@ -695,34 +710,30 @@ describe('取消售后单（AC-AS-16）与补登已完成的单（AC-P1-19）', 
   });
 
   it('补登历史导入的退款单：额外赔偿登记成 0 按 R-AS-08 算缺，可以补；补齐后不再缺', async () => {
-    const usd = (column: 'productCost' | 'freight' | 'compensation' | 'otherCost') => ({
-      [column]: '0.00',
-      [`${column}Currency`]: 'USD' as const,
-      [`${column}Usd`]: '0.00',
+    // 原表的退款金额登记成 0（R-AS-08：退款须大于 0，算缺），经售后登记表导入命令（待办 27）写入
+    const number = await importHistory(t, {
+      登记编号: 'AC-P1-07-refund',
+      登记日期: '2026-08-01',
+      店铺: 'forcome.com',
+      站点: 'US',
+      订单号: '#0902',
+      客户: 'History Refund',
+      负责人: WANG.name,
+      处理方式: '退款',
+      责任: '客户原因',
+      费用发生日: '2026-08-01',
+      币种: 'USD',
+      产品成本: 0,
+      运费: 0,
+      退款金额: 0,
+      其他费用: 0,
+      工厂承担比例: 0,
+      状态: '完成',
+      完成日期: '2026-08-02 10:00',
     });
-    await t.addHistoryImport({
-      number: 'S-20260801-9002',
-      status: 'completed',
-      storeId: COM.id,
-      site: 'US',
-      orderNumber: '#0902',
-      customerName: 'History Refund',
-      ownerId: WANG.id,
-      method: 'refund_or_compensation',
-      responsibility: 'customer_use',
-      feeDate: '2026-08-01',
-      ...usd('productCost'),
-      ...usd('freight'),
-      ...usd('compensation'),
-      ...usd('otherCost'),
-      productFactoryPct: 0,
-      freightFactoryPct: 0,
-      otherFactoryPct: 0,
-      completedAt: new Date('2026-08-02T02:00:00Z'),
-    });
-    const before = await detail(owner, 'S-20260801-9002');
+    const before = await detail(owner, number);
     expect(before.missing).toEqual(['fees.compensation']);
-    const res = await update(owner, 'S-20260801-9002', {
+    const res = await update(owner, number, {
       version: before.version,
       changes: { fees: { compensation: { amount: '12.00', currency: 'USD' } } },
     });

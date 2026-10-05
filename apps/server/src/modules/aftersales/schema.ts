@@ -16,6 +16,8 @@ import {
   check,
   date,
   index,
+  integer,
+  jsonb,
   pgSchema,
   smallint,
   text,
@@ -132,6 +134,34 @@ export const aftersales = aftersalesSchema.table(
     ...feeChecks('aftersales_freight', t, 'freight'),
     ...feeChecks('aftersales_compensation', t, 'compensation'),
     ...feeChecks('aftersales_other_cost', t, 'otherCost'),
+  ],
+);
+
+/**
+ * 售后单的导入记录（PRD 第 14 节「售后登记表一次性导入」，待办 27）：每张历史导入的售后单一行，只增不改。
+ * - 行标识 source_key（映射表 rowKey 各列的值）全表唯一：重跑导入时据此跳过已导入的行（幂等），并发的两次导入也只会成功一次；
+ * - 「历史导入」的标注落在这里（协调者 2026-10-06 决定，P13 本期不加新标识）：原表没有原币、按美元导入（usd_assumed），
+ *   原表没有费用发生日、取原登记日期（fee_date_from_registered）；缺的字段不另存，按 R-AS-08 随时算（台账「待回填」「缺 N 项」）；
+ * - 原表这一行的原值（表头 → 单元格文字，空的不存）与来源文件、行号，供追溯。
+ */
+export const historyImport = aftersalesSchema.table(
+  'history_import',
+  {
+    id: primaryId(),
+    aftersalesId: uuid('aftersales_id')
+      .notNull()
+      .references(() => aftersales.id),
+    sourceKey: text('source_key').notNull(),
+    sourceFile: text('source_file').notNull(),
+    sourceRow: integer('source_row').notNull(),
+    usdAssumed: boolean('usd_assumed').notNull(),
+    feeDateFromRegistered: boolean('fee_date_from_registered').notNull(),
+    source: jsonb('source').$type<Record<string, string>>().notNull(),
+    importedAt: timestamptz('imported_at').notNull(),
+  },
+  (t) => [
+    unique('history_import_aftersales_id_key').on(t.aftersalesId),
+    unique('history_import_source_key_key').on(t.sourceKey),
   ],
 );
 

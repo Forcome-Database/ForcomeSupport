@@ -4,6 +4,8 @@
 #   docker run <image> node dist/migrate.mjs    → migrate（一次性，先于 api 与 worker）
 #   docker run <image> node dist/seed.mjs       → 灌示例数据（只用于非生产环境，先跑 migrate）
 #   docker run <image> node dist/reset-inbound.mjs → 重放来信：清空收信与工单（只用于非生产环境，先停 worker）
+#   docker run <image> node dist/import-aftersales.mjs <登记表> [--mapping <映射表>] [--dry-run]
+#                                               → 售后登记表导入（一次性，各环境都用；表格挂进容器，docs/部署说明.md）
 # 构建上下文是仓库根目录：docker build -f apps/server/Dockerfile -t forcome-server .
 FROM node:24-slim AS build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0

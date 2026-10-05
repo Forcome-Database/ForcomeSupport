@@ -72,6 +72,13 @@ describe('动作筛选', () => {
     ]);
   });
 
+  it('售后单的动作含「历史导入」（售后登记表导入命令，操作人「系统」，待办 27）', () => {
+    expect(auditActionFilterOptions('aftersales').slice(0, 2)).toEqual([
+      { value: 'aftersales.create', label: '新建登记' },
+      { value: 'aftersales.import', label: '历史导入' },
+    ]);
+  });
+
   it('一项对应的动作；认不出的键为空', () => {
     expect(auditActionsOfFilter('export')).toEqual(['ledger.export', 'audit.export']);
     expect(auditActionsOfFilter('aftersales.complete')).toEqual(['aftersales.complete']);

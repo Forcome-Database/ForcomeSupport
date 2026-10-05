@@ -14,7 +14,9 @@
     "db:check": "drizzle-kit check",
     "db:migrate": "tsx --env-file=dev.env src/migrate.ts",
     "db:seed": "tsx --env-file=dev.env src/seed.ts",
-    "db:reset-inbound": "tsx --env-file=dev.env src/reset-inbound.ts"
+    "db:reset-inbound": "tsx --env-file=dev.env src/reset-inbound.ts",
+    "import:aftersales": "tsx --env-file=dev.env src/import-aftersales.ts",
+    "history:sample": "tsx scripts/history-import-sample.ts"
   },
   "dependencies": {
     "@forcome/calendar": "workspace:*",

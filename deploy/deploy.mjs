@@ -11,6 +11,9 @@
 //   node deploy/deploy.mjs staging down         停止并删除容器（保留数据卷）
 //   node deploy/deploy.mjs staging reset-inbound 对当前部署的版本重放来信：停 worker → 清空收信与工单 → 起 worker
 //                                               （按当前口径重新回放示例来信；只用于非生产环境，docs/部署说明.md）
+//   node deploy/deploy.mjs staging import-aftersales <登记表.xlsx|.csv> [--mapping <映射表.json>] [--dry-run]
+//                                               用当前部署的版本导入售后登记表（待办 27；--dry-run 只报告不写库，
+//                                               docs/部署说明.md「售后登记表导入」）
 //
 // 只依赖 Node（≥ 22）、git 与 Docker（含 compose），不需要 pnpm install；Linux 服务器与 Windows 本机通用。
 // 环境文件默认 deploy/.env.<环境>，可用 FORCOME_ENV_FILE 指到别处；部署产物（根证书、报告）在 deploy/.state/<环境>/。
@@ -29,13 +32,17 @@ import { composeEnvironment } from './lib/compose.mjs';
 import { createEnvFile, readDeployEnv } from './lib/env-file.mjs';
 import { ENVIRONMENTS } from './lib/environments.mjs';
 import { httpsGet, verifyCertificate } from './lib/https-check.mjs';
+import { IMPORT_AFTERSALES_USAGE, importAftersalesRun } from './lib/import-aftersales.mjs';
 import { capture, mustRun, run } from './lib/process.mjs';
 import { formatReport, summarizePlaywright } from './lib/report.mjs';
 
 const ROOT_CERT_IN_CADDY = '/data/caddy/pki/authorities/local/root.crt';
-const USAGE = `用法：node deploy/deploy.mjs <环境> [deploy [--reset-inbound] | smoke | cert | compose <参数…> | down | reset-inbound]
+const USAGE = `用法：node deploy/deploy.mjs <环境> [deploy [--reset-inbound] | smoke | cert | compose <参数…> | down | reset-inbound
+  | ${IMPORT_AFTERSALES_USAGE}]
 环境：${Object.keys(ENVIRONMENTS).join('、')}`;
 
+// 命令行里给的文件（售后登记表导入）按调用者所在的目录解析：pnpm 运行脚本时把它放在 INIT_CWD
+const invokedFrom = process.env.INIT_CWD ?? process.cwd();
 // 所有路径相对仓库根目录（Docker 在 Windows 上把「盘符:」当成容器名，所以不用绝对路径）
 process.chdir(path.resolve(import.meta.dirname, '..'));
 
@@ -342,6 +349,19 @@ async function main() {
       }
       console.log('已清空收信与工单，worker 已重启，示例来信几十秒内重新归并成工单');
       return true;
+    }
+    case 'import-aftersales': {
+      // 售后登记表导入（待办 27）：用当前部署的镜像起一次性容器，表格与映射表只读挂进 /import/，报告直接打到终端
+      const planned = importAftersalesRun(commandArgs, (file) => path.resolve(invokedFrom, file));
+      if ('error' in planned) {
+        console.error(planned.error);
+        return false;
+      }
+      const compose = composeFor(loadDeployEnv(), deployedRelease());
+      const volumes = planned.volumes.flatMap((volume) => ['-v', volume]);
+      return (
+        compose.status('run', '--rm', '--no-deps', ...volumes, 'migrate', ...planned.command) === 0
+      );
     }
     default:
       console.error(USAGE);
