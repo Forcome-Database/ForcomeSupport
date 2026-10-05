@@ -1,4 +1,10 @@
-import { registrationMessages, type OwnerNote } from '@forcome/contracts';
+import {
+  ledgerColumnLabels,
+  RATIO_BY_ITEM,
+  registrationMessages,
+  storeSiteLabel,
+  type OwnerNote,
+} from '@forcome/contracts';
 
 /*
  * P13 登记台账与新建登记抽屉的界面文案（逐字照原型；p13-copy.test.ts 直接读原型生成物核对）：第一期参照页
@@ -20,22 +26,65 @@ export const PAGE_DESCRIPTION = {
 export const NEW_REGISTRATION = '新建登记';
 
 /**
- * 台账的列（最简列表；费用合计、FSH / 工厂承担、行尾「更多」随 21、22 加在原型的位置上，快递单号的「待回填」与补登随 21）。
- * 金额三列只给有财务权限的角色（坐席看不到），写冻结的美元值，非美元另起一行写原币与汇率日期（待办 20）。
+ * 台账的列（PRD P13「第一阶段」的 17 列，叫法在 contracts 的 ledgerColumnLabels，导出 Excel 共用）：七个金额列只给有财务权限的
+ * 角色（坐席看不到）；默认隐藏 配件 × 数量、负责人、其他、生产厂，在「列设置」里打开
  */
-export const COLUMNS = {
-  number: '售后单号',
-  customer: '客户',
-  storeSite: '店铺与站点',
+export const COLUMNS = ledgerColumnLabels;
+
+/** 右上「列设置」（S13 补充小样：下拉菜单列出除售后单号外的列，勾选即显示，底部「恢复默认」）与筛选行下的「已隐藏 N 列」 */
+export const COLUMN_SETTINGS = {
+  button: '列设置',
+  reset: '恢复默认',
+  /** 「已隐藏 4 列：配件 × 数量、负责人、其他、生产厂 · 表格可横向滚动」（坐席的画面不写「表格可横向滚动」） */
+  hidden: (labels: readonly string[], scroll: boolean) =>
+    `已隐藏 ${labels.length} 列：${labels.join('、')}${scroll ? ' · 表格可横向滚动' : ''}`,
+  show: '在「列设置」中显示',
+} as const;
+
+/** 筛选行（S13 与补充小样）：芯片名、店铺没选时写「全部」、下拉第一项「全部」清除该条件、偏离默认时右侧「清除筛选」 */
+export const FILTERS = {
+  feeDate: '费用发生日',
+  store: '店铺',
   method: '处理方式',
   responsibility: '责任',
   status: '状态',
-  trackingNumber: '快递单号',
+  owner: '负责人',
+  all: '全部',
+  clear: '清除筛选',
 } as const;
-export const FINANCE_COLUMNS = {
-  productCost: '产品成本',
-  freight: '运费',
-  compensation: '额外赔偿',
+
+/** 合计行（原型 p13_p1_table() 的合计行：「合计 · 12 单」「首列与合计行固定」，「其他」列隐藏时另写它的合计） */
+export const TOTALS = {
+  label: (count: number) => `合计 · ${count} 单`,
+  pinned: '首列与合计行固定',
+  hiddenOther: (amount: string) => `· 隐藏列「其他」${amount}`,
+} as const;
+
+/** FSH / 工厂承担的悬停（S13 补充小样）：三组相同写一个值，不同时第一行「按费用项」、下面逐组列出 */
+export const SHARE = { byItem: RATIO_BY_ITEM } as const;
+
+/** 已取消的单没保留的费用项（S13 补充小样：格内写 $0.00，悬停原登记额） */
+export const NOT_KEPT = (usd: string) => `原登记 ${usd}，取消时没有保留，不计入售后成本`;
+
+/** 表下说明（原型 p13_p1() 的 note：有财务权限的与坐席的两种） */
+export const NOTE = {
+  finance:
+    '金额统一美元；比索、加元按费用发生日的欧洲央行日汇率折算，金额下方写原币与汇率日期（R-FL-06）。工厂承担 = 各组费用 × 该组工厂比例，逐行取整到分；' +
+    'FSH 承担 = 该行费用合计 − 工厂承担（R-AS-08）。进行中的单还没发生的字段显示「—」；已完成的单缺适用字段标黄「待回填」，售后单号下标「缺 N 项」（含隐藏列）。' +
+    '点售后单号打开「编辑登记」；行尾「更多」：设为已完成、取消售后单、改派负责人。',
+  readOnly:
+    '坐席只读：不显示产品成本、运费、额外赔偿、其他、费用合计、FSH 承担、工厂承担七列与合计行，导出同样不含这些字段；点售后单号查看登记（只读）。' +
+    '已完成的单缺适用字段标黄「待回填」，由售后负责人补登。',
+} as const;
+
+/** 右上「导出 Excel」（S11、K5 与 S13 补充小样）：生成中「导出中」，完成浮层写文件名与单数，失败按 G5 */
+export const EXPORT = {
+  button: '导出 Excel',
+  busy: '导出中',
+  doneTitle: '登记台账已导出',
+  doneDescription: (fileName: string, count: number) =>
+    `${fileName} · ${count} 单，浏览器已开始下载 · 已记入审计日志。`,
+  failedAction: '导出',
 } as const;
 
 /**
@@ -54,16 +103,27 @@ export const FOREIGN_AMOUNT = {
     `汇率为手工修改：1 USD = ${rate} ${currency}（售后负责人修改，已记入审计日志）`,
 } as const;
 
-/** 店铺与站点（原型 store_site()：「Forcome Direct · US」） */
-export function storeSite(store: string, site: string | null): string {
-  return site ? `${store} · ${site}` : store;
-}
+/** 店铺与站点（原型 store_site()：「Forcome Direct · US」；导出 Excel 同一个写法） */
+export const storeSite = storeSiteLabel;
 
 /** 没有值的单元格（原型 na()） */
 export const EMPTY_VALUE = '—';
 
-/** 列表为空：S10 的标题（筛选随 22，在那之前只显示标题，同 P04 在 08 的做法） */
+/**
+ * 列表为空（S10 的 P13 写法，S13 补充小样）：说明写当前筛选（「费用发生日 2026-09-01 至 09-11 · 店铺 forcome.mx · 责任 其他」）；
+ * 不是默认条件时接「换个条件试试，或清除筛选查看全部 N 张。」（N 为清除后会列出的单数，为 0 时只写「换个条件试试。」），条件就是默认时只写当前筛选
+ */
 export const EMPTY_TITLE = '没有符合条件的售后单';
+export const EMPTY = {
+  filter: (label: string, value: string) => `${label} ${value}`,
+  description: (filters: readonly string[], clearable: boolean, total: number) =>
+    `当前筛选：${filters.join(' · ')}。` +
+    (!clearable
+      ? ''
+      : total > 0
+        ? `换个条件试试，或清除筛选查看全部 ${total} 张。`
+        : '换个条件试试。'),
+} as const;
 
 /** 新建登记抽屉（S14） */
 export const DRAWER = {

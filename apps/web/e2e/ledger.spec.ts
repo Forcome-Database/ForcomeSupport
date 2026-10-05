@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
+/** 示例台账的单（原型数据）都在 2026 年 9 月；台账默认只列本月，看它们要带上费用发生日 */
+const SEPTEMBER = '/aftersales/ledger?from=2026-09-01&to=2026-09-30';
+
 /*
  * P13 登记台账与新建登记（待办 19；PRD P13「第一阶段」、S13、S14，AC-P1-17、AC-P1-18）。
  * 开发测试环境长期运行、数据会累积，售后单又不能删：新建的那张用带时间戳的客户名找回来，每次部署多一张进行中的测试单；
@@ -93,7 +96,7 @@ test('保存时校验全部：额外赔偿为 0、比例 130、「其他」未�
   page,
 }) => {
   await loginAs(page, '周敏');
-  await page.goto('/aftersales/ledger');
+  await page.goto(SEPTEMBER);
   await expect(page.getByTestId('ledger-row').first()).toBeVisible();
   const rowsBefore = await page.getByTestId('ledger-row').count();
   await page.getByRole('button', { name: '新建登记' }).click();
@@ -231,7 +234,7 @@ test('责任与承担比例一节的布局：物流问题时索赔对象与索�
 
 test('坐席只读查看台账：没有「新建登记」，不显示金额列（P13「第一阶段」）', async ({ page }) => {
   await loginAs(page, '李婷');
-  await page.goto('/aftersales/ledger');
+  await page.goto(SEPTEMBER);
   await expect(page.getByText('售后单的处理方式与寄件登记 · 只读，不含财务字段')).toBeVisible();
   await expect(page.getByTestId('ledger-row').first()).toBeVisible();
   await expect(page.getByRole('button', { name: '新建登记' })).toHaveCount(0);

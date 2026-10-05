@@ -67,7 +67,8 @@ test('非美元金额：抽屉里即时折算成美元，保存后台账写美�
   const customer = `E2E 汇率 ${Date.now()}`;
   await loginAs(page, '王磊');
   await waitForRates(page, beijingToday());
-  await page.goto('/aftersales/ledger');
+  // 示例台账在 2026 年 9 月，台账默认只列本月：带上费用发生日
+  await page.goto('/aftersales/ledger?from=2026-09-01&to=2026-09-30');
 
   // 示例单 S-20260911-0020：额外赔偿冻结为 $49.39，下方写原币与汇率日期，悬停说明汇率的来源
   const sample = page.getByTestId('ledger-row').filter({ hasText: 'S-20260911-0020' });
@@ -76,6 +77,9 @@ test('非美元金额：抽屉里即时折算成美元，保存后台账写美�
   await expect(
     sample.getByTitle('汇率取费用发生日的欧洲央行日汇率；售后负责人可修改并记审计'),
   ).toBeVisible();
+
+  // 新登记的费用发生日是今天，回到默认的本月
+  await page.goto('/aftersales/ledger');
 
   await fillRefund(page, customer);
   await textbox(page, '额外赔偿').fill('889.00');
@@ -143,7 +147,8 @@ test('费用发生日及之前没有汇率：金额框下说明，保存时报�
   // 浏览器的今天固定在 1998 年：费用发生日默认这天，欧洲央行 1999 年才开始公布参考汇率
   await page.clock.setFixedTime(new Date('1998-12-10T10:00:00+08:00'));
   await loginAs(page, '周敏');
-  await page.goto('/aftersales/ledger');
+  // 示例台账在 2026 年 9 月（台账默认只列本月，这里要一个有单的列表）
+  await page.goto('/aftersales/ledger?from=2026-09-01&to=2026-09-30');
   await expect(page.getByTestId('ledger-row').first()).toBeVisible();
   const rowsBefore = await page.getByTestId('ledger-row').count();
 

@@ -16,7 +16,7 @@ import {
   type LedgerItem,
 } from '@forcome/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, CircleCheck, CircleX, Ellipsis, Filter, X } from 'lucide-react';
+import { ChevronRight, CircleCheck, CircleX, Ellipsis } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 import { FormField, useFocusField } from '@/components/form-field';
 import {
@@ -44,7 +44,7 @@ import { api, ApiRequestError } from '@/lib/api';
 import { dismissToast, showError, showSuccess, showUndo } from '@/lib/notify';
 import { endSessionIfUnauthenticated } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { A11Y, CANCEL, COMPLETE_RESULT, COMPLETION, MISSING_FILTER, MORE, STALE } from './p13-copy';
+import { A11Y, CANCEL, COMPLETE_RESULT, COMPLETION, MORE, STALE } from './p13-copy';
 
 /*
  * P13 台账上的状态操作与完整率（PRD P13「第一阶段」、S13、S15 及其补充小样）：页头的当月登记完整率、点它筛出缺字段的
@@ -139,36 +139,6 @@ export function CompletionBadge({
   ) : (
     <div title={COMPLETION.title} className={box}>
       {content}
-    </div>
-  );
-}
-
-/**
- * 点完整率筛出后的筛选芯片（S15 补充小样，同 P04「来自报表」芯片的样子）：选中态「缺字段的已完成单：9 月」带 ×，
- * 右侧「清除筛选」。筛选行的其余条件随待办 22。
- */
-export function MissingFilterBar({ month, onClear }: { month: string; onClear: () => void }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="inline-flex h-7 items-center gap-1.5 rounded-md border border-primary-line bg-primary-soft pr-1.5 pl-2 text-12 font-medium whitespace-nowrap text-muted-foreground">
-        <Filter className="size-3.25 text-primary-text" />
-        {MISSING_FILTER.label}
-        <span className="font-semibold text-primary-text">
-          {MISSING_FILTER.month(monthOf(month))}
-        </span>
-        <button
-          type="button"
-          title={MISSING_FILTER.remove}
-          aria-label={MISSING_FILTER.remove}
-          onClick={onClear}
-          className="flex rounded-xs p-0.5 text-primary-text outline-none hover:bg-primary-line focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <X className="size-3" strokeWidth={2} />
-        </button>
-      </span>
-      <Button variant="text-link" size="text" onClick={onClear}>
-        {MISSING_FILTER.clear}
-      </Button>
     </div>
   );
 }

@@ -162,8 +162,9 @@ async function expectBlocked(page: Page, name: string, reason: string): Promise<
   await expect(page.getByRole('tooltip')).toHaveCount(0);
 }
 
-async function openLedger(page: Page): Promise<void> {
-  await page.goto('/aftersales/ledger');
+/** 打开台账（默认只列本月：用例自己登记的单费用发生日是今天；看示例单要带上 2026 年 9 月） */
+async function openLedger(page: Page, path = '/aftersales/ledger'): Promise<void> {
+  await page.goto(path);
   await expect(page.getByTestId('ledger-row').first()).toBeVisible();
 }
 
@@ -553,7 +554,7 @@ test('坐席：看得到完整率与「缺 N 项」，没有「更多」；点�
   page,
 }) => {
   await loginAs(page, '李婷');
-  await openLedger(page);
+  await openLedger(page, '/aftersales/ledger?from=2026-09-01&to=2026-09-30');
   await expect(
     page
       .getByRole('button', { name: /月登记完整率/ })

@@ -8,36 +8,50 @@ import {
   formatRateDate,
   handlingMethodLabels,
   ledgerActionMessages,
+  ledgerColumns,
+  ledgerDefaultHidden,
+  ledgerFinanceColumns,
   missingItemLabels,
   rateChangeMessages,
   ratioGroupLabels,
+  ratioGroupWords,
+  ratioPairsOf,
+  ratioWords,
   registrationMessages,
   responsibilityLabels,
 } from '@forcome/contracts';
 import { describe, expect, it } from 'vitest';
 import { pages } from '@/lib/pages';
+import { rangeLabel } from './ledger-search';
 import {
   BACKFILL_RESULT,
   CANCEL,
+  COLUMN_SETTINGS,
   COLUMNS,
   COMPLETE_RESULT,
   COMPLETION,
   DRAWER,
   EDIT,
+  EMPTY,
   EMPTY_TITLE,
   EMPTY_VALUE,
-  FINANCE_COLUMNS,
+  EXPORT,
+  FILTERS,
   FOREIGN_AMOUNT,
   LEAVE,
   MISSING,
   MISSING_FILTER,
   MORE,
   NEW_REGISTRATION,
+  NOT_KEPT,
+  NOTE,
   PAGE_DESCRIPTION,
   PAGE_TITLE,
   SAVE_RESULT,
+  SHARE,
   LOOKUP,
   STALE,
+  TOTALS,
   storeSite,
 } from './p13-copy';
 
@@ -83,15 +97,67 @@ describe('P13 第一期参照页', () => {
     expect(P13_AGENT.includes(`>${NEW_REGISTRATION}<`)).toBe(false);
   });
 
-  it('列名：售后单号到快递单号七列两个画面都有，金额列只在售后负责人的画面里', () => {
-    for (const title of Object.values(COLUMNS)) {
+  it('列名：默认显示的列两个画面都有，七个金额列只在售后负责人的画面里；默认隐藏的四列写在「已隐藏 N 列」里', () => {
+    const shown = ledgerColumns.filter((column) => !ledgerDefaultHidden.includes(column));
+    for (const column of shown) {
+      const title = COLUMNS[column];
       expectText(P13, title);
-      expectText(P13_AGENT, title);
+      if (ledgerFinanceColumns.has(column)) {
+        expect(P13_AGENT.includes(`>${title}<`), title).toBe(false);
+      } else {
+        expectText(P13_AGENT, title);
+      }
     }
-    for (const title of Object.values(FINANCE_COLUMNS)) {
-      expectText(P13, title);
-      expect(P13_AGENT.includes(`>${title}<`), title).toBe(false);
+    const hidden = ledgerDefaultHidden.map((column) => COLUMNS[column]);
+    expectText(P13, COLUMN_SETTINGS.hidden(hidden, true));
+    expectText(
+      P13_AGENT,
+      COLUMN_SETTINGS.hidden(
+        ledgerDefaultHidden.filter((c) => !ledgerFinanceColumns.has(c)).map((c) => COLUMNS[c]),
+        false,
+      ),
+    );
+    expectText(P13, COLUMN_SETTINGS.show);
+    expectText(P13_AGENT, COLUMN_SETTINGS.show);
+  });
+
+  it('右上：列设置、导出 Excel（两个画面都有）', () => {
+    for (const page of [P13, P13_AGENT]) {
+      expectIn(page, `>${COLUMN_SETTINGS.button}<`);
+      expectIn(page, `>${EXPORT.button}<`);
     }
+  });
+
+  it('筛选行：费用发生日（本月）、店铺（没选写「全部」）、处理方式、责任、状态、负责人', () => {
+    for (const page of [P13, P13_AGENT]) {
+      expectIn(page, `>${FILTERS.feeDate}：<span`);
+      expectText(page, rangeLabel({ from: '2026-09-01', to: '2026-09-11' }));
+      expectIn(page, `>${FILTERS.store}：<span`);
+      expectText(page, FILTERS.all);
+      for (const label of [FILTERS.method, FILTERS.responsibility, FILTERS.status, FILTERS.owner]) {
+        expectIn(page, `>${label}<svg`);
+      }
+    }
+  });
+
+  it('合计行（12 单，费用合计 $188.79、FSH $58.85、工厂 $129.94；「其他」列隐藏时另写它的合计）与表下说明', () => {
+    expectText(P13, TOTALS.label(12));
+    expectText(P13, TOTALS.pinned);
+    expectText(P13, TOTALS.hiddenOther(formatMoney('0.00', 'USD')));
+    for (const amount of ['55.30', '72.10', '61.39', '188.79', '58.85', '129.94']) {
+      expectText(P13, formatMoney(amount, 'USD'));
+    }
+    expect(P13_AGENT.includes(TOTALS.label(12))).toBe(false);
+    expectText(P13, NOTE.finance);
+    expectText(P13_AGENT, NOTE.readOnly);
+  });
+
+  it('FSH / 工厂承担的悬停：三组相同写「三组均 FSH 0 / 工厂 100」', () => {
+    expectIn(
+      P13,
+      `title="${ratioWords(ratioPairsOf({ product: 100, freight: 100, other: 100 }))}"`,
+    );
+    expectIn(P13, `title="${ratioWords(ratioPairsOf({ product: 50, freight: 50, other: 50 }))}"`);
   });
 
   it('单元格的写法：店铺与站点、处理方式与责任、状态、原币金额、没有值的「—」', () => {
@@ -127,11 +193,59 @@ describe('P13 第一期参照页', () => {
   });
 });
 
-describe('S10 列表为空、S14 新建登记抽屉', () => {
-  it('S10 的标题', () => {
+describe('S13 补充小样（用户确认 10-05）与 S11 导出', () => {
+  it('S10 的 P13 写法：标题、说明写当前筛选与「清除筛选查看全部 N 张」、按钮「清除筛选」', () => {
     expectText(STATES, EMPTY_TITLE);
+    expectText(
+      STATES,
+      EMPTY.description(
+        [
+          EMPTY.filter(FILTERS.feeDate, rangeLabel({ from: '2026-09-01', to: '2026-09-11' })),
+          EMPTY.filter(FILTERS.store, 'forcome.mx'),
+          EMPTY.filter(FILTERS.responsibility, '其他'),
+        ],
+        true,
+        12,
+      ),
+    );
+    expectIn(STATES, `>${FILTERS.clear}<`);
   });
 
+  it('筛选芯片选中后写「名称：值」；下拉第一项「全部」', () => {
+    expectIn(STATES, `>${FILTERS.store}：<span`);
+    expectText(STATES, 'forcome.com');
+    expectIn(STATES, `>${FILTERS.responsibility}：<span`);
+    expectIn(STATES, `>${FILTERS.all}<`);
+  });
+
+  it('列设置：按表格顺序列出除售后单号外的列，底部「恢复默认」', () => {
+    for (const column of ledgerColumns.filter((c) => c !== 'number')) {
+      expectIn(STATES, `>${COLUMNS[column]}<`);
+    }
+    expectIn(STATES, `>${COLUMN_SETTINGS.reset}<`);
+  });
+
+  it('已取消的单没保留的费用项：悬停写原登记额', () => {
+    expectText(STATES, NOT_KEPT(formatMoney('18.00', 'USD')));
+    expectIn(STATES, `title="${NOT_KEPT(formatMoney('18.00', 'USD'))}"`);
+  });
+
+  it('三组比例不同时的承担悬停：「按费用项」与逐组的写法', () => {
+    expectText(STATES, SHARE.byItem);
+    for (const line of ratioGroupWords(ratioPairsOf({ product: 100, freight: 0, other: 50 }))) {
+      expectText(STATES, line);
+    }
+  });
+
+  it('导出：生成中「导出中」，完成浮层写文件名与单数，失败按 G5', () => {
+    expectIn(STATES, `>${EXPORT.busy}<`);
+    expectText(STATES, EXPORT.doneTitle);
+    expectText(STATES, EXPORT.doneDescription('登记台账_20260901-20260911.xlsx', 12));
+    expectText(STATES, `${EXPORT.failedAction}失败：网络不可用`);
+  });
+});
+
+describe('S14 新建登记抽屉', () => {
   it('抽屉标题、说明、各节标题与右侧灰字、处理方式三张卡片', () => {
     expectText(STATES, DRAWER.createTitle);
     expectIn(STATES, DRAWER.description);

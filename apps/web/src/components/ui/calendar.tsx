@@ -8,12 +8,12 @@ import { cn } from '@/lib/utils';
  * 日历（shadcn Calendar 的写法，按原型 date_picker() 改过样式；底下是 DayPicker v10，包名 @daypicker/react，不引它自带的样式表）：
  * 宽 236、内边距 10 / 12、间距 6；头部「2026 年 9 月」13 / 600，两侧 14 的翻月箭头；星期从周一开始，「一 … 日」12 / 600 最淡的次要色；
  * 日期格 30 × 28、6 圆角、12 等宽数字；今天主色字加 1px 主色描边，选中为主色实心白字；不可选的日期浅色划线。
- * 只显示本月的日期（不显示上下月补位）。
+ * 只显示本月的日期（不显示上下月补位）。classNames 与这里的合并（区间日历改起止与中间的样子）。
  */
 
 const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'] as const;
 
-function Calendar({ className, ...props }: React.ComponentProps<typeof DayPicker>) {
+function Calendar({ className, classNames, ...props }: React.ComponentProps<typeof DayPicker>) {
   return (
     <DayPicker
       locale={zhCN}
@@ -51,6 +51,8 @@ function Calendar({ className, ...props }: React.ComponentProps<typeof DayPicker
           '[&[data-selected=true]>button]:bg-primary [&[data-selected=true]>button]:font-bold [&[data-selected=true]>button]:text-primary-foreground [&[data-selected=true]>button]:shadow-none',
         disabled: '[&>button]:text-placeholder [&>button]:line-through',
         hidden: 'invisible',
+        // 使用处可以改个别部件（例如区间日历的起止与中间，P13 费用发生日）
+        ...classNames,
       }}
       components={{
         Chevron: ({ orientation }) =>

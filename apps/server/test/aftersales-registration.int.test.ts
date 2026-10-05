@@ -183,6 +183,7 @@ describe('新建登记（待办 19）', () => {
       expect(Object.keys(item).sort()).toEqual(
         [
           'customerName',
+          'factory',
           'feeDate',
           'id',
           'method',
@@ -190,6 +191,8 @@ describe('新建登记（待办 19）', () => {
           'number',
           'origin',
           'ownerId',
+          'ownerName',
+          'part',
           'registeredById',
           'responsibility',
           'site',
@@ -204,6 +207,8 @@ describe('新建登记（待办 19）', () => {
       for (const item of await ledger(client)) {
         expect(item).toHaveProperty('fees');
         expect(item).toHaveProperty('ratios');
+        expect(item).toHaveProperty('cost');
+        expect(item).toHaveProperty('keptFees');
       }
     }
   });

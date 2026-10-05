@@ -27,6 +27,7 @@ import {
   rateText,
   factoryPercents,
   shareCents,
+  shareTotalCents,
   type FeeForm,
   type RatioSideForm,
 } from './registration-form';
@@ -175,13 +176,8 @@ export function RatioTable({
     );
     return { group, amount, groupErrors, bad, share, messages };
   });
-  const sum = (pick: (share: { fsh: number; factory: number }) => number) =>
-    rows.reduce<number | null>(
-      (total, row) => (total === null || !row.share ? null : total + pick(row.share)),
-      0,
-    );
-  const fshTotal = sum((share) => share.fsh);
-  const factoryTotal = sum((share) => share.factory);
+  // 合计按整行取整（同台账的承担金额，R-AS-08），不是把各组取整后的金额相加
+  const totals = rows.every((row) => row.share) ? shareTotalCents(groupAmounts, percents) : null;
   const h = DRAWER.ratioHeaders;
   return (
     <div className="flex flex-col gap-1.5">
@@ -243,8 +239,8 @@ export function RatioTable({
         {anyError
           ? DRAWER.ratioTotalError
           : DRAWER.ratioTotal(
-              fshTotal === null ? EMPTY_VALUE : formatUsdCents(fshTotal),
-              factoryTotal === null ? EMPTY_VALUE : formatUsdCents(factoryTotal),
+              totals === null ? EMPTY_VALUE : formatUsdCents(totals.fsh),
+              totals === null ? EMPTY_VALUE : formatUsdCents(totals.factory),
             )}
       </div>
     </div>

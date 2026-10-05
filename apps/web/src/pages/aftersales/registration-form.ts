@@ -378,6 +378,28 @@ export function conversionOf(
   return rate ? { kind: 'converted', usd: usdOf(amount, rate.rate), rate } : { kind: 'no_rate' };
 }
 
+/**
+ * 比例表下的「FSH 合计 · 工厂合计」（分）：同台账一行的承担（contracts 的 costShares，R-AS-08）——工厂承担 = 各组金额 × 该组
+ * 工厂比例之和，整行四舍五入到分（不是把各组取整后的金额相加）；FSH = 金额合计 − 工厂。有一组还算不出时为 null
+ */
+export function shareTotalCents(
+  amounts: Readonly<Record<RatioGroup, number | null>>,
+  percents: Readonly<Record<RatioGroup, number | null>>,
+): { fsh: number; factory: number } | null {
+  let total = 0;
+  let factoryTimes100 = 0;
+  for (const group of ratioGroups) {
+    const amount = amounts[group];
+    const percent = percents[group];
+    if (amount === null || percent === null) return null;
+    total += amount;
+    factoryTimes100 += amount * percent;
+  }
+  // 分 × 百分比是整数，除以 100 后按四舍五入取整（金额不为负，Math.round 的半数进位即四舍五入）
+  const factory = Math.round(factoryTimes100 / 100);
+  return { fsh: total - factory, factory };
+}
+
 /** 一组的两方承担（分）：工厂 = 金额 × 工厂比例（四舍五入到分），FSH = 金额 − 工厂（R-AS-08） */
 export function shareCents(
   amount: number,

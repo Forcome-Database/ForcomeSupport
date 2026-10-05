@@ -1,5 +1,6 @@
-import { emptyRegistrationInput, type AftersalesDetail } from '@forcome/contracts';
+import { costShares, emptyRegistrationInput, type AftersalesDetail } from '@forcome/contracts';
 import { describe, expect, it } from 'vitest';
+import { amountOfCents, centsOf } from '@/lib/cents';
 import {
   amountText,
   changedFieldLabels,
@@ -18,6 +19,7 @@ import {
   rateText,
   registrationInputOf,
   shareCents,
+  shareTotalCents,
   withRatioSide,
   type FeeForm,
 } from './registration-form';
@@ -163,6 +165,46 @@ describe('新建登记的表单（S14）', () => {
     expect(shareCents(320, 100)).toEqual({ fsh: 0, factory: 320 });
     expect(shareCents(1105, 50)).toEqual({ fsh: 552, factory: 553 });
     expect(shareCents(680, 0)).toEqual({ fsh: 680, factory: 0 });
+  });
+
+  it('「FSH 合计 · 工厂合计」按整行取整，与台账的承担金额（contracts 的 costShares）一致', () => {
+    // 逐组取整再相加会得 3 + 3 = 6 分；整行：2.5 + 2.5 = 5 分
+    expect(
+      shareTotalCents(
+        { product: 5, freight: 5, other: 0 },
+        { product: 50, freight: 50, other: 50 },
+      ),
+    ).toEqual({ fsh: 5, factory: 5 });
+    for (const [amounts, percents] of [
+      [
+        { product: 980, freight: 1360, other: 450 },
+        { product: 100, freight: 0, other: 50 },
+      ],
+      [
+        { product: 7, freight: 3, other: 1 },
+        { product: 33, freight: 17, other: 51 },
+      ],
+    ] as const) {
+      const row = costShares(
+        {
+          productCost: amountOfCents(amounts.product),
+          freight: amountOfCents(amounts.freight),
+          compensation: amountOfCents(amounts.other),
+          otherCost: null,
+        },
+        percents,
+      );
+      expect(shareTotalCents(amounts, percents)).toEqual({
+        fsh: centsOf(row.fsh!),
+        factory: centsOf(row.factory!),
+      });
+    }
+    expect(
+      shareTotalCents(
+        { product: 5, freight: null, other: 0 },
+        { product: 50, freight: 50, other: 50 },
+      ),
+    ).toBeNull();
   });
 });
 

@@ -113,6 +113,13 @@
       "when": 1791199895863,
       "tag": "0015_aftersales_ledger_states",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791207538173,
+      "tag": "0016_aftersales_cost_view",
+      "breakpoints": true
     }
   ]
 }

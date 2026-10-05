@@ -1,28 +1,35 @@
 import { BUSINESS_TIME_ZONE, businessDate } from '@forcome/calendar';
 import {
+  costShares,
+  defaultFeeDateRange,
   feeItems,
   missingFields,
   ratioPairsOf,
   type AftersalesDetail,
   type Completion,
   type FactoryRatios,
+  type FeeDateRange,
   type FeeItem,
+  type LedgerCost,
   type LedgerItem,
   type LedgerQuery,
+  type LedgerTotals,
   type Ratios,
   type RegistrationField,
   type RegistrationRecord,
 } from '@forcome/contracts';
-import { and, asc, eq, gte, lte, ne, sql, type SQL } from 'drizzle-orm';
+import Big from 'big.js';
+import { and, asc, eq, getViewSelectedFields, gte, lte, ne, sql, type SQL } from 'drizzle-orm';
 import { storeNamesById } from '../channel';
 import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
-import type { Access } from '../org';
+import { listParts } from '../factory';
+import { memberNamesById, type Access } from '../org';
 import { feesOf } from './fees';
-import { aftersales } from './schema';
+import { aftersales, aftersalesCost } from './schema';
 
 /*
- * 登记台账 P13 的查询（店铺范围内，ADR 0010）：列表（店铺、费用发生日筛选与「缺字段」筛选；筛选行的其余条件、合计、
- * 列设置与导出随 22）、当月登记完整率（R-AS-08）、一张单的完整登记（编辑登记抽屉）。
+ * 登记台账 P13 的查询（店铺范围内，ADR 0010）：列表与合计行（筛选行的条件与「缺字段」筛选；每行计入售后成本的部分取
+ * 售后成本视图）、当月登记完整率（R-AS-08）、一张单的完整登记（编辑登记抽屉）。导出用同一份列表（export.ts）。
  * 缺失字段按 contracts 的 missingFields（R-AS-08 必填矩阵，前后端共用）判断，只对已完成的单算（AC-AS-22）。
  */
 
@@ -84,29 +91,109 @@ export function keptFeesOf(row: AftersalesRow): FeeItem[] {
   return feeItems.filter((item) => row[`${item}Kept`] === true);
 }
 
+/** 售后成本视图的一行（这张单计入售后成本的部分） */
+export type CostRow = typeof aftersalesCost.$inferSelect;
+
+/** 台账各行要显示的名字：店铺名、负责人姓名、配件名（按 ID 或 SKU 取） */
+export interface LedgerNames {
+  readonly stores: ReadonlyMap<string, string>;
+  readonly members: ReadonlyMap<string, string>;
+  readonly parts: ReadonlyMap<string, string>;
+}
+
+/** 取这些单要显示的名字（店铺、负责人、配件） */
+export async function ledgerNamesOf(
+  db: DbExecutor,
+  rows: readonly AftersalesRow[],
+): Promise<LedgerNames> {
+  const [stores, members, parts] = await Promise.all([
+    storeNamesById(
+      db,
+      rows.map((row) => row.storeId),
+    ),
+    memberNamesById(
+      db,
+      rows.flatMap((row) => (row.ownerId ? [row.ownerId] : [])),
+    ),
+    rows.some((row) => row.partSku) ? listParts(db) : Promise.resolve([]),
+  ]);
+  return { stores, members, parts: new Map(parts.map((part) => [part.sku, part.name])) };
+}
+
+/**
+ * 一行计入售后成本的部分（售后成本视图）与两方承担：费用合计取视图，FSH / 工厂承担按计入的金额与三组比例逐行算
+ * （contracts 的 costShares，R-AS-08）
+ */
+export function ledgerCostOf(row: AftersalesRow, cost: CostRow): LedgerCost {
+  const counted: Record<FeeItem, string | null> = {
+    productCost: cost.productCostUsd,
+    freight: cost.freightUsd,
+    compensation: cost.compensationUsd,
+    otherCost: cost.otherCostUsd,
+  };
+  const { fsh, factory } = costShares(counted, factoryRatiosOfRow(row));
+  return { ...counted, total: cost.totalUsd, fsh, factory };
+}
+
 /** 台账的一行；财务字段由接口按查看者的权限过滤（stripFinanceFields） */
-export function toLedgerItem(
-  row: AftersalesRow,
-  storeNames: ReadonlyMap<string, string>,
-): LedgerItem {
+export function toLedgerItem(row: AftersalesRow, cost: CostRow, names: LedgerNames): LedgerItem {
   return {
     id: row.id,
     number: row.number,
     status: row.status,
     origin: row.origin,
     customerName: row.customerName,
-    store: { id: row.storeId, name: storeNames.get(row.storeId) ?? '' },
+    store: { id: row.storeId, name: names.stores.get(row.storeId) ?? '' },
     site: row.site,
     method: row.method,
     responsibility: row.responsibility,
+    factory: row.factoryCode,
+    part: row.partSku
+      ? {
+          sku: row.partSku,
+          name: names.parts.get(row.partSku) ?? null,
+          quantity: row.partQuantity,
+        }
+      : null,
     trackingNumber: row.trackingNumber,
     feeDate: row.feeDate,
     registeredById: row.registeredById,
     ownerId: row.ownerId,
+    ownerName: row.ownerId ? (names.members.get(row.ownerId) ?? null) : null,
     missing: missingOf(row),
     version: row.version,
     fees: feesOf(row),
     ratios: ratiosOf(row),
+    cost: ledgerCostOf(row, cost),
+    keptFees: row.status === 'cancelled' ? keptFeesOf(row) : null,
+  };
+}
+
+/** 一张单的台账行（新建登记、设为已完成、取消等接口返回刚改过的这一行；店铺范围已由调用方把关） */
+export async function ledgerItemOf(db: DbExecutor, row: AftersalesRow): Promise<LedgerItem> {
+  const [[cost], names] = await Promise.all([
+    db.select().from(aftersalesCost).where(eq(aftersalesCost.aftersalesId, row.id)),
+    ledgerNamesOf(db, [row]),
+  ]);
+  if (!cost) throw new Error(`售后单 ${row.number} 不在售后成本视图里`);
+  return toLedgerItem(row, cost, names);
+}
+
+/** 合计行：各金额列之和（计入售后成本的部分；FSH / 工厂承担为各行之和，比例没登记的行不计） */
+export function ledgerTotalsOf(items: readonly LedgerItem[]): LedgerTotals {
+  const sum = (pick: (cost: LedgerCost) => string | null) =>
+    items
+      .reduce((total, item) => total.plus(item.cost ? (pick(item.cost) ?? 0) : 0), new Big(0))
+      .toFixed(2);
+  return {
+    count: items.length,
+    productCost: sum((cost) => cost.productCost),
+    freight: sum((cost) => cost.freight),
+    compensation: sum((cost) => cost.compensation),
+    otherCost: sum((cost) => cost.otherCost),
+    total: sum((cost) => cost.total),
+    fsh: sum((cost) => cost.fsh),
+    factory: sum((cost) => cost.factory),
   };
 }
 
@@ -221,35 +308,58 @@ export async function completionOf(
 }
 
 /**
- * P13 台账（店铺范围内），按售后单号先后（原型 P13 的顺序：创建日期、全局序号）。
- * 筛选：店铺、费用发生日起止；missing 只列当月缺字段的已完成单（与完整率同口径，点页头完整率筛出；不叠日期条件）。
+ * 这次按的费用发生日起止：没给的一端取本月的那一端（北京时间，按注入的时钟；S13 补充小样）；筛出缺字段时不按日期，为 null
+ */
+export function feeDateRangeOf(query: LedgerQuery, now: Date): FeeDateRange | null {
+  if (query.missing) return null;
+  const fallback = defaultFeeDateRange(businessDate(now));
+  return { from: query.from ?? fallback.from, to: query.to ?? fallback.to };
+}
+
+/** 筛选行的条件（费用发生日起止、处理方式、责任、状态、负责人；店铺另行施加） */
+function rowFilters(query: LedgerQuery, range: FeeDateRange): (SQL | undefined)[] {
+  return [
+    gte(aftersalesCost.feeDate, range.from),
+    lte(aftersalesCost.feeDate, range.to),
+    query.method ? eq(aftersales.method, query.method) : undefined,
+    query.responsibility ? eq(aftersales.responsibility, query.responsibility) : undefined,
+    query.status ? eq(aftersales.status, query.status) : undefined,
+    query.owner ? eq(aftersales.ownerId, query.owner) : undefined,
+  ];
+}
+
+/**
+ * P13 台账（店铺范围内）与合计行，按售后单号先后（原型 P13 的顺序：创建日期、全局序号）。
+ * 每行连同它在售后成本视图里的一行一起取（R-AS-08：计入售后成本的部分，合计按它求和，与 P17 同一个视图，AC-RP-01）；
+ * 店铺范围施加在视图的店铺上。筛选：费用发生日起止（没给的一端取本月）、店铺、处理方式、责任、状态、负责人；missing 只列当月缺字段的
+ * 已完成单（与完整率同口径，点页头完整率筛出：只随店铺，不叠其余条件）。
  */
 export async function listLedger(
   db: DbExecutor,
   scope: StoreScope,
   query: LedgerQuery,
   now: Date,
-): Promise<LedgerItem[]> {
+): Promise<{ items: LedgerItem[]; totals: LedgerTotals; range: FeeDateRange | null }> {
+  const range = feeDateRangeOf(query, now);
   const rows = await db
-    .select()
+    .select({ row: aftersales, cost: getViewSelectedFields(aftersalesCost) })
     .from(aftersales)
+    .innerJoin(aftersalesCost, eq(aftersalesCost.aftersalesId, aftersales.id))
     .where(
       and(
-        storeScopeCondition(scope, aftersales.storeId),
-        storeFilter(query.store),
-        // 「缺字段」筛选与完整率同口径：只随店铺，不叠费用发生日的条件
-        !query.missing && query.from ? gte(aftersales.feeDate, query.from) : undefined,
-        !query.missing && query.to ? lte(aftersales.feeDate, query.to) : undefined,
-        query.missing ? completedIn(businessMonth(now)) : undefined,
+        storeScopeCondition(scope, aftersalesCost.storeId),
+        query.store ? eq(aftersalesCost.storeId, query.store) : undefined,
+        ...(range ? rowFilters(query, range) : [completedIn(businessMonth(now))]),
       ),
     )
     .orderBy(asc(aftersales.number));
-  const listed = query.missing ? rows.filter((row) => missingOf(row).length > 0) : rows;
-  const names = await storeNamesById(
+  const listed = query.missing ? rows.filter(({ row }) => missingOf(row).length > 0) : rows;
+  const names = await ledgerNamesOf(
     db,
-    listed.map((row) => row.storeId),
+    listed.map(({ row }) => row),
   );
-  return listed.map((row) => toLedgerItem(row, names));
+  const items = listed.map(({ row, cost }) => toLedgerItem(row, cost, names));
+  return { items, totals: ledgerTotalsOf(items), range };
 }
 
 /**

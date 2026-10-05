@@ -6,7 +6,9 @@ import {
   currentMemberSchema,
   devMembersResponseSchema,
   exchangeRatesOnSchema,
+  EXPORT_ROWS_HEADER,
   ledgerItemSchema,
+  ledgerOptionsSchema,
   ledgerSchema,
   loginDeniedSchema,
   preferencesSchema,
@@ -25,6 +27,7 @@ import {
   type FieldErrors,
   type Ledger,
   type LedgerItem,
+  type LedgerOptions,
   type LedgerQuery,
   type LoginDenialReason,
   type Preferences,
@@ -85,6 +88,15 @@ export class LoginDeniedError extends ApiRequestError {
     super(403, 'login_denied', message);
     this.reason = reason;
   }
+}
+
+const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+/** 导出得到的文件：内容、文件名与行数 */
+export interface ExportedFile {
+  readonly blob: Blob;
+  readonly fileName: string;
+  readonly rows: number;
 }
 
 async function send(path: string, init?: RequestInit): Promise<Response> {
@@ -173,6 +185,27 @@ export const api = {
   /** P13 登记台账（店铺范围内；坐席拿到的没有财务字段） */
   ledger: (query: LedgerQuery = {}): Promise<Ledger> =>
     call(`/api/aftersales/ledger${queryString(query)}`, ledgerSchema),
+
+  /** P13 筛选行的选项：负责人（店铺范围内在职的售后负责人） */
+  ledgerOptions: (): Promise<LedgerOptions> =>
+    call('/api/aftersales/ledger/options', ledgerOptionsSchema),
+
+  /**
+   * 导出 P13 台账（S11、K5）：按当前筛选与字段权限在服务端生成 Excel；返回文件、文件名（Content-Disposition 的 filename*）
+   * 与行数。失败时抛 ApiRequestError（同其他接口）
+   */
+  exportLedger: async (query: LedgerQuery): Promise<ExportedFile> => {
+    const response = await send(`/api/aftersales/ledger/export${queryString(query)}`, {
+      headers: { accept: XLSX_TYPE },
+    });
+    const disposition = response.headers.get('content-disposition') ?? '';
+    const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+    return {
+      blob: await response.blob(),
+      fileName: encoded ? decodeURIComponent(encoded) : 'ledger.xlsx',
+      rows: Number(response.headers.get(EXPORT_ROWS_HEADER) ?? 0),
+    };
+  },
 
   /** 新建登记抽屉的选项：可选负责人、责任类型的默认比例、生产厂、配件与所属生产厂 */
   registrationOptions: (): Promise<RegistrationOptions> =>

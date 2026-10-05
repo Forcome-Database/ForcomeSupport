@@ -2,8 +2,10 @@ import {
   aftersalesDetailSchema,
   apiErrorSchema,
   cancelInputSchema,
+  EXPORT_ROWS_HEADER,
   exchangeRatesOnSchema,
   ledgerItemSchema,
+  ledgerOptionsSchema,
   ledgerQuerySchema,
   ledgerSchema,
   rateChangeInputSchema,
@@ -30,13 +32,19 @@ import { updateRegistration } from './edit';
 import {
   completionOf,
   findOwnedAftersales,
+  ledgerItemOf,
   listLedger,
   toDetail,
-  toLedgerItem,
   type AftersalesRow,
 } from './ledger';
+import { exportLedger, XLSX_CONTENT_TYPE } from './export';
 import { changeFeeRates } from './rates';
-import { createRegistration, findSourceTicket, registrationOptions } from './registration';
+import {
+  createRegistration,
+  findSourceTicket,
+  ledgerOptions,
+  registrationOptions,
+} from './registration';
 import { cancelAftersales, completeAftersales, undoComplete } from './status';
 
 const json = <T extends z.ZodType>(schema: T, description: string) => ({
@@ -66,6 +74,34 @@ const ledgerRoute = createRoute({
   responses: {
     200: json(ledgerSchema, '台账（按售后单号先后）与当月登记完整率'),
     400: json(apiErrorSchema, '查询条件格式不对'),
+    401: unauthenticated,
+    403: forbidden,
+  },
+});
+
+const exportRoute = createRoute({
+  method: 'get',
+  path: '/api/aftersales/ledger/export',
+  summary:
+    '导出 Excel（S11、K5）：按当前筛选与字段权限同步生成后直接下载，不留存文件（坐席不含七个金额列）；记审计',
+  request: { query: ledgerQuerySchema },
+  responses: {
+    200: {
+      description: `Excel 文件（文件名在 Content-Disposition 的 filename*，行数在 ${EXPORT_ROWS_HEADER}）`,
+      content: { [XLSX_CONTENT_TYPE]: { schema: z.string().openapi({ format: 'binary' }) } },
+    },
+    400: json(apiErrorSchema, '查询条件格式不对'),
+    401: unauthenticated,
+    403: forbidden,
+  },
+});
+
+const ledgerOptionsRoute = createRoute({
+  method: 'get',
+  path: '/api/aftersales/ledger/options',
+  summary: 'P13 筛选行的选项：负责人（查看者店铺范围内在职的售后负责人）',
+  responses: {
+    200: json(ledgerOptionsSchema, '选项'),
     401: unauthenticated,
     403: forbidden,
   },
@@ -257,8 +293,14 @@ export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv 
 
   /** 一行台账（财务字段按查看者的权限过滤） */
   async function itemOf(access: Access, row: AftersalesRow) {
-    const names = await storeNamesById(runtime.db, [row.storeId]);
-    return stripFinanceFields(ledgerItemSchema, toLedgerItem(row, names), access.financeVisible);
+    const item = await ledgerItemOf(runtime.db, row);
+    return stripFinanceFields(ledgerItemSchema, item, access.financeVisible);
+  }
+
+  /** 店铺筛选：范围外的店铺记越权审计并 403（E-24） */
+  async function requireStoreFilter(access: Access, store: string | undefined) {
+    if (!store) return;
+    await access.requireStores({ storeIds: [store], objectType: 'store', objectId: store });
   }
 
   /** 一张单的完整登记（财务字段按查看者的权限过滤） */
@@ -279,30 +321,39 @@ export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv 
   routes.openapi(ledgerRoute, async (c) => {
     const access = c.get('access');
     const query = c.req.valid('query');
-    // 店铺筛选：范围外的店铺记越权审计并 403（E-24）
-    if (query.store) {
-      await access.requireStores({
-        storeIds: [query.store],
-        objectType: 'store',
-        objectId: query.store,
-      });
-    }
+    await requireStoreFilter(access, query.store);
     const now = runtime.clock.now();
-    const [items, completion] = await Promise.all([
+    const [{ items, totals, range }, completion] = await Promise.all([
       listLedger(runtime.db, access.stores, query, now),
       completionOf(runtime.db, access.stores, query.store, now),
     ]);
     return c.json(
-      stripFinanceFields(ledgerSchema, { items, completion }, access.financeVisible),
+      stripFinanceFields(ledgerSchema, { items, totals, range, completion }, access.financeVisible),
       200,
     );
   });
 
+  routes.openapi(exportRoute, async (c) => {
+    const access = c.get('access');
+    const query = c.req.valid('query');
+    await requireStoreFilter(access, query.store);
+    const file = await exportLedger(runtime, access, query);
+    return c.body(file.body, 200, {
+      'Content-Type': XLSX_CONTENT_TYPE,
+      'Content-Disposition': `attachment; filename="ledger.xlsx"; filename*=UTF-8''${encodeURIComponent(file.fileName)}`,
+      [EXPORT_ROWS_HEADER]: String(file.count),
+      'Cache-Control': 'no-store',
+    });
+  });
+
+  routes.openapi(ledgerOptionsRoute, async (c) =>
+    c.json(await ledgerOptions(runtime.db, c.get('access').stores), 200),
+  );
+
   routes.openapi(registerRoute, async (c) => {
     const access = c.get('access');
-    const { row, storeName } = await createRegistration(runtime, access, c.req.valid('json'));
-    const item = toLedgerItem(row, new Map([[row.storeId, storeName]]));
-    return c.json(stripFinanceFields(ledgerItemSchema, item, access.financeVisible), 201);
+    const { row } = await createRegistration(runtime, access, c.req.valid('json'));
+    return c.json(await itemOf(access, row), 201);
   });
 
   routes.openapi(optionsRoute, async (c) =>

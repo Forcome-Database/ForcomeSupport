@@ -12,6 +12,13 @@ export const ledgerQuery = (query: LedgerQuery = {}) =>
     queryFn: () => api.ledger(query),
   });
 
+/** P13 筛选行的选项（负责人）；成员变动不频繁，5 分钟内不再取 */
+export const ledgerOptionsQuery = queryOptions({
+  queryKey: [...AFTERSALES_QUERY_KEY, 'ledger-options'],
+  queryFn: api.ledgerOptions,
+  staleTime: 5 * 60_000,
+});
+
 /** 一张售后单的完整登记（编辑登记抽屉） */
 export const aftersalesQuery = (number: string) =>
   queryOptions({

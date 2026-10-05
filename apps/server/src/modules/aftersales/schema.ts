@@ -3,12 +3,14 @@ import {
   aftersalesStatuses,
   claimStatuses,
   claimTargets,
+  feeItems,
   handlingMethods,
   responsibilities,
   shippers,
   sites,
+  type FeeItem,
 } from '@forcome/contracts';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import {
   boolean,
   check,
@@ -21,7 +23,7 @@ import {
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
-import { feeChecks, feeColumns, primaryId, timestamptz, version } from '../core';
+import { amount, feeChecks, feeColumns, primaryId, timestamptz, version } from '../core';
 
 /** aftersales 模块的数据库 schema（一个模块一个 schema，ADR 0006）；表随各期待办加入 */
 export const aftersalesSchema = pgSchema('aftersales');
@@ -132,6 +134,54 @@ export const aftersales = aftersalesSchema.table(
     ...feeChecks('aftersales_other_cost', t, 'otherCost'),
   ],
 );
+
+/** 视图里四个费用项的列名（与 feeItems 一一对应） */
+const COST_COLUMNS: Record<FeeItem, string> = {
+  productCost: 'product_cost_usd',
+  freight: 'freight_usd',
+  compensation: 'compensation_usd',
+  otherCost: 'other_cost_usd',
+};
+
+/** 一个费用项计入售后成本的美元值：已取消的单只计确认保留的项（没保留的计 0），没登记的为空 */
+function countedUsd(item: FeeItem): SQL {
+  const usd = aftersales[`${item}Usd`];
+  const kept = aftersales[`${item}Kept`];
+  return sql`CASE WHEN ${aftersales.status} = 'cancelled' AND ${usd} IS NOT NULL AND ${kept} IS NOT TRUE THEN 0 ELSE ${usd} END AS ${sql.raw(COST_COLUMNS[item])}`;
+}
+
+/**
+ * 售后成本视图（R-AS-08、AC-RP-01）：每张计入售后成本的售后单一行——全部非待确认的单（第一期没有「待确认」，即全部；
+ * 第二期加了这个状态视图不用改），四个费用项按冻结的美元值，已取消的单只计取消时确认保留的部分，按费用发生日归期。
+ * P13 的合计行（台账列表经它取每行计入的金额再求和）与 P17「售后成本按责任类型」（待办 25，report 经只读角色直读）
+ * 共用这一个视图，两处的「费用合计」因此一致。只放售后成本的口径；承担金额按 contracts 的 costShares 逐行计算。
+ * 读它的查询都要显式施加店铺范围（store_id；ADR 0010，报表绕过了仓储层的编译期保护）。
+ */
+export const aftersalesCost = aftersalesSchema
+  .view('aftersales_cost', {
+    aftersalesId: uuid('aftersales_id').notNull(),
+    storeId: uuid('store_id').notNull(),
+    feeDate: date('fee_date', { mode: 'string' }),
+    responsibility: text('responsibility', { enum: responsibilities }),
+    productCostUsd: amount('product_cost_usd'),
+    freightUsd: amount('freight_usd'),
+    compensationUsd: amount('compensation_usd'),
+    otherCostUsd: amount('other_cost_usd'),
+    /** 费用合计：四项计入的美元值之和（没登记的按 0） */
+    totalUsd: amount('total_usd').notNull(),
+  })
+  .as(
+    sql`SELECT aftersales_id, store_id, fee_date, responsibility,
+  ${sql.raw(feeItems.map((item) => `${COST_COLUMNS[item]}::numeric(12, 2) AS ${COST_COLUMNS[item]}`).join(', '))},
+  (${sql.raw(feeItems.map((item) => `coalesce(${COST_COLUMNS[item]}, 0)`).join(' + '))})::numeric(12, 2) AS total_usd
+FROM (
+  SELECT ${aftersales.id} AS aftersales_id, ${aftersales.storeId} AS store_id,
+    ${aftersales.feeDate} AS fee_date, ${aftersales.responsibility} AS responsibility,
+    ${sql.join(feeItems.map(countedUsd), sql`,\n    `)}
+  FROM ${aftersales}
+  WHERE ${aftersales.status} <> 'pending_confirmation'
+) AS counted`,
+  );
 
 /**
  * 责任类型的默认承担比例（R-AS-02、D-19，客户确认 Q-03）：选责任类型后三组比例按它预填。

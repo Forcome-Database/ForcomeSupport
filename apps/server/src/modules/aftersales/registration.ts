@@ -8,6 +8,7 @@ import {
   type FactoryRatios,
   type FeeItem,
   type FieldErrors,
+  type LedgerOptions,
   type OwnerOption,
   type RegistrationInput,
   type RegistrationOptions,
@@ -51,6 +52,18 @@ function ownerWithinScope(owner: OwnerOption, scope: StoreScope): OwnerOption | 
     ? [...scope.storeIds]
     : owner.stores.storeIds.filter((id) => isStoreInScope(scope, id));
   return storeIds.length > 0 ? { ...owner, stores: { all: false, storeIds } } : null;
+}
+
+/**
+ * P13 筛选行的选项：负责人筛选列出查看者店铺范围内在职的售后负责人（与新建登记的可选负责人同一批人；「待分配」随待办 23）
+ */
+export async function ledgerOptions(db: DbExecutor, scope: StoreScope): Promise<LedgerOptions> {
+  const owners = await listAftersalesOwners(db);
+  return {
+    owners: owners.flatMap((owner) =>
+      ownerWithinScope(owner, scope) ? [{ id: owner.id, name: owner.name }] : [],
+    ),
+  };
 }
 
 /**

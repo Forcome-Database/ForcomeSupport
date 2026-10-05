@@ -1,3 +1,4 @@
+import Big from 'big.js';
 import { z } from 'zod';
 import { storeScopeSchema } from './auth';
 import { can } from './capabilities';
@@ -819,6 +820,67 @@ export const ratiosSchema = z.object({
 });
 export type Ratios = z.infer<typeof ratiosSchema>;
 
+/** 一行的费用合计与两方承担（美元，两位小数）；比例没登记（历史导入）时承担为 null */
+export interface CostShares {
+  readonly total: string;
+  readonly factory: string | null;
+  readonly fsh: string | null;
+}
+
+/**
+ * 承担金额（R-AS-08、D-24）：费用合计 = 四项美元值之和（没登记的不计）；工厂承担 = 各组费用 × 该组工厂比例之和，
+ * 逐行四舍五入到分（不是逐组取整再相加）；FSH 承担 = 该行费用合计 − 工厂承担，所以两者之和总等于费用合计。
+ * 台账每行、合计行（各行之和）、导出与登记抽屉的「FSH 合计 · 工厂合计」都按它算。十进制运算用 big.js，四舍五入。
+ */
+export function costShares(
+  usd: Readonly<Record<FeeItem, string | null>>,
+  ratios: FactoryRatios | null,
+): CostShares {
+  const amount = (item: FeeItem) => new Big(usd[item] ?? 0);
+  const total = feeItems.reduce((sum, item) => sum.plus(amount(item)), new Big(0));
+  if (!ratios) return { total: total.toFixed(2), factory: null, fsh: null };
+  const factory = feeItems
+    .reduce(
+      (sum, item) => sum.plus(amount(item).times(ratios[feeItemGroup[item]]).div(100)),
+      new Big(0),
+    )
+    .round(2, Big.roundHalfUp);
+  return {
+    total: total.toFixed(2),
+    factory: factory.toFixed(2),
+    fsh: total.minus(factory).toFixed(2),
+  };
+}
+
+/** 一组比例的写法「FSH 0 / 工厂 100」 */
+export function ratioPairWords(pair: RatioPair): string {
+  return `FSH ${pair.fsh} / 工厂 ${pair.factory}`;
+}
+
+/** 三组比例相同时为这个比例，不同时为 null（台账悬停按它写一个值或「按费用项」，PRD R-AS-02 下的写法说明） */
+export function uniformRatio(ratios: Ratios): RatioPair | null {
+  const [first, ...rest] = ratioGroups.map((group) => ratios[group]);
+  if (!first) return null;
+  return rest.every((pair) => pair.factory === first.factory) ? first : null;
+}
+
+/** 三组比例不同时，紧凑写法与悬停的标题（PRD R-AS-02 下的写法说明：「按费用项」） */
+export const RATIO_BY_ITEM = '按费用项';
+
+/** 逐组的写法「产品成本 FSH 0 / 工厂 100」（按产品成本、快递物流、其他费用的顺序） */
+export function ratioGroupWords(ratios: Ratios): string[] {
+  return ratioGroups.map((group) => `${ratioGroupLabels[group]} ${ratioPairWords(ratios[group])}`);
+}
+
+/**
+ * 比例的说明写法（原型 data.ratio_words）：三组相同写「三组均 FSH 0 / 工厂 100」，不同时逐组列出
+ * 「产品成本 FSH 0 / 工厂 100 · 快递物流 FSH 100 / 工厂 0 · 其他费用 FSH 50 / 工厂 50」
+ */
+export function ratioWords(ratios: Ratios): string {
+  const uniform = uniformRatio(ratios);
+  return uniform ? `三组均 ${ratioPairWords(uniform)}` : ratioGroupWords(ratios).join(' · ');
+}
+
 /** 工厂比例写成两侧（FSH = 100 − 工厂） */
 export function ratioPairsOf(factory: FactoryRatios): Ratios {
   const pair = (value: number): RatioPair => ({ fsh: 100 - value, factory: value });
@@ -832,9 +894,27 @@ export function ratioPairsOf(factory: FactoryRatios): Ratios {
 export const registrationFieldSchema = z.enum(registrationFields);
 
 /**
- * P13 台账的一行（售后单号、客户、店铺与站点、处理方式、责任、状态、快递单号、费用列；完整的列、合计与列设置随待办 22）。
- * 费用与承担比例是财务字段，坐席看不到（PRD 10.1、P13「第一阶段」）；比例在台账里写在 FSH / 工厂承担的悬停说明（22），
- * 历史导入缺比例时为 null。missing 是后端按 R-AS-08 算好的缺失字段（坐席拿不到费用与比例，前端不自己算）：
+ * 台账一行计入售后成本的部分（R-AS-08，售后成本视图 aftersales.aftersales_cost，P17 共用，AC-RP-01）：四个费用项计入的美元值
+ * ——已取消的单只计取消时确认保留的部分，没保留的项为 "0.00"；没登记的项为 null——与费用合计、两方承担（costShares）
+ */
+export const ledgerCostSchema = z.object({
+  productCost: z.string().nullable(),
+  freight: z.string().nullable(),
+  compensation: z.string().nullable(),
+  otherCost: z.string().nullable(),
+  total: z.string(),
+  /** 比例没登记（历史导入）时为 null */
+  fsh: z.string().nullable(),
+  factory: z.string().nullable(),
+});
+export type LedgerCost = z.infer<typeof ledgerCostSchema>;
+
+/**
+ * P13 台账的一行（PRD P13「第一阶段」的 17 列：售后单号 · 客户 · 店铺与站点 · 处理方式 · 责任 · 状态 · 负责人 · 生产厂 ·
+ * 配件 × 数量 · 快递单号 · 四个费用项 · 费用合计 · FSH 承担 · 工厂承担）。
+ * 费用、承担比例与承担金额是财务字段，坐席看不到（PRD 10.1、P13「第一阶段」）；比例写在 FSH / 工厂承担的悬停说明里，
+ * 历史导入缺比例时为 null。fees 是登记的原值，cost 是计入售后成本的部分（只有已取消的单两者会不同，原登记额在悬停中）。
+ * missing 是后端按 R-AS-08 算好的缺失字段（坐席拿不到费用与比例，前端不自己算）：
  * 已完成的单据此标黄「待回填」、售后单号下标「缺 N 项」，进行中的单不标（AC-AS-22）。
  */
 export const ledgerItemSchema = z.object({
@@ -847,31 +927,154 @@ export const ledgerItemSchema = z.object({
   site: siteSchema.nullable(),
   method: handlingMethodSchema.nullable(),
   responsibility: responsibilitySchema.nullable(),
+  /** 生产厂代码（任一组工厂比例大于 0 时） */
+  factory: z.string().nullable(),
+  /** 配件 × 数量（寄配件；配件名取配件表，表里没有时为 null） */
+  part: z
+    .object({ sku: z.string(), name: z.string().nullable(), quantity: z.int().nullable() })
+    .nullable(),
   /** 快递单号（寄配件寄出后填写；没有为 null） */
   trackingNumber: z.string().nullable(),
-  /** 费用发生日（取消时保留的费用按它计入售后成本） */
+  /** 费用发生日（售后成本按它归期；取消时保留的费用同样按它计入） */
   feeDate: z.iso.date().nullable(),
   /** 登记人与负责人（行尾「更多」与编辑登记按它们判断权限，aftersalesActions） */
   registeredById: z.uuid().nullable(),
   ownerId: z.uuid().nullable(),
+  /** 负责人姓名（「负责人」列；离职的也取得到） */
+  ownerName: z.string().nullable(),
   /** 缺失的适用字段（R-AS-08，按抽屉顺序；齐全为空） */
   missing: z.array(registrationFieldSchema),
   /** 乐观锁版本（编辑登记、补登、设为已完成、取消、修改汇率时带上，G7） */
   version: z.int(),
   fees: financeField(feesSchema),
   ratios: financeField(ratiosSchema.nullable()),
+  cost: financeField(ledgerCostSchema),
+  /** 已取消的单取消时确认保留的费用项（其余状态为 null） */
+  keptFees: financeField(z.array(z.enum(feeItems)).nullable()),
 });
 export type LedgerItem = z.infer<typeof ledgerItemSchema>;
-/** P13 台账：列表与页头的当月登记完整率（完整率不随日期筛选与「缺字段」筛选变化） */
+
+/**
+ * P13 台账的 17 列（PRD P13「第一阶段」：完整版去掉报备、协商、结算），按表格顺序；导出 Excel 用同样的列与表头。
+ * 原型只画了默认显示的列，默认隐藏的四列的叫法取自「已隐藏 4 列：配件 × 数量、负责人、其他、生产厂」。
+ */
+export const ledgerColumns = [
+  'number',
+  'customer',
+  'storeSite',
+  'method',
+  'responsibility',
+  'status',
+  'owner',
+  'factory',
+  'part',
+  'trackingNumber',
+  'productCost',
+  'freight',
+  'compensation',
+  'otherCost',
+  'feeTotal',
+  'fshShare',
+  'factoryShare',
+] as const;
+export type LedgerColumn = (typeof ledgerColumns)[number];
+export const ledgerColumnLabels: Record<LedgerColumn, string> = {
+  number: '售后单号',
+  customer: '客户',
+  storeSite: '店铺与站点',
+  method: '处理方式',
+  responsibility: '责任',
+  status: '状态',
+  owner: '负责人',
+  factory: '生产厂',
+  part: '配件 × 数量',
+  trackingNumber: '快递单号',
+  productCost: feeItemLabels.productCost,
+  freight: feeItemLabels.freight,
+  compensation: feeItemLabels.compensation,
+  otherCost: feeItemLabels.otherCost,
+  feeTotal: '费用合计',
+  fshShare: 'FSH 承担 $',
+  factoryShare: '工厂承担 $',
+};
+/** 只给有财务权限的角色的七个金额列（P13「第一阶段」：坐席不显示，导出同样不含） */
+export const ledgerFinanceColumns: ReadonlySet<LedgerColumn> = new Set([
+  'productCost',
+  'freight',
+  'compensation',
+  'otherCost',
+  'feeTotal',
+  'fshShare',
+  'factoryShare',
+]);
+/** 默认隐藏的列，按「已隐藏 4 列：配件 × 数量、负责人、其他、生产厂」的顺序（P13「第一阶段」） */
+export const ledgerDefaultHidden: readonly LedgerColumn[] = [
+  'part',
+  'owner',
+  'otherCost',
+  'factory',
+];
+
+/** 店铺与站点的写法（原型 store_site()：「Forcome Direct · US」） */
+export function storeSiteLabel(store: string, site: Site | null): string {
+  return site ? `${store} · ${site}` : store;
+}
+
+/** 配件 × 数量的写法「HEPA 滤芯组件 FC-V2-HF01 × 1」（配件表里没有名字时只写 SKU，数量没填时不写「× N」） */
+export function partLabel(part: {
+  readonly sku: string;
+  readonly name: string | null;
+  readonly quantity: number | null;
+}): string {
+  const name = part.name ? `${part.name} ${part.sku}` : part.sku;
+  return part.quantity === null ? name : `${name} × ${part.quantity}`;
+}
+
+/**
+ * 合计行（R-AS-08、P13「第一阶段」）：列出的单数与各金额列之和（各行计入售后成本的部分；FSH / 工厂承担为各行之和）。
+ * 「费用合计」与 P17「售后成本按责任类型」卡头总额来自同一个售后成本视图（AC-RP-01）。
+ */
+export const ledgerTotalsSchema = z.object({
+  count: z.int().min(0),
+  productCost: z.string(),
+  freight: z.string(),
+  compensation: z.string(),
+  otherCost: z.string(),
+  total: z.string(),
+  fsh: z.string(),
+  factory: z.string(),
+});
+export type LedgerTotals = z.infer<typeof ledgerTotalsSchema>;
+
+/** 费用发生日起止（含两端，YYYY-MM-DD） */
+export const feeDateRangeSchema = z.object({ from: z.iso.date(), to: z.iso.date() });
+export type FeeDateRange = z.infer<typeof feeDateRangeSchema>;
+
+/**
+ * 默认的费用发生日：本月（北京时间当月 1 日至今天，S13 补充小样，用户确认）。today 是北京时间的今天；
+ * 按服务端的时钟取（演示与测试的「当前时间」可注入），所以默认值由接口补上，前端不自己算
+ */
+export function defaultFeeDateRange(today: string): FeeDateRange {
+  return { from: `${today.slice(0, 7)}-01`, to: today };
+}
+
+/**
+ * P13 台账：列表、合计行与页头的当月登记完整率（完整率不随日期筛选与「缺字段」筛选变化）。合计行是财务字段（坐席没有，
+ * P13「第一阶段」）。
+ */
 export const ledgerSchema = z.object({
   items: z.array(ledgerItemSchema),
+  totals: financeField(ledgerTotalsSchema),
+  /** 这次按的费用发生日起止（没给的一端取本月的那一端）；筛出缺字段时不按日期，为 null */
+  range: feeDateRangeSchema.nullable(),
   completion: completionSchema,
 });
 export type Ledger = z.infer<typeof ledgerSchema>;
 
 /**
- * P13 台账的查询条件（放在地址栏）。店铺与费用发生日是筛选行的前两项（筛选行的界面与其余条件随待办 22）；
- * missing 是点页头完整率「筛出缺字段的 N 单」：只列当月（按完成时间）已完成、缺适用字段的单（与完整率同口径，历史导入不列）。
+ * P13 台账的查询条件（放在地址栏；导出用同一组条件）。筛选行：费用发生日起止 · 店铺 · 处理方式 · 责任 · 状态 · 负责人
+ * （PRD P13「第一阶段」）；费用发生日没给的一端取本月的那一端（defaultFeeDateRange），其余不填是全部。missing 是点页头完整率
+ * 「筛出缺字段的 N 单」：只列当月（按完成时间）已完成、缺适用字段的单（与完整率同口径：只随店铺，不叠其余条件；历史导入不列）。
  */
 export const ledgerQuerySchema = z.object({
   /** 店铺（完整率随它变化） */
@@ -879,12 +1082,24 @@ export const ledgerQuerySchema = z.object({
   /** 费用发生日起止（含两端；完整率不随它变化） */
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
+  method: handlingMethodSchema.optional(),
+  responsibility: responsibilitySchema.optional(),
+  status: aftersalesStatusSchema.optional(),
+  /** 负责人（成员 ID；「待分配」随待办 23） */
+  owner: z.uuid().optional(),
   missing: z.literal('1').optional(),
 });
 export type LedgerQuery = z.infer<typeof ledgerQuerySchema>;
 
 /** 一个人（登记人、负责人）：成员 ID 与姓名 */
 const personSchema = z.object({ id: z.uuid(), name: z.string() });
+
+/** P13 筛选行的选项：负责人（查看者店铺范围内在职的售后负责人；「待分配」随待办 23）。店铺取 channel 的店铺选项 */
+export const ledgerOptionsSchema = z.object({ owners: z.array(personSchema) });
+export type LedgerOptions = z.infer<typeof ledgerOptionsSchema>;
+
+/** 导出 Excel 的响应头：导出的行数（浮层「· 12 单」）；文件名在 Content-Disposition 的 filename* */
+export const EXPORT_ROWS_HEADER = 'X-Export-Rows';
 
 /**
  * 一张售后单的完整登记（编辑登记抽屉 S14：进行中可改、已完成补登、已取消只读；「查看最新」也取它）。

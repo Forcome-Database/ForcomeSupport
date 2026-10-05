@@ -182,19 +182,35 @@ describe('数据约定（规格「数据约定」、ADR 0006）', () => {
     nullable: 'YES' | 'NO';
   };
 
-  async function moduleColumns(): Promise<Column[]> {
+  /** 各模块的表（kind 'BASE TABLE'）或视图（'VIEW'）的列；数据约定逐条针对表，视图另有一条 */
+  async function moduleColumns(kind: 'BASE TABLE' | 'VIEW' = 'BASE TABLE'): Promise<Column[]> {
     return rows<Column>(sql`
-      SELECT table_schema AS schema, table_name AS table, column_name AS column, data_type AS type,
-             numeric_precision AS precision, numeric_scale AS scale, column_default AS default,
-             is_nullable AS nullable
-      FROM information_schema.columns
-      WHERE table_schema IN (${sql.join(
-        MODULES.map((m) => sql`${m}`),
-        sql`, `,
-      )})
-      ORDER BY 1, 2, ordinal_position
+      SELECT c.table_schema AS schema, c.table_name AS table, c.column_name AS column,
+             c.data_type AS type, c.numeric_precision AS precision, c.numeric_scale AS scale,
+             c.column_default AS default, c.is_nullable AS nullable
+      FROM information_schema.columns c
+      JOIN information_schema.tables t
+        ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+      WHERE t.table_type = ${kind}
+        AND c.table_schema IN (${sql.join(
+          MODULES.map((m) => sql`${m}`),
+          sql`, `,
+        )})
+      ORDER BY 1, 2, c.ordinal_position
     `);
   }
+
+  it('视图（如售后成本视图）的金额是冻结的美元值：numeric(12,2)、列名以 _usd 结尾，不带币种列', async () => {
+    const views = await moduleColumns('VIEW');
+    expect(new Set(views.map((c) => `${c.schema}.${c.table}`))).toContain(
+      'aftersales.aftersales_cost',
+    );
+    const offenders = views.filter(
+      (c) =>
+        c.type === 'numeric' && (c.precision !== 12 || c.scale !== 2 || !c.column.endsWith('_usd')),
+    );
+    expect(offenders.map((c) => `${c.schema}.${c.table}.${c.column}`)).toEqual([]);
+  });
 
   it('时间列一律 timestamptz，JSON 列一律 jsonb', async () => {
     const offenders = (await moduleColumns()).filter((c) =>
