@@ -13,6 +13,7 @@ import {
 import { listStoreOptions } from '../channel';
 import {
   FieldValidationError,
+  isStoreInScope,
   nextBusinessNumber,
   recordAudit,
   transaction,
@@ -42,7 +43,7 @@ function ownerWithinScope(owner: OwnerOption, scope: StoreScope): OwnerOption | 
   if (scope.all) return owner;
   const storeIds = owner.stores.all
     ? [...scope.storeIds]
-    : owner.stores.storeIds.filter((id) => scope.storeIds.includes(id));
+    : owner.stores.storeIds.filter((id) => isStoreInScope(scope, id));
   return storeIds.length > 0 ? { ...owner, stores: { all: false, storeIds } } : null;
 }
 

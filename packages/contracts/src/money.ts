@@ -17,6 +17,6 @@ export function formatMoney(amount: string, currency: Currency): string {
     format = new Intl.NumberFormat('en-US', { style: 'currency', currency });
     formats.set(currency, format);
   }
-  // 十进制字符串按原值格式化（ECMA-402 的 Intl 数学值）；类型声明只写了 number | bigint
-  return format.format(amount as unknown as number);
+  // 十进制字符串按原值格式化（ECMA-402 的 Intl 数学值），不经浮点
+  return format.format(amount as `${number}`);
 }

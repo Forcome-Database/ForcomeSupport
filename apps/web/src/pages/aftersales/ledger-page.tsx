@@ -132,7 +132,7 @@ const BASE_COLUMNS: readonly Column[] = [
     width: { finance: '', readOnly: '' },
     cell: (item) =>
       item.trackingNumber ? (
-        <div className="truncate text-12 text-primary tabular-nums" title={item.trackingNumber}>
+        <div className="truncate text-minor text-primary tabular-nums" title={item.trackingNumber}>
           {item.trackingNumber}
         </div>
       ) : (

@@ -79,7 +79,8 @@ export const aftersales = aftersalesSchema.table(
     trackingNumber: text('tracking_number'),
     claimTarget: text('claim_target', { enum: claimTargets }),
     claimStatus: text('claim_status', { enum: claimStatuses }),
-    // 四个费用项（键与 contracts 的 feeItems 一致）：原币金额与币种
+    // 四个费用项（键与 contracts 的 feeItems 一致）：原币金额与币种；下面的 feeCurrencyCheck 逐项对应
+    // （CHECK 是表级约束，列助手里生成不了，所以两处各写一遍，键由类型检查对上）
     ...feeColumns('productCost', 'product_cost'),
     ...feeColumns('freight', 'freight'),
     ...feeColumns('compensation', 'compensation'),

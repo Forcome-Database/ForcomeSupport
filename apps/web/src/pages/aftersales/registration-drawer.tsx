@@ -394,8 +394,7 @@ function RegistrationForm({
   }
 
   /**
-   * 按工单号查来源工单并带入；没有这张工单（或在别的店铺）写在字段下方。返回 true 表示已处理（查到或报在字段上），
-   * 接口出错抛出，由调用方给失败浮层
+   * 按工单号查来源工单并带入；没有这张工单（或在别的店铺）写在字段下方。接口出错时抛出，由调用方给失败浮层（G5，重试也走这里）
    */
   async function fetchTicket(number: string): Promise<void> {
     try {
@@ -428,7 +427,15 @@ function RegistrationForm({
         id: LOOKUP_TOAST,
         action: SOURCE_TICKET_LOOKUP.failedAction,
         error,
-        retry: () => fetchTicket(number),
+        // 重试前用户改了工单号就不再带入旧号（失败浮层随之撤掉）；查成功后记下这个号，离开输入框不再重复查
+        retry: async () => {
+          if (getValues('sourceTicket').trim() !== number) {
+            dismissToast(LOOKUP_TOAST);
+            return;
+          }
+          await fetchTicket(number);
+          setLookedUpTicket(number);
+        },
       });
     }
   }
@@ -902,10 +909,7 @@ function RegistrationForm({
               note={DRAWER.sections.feeTotal(total === null ? EMPTY_VALUE : formatUsdCents(total))}
             >
               <div
-                className={cn(
-                  'grid items-start gap-2.5',
-                  method === 'send_parts' ? 'grid-cols-4' : 'grid-cols-2',
-                )}
+                className={cn('grid items-start gap-2.5', shipping ? 'grid-cols-4' : 'grid-cols-2')}
               >
                 {feeItems.map((item) => {
                   const path = `fees.${item}.amount` as const;
