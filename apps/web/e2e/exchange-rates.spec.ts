@@ -29,15 +29,19 @@ function beijingToday(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
 }
 
-/** 等 worker 启动时的汇率同步写完（刚部署或刚起 e2e 服务时可能还在跑） */
+/**
+ * 等 worker 启动时的汇率同步写完（刚部署或刚起 e2e 服务时可能还在跑）。在页面里 fetch：与页面同一个会话、
+ * 同一套证书校验（开发测试环境的根证书只装进了冒烟容器的 Chromium，Node 端的 page.request 不信任它）
+ */
 async function waitForRates(page: Page, date: string): Promise<void> {
   await expect
     .poll(
-      async () => {
-        const res = await page.request.get(`/api/aftersales/exchange-rates?date=${date}`);
-        const body = (await res.json()) as { rates?: { MXN: unknown } };
-        return body.rates?.MXN ?? null;
-      },
+      () =>
+        page.evaluate(async (day) => {
+          const res = await fetch(`/api/aftersales/exchange-rates?date=${day}`);
+          const body = (await res.json()) as { rates?: { MXN: unknown } };
+          return body.rates?.MXN ?? null;
+        }, date),
       { timeout: 30_000 },
     )
     .not.toBeNull();

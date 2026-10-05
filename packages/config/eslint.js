@@ -17,6 +17,10 @@ export default [
       'docs/**',
       '.scratch/**',
       'apps/server/drizzle/**',
+      // 部署脚本的本机状态与 Playwright 的输出（失败时带 trace 查看器的打包脚本），都不进 git
+      'deploy/.state/**',
+      '**/test-results/**',
+      '**/playwright-report/**',
     ],
   },
   js.configs.recommended,

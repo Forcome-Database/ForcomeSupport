@@ -9,3 +9,5 @@ apps/server/drizzle/
 **/coverage/
 # 生成物：示例数据夹具由 scripts/fixtures/export_demo_fixture.py 生成，与生成结果逐字节一致
 packages/fixtures/data/
+# 部署脚本的本机状态（环境文件、根证书、冒烟报告），不进 git
+deploy/.state/
