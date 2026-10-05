@@ -189,7 +189,37 @@ def s14():
     left = col(cap('新建登记 · 寄配件（%s · %s）' % (LEDGER_NEW_DEMO['customer'], LEDGER_NEW_DEMO['store'])) + over_page(BL.reg_drawer(), 1030), 8)
     right = col(cap('保存时校验 · 改为退款或部分补偿、责任「其他」') + over_page(BL.reg_drawer(True), 910) +
                 cap('编辑登记 · 进行中的单，比索金额显示折算与汇率日期') + over_page(BL.edit_drawer(), 460, 0.444), 8)
-    return frame(grid(left + right, 2, 32, extra='align-items: start;'), WIDE)
+    return col(frame(grid(left + right, 2, 32, extra='align-items: start;'), WIDE) + s14_more(), 0)
+
+
+def s14_more():
+    """S14 的补充小样（第一阶段实现时确认，10-05）：物流问题的索赔字段、负责人旁的灰字与未选店铺、必填项为空、查库的报错、保存与查询的结果浮层、新建时的未保存离开。"""
+    claim = grid(BL.span(field('责任类型', select_box('物流问题'), True)) + BL.span('') +
+                 BL.span(field('索赔对象', select_box(), True)) + BL.span(field('索赔状态', select_box(), True)), 4, 10)
+    owners = col(field(BL.lbl_note('负责人', '已默认为你本人'), select_box('王磊（售后负责人）')) +
+                 field(BL.lbl_note('负责人', '只列有该店铺数据范围的售后负责人'), select_box()) +
+                 row(field(BL.lbl_note('负责人', ''), select_box(st='disabled'), extra='flex: 1;') + tooltip('先选店铺'), 10, 'flex-end'), 10)
+    required = col(''.join(row(icon('alert', 13, T['bad'], 2) + nowrap(t, 12, T['bad']), 4) for t in (
+        '请选择处理方式', '请选择店铺', '请选择站点', '请填写订单号', '请填写客户', '请选择费用发生日', '请选择负责人', '请选择责任类型', '请选择生产厂')), 6)
+    checked = grid(field('负责人', select_box('赵敏（售后负责人）', st='error'), True, error='只能选有该店铺数据范围的售后负责人') +
+                   field(BL.lbl_note('来源工单', '可不填', False), input_box('T-20990101-0001', st='error', mono=True), error='没有这张工单，或不在你的店铺范围内') +
+                   field(BL.lbl_note('来源工单', '可不填', False), input_box('T-20260911-0031', st='error', mono=True), error='来源工单属于 forcome.com，与所选店铺不一致') +
+                   field('数量', input_box('12', st='error', suffix='件 · 1–10', mono=True), True, error='数量为 1–10 的整数') +
+                   field('产品成本', input_box('3.205', st='error', mono=True), True, error='金额不能为负数，最多两位小数'), 2, 12, extra='align-items: start;')
+    ok = toast('success', '登记已保存', 'S-20260911-0023 · Olivia Turner，状态「进行中」，已记入审计日志。')
+    fail = toast('error', '保存失败：网络不可用', '填写的内容已保留在抽屉里。', link('立即重试', 12))
+    lookup = toast('error', '查询失败：网络不可用', None, link('立即重试', 12))
+    leave = dialog('离开前保存修改？', muted('「新建登记」填写的内容还没保存，放弃后不保留。', 13),
+                   btn('继续编辑', 'secondary', st='focus') + btn('放弃修改', 'danger_outline') + btn('保存并离开', 'primary'), 460, 'warning')
+    # 两列，每列按抽屉宽 640 画（字段与抽屉里的一样宽）
+    width = lambda html: '<div style="width: 640px; display: flex; flex-direction: column; gap: 10px;">%s</div>' % html
+    left = width(cap('责任为「物流问题」· 索赔对象（承运商 / 易仓）与索赔状态（待发起 / 索赔中 / 已赔付 / 已拒赔）；三组均 FSH 100，生产厂不显示') + claim +
+                 cap('负责人旁的灰字：登记人是售后负责人且还有别人 · 有几位要选 · 还没选店铺（下拉不可用，悬停说明）') + owners +
+                 cap('必填项为空（保存时校验全部；寄件一节、四项费用、索赔进行中可后填）') + required)
+    right = width(cap('要查库的报错：负责人不合格、来源工单不存在或店铺不一致；数量与金额的格式') + checked +
+                  cap('保存与查询的结果') + col(ok + fail + lookup, 10) +
+                  cap('新建登记时有未保存的输入就关闭（G8）') + leave)
+    return frame(cap('S14 补充小样（第一阶段实现时确认，10-05）') + grid(left + right, 2, 32, extra='align-items: start;'), WIDE, gap=10)
 
 
 # ---------------------------------------------------------------- S15 设为已完成、取消与补登
@@ -253,7 +283,9 @@ def build():
         VW('S14 新建登记与编辑登记', '右侧抽屉，处理方式三选一（调整安装方式 / 寄配件 / 退款或部分补偿）后按 R-AS-08 列出适用字段，不适用的不显示。示例为寄配件：店铺 forcome.com · 站点 US · 订单号 #1063 · 客户 Olivia Turner · 来源工单 T-20260911-0031（可不填）· '
            '负责人 王磊（该店铺唯一的售后负责人，已默认）· 费用发生日 09-11 · 责任 产品质量问题（三组比例按默认预填 FSH 0 / 工厂 100，可改，两侧互补）· 生产厂 FQD（按配件预填）· 配件 HEPA 滤芯组件 FC-V2-HF01 × 1 · 发货方 易仓 · 承运方式 · 寄出日期 · 快递单号（进行中可后填）· '
            '产品成本、运费、额外赔偿、其他（每项选币种 USD / CAD / MXN，非美元即时显示折算与汇率日期）。保存时校验全部，字段下方报错：比例 130 →「比例为 0–100 的整数」；退款或部分补偿的额外赔偿为 0 →「部分补偿、免退货退款的款项记在额外赔偿，须大于 0」；'
-           '责任为其他时理由必填；保存按钮保持可点，点击后定位到第一个错误（同 K8）。编辑登记为同一抽屉，标题「编辑登记 · S-…」，已完成的单只能由售后负责人补登缺失的适用字段与修改汇率，修改记审计。', s14(), 'P13 点「新建登记」或售后单号') +
+           '责任为其他时理由必填；保存按钮保持可点，点击后定位到第一个错误（同 K8）。保存时必须填：处理方式、店铺、站点、订单号、客户、费用发生日、负责人、责任类型、三组比例，以及上面三条；寄件一节、四项费用、索赔对象与状态进行中可后填（费用框默认空，没发生的填 0）。'
+           '责任为物流问题时列出索赔对象与索赔状态，三组工厂比例都为 0 时不显示生产厂。来源工单离开输入框时查询，带入店铺、站点、订单号、客户（仍可改，保存时店铺须一致）；选店铺带出默认站点与默认负责人，费用发生日默认今天，寄配件数量默认 1。'
+           '编辑登记为同一抽屉，标题「编辑登记 · S-…」，已完成的单只能由售后负责人补登缺失的适用字段与修改汇率，修改记审计。下方为补充小样（第一阶段实现时确认）。', s14(), 'P13 点「新建登记」或售后单号') +
         VW('S15 设为已完成、取消与补登', '三张小图：① 设为已完成：直接执行，浮层「S-20260911-0018 已完成 · 缺 2 项，已标黄待回填 · 撤销 4s」；② 取消售后单：二次确认弹窗「取消 S-20260911-0021？」，原因必填（0 / 200），逐项列出已登记费用并勾选取消后保留的已产生部分（默认全部保留），'
            '说明「已取消的单不能恢复；保留的费用照常计入售后成本」，默认焦点在「取消」；③ 补登：售后负责人点已完成单的「待回填」单元格行内编辑快递单号，保存后浮层「已补登 · 已记入审计日志」，「缺 N 项」随之减少。', s15(),
            'P13 行尾「更多」或已完成单的「待回填」单元格'),

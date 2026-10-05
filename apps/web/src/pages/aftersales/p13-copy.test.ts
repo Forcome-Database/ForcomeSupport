@@ -16,9 +16,12 @@ import {
   EMPTY_TITLE,
   EMPTY_VALUE,
   FINANCE_COLUMNS,
+  LEAVE,
   NEW_REGISTRATION,
   PAGE_DESCRIPTION,
   PAGE_TITLE,
+  SAVE_RESULT,
+  SOURCE_TICKET_LOOKUP,
   storeSite,
 } from './p13-copy';
 
@@ -26,6 +29,7 @@ import {
  * P13 与新建登记抽屉的界面文案与原型逐字一致（CLAUDE.md「文案逐字照原型」，ADR 0007 修订）：直接读原型生成物——第一期参照页
  * P13_AfterSalesLog（售后负责人）与 P13_AfterSalesLog_agent（坐席），状态板 StatesAfterSales（S10、S14）。原型改了文案而代码没跟上、
  * 或反过来，都会失败。原型由 design/spec 下的脚本生成（README「修改与重建」），改原型后要重新生成再跑这里。
+ * 实现时补的文案（10-05 用户确认）先回写进 S14 下方的补充小样（build_states_as.s14_more），再在这里核对。
  * 示例数据：S14 的新建登记是 forcome.com · Olivia Turner · 寄配件（HEPA 滤芯组件 FC-V2-HF01 × 1，产品成本 $3.20、运费 $6.80）。
  */
 
@@ -173,5 +177,53 @@ describe('S10 列表为空、S14 新建登记抽屉', () => {
     expectIn(STATES, registrationMessages.ratio);
     expectIn(STATES, registrationMessages.refundCompensation);
     expectIn(STATES, registrationMessages.reasonMissing);
+  });
+});
+
+describe('S14 补充小样（第一阶段实现时确认，10-05 用户确认）', () => {
+  it('物流问题的索赔对象与索赔状态、下拉占位', () => {
+    expectIn(STATES, `>${DRAWER.labels.claimTarget}<`);
+    expectIn(STATES, `>${DRAWER.labels.claimStatus}<`);
+    expectText(STATES, DRAWER.placeholder);
+  });
+
+  it('负责人旁的灰字三种与未选店铺时的悬停说明', () => {
+    expectIn(STATES, `>${DRAWER.ownerNotes.only}<`);
+    expectIn(STATES, `>${DRAWER.ownerNotes.self}<`);
+    expectIn(STATES, `>${DRAWER.ownerNotes.choose}<`);
+    expect(DRAWER.ownerNotes.none).toBe(DRAWER.ownerNotes.choose);
+    expectIn(STATES, `>${DRAWER.ownerNeedsStore}<`);
+  });
+
+  it('必填项为空与要查库的报错、数量与金额的格式', () => {
+    const m = registrationMessages;
+    for (const message of [
+      m.methodMissing,
+      m.storeMissing,
+      m.siteMissing,
+      m.orderNumberMissing,
+      m.customerMissing,
+      m.feeDateMissing,
+      m.ownerMissing,
+      m.responsibilityMissing,
+      m.factoryMissing,
+      m.ownerNotEligible,
+      m.sourceTicketNotFound,
+      m.sourceTicketStore('forcome.com'),
+      m.quantity,
+      m.amountFormat,
+    ]) {
+      expectIn(STATES, `${message}<`);
+    }
+  });
+
+  it('保存与来源工单查询的结果浮层（G5）、新建时的未保存离开（G8）', () => {
+    expectText(STATES, SAVE_RESULT.savedTitle);
+    expectIn(STATES, SAVE_RESULT.savedDescription('S-20260911-0023', 'Olivia Turner'));
+    // 失败浮层的标题由 notify 拼成「<动作>失败：原因」（ADR 0007）
+    expectIn(STATES, `>${SAVE_RESULT.failedAction}失败：网络不可用<`);
+    expectIn(STATES, SAVE_RESULT.failedDescription);
+    expectIn(STATES, `>${SOURCE_TICKET_LOOKUP.failedAction}失败：网络不可用<`);
+    expectIn(STATES, LEAVE);
   });
 });
