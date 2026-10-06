@@ -7,6 +7,7 @@ import {
   changeLines,
   conflictsOf,
   editsAfterReload,
+  editsAfterSave,
   firstErrorCell,
   teamChangesOf,
   type TeamEdits,
@@ -148,5 +149,33 @@ describe('并发（G7）', () => {
     const next = editsAfterReload(edits, latest);
     expect([...next.keys()]).toEqual(['lt']);
     expect(next.get('lt')?.base.version).toBe(1);
+  });
+});
+
+describe('保存成功之后', () => {
+  it('提交出去的修改清掉；提交期间又改的留着，依据换成刚保存好的那一版', () => {
+    const sent = applyEdit(none, zhaoqian, { stores: { all: true } });
+    // 提交之后、成功之前又改了李婷
+    const current = applyEdit(sent, liting, { roles: ['agent', 'supervisor'] });
+    const latest = [
+      { ...zhaoqian, version: 2, stores: { all: true } as const },
+      { ...liting, version: 1 },
+    ];
+    const next = editsAfterSave(current, sent, latest);
+    expect([...next.keys()]).toEqual(['lt']);
+    expect(next.get('lt')).toMatchObject({ roles: ['agent', 'supervisor'], base: { version: 1 } });
+  });
+
+  it('提交出去之后同一个人又改了：留着，依据是保存好的那一版（不再按旧版本号提交）', () => {
+    const sent = applyEdit(none, zhaoqian, { stores: { all: true } });
+    const current = applyEdit(sent, zhaoqian, { roles: ['agent', 'knowledge_owner'] });
+    const saved = { ...zhaoqian, version: 2, stores: { all: true } as const };
+    const next = editsAfterSave(current, sent, [saved, liting]);
+    expect(next.get('zq')).toMatchObject({
+      roles: ['agent', 'knowledge_owner'],
+      stores: { all: true },
+      base: { version: 2 },
+    });
+    expect(changedCellCount(next)).toBe(1);
   });
 });

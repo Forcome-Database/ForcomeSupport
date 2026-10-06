@@ -469,6 +469,8 @@ def k17_more():
                 row(btn('查看最新', 'secondary', 'sm', 'refresh') + btn('覆盖保存', 'danger_outline', 'sm'), 8))
     g7_many = banner('warning', '赵倩等 2 人刚被他人修改', '你的修改还没保存，已保留在表格中；可先查看最新内容再改，或用你的内容覆盖。',
                      row(btn('查看最新', 'secondary', 'sm', 'refresh') + btn('覆盖保存', 'danger_outline', 'sm'), 8))
+    g7_unknown = banner('warning', '赵倩刚被他人修改', '你的修改还没保存，已保留在表格中；可先查看最新内容再改，或用你的内容覆盖。',
+                        row(btn('查看最新', 'secondary', 'sm', 'refresh') + btn('覆盖保存', 'danger_outline', 'sm'), 8))
     # ⑦ 离开（G8）
     leave = dialog('离开前保存修改？', muted('「团队与权限」有 2 项未保存的修改。放弃后恢复为上次保存的值。', 13),
                    btn('继续编辑', 'secondary', st='focus') + btn('放弃修改', 'danger_outline') + btn('保存并离开', 'primary'), 460, 'warning')
@@ -490,7 +492,7 @@ def k17_more():
                  cap('④ 保存结果：成功浮层写修改摘要；断网时保留修改并在恢复后自动重试（K6），仍失败转红色失败浮层') + grid(ok + fail, 2, 12, extra='align-items: start;') + grid(off + back, 2, 12, extra='align-items: start;') +
                  cap('⑤ 保存时的报错写在格子下方，整批都不保存：「指定店铺」没勾店铺；去掉了最后一位在职管理员的「管理员」角色') + errs +
                  cap('已停用的成员：角色与数据范围的格子不能改，悬停写原因') + gone + gone_tip +
-                 cap('⑥ 有人已被别人改过（G7）：整批都不保存，表格上方给横幅；几个人时标题写「等 N 人」、不写是谁；「覆盖保存」需二次确认（同 P18）') + g7 + g7_many +
+                 cap('⑥ 有人已被别人改过（G7）：整批都不保存，表格上方给横幅；几个人时标题写「等 N 人」、不写是谁，一个人但对不出是谁改的（这个人已不在成员表里，例如刚回到通讯录、角色被清空）同样写「他人」；「覆盖保存」需二次确认（同 P18）') + g7 + g7_many + g7_unknown +
                  cap('⑦ 有未保存的修改时离开本页（G8，切换设置菜单、顶栏导航、头像菜单）；切「角色权限」页签不算离开') + '<div style="display: flex; justify-content: center;">%s</div>' % leave +
                  cap('⑧ 「从钉钉添加」右侧抽屉（宽 440）：成员、角色、数据范围都必填，数据范围默认不选；保存时一次报全并定位到第一个错误；在抽屉里直接保存，不进吸底保存栏') +
                  row(drawer_ + picks, 24, 'flex-start') +

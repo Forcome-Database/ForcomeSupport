@@ -13,6 +13,7 @@ import { Check, ChevronDown } from 'lucide-react';
 import { useId, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { FormField, useFocusField } from '@/components/form-field';
+import { LoadError } from '@/components/load-error';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -55,22 +56,33 @@ const EMPTY_FORM: AddForm = { memberId: null, roles: [], stores: null };
 const FIELD_ORDER = ['memberId', 'roles', 'stores'] as const;
 const SAVE_TOAST = 'team-member-add';
 
-/** 成员：可搜索的下拉（姓名、钉钉部门、邮箱都能搜） */
+/** 搜索只看姓名与邮箱（PRD P20 v2.24「搜姓名或邮箱」）；cmdk 的 value 是成员 ID（同名的人也分得开），不参与搜索 */
+const searchByKeywords = (_value: string, search: string, keywords?: string[]) =>
+  (keywords ?? []).some((k) => k.toLowerCase().includes(search.trim().toLowerCase())) ? 1 : 0;
+
+/** 成员：可搜索的下拉；候选取不到时写加载失败并可重试（设计规范第 9 节） */
 function MemberPicker({
   id,
   value,
   candidates,
+  failed,
+  onRetry,
   invalid,
   onChange,
 }: {
   id: string;
   value: string | null;
+  /** 加载中为 null */
   candidates: readonly TeamCandidate[] | null;
+  failed: boolean;
+  onRetry: () => void;
   invalid: boolean;
   onChange: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const chosen = candidates?.find((c) => c.id === value);
+  // 选中的人：候选刷新后（例如刚被别人添加）他已不在下拉里，触发框仍写他的姓名，报错写在下方（K17 补充小样 ⑧）
+  const [picked, setPicked] = useState<TeamCandidate | null>(null);
+  const chosen = candidates?.find((c) => c.id === value) ?? (picked?.id === value ? picked : null);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -82,10 +94,7 @@ function MemberPicker({
           className={cn(controlClass, 'flex items-center justify-between gap-2 px-2.5 text-left')}
         >
           {chosen ? (
-            <span className="flex min-w-0 items-center gap-2">
-              <span className="text-13 text-foreground">{chosen.name}</span>
-              <span className="truncate text-12 text-muted-foreground">{chosen.dept}</span>
-            </span>
+            <span className="truncate text-13 text-foreground">{chosen.name}</span>
           ) : (
             <span className="text-placeholder">{DRAWER.memberPlaceholder}</span>
           )}
@@ -93,13 +102,15 @@ function MemberPicker({
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
-        {candidates === null ? (
+        {failed ? (
+          <LoadError onRetry={onRetry} />
+        ) : candidates === null ? (
           <div className="flex flex-col gap-2 p-3">
             <Skeleton className="h-3.5 rounded-sm" />
             <Skeleton className="h-3.5 rounded-sm" />
           </div>
         ) : (
-          <Command>
+          <Command filter={searchByKeywords}>
             <CommandInput placeholder={DRAWER.memberSearch} />
             <CommandList>
               <CommandEmpty>
@@ -110,9 +121,11 @@ function MemberPicker({
                 return (
                   <CommandItem
                     key={candidate.id}
-                    value={`${candidate.name} ${candidate.dept} ${candidate.email ?? ''}`}
+                    value={candidate.id}
+                    keywords={[candidate.name, candidate.email ?? '']}
                     aria-current={current || undefined}
                     onSelect={() => {
+                      setPicked(candidate);
                       onChange(candidate.id);
                       setOpen(false);
                     }}
@@ -198,29 +211,31 @@ function TeamMemberDrawerContent({
     return true;
   }
 
-  async function submit(values: AddForm) {
+  /** 保存一次（提交此刻抽屉里填的内容）：字段错误留在抽屉里；处理不了的失败抛出（给失败浮层的「立即重试」用） */
+  async function addOnce() {
     try {
-      await added(await add.mutateAsync(values));
+      await added(await add.mutateAsync(form.getValues()));
     } catch (error) {
       if (handledInDrawer(error)) return;
+      throw error;
+    }
+  }
+
+  async function submit() {
+    try {
+      await addOnce();
+    } catch (error) {
       showError({
         id: SAVE_TOAST,
         action: ADD_RESULT.failedAction,
         error,
         description: ADD_RESULT.failedDescription,
-        retry: async () => {
-          try {
-            await added(await add.mutateAsync(values));
-          } catch (retryError) {
-            if (handledInDrawer(retryError)) return;
-            throw retryError;
-          }
-        },
+        retry: addOnce,
       });
     }
   }
 
-  const onSave = handleSubmit((values) => submit(values));
+  const onSave = handleSubmit(() => submit());
 
   function requestClose() {
     if (isDirty) setLeaving(true);
@@ -256,6 +271,8 @@ function TeamMemberDrawerContent({
                     id={fieldId('memberId')}
                     value={field.value}
                     candidates={candidates.data ?? null}
+                    failed={candidates.isError}
+                    onRetry={() => void candidates.refetch()}
                     invalid={fieldState.invalid}
                     onChange={(id) => {
                       field.onChange(id);

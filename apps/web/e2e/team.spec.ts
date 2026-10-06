@@ -1,4 +1,4 @@
-import { teamCandidatesSchema, teamSchema } from '@forcome/contracts';
+import { apiErrorSchema, teamCandidatesSchema, teamSchema } from '@forcome/contracts';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
 /*
@@ -36,6 +36,11 @@ async function resetNewcomer(page: Page): Promise<void> {
 /** 经接口把吴桐设成已添加的样子（坐席、只限 Forcome Direct），供后面的用例改他 */
 async function addNewcomerByApi(page: Page): Promise<void> {
   await resetNewcomer(page);
+  await addNewcomerDirect(page);
+}
+
+/** 经接口直接添加吴桐（坐席、只限 Forcome Direct）；他要是候选 */
+async function addNewcomerDirect(page: Page): Promise<void> {
   const status = await page.evaluate(async (name) => {
     const json = async (res: Response) => {
       if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
@@ -59,6 +64,13 @@ async function addNewcomerByApi(page: Page): Promise<void> {
     return res.status;
   }, NEWCOMER);
   expect(status).toBe(201);
+}
+
+/** 在抽屉的成员下拉里选吴桐 */
+async function pickNewcomer(page: Page): Promise<void> {
+  await drawer(page).getByLabel(/^成员/).click();
+  await page.getByPlaceholder('搜索姓名或邮箱').fill('wutong');
+  await page.getByRole('option', { name: new RegExp(NEWCOMER) }).click();
 }
 
 const row = (page: Page, name: string) =>
@@ -186,6 +198,53 @@ test('从钉钉添加（AC-ST-06）：不填时一次报全；角色里没有生
     return ((await res.json()) as { stores: { name: string }[] }).stores.map((s) => s.name);
   });
   expect(stores).toEqual(['Forcome Direct']);
+});
+
+test('「从钉钉添加」：有输入时关闭弹 G8；保存失败浮层的「立即重试」提交此刻填的内容；选的人刚被别人添加过，报在「成员」上', async ({
+  page,
+}) => {
+  await loginAs(page, '刘洋');
+  await resetNewcomer(page);
+  await openTeam(page);
+  await page.getByRole('button', { name: '从钉钉添加' }).click();
+  await drawer(page).getByRole('checkbox', { name: '坐席' }).click();
+  await drawer(page).getByRole('button', { name: '取消' }).click();
+  const leave = page.getByRole('alertdialog');
+  await expect(leave.getByRole('heading', { name: '离开前保存修改？' })).toBeVisible();
+  await expect(leave).toContainText('「从钉钉添加成员」填写的内容还没保存，放弃后不保留。');
+  await leave.getByRole('button', { name: '继续编辑' }).click();
+  await expect(drawer(page).getByRole('heading', { name: '从钉钉添加成员' })).toBeVisible();
+
+  await pickNewcomer(page);
+  await drawer(page).getByRole('radio', { name: '全部店铺（含以后新增的）' }).click();
+  // 接口连不上：失败浮层（G5），填的内容留在抽屉里
+  await page.route('**/api/org/team/members', (route) => route.abort());
+  await drawer(page).getByRole('button', { name: '保存' }).click();
+  await expect(page.getByText('保存失败：网络不可用')).toBeVisible();
+  await expect(page.getByText('填写的内容已保留在抽屉里。')).toBeVisible();
+  // 又加了一个角色再重试：提交的是此刻填的
+  await drawer(page).getByRole('checkbox', { name: '客服主管' }).click();
+  await page.unroute('**/api/org/team/members');
+  await page.getByRole('button', { name: '立即重试' }).click();
+  await expect(page.getByText('已添加成员')).toBeVisible();
+  await expect(
+    page.getByText(
+      new RegExp(`^${NEWCOMER} · 坐席、客服主管，已记入审计日志（刘洋 \\d{2}:\\d{2}）。$`),
+    ),
+  ).toBeVisible();
+  await expect(drawer(page)).toHaveCount(0);
+
+  // 选的人刚被别人添加过：报在「成员」上，触发框仍写他
+  await resetNewcomer(page);
+  await page.reload();
+  await page.getByRole('button', { name: '从钉钉添加' }).click();
+  await pickNewcomer(page);
+  await drawer(page).getByRole('checkbox', { name: '坐席' }).click();
+  await drawer(page).getByRole('radio', { name: '全部店铺（含以后新增的）' }).click();
+  await addNewcomerDirect(page);
+  await drawer(page).getByRole('button', { name: '保存' }).click();
+  await expect(drawer(page).getByText(`${NEWCOMER}已经分配过角色`, { exact: true })).toBeVisible();
+  await expect(drawer(page).getByLabel(/^成员/)).toHaveText(NEWCOMER);
 });
 
 test('格内修改（K6）：改角色与数据范围 → 已修改与保存栏摘要 → 保存成功浮层；只剩一个角色时不能取消；改回原值不算修改', async ({
@@ -381,6 +440,72 @@ test('并发（G7）：别人先保存了，整批不保存并给横幅；覆盖
   await expect(row(page, NEWCOMER)).toContainText('全部店铺');
 });
 
+test('并发（G7）几个人同时冲突：标题写「等 N 人」、不写是谁；查看最新放弃这几个人的修改（接口桩按 contracts 严格解析）', async ({
+  page,
+}) => {
+  await loginAs(page, '刘洋');
+  await addNewcomerByApi(page);
+  await openTeam(page);
+  await editScope(page, '全部店铺（含以后新增的）');
+  await page.getByRole('button', { name: '修改李婷的角色' }).click();
+  await page.getByRole('menuitemcheckbox', { name: '客服主管' }).click();
+  await page.keyboard.press('Escape');
+  // 别人先改了吴桐与李婷：保存 409，之后取到的成员表里两人都换了版本
+  await page.route('**/api/org/team', async (route) => {
+    if (route.request().method() === 'PUT') {
+      return route.fulfill({
+        status: 409,
+        json: apiErrorSchema.parse({ error: 'optimistic_lock', message: '数据已被他人修改' }),
+      });
+    }
+    const team = teamSchema.parse(await (await route.fetch()).json());
+    return route.fulfill({
+      json: teamSchema.parse({
+        ...team,
+        members: team.members.map((m) =>
+          m.name === NEWCOMER || m.name === '李婷' ? { ...m, version: m.version + 1 } : m,
+        ),
+      }),
+    });
+  });
+  await saveBar(page).getByRole('button', { name: '保存' }).click();
+  const alert = page.getByRole('alert').filter({ hasText: '刚被' });
+  await expect(alert).toContainText(`${NEWCOMER}等 2 人刚被他人修改`);
+  await expect(alert).toContainText(
+    '你的修改还没保存，已保留在表格中；可先查看最新内容再改，或用你的内容覆盖。',
+  );
+  await alert.getByRole('button', { name: '查看最新' }).click();
+  await expect(alert).toHaveCount(0);
+  await expect(saveBar(page)).toContainText('没有未保存的修改');
+  await page.unroute('**/api/org/team');
+});
+
+test('断网（K6）：恢复后自动重试仍失败，转红色失败浮层并保留修改；「立即重试」后保存', async ({
+  page,
+  context,
+}) => {
+  await loginAs(page, '刘洋');
+  await addNewcomerByApi(page);
+  await openTeam(page);
+  await editScope(page, '全部店铺（含以后新增的）');
+  await context.setOffline(true);
+  await saveBar(page).getByRole('button', { name: '保存' }).click();
+  await expect(page.getByText('网络已断开，暂未保存')).toBeVisible();
+  // 网络恢复了，服务却连不上：自动重试失败
+  await page.route('**/api/org/team', (route) =>
+    route.request().method() === 'PUT' ? route.abort() : route.continue(),
+  );
+  await context.setOffline(false);
+  await expect(page.getByText('保存失败：网络不可用')).toBeVisible();
+  await expect(page.getByText('修改已保留在页面上。', { exact: true })).toBeVisible();
+  await expect(page.getByText('网络已断开，暂未保存')).toHaveCount(0);
+  await expect(saveBar(page)).toContainText('有 1 项未保存修改');
+  await page.unroute('**/api/org/team');
+  await page.getByRole('button', { name: '立即重试' }).click();
+  await expect(page.getByText('设置已保存')).toBeVisible();
+  await expect(saveBar(page)).toContainText('没有未保存的修改');
+});
+
 test('断网（K6）：保存时断网保留修改，恢复后自动重试并保存', async ({ page, context }) => {
   await loginAs(page, '刘洋');
   await addNewcomerByApi(page);
@@ -449,6 +574,19 @@ test('已停用的成员不能改（悬停写原因）；「从钉钉添加」�
   await drawer(page).getByLabel(/^成员/).click();
   await page.getByPlaceholder('搜索姓名或邮箱').fill('不存在的人');
   await expect(page.getByText('没有匹配的人', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await drawer(page).getByRole('button', { name: '取消' }).click();
+
+  // 候选取不到：加载失败，可以重试（设计规范第 9 节）
+  await page.route('**/api/org/team/candidates', (route) => route.abort());
+  await page.reload();
+  await page.getByRole('button', { name: '从钉钉添加' }).click();
+  await drawer(page).getByLabel(/^成员/).click();
+  // 查询失败前会按默认的退避重试 3 次（约 7 秒）
+  await expect(page.getByText('加载失败', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await page.unroute('**/api/org/team/candidates');
+  await page.getByRole('button', { name: '重试' }).click();
+  await expect(page.getByPlaceholder('搜索姓名或邮箱')).toBeVisible();
   await page.keyboard.press('Escape');
   await drawer(page).getByRole('button', { name: '取消' }).click();
 

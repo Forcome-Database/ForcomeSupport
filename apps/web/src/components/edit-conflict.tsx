@@ -19,8 +19,8 @@ import { Button } from '@/components/ui/button';
 export interface EditConflictInfo {
   /** 先保存的人（姓名；系统写入为「系统」） */
   readonly who: string;
-  /** 对方保存的时刻（hh:mm）；不知道时为空串（P20 几个人同时冲突时写「他人」） */
-  readonly at: string;
+  /** 对方保存的时刻（hh:mm）；不知道时为 null（P20 几个人同时冲突时写「他人」，不写时刻） */
+  readonly at: string | null;
   /** 对方改了哪些项（字段名）；内容相同时为空 */
   readonly fields: readonly string[];
 }
@@ -41,7 +41,7 @@ export function EditConflictAlert({
   return (
     <Alert
       tone="warning"
-      title={copy?.title ?? `这条记录刚被${who}修改（${at}）`}
+      title={copy?.title ?? `这条记录刚被${who}修改${at ? `（${at}）` : ''}`}
       description={
         copy?.description ??
         `${fields.length > 0 ? `${who}改了：${fields.join('、')}。` : ''}你的修改还没保存，已保留在下方；可先查看最新内容再改，或用你的内容覆盖。`

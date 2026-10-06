@@ -2,6 +2,7 @@ import {
   apiErrorSchema,
   currentMemberSchema,
   devDingtalkRejoinResponseSchema,
+  devMembersResponseSchema,
   storeOptionsSchema,
   teamCandidatesSchema,
   teamMemberSchema,
@@ -447,5 +448,72 @@ describe('修改角色与店铺范围（吸底保存栏统一保存，K6）', ()
     expect(
       await fieldErrors(await save([await change(chenchen.id, ['agent'], { all: true })])),
     ).toEqual({ [`${chenchen.id}.roles`]: teamMessages.disabledMember });
+  });
+});
+
+describe('列谁与保护规则的边界（Q2、Q4，2026-10-06 用户确认）', () => {
+  it('只有生产厂对接人角色的不列（示例数据的陈工、张工是在职成员）；兼有客服系统角色的列出，保存时原样保留生产厂对接人角色', async () => {
+    const dev = devMembersResponseSchema.parse(await (await t.api.get('/api/dev/members')).json());
+    expect(dev.members.find((m) => m.name === '陈工')?.roles).toEqual(['factory_contact']);
+    const names = (await team()).members.map((m) => m.name);
+    expect(names).not.toContain('陈工');
+    expect(names).not.toContain('张工');
+
+    const both = await t.addMember({
+      name: '兼岗',
+      dept: 'FQD / 品质部',
+      roles: ['factory_contact', 'supervisor'],
+      allStores: true,
+    });
+    expect((await memberOf(both))?.roles).toEqual(['supervisor', 'factory_contact']);
+    expect((await save([await change(both, ['agent'], { all: true })])).status).toBe(200);
+    expect((await memberOf(both))?.roles).toEqual(['agent', 'factory_contact']);
+  });
+
+  it('其他管理员都已停用时，去掉在职管理员的「管理员」角色同样报错（停用的不算）', async () => {
+    await t.addMember({
+      name: '已停用的管理员',
+      dept: 'FSH / 信息部',
+      roles: ['admin'],
+      allStores: true,
+      status: 'disabled',
+    });
+    const admins = (await team()).members.filter(
+      (m) => m.status === 'active' && m.roles.includes('admin'),
+    );
+    expect(admins.length).toBeGreaterThan(0);
+    const res = await save(
+      await Promise.all(
+        admins.map((m) =>
+          change(
+            m.id,
+            m.roles.filter((r) => r !== 'admin' && r !== 'factory_contact').length > 0
+              ? m.roles.filter((r) => r !== 'admin' && r !== 'factory_contact')
+              : ['agent'],
+            m.stores,
+          ),
+        ),
+      ),
+    );
+    expect(await fieldErrors(res)).toEqual(
+      Object.fromEntries(admins.map((m) => [`${m.id}.roles`, teamMessages.lastAdmin])),
+    );
+  });
+
+  it('「从钉钉添加」选的人刚被停用（钉钉离职）：同没选一样报「请选择成员」，候选里不再有他', async () => {
+    const dingtalk = t.clients.fake(dingtalkClient);
+    dingtalk.addUser({ userId: 'leaver', name: '将离职', departmentIds: [], email: null });
+    await t.runJobs();
+    const leaver = await candidateNamed('将离职');
+    expect(leaver).not.toBeNull();
+
+    dingtalk.removeUser('leaver');
+    await t.runJobs();
+    expect(await candidateNamed('将离职')).toBeNull();
+    expect(
+      await fieldErrors(
+        await addMember({ memberId: leaver, roles: ['agent'], stores: { all: true } }),
+      ),
+    ).toEqual({ memberId: teamMessages.memberRequired });
   });
 });

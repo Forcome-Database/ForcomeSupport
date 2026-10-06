@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   isTeamMember,
   lastLoginWords,
+  orderedRoles,
+  sameRoles,
+  sameStoreScope,
   storeScopeWords,
   syncedAtWords,
   teamAccessErrors,
@@ -35,6 +38,29 @@ describe('P20 可分配的角色', () => {
     expect(isTeamMember(['factory_contact', 'supervisor'])).toBe(true);
     expect(isTeamMember(['factory_contact'])).toBe(false);
     expect(isTeamMember([])).toBe(false);
+  });
+});
+
+describe('角色与店铺范围的比较（勾选先后不算区别）', () => {
+  it('角色按 PRD 10.1 的顺序排；两组角色相同不看先后', () => {
+    expect(orderedRoles(['admin', 'agent', 'factory_contact'])).toEqual([
+      'agent',
+      'admin',
+      'factory_contact',
+    ]);
+    expect(sameRoles(['admin', 'agent'], ['agent', 'admin'])).toBe(true);
+    expect(sameRoles(['agent'], ['agent', 'admin'])).toBe(false);
+  });
+
+  it('店铺范围：全部店铺与指定店铺不同；指定的店铺相同不看先后', () => {
+    expect(sameStoreScope({ all: true }, { all: true })).toBe(true);
+    expect(sameStoreScope({ all: true }, { all: false, storeIds: [FD, FC] })).toBe(false);
+    expect(
+      sameStoreScope({ all: false, storeIds: [FD, FC] }, { all: false, storeIds: [FC, FD] }),
+    ).toBe(true);
+    expect(sameStoreScope({ all: false, storeIds: [FD] }, { all: false, storeIds: [FC] })).toBe(
+      false,
+    );
   });
 });
 

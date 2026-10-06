@@ -143,7 +143,6 @@ export const A11Y = {
   permissionsRegion: PERMISSIONS.label,
   editRoles: (name: string) => `修改${name}的角色`,
   editStores: (name: string) => `修改${name}的数据范围`,
-  actionsColumn: '操作',
   saveBar: '保存修改',
   stores: '店铺',
 } as const;

@@ -90,6 +90,7 @@ function CapabilityRow({
   return (
     <div
       role="row"
+      data-capability={capability.key}
       className={cn(
         GRID,
         'py-1.75',
@@ -105,7 +106,7 @@ function CapabilityRow({
         {capability.label}
       </div>
       {roles.map((role) => (
-        <div role="cell" key={role}>
+        <div role="cell" key={role} data-grant={capability.grants[role]?.kind ?? 'none'}>
           <Mark grant={capability.grants[role]} />
         </div>
       ))}

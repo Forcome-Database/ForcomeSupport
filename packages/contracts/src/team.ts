@@ -27,9 +27,26 @@ export function isTeamMember(memberRoles: readonly Role[]): boolean {
   return memberRoles.some((role) => (teamRoles as readonly Role[]).includes(role));
 }
 
+/** 角色按 PRD 10.1 的顺序排好（成员表、审计与比较都用这个顺序，勾选先后不算区别） */
+export function orderedRoles(memberRoles: readonly Role[]): Role[] {
+  return roles.filter((role) => memberRoles.includes(role));
+}
+
+/** 两组角色是否相同（不看先后） */
+export function sameRoles(a: readonly Role[], b: readonly Role[]): boolean {
+  return orderedRoles(a).join(',') === orderedRoles(b).join(',');
+}
+
+/** 两个店铺范围是否相同：都是全部店铺，或指定的店铺相同（不看先后） */
+export function sameStoreScope(a: StoreScopeValue, b: StoreScopeValue): boolean {
+  if (a.all || b.all) return a.all === b.all;
+  return [...a.storeIds].sort().join(',') === [...b.storeIds].sort().join(',');
+}
+
 /**
  * 校验与保存的报错（字段下方或成员表格子下方；文案照原型 K17 下方的 P20 补充小样，10-06 用户确认）。
- * factoryRole、unknownStore、notActive 只有直接调接口或选的人刚好被停用时才会收到（界面不给这些选项），原型不画
+ * factoryRole、unknownStore 只有直接调接口才会收到（界面不给这些选项），原型不画。「从钉钉添加」选的人刚被停用（钉钉离职）
+ * 或已不在成员表里时，同没选一样报「请选择成员」（候选随之刷新，这个人从下拉里消失）
  */
 export const teamMessages = {
   memberRequired: '请选择成员',
@@ -42,8 +59,6 @@ export const teamMessages = {
   lastAdmin: '至少要有一位在职的管理员',
   /** 「从钉钉添加」选的人刚被别人添加过 */
   alreadyAdded: (name: string) => `${name}已经分配过角色`,
-  /** 「从钉钉添加」选的人刚被停用（钉钉离职） */
-  notActive: (name: string) => `${name}已停用，不能添加`,
   disabledMember: '已停用的成员不能修改角色与数据范围',
 } as const;
 

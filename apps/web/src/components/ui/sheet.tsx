@@ -9,7 +9,15 @@ import { cn } from '@/lib/utils';
  * 标题区（内边距 16 / 20 / 14、下边浅线）：16 / 600 标题 + 12 次要色说明，右侧 16 的关闭 ×；
  * 表单区（内边距 16 / 20、间距 14，超出时滚动）；底部按钮区（内边距 12 / 20、上边浅线、浅灰底，按钮靠右、间距 8）。
  * 只做右侧一种。关闭（Esc、点遮罩、×）都经 onOpenChange(false)，有未保存修改时由使用处决定是否先确认（G8）。
+ * 抽屉开着时保存失败的浮层（G5）要能点「立即重试」：浮层在抽屉之外，点它不算点到抽屉外面（不关抽屉、不弹 G8）；
+ * 浮层本身能接住点击见 components/ui/sonner.tsx。
  */
+
+/** 点的是浮层提示（Sonner 的容器里）：不当作点到抽屉外面 */
+function keepOpenForToasts(event: Event): void {
+  const target = event.target;
+  if (target instanceof Element && target.closest('[data-sonner-toaster]')) event.preventDefault();
+}
 
 function Sheet(props: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
@@ -18,6 +26,7 @@ function Sheet(props: React.ComponentProps<typeof SheetPrimitive.Root>) {
 function SheetContent({
   className,
   children,
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content>) {
   return (
@@ -32,6 +41,10 @@ function SheetContent({
           'fixed inset-y-0 right-0 z-50 flex h-full flex-col border-l bg-card text-body text-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right-10 data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-10 data-[state=closed]:fade-out-0',
           className,
         )}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event);
+          if (!event.defaultPrevented) keepOpenForToasts(event);
+        }}
         {...props}
       >
         {children}

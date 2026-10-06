@@ -58,6 +58,7 @@ const addRoute = createRoute({
     400: invalid,
     401: unauthenticated,
     403: forbidden,
+    409: json(apiErrorSchema, '选的人刚被钉钉同步改过（例如离职停用），请重新选择'),
   },
 });
 

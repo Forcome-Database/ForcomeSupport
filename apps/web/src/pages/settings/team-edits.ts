@@ -1,6 +1,8 @@
 import {
+  orderedRoles,
   roleNames,
-  roles as allRoles,
+  sameRoles,
+  sameStoreScope,
   storeScopeWords,
   type FieldErrors,
   type Role,
@@ -29,22 +31,14 @@ export interface TeamEdit {
 /** 成员 ID → 待保存的修改（按改的先后） */
 export type TeamEdits = ReadonlyMap<string, TeamEdit>;
 
-const ordered = (memberRoles: readonly Role[]) =>
-  allRoles.filter((role) => memberRoles.includes(role));
-
-const sameRoles = (a: readonly Role[], b: readonly Role[]) =>
-  ordered(a).join(',') === ordered(b).join(',');
-
-const sameScope = (a: StoreScopeValue, b: StoreScopeValue) =>
-  a.all || b.all
-    ? a.all === b.all
-    : [...a.storeIds].sort().join(',') === [...b.storeIds].sort().join(',');
+/** 格子下方的报错：成员 ID → 哪一列、写什么 */
+export type TeamCellErrors = ReadonlyMap<string, Partial<Record<TeamCell, string>>>;
 
 /** 这位成员哪几格改了 */
 export function changedCells(edit: TeamEdit): Record<TeamCell, boolean> {
   return {
     roles: !sameRoles(edit.roles, edit.base.roles),
-    stores: !sameScope(edit.stores, edit.base.stores),
+    stores: !sameStoreScope(edit.stores, edit.base.stores),
   };
 }
 
@@ -60,7 +54,7 @@ export function applyEdit(
   const current = edits.get(member.id);
   const base = current?.base ?? member;
   const next: TeamEdit = {
-    roles: ordered(change.roles ?? current?.roles ?? base.roles),
+    roles: orderedRoles(change.roles ?? current?.roles ?? base.roles),
     stores: change.stores ?? current?.stores ?? base.stores,
     base,
   };
@@ -120,7 +114,7 @@ export function teamChangesOf(
 }
 
 /** 接口的字段错误（键「成员 ID.roles / .stores」）按成员分开 */
-export function cellErrorsOf(fields: FieldErrors): Map<string, Partial<Record<TeamCell, string>>> {
+export function cellErrorsOf(fields: FieldErrors): TeamCellErrors {
   const errors = new Map<string, Partial<Record<TeamCell, string>>>();
   for (const [path, message] of Object.entries(fields)) {
     const match = /^(.+)\.(roles|stores)$/.exec(path);
@@ -133,7 +127,7 @@ export function cellErrorsOf(fields: FieldErrors): Map<string, Partial<Record<Te
 
 /** 第一个出错的格（按成员表的先后、同一行先角色后数据范围），保存后定位到它 */
 export function firstErrorCell(
-  errors: ReadonlyMap<string, Partial<Record<TeamCell, string>>>,
+  errors: TeamCellErrors,
   order: readonly string[],
 ): { memberId: string; column: TeamCell } | null {
   for (const memberId of order) {
@@ -163,7 +157,7 @@ export function conflictsOf(edits: TeamEdits, latest: readonly TeamMember[]): Te
     if (now && now.version === edit.base.version) continue;
     const fields: string[] = [];
     if (now && !sameRoles(now.roles, edit.base.roles)) fields.push(FIELD_NAMES.roles);
-    if (now && !sameScope(now.stores, edit.base.stores)) fields.push(FIELD_NAMES.stores);
+    if (now && !sameStoreScope(now.stores, edit.base.stores)) fields.push(FIELD_NAMES.stores);
     if (now && now.status !== edit.base.status) fields.push(FIELD_NAMES.status);
     conflicts.push({
       id,
@@ -186,6 +180,25 @@ export function editsAfterReload(edits: TeamEdits, latest: readonly TeamMember[]
   for (const [id, edit] of edits) {
     const now = byId.get(id);
     if (!now || now.version !== edit.base.version || now.status !== 'active') continue;
+    next = applyEdit(next, now, { roles: edit.roles, stores: edit.stores });
+  }
+  return next;
+}
+
+/**
+ * 保存成功之后还剩的修改：这次提交出去的（sent 里的同一份）都已保存；提交期间又改了的格子留着，依据换成刚保存好的最新一行
+ * （latest），不让「保存」把提交之后的改动一并清掉
+ */
+export function editsAfterSave(
+  current: TeamEdits,
+  sent: TeamEdits,
+  latest: readonly TeamMember[],
+): TeamEdits {
+  const byId = new Map(latest.map((m) => [m.id, m]));
+  let next: TeamEdits = new Map();
+  for (const [id, edit] of current) {
+    const now = byId.get(id);
+    if (sent.get(id) === edit || !now || now.status !== 'active') continue;
     next = applyEdit(next, now, { roles: edit.roles, stores: edit.stores });
   }
   return next;

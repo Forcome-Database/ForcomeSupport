@@ -6,7 +6,8 @@ import { UNDO_TOASTER } from '@/lib/notify';
  * 放在顶栏下方（上 68、右 16），不挡顶栏。成功与信息 3 秒消失（默认时长）；失败与警示不自动消失，
  * 由 src/lib/notify.tsx 的 showError 设定。浮层本身由 notify 渲染成原型的卡片样式。
  * 只做浅色，不接 shadcn 默认带的 next-themes；关掉 Sonner 自带的 Alt+T 快捷键（PRD D-20：快捷键只保留顶部搜索），
- * 读屏器播报区用中文名。
+ * 读屏器播报区用中文名。抽屉、弹窗开着时 Radix 让页面其余部分接不到点击（body 的 pointer-events: none），
+ * 浮层要自己接住点击，失败浮层的「立即重试」、关闭 × 才点得到（抽屉那边不把点浮层当作点到外面，见 ui/sheet.tsx）。
  */
 export function Toaster() {
   return (
@@ -19,6 +20,7 @@ export function Toaster() {
       offset={{ top: 68, right: 16 }}
       hotkey={[]}
       containerAriaLabel="浮层提示"
+      toastOptions={{ style: { pointerEvents: 'auto' } }}
     />
   );
 }
@@ -38,6 +40,7 @@ export function UndoToaster() {
       offset={{ bottom: 16, right: 24 }}
       hotkey={[]}
       containerAriaLabel="撤销浮层"
+      toastOptions={{ style: { pointerEvents: 'auto' } }}
     />
   );
 }

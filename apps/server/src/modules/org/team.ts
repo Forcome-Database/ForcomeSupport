@@ -1,6 +1,9 @@
 import {
   roles as allRoles,
   isTeamMember,
+  orderedRoles,
+  sameRoles,
+  sameStoreScope,
   SYSTEM_ACTOR_NAME,
   teamAccessErrors,
   teamFieldPath,
@@ -53,7 +56,7 @@ function toTeamMember(row: MemberRow): TeamMember {
     name: row.name,
     email: row.email,
     dept: row.dept,
-    roles: [...row.roles],
+    roles: orderedRoles(row.roles),
     stores: memberScopeValue(row),
     status: row.status,
     lastLoginAt: row.lastLoginAt?.toISOString() ?? null,
@@ -63,15 +66,14 @@ function toTeamMember(row: MemberRow): TeamMember {
   };
 }
 
-/** 角色在成员表里按 PRD 10.1 的顺序存 */
-const ordered = (memberRoles: readonly Role[]): Role[] =>
-  allRoles.filter((role) => memberRoles.includes(role));
-
 /** 角色的先后：成员的几个角色里最靠前的那个（PRD 10.1 的顺序） */
 const roleRank = (memberRoles: readonly Role[]) =>
   Math.min(...memberRoles.map((role) => allRoles.indexOf(role)), allRoles.length);
 
-/** 成员表：至少有一个客服系统角色的成员（含已停用的），按角色、同角色按加入先后（原型 P20 的顺序） */
+/**
+ * 成员表：至少有一个客服系统角色的成员（含已停用的；即 contracts 的 isTeamMember，在 SQL 里按 teamRoles 取），
+ * 按角色、同角色按加入先后（原型 P20 的顺序）
+ */
 export async function listTeam(
   db: DbExecutor,
   storeChoices: TeamStoreChoices,
@@ -86,7 +88,6 @@ export async function listTeam(
     dingtalkSyncHealth(db),
   ]);
   const members = rows
-    .filter((row) => isTeamMember(row.roles))
     .sort(
       (a, b) =>
         roleRank(a.roles) - roleRank(b.roles) ||
@@ -120,12 +121,6 @@ function normalizeScope(scope: StoreScopeValue, stores: readonly TeamStore[]): S
   };
 }
 
-const sameScope = (a: StoreScopeValue, b: StoreScopeValue) =>
-  a.all === b.all && (a.all || b.all || a.storeIds.join(',') === b.storeIds.join(','));
-
-const sameRoles = (a: readonly Role[], b: readonly Role[]) =>
-  ordered(a).join(',') === ordered(b).join(',');
-
 function changedByName(actor: Actor): string {
   return actor.kind === 'member' ? actor.name : SYSTEM_ACTOR_NAME;
 }
@@ -150,7 +145,8 @@ export async function addTeamMember(
     [row] = await tx.db.select().from(member).where(eq(member.id, input.memberId)).limit(1);
     if (!row) errors.memberId = teamMessages.memberRequired;
     else if (row.roles.length > 0) errors.memberId = teamMessages.alreadyAdded(row.name);
-    else if (row.status !== 'active') errors.memberId = teamMessages.notActive(row.name);
+    // 刚被停用（钉钉离职）的同没选：候选刷新后这个人从下拉里消失
+    else if (row.status !== 'active') errors.memberId = teamMessages.memberRequired;
   }
   Object.assign(
     errors,
@@ -163,7 +159,7 @@ export async function addTeamMember(
 
   const scope = normalizeScope(input.stores!, stores);
   const updated = await updateWithVersion(tx, member, row, {
-    roles: ordered(input.roles),
+    roles: orderedRoles(input.roles),
     allStores: scope.all,
     storeIds: scope.all ? [] : scope.storeIds,
     changedAt: tx.now,
@@ -230,7 +226,7 @@ export async function saveTeam(
       if (access.stores) errors[path('stores')] = access.stores;
     }
     const keptFactory = row.roles.includes('factory_contact') ? (['factory_contact'] as const) : [];
-    const roles = ordered([...change.roles, ...keptFactory]);
+    const roles = orderedRoles([...change.roles, ...keptFactory]);
     const scope = normalizeScope(change.stores, stores);
     return {
       row,
@@ -238,7 +234,7 @@ export async function saveTeam(
       roles,
       scope,
       rolesChanged: !sameRoles(roles, row.roles),
-      storesChanged: !sameScope(scope, memberScopeValue(row)),
+      storesChanged: !sameStoreScope(scope, memberScopeValue(row)),
     };
   });
 

@@ -2,7 +2,15 @@ import { syncedAtWords, type Team, type TeamMember } from '@forcome/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBlocker, useSearch } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
-import { useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { z } from 'zod';
 import { EditConflictAlert, OverwriteDialog } from '@/components/edit-conflict';
 import { useFocusField } from '@/components/form-field';
@@ -38,9 +46,11 @@ import {
   changeLines,
   conflictsOf,
   editsAfterReload,
+  editsAfterSave,
   firstErrorCell,
   teamChangesOf,
   type TeamCell,
+  type TeamCellErrors,
   type TeamConflict,
   type TeamEdits,
 } from './team-edits';
@@ -61,7 +71,7 @@ export const teamSearchSchema = z.object({ member: z.uuid().optional().catch(und
 
 const SAVE_TOAST = 'team-save';
 const OFFLINE_TOAST = 'team-save-offline';
-const NO_ERRORS: ReadonlyMap<string, Partial<Record<TeamCell, string>>> = new Map();
+const NO_ERRORS: TeamCellErrors = new Map();
 
 type Tab = 'members' | 'permissions';
 
@@ -83,8 +93,15 @@ export function TeamPage() {
   const focusField = useFocusField();
   // 断网时要立即失败（交给 K6 的断网处理），不能像 TanStack Query 默认的那样暂停到恢复联网
   const save = useMutation({ mutationFn: api.saveTeam, networkMode: 'always' });
-  /** 断网时那次保存用的版本号（覆盖保存时是最新的），恢复后自动重试沿用 */
-  const retryVersions = useRef<ReadonlyMap<string, number> | undefined>(undefined);
+  /**
+   * 重试（失败浮层的「立即重试」、断网恢复后的自动重试）提交的是重试那一刻页面上的修改，不是失败那一刻的；
+   * 「覆盖保存」后冲突的人改用最新的版本号，之后的重试沿用，保存成功、放弃或查看最新后清掉
+   */
+  const editsRef = useRef(edits);
+  const versionsRef = useRef<ReadonlyMap<string, number> | undefined>(undefined);
+  useLayoutEffect(() => {
+    editsRef.current = edits;
+  });
 
   const storeNames = useMemo(
     () => new Map((team.data?.stores ?? []).map((s) => [s.id, s.name])),
@@ -110,9 +127,17 @@ export function TeamPage() {
     else blocker.reset();
   }
 
-  function saved(latest: Team, lines: string, retried: boolean) {
+  /** 换一份待保存的修改（同时更新给重试用的那份，setState 要到下一次渲染才生效） */
+  function replaceEdits(next: TeamEdits) {
+    editsRef.current = next;
+    setEdits(next);
+  }
+
+  /** 保存成功：提交出去的修改清掉（提交期间又改的留着），成功浮层写摘要；断网后自动重试成功的是中性浮层（K6） */
+  function saved(latest: Team, sent: TeamEdits, lines: string, retried: boolean) {
     queryClient.setQueryData(teamQuery.queryKey, latest);
-    setEdits(new Map());
+    replaceEdits(editsAfterSave(editsRef.current, sent, latest.members));
+    versionsRef.current = undefined;
     setErrors(NO_ERRORS);
     setConflicts(null);
     setWaitingOnline(false);
@@ -133,20 +158,25 @@ export function TeamPage() {
     finishLeaving(true);
   }
 
-  /** 保存冲突（409）：取最新的成员表，标出谁、几点改了谁的哪些列（G7） */
-  async function showConflicts() {
+  /** 保存冲突（409）：取最新的成员表，标出谁、几点改了谁的哪些列（G7）；对不出是谁（期间又改回来了）时按失败处理 */
+  async function showConflicts(error: unknown) {
     const latest = await queryClient.fetchQuery({ ...teamQuery, staleTime: 0 });
-    const found = conflictsOf(edits, latest.members);
-    if (found.length === 0) {
-      // 冲突的那一版已被刷新到页面上（期间又改回来了）：按最新的版本号重新保存即可
-      setConflicts(null);
+    const found = conflictsOf(editsRef.current, latest.members);
+    if (found.length > 0) {
+      setConflicts(found);
       return;
     }
-    setConflicts(found);
+    showError({
+      id: SAVE_TOAST,
+      action: SAVE_RESULT.failedAction,
+      error,
+      description: SAVE_RESULT.failedDescription,
+      retry: () => saveOnce(false),
+    });
   }
 
   /** 保存失败的处理：会话结束、字段错误、冲突、断网在页面上处理，返回 true；其余交给失败浮层 */
-  function handledOnPage(error: unknown, versions?: ReadonlyMap<string, number>): boolean {
+  function handledOnPage(error: unknown): boolean {
     if (endSessionIfUnauthenticated(queryClient, error)) return true;
     if (error instanceof NetworkError && !navigator.onLine) {
       showWarning({
@@ -155,7 +185,6 @@ export function TeamPage() {
         description: SAVE_RESULT.offlineDescription,
         pending: SAVE_RESULT.waiting,
       });
-      retryVersions.current = versions;
       setWaitingOnline(true);
       return true;
     }
@@ -168,23 +197,21 @@ export function TeamPage() {
       return true;
     }
     if (error.status === 409) {
-      void showConflicts();
+      void showConflicts(error);
       return true;
     }
     return false;
   }
 
-  /** 保存一次：成功收尾；页面上处理不了的失败抛出（给失败浮层的「立即重试」用） */
-  async function saveOnce(
-    current: TeamEdits,
-    versions: ReadonlyMap<string, number> | undefined,
-    retried: boolean,
-  ) {
-    const lines = changeLines(current, storeNames).join(SAVE_BAR.separator);
+  /** 保存一次（提交此刻页面上的修改）：成功收尾；页面上处理不了的失败抛出（给失败浮层的「立即重试」用） */
+  async function saveOnce(retried: boolean) {
+    const sent = editsRef.current;
+    if (sent.size === 0) return;
+    const lines = changeLines(sent, storeNames).join(SAVE_BAR.separator);
     try {
-      saved(await save.mutateAsync(teamChangesOf(current, versions)), lines, retried);
+      saved(await save.mutateAsync(teamChangesOf(sent, versionsRef.current)), sent, lines, retried);
     } catch (error) {
-      if (handledOnPage(error, versions)) {
+      if (handledOnPage(error)) {
         finishLeaving(false);
         return;
       }
@@ -192,9 +219,9 @@ export function TeamPage() {
     }
   }
 
-  async function submit(versions?: ReadonlyMap<string, number>, retried = false) {
+  async function submit(retried = false) {
     try {
-      await saveOnce(edits, versions, retried);
+      await saveOnce(retried);
     } catch (error) {
       finishLeaving(false);
       dismissToast(OFFLINE_TOAST);
@@ -203,16 +230,15 @@ export function TeamPage() {
         action: SAVE_RESULT.failedAction,
         error,
         description: SAVE_RESULT.failedDescription,
-        retry: () => saveOnce(edits, versions, false),
+        retry: () => saveOnce(false),
       });
     }
   }
 
-  // 断网后等网络恢复，自动重试一次（K6：成功为中性浮层「已自动重试并保存」，仍失败转红色失败浮层并保留修改）；
-  // 重试的是那时页面上的修改（effect event 取最新的 submit）
+  // 断网后等网络恢复，自动重试一次（K6：成功为中性浮层「已自动重试并保存」，仍失败转红色失败浮层并保留修改）
   const retryWhenOnline = useEffectEvent(() => {
     setWaitingOnline(false);
-    void submit(retryVersions.current, true);
+    void submit(true);
   });
   useEffect(() => {
     if (!waitingOnline) return;
@@ -222,7 +248,7 @@ export function TeamPage() {
   }, [waitingOnline]);
 
   function edit(member: TeamMember, change: Parameters<typeof applyEdit>[2]) {
-    setEdits((current) => applyEdit(current, member, change));
+    replaceEdits(applyEdit(editsRef.current, member, change));
     // 改了哪一格就撤掉它的报错
     setErrors((current) => {
       if (!current.has(member.id)) return current;
@@ -237,17 +263,34 @@ export function TeamPage() {
   }
 
   function discard() {
-    setEdits(new Map());
+    replaceEdits(new Map());
+    versionsRef.current = undefined;
     setErrors(NO_ERRORS);
     setConflicts(null);
     setWaitingOnline(false);
     dismissToast(OFFLINE_TOAST);
   }
 
+  /** 「覆盖保存」：冲突的人改用最新的版本号；已不在成员表里的人（例如刚回到通讯录、角色被清空）放弃修改，一个都不剩就不提交 */
+  function overwrite() {
+    setConfirmOverwrite(false);
+    if (!conflicts) return;
+    const versions = new Map(versionsRef.current);
+    const kept = new Map(editsRef.current);
+    for (const conflict of conflicts) {
+      if (conflict.latest) versions.set(conflict.id, conflict.latest.version);
+      else kept.delete(conflict.id);
+    }
+    replaceEdits(kept);
+    versionsRef.current = versions;
+    setConflicts(null);
+    if (kept.size > 0) void submit();
+  }
+
   const single = conflicts?.length === 1 ? conflicts[0] : undefined;
   const conflictInfo = conflicts && {
     who: single?.who ?? CONFLICT.someone,
-    at: single?.at ? formatClock(single.at) : '',
+    at: single?.at ? formatClock(single.at) : null,
     fields: single?.fields ?? [],
   };
 
@@ -305,13 +348,14 @@ export function TeamPage() {
                   title: CONFLICT.title(
                     conflicts.map((c) => c.name),
                     single?.who ?? null,
-                    conflictInfo.at || null,
+                    conflictInfo.at,
                   ),
                   description: CONFLICT.description(single?.who ?? null, single?.fields ?? []),
                 }}
                 onReload={() => {
                   const latest = queryClient.getQueryData(teamQuery.queryKey);
-                  if (latest) setEdits(editsAfterReload(edits, latest.members));
+                  if (latest) replaceEdits(editsAfterReload(editsRef.current, latest.members));
+                  versionsRef.current = undefined;
                   setErrors(NO_ERRORS);
                   setConflicts(null);
                 }}
@@ -353,24 +397,7 @@ export function TeamPage() {
         open={confirmOverwrite}
         onOpenChange={setConfirmOverwrite}
         pending={save.isPending}
-        onConfirm={() => {
-          setConfirmOverwrite(false);
-          if (!conflicts) return;
-          // 用最新的版本号覆盖；已不在成员表里的人（例如刚被停用、角色被清空）放弃修改
-          const versions = new Map<string, number>();
-          let kept = edits;
-          for (const conflict of conflicts) {
-            if (conflict.latest) versions.set(conflict.id, conflict.latest.version);
-            else {
-              const next = new Map(kept);
-              next.delete(conflict.id);
-              kept = next;
-            }
-          }
-          setEdits(kept);
-          setConflicts(null);
-          void submitWith(kept, versions);
-        }}
+        onConfirm={overwrite}
       />
 
       <UnsavedChangesDialog
@@ -390,19 +417,4 @@ export function TeamPage() {
       />
     </SettingsLayout>
   );
-
-  /** 「覆盖保存」：用调整后的修改与最新的版本号保存（setEdits 还没生效，直接用算好的那份） */
-  async function submitWith(current: TeamEdits, versions: ReadonlyMap<string, number>) {
-    try {
-      await saveOnce(current, versions, false);
-    } catch (error) {
-      showError({
-        id: SAVE_TOAST,
-        action: SAVE_RESULT.failedAction,
-        error,
-        description: SAVE_RESULT.failedDescription,
-        retry: () => saveOnce(current, versions, false),
-      });
-    }
-  }
 }

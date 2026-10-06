@@ -163,10 +163,11 @@ describe('P20 补充小样（K17 下方，待办 06）', () => {
     expectText(STATES_ADMIN, teamMessages.lastAdmin);
   });
 
-  it('并发（G7）横幅：一个人与几个人的写法', () => {
+  it('并发（G7）横幅：一个人、几个人、对不出是谁改的写法', () => {
     expectText(STATES_ADMIN, CONFLICT.title(['赵倩'], '周敏', '10:24'));
     expectText(STATES_ADMIN, CONFLICT.description('周敏', ['角色']));
     expectText(STATES_ADMIN, CONFLICT.title(['赵倩', '李婷'], null, null));
+    expectText(STATES_ADMIN, CONFLICT.title(['赵倩'], null, null));
     expectText(STATES_ADMIN, CONFLICT.description(null, []));
   });
 
