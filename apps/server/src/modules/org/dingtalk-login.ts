@@ -25,7 +25,7 @@ import { loadDepartmentTree } from './directory';
 import { loginDenial } from './login';
 import { findMemberByDingtalkUnionId, findMemberByDingtalkUserId } from './members';
 import { json } from './openapi';
-import { secureCookies } from './session';
+import { secureCookies, type MemberRow } from './session';
 import { loginDeniedBody, signIn } from './sign-in';
 
 /*
@@ -97,6 +97,11 @@ function redirectUriOf(c: Context): string {
   const host =
     c.req.header('x-forwarded-host')?.split(',')[0]?.trim() ?? c.req.header('host') ?? url.host;
   return `${proto}://${host}${DINGTALK_LOGIN_CALLBACK_PATH}`;
+}
+
+/** 找到的成员是不是另一个人：他记着的 unionid 与扫码人的不同（用户 ID 给了别人时会这样） */
+function isSomeoneElse(found: MemberRow | null, unionId: string): boolean {
+  return found?.dingtalkUnionId != null && found.dingtalkUnionId !== unionId;
 }
 
 function sameState(expected: string | undefined, received: string): boolean {
@@ -173,8 +178,7 @@ export function createDingtalkLoginRoutes(deps: {
       : await findMemberByDingtalkUnionId(runtime.db, identity.unionId);
     // 成员表还没跟上钉钉时，当场向钉钉取这个人再判断：刚入职（还没同步进来）、钉钉离职停用后又回来、已离职但还没停用、
     // 用户 ID 换了人（对上了用户 ID、unionid 却不同：这个用户 ID 已给了另一个人，旧成员的离职还没同步到）
-    const anotherPerson =
-      found?.dingtalkUnionId != null && found.dingtalkUnionId !== identity.unionId;
+    const anotherPerson = isSomeoneElse(found, identity.unionId);
     const stale = identity.userId
       ? !found ||
         anotherPerson ||
@@ -192,7 +196,7 @@ export function createDingtalkLoginRoutes(deps: {
     }
 
     // 兜底：unionid 与扫码人对不上的成员一律不认，扫码人不能顶替别人
-    if (found?.dingtalkUnionId != null && found.dingtalkUnionId !== identity.unionId) found = null;
+    if (isSomeoneElse(found, identity.unionId)) found = null;
     // 钉钉认得、成员表里没有（通讯录权限范围没覆盖他，或不是本组织的人）：按未分配角色处理
     if (!found) return c.json(await loginDeniedBody(runtime.db, 'no_role'), 403);
     const denied = loginDenial(found);
