@@ -22,7 +22,7 @@ import {
   type Tx,
 } from '../core';
 import { notifyMembers } from '../org';
-import { inboundReceivedJob } from './gmail-sync';
+import { inboundReceivedJob } from './events';
 import {
   addressesInHeader,
   recipientsOf,
@@ -32,6 +32,7 @@ import {
 } from './recognition';
 import { message, store, storeMailbox } from './schema';
 import { loadSenderRules } from './sender-rules';
+import type { SenderRule } from './recognition';
 
 /*
  * 未归属店铺来信队列（PRD E-13、R-ST-02、P04「第一阶段」、I17、AC-TK-09、AC-TK-11、AC-P1-15、AC-P1-16，待办 15）：
@@ -42,6 +43,7 @@ import { loadSenderRules } from './sender-rules';
  *   SLA 按原到达时间照常计时，目标按发件域（contracts 的 unassignedSlaTarget）。
  * - 指定店铺（assignStore）：客服主管为一封来信选一个授权店铺（5 秒撤销窗口在前端，窗口结束后才调到这里，D-24）；
  *   自动归位（placeMatchingMail）：管理员新增店铺或给店铺加进线邮箱后（「店铺已变更」），收件地址已登记的来信按同一流程归位。
+ *   自动归位另由每 5 分钟的兜底任务（jobs.ts 的 placeUnassignedJob）再扫一次：收信与登记邮箱同时进行时，信可能在新邮箱生效前入队。
  *   两者都锁住来信行、确认它还在队列里，按所归店铺重新识别渠道、站点、来源与客户渠道身份（R-ST-02）、写回来信、记审计，
  *   再发「来信已接收」——由 ticket 关联订单并归并成工单，SLA 按原到达时间（来信的 received_at 不变）。
  *   自动归位的在 ticket 归并成工单后通知所归店铺范围内的客服主管（unassigned_mail_placed，只发站内）。
@@ -71,12 +73,18 @@ const queueColumns = {
 
 type QueueRow = Awaited<ReturnType<typeof lockQueued>>[number];
 
-/** 客户（I17「来信」一列与通知、审计的写法）：客户渠道身份的显示名，没有写地址 */
-function customerOf(
-  row: Pick<QueueRow, 'senderAddress' | 'senderName' | 'fromAddress'>,
-): MailAddress {
-  const address = row.senderAddress ?? row.fromAddress;
-  return { address, name: row.senderName || address };
+/** 客户（I17「来信」一列与通知、审计的写法）：客户渠道身份，显示名没写时写地址 */
+export function customerOf(sender: MailAddress): MailAddress {
+  return { address: sender.address, name: sender.name || sender.address };
+}
+
+function customerOfRow(row: Pick<QueueRow, 'senderAddress' | 'senderName' | 'fromAddress'>) {
+  return customerOf({ address: row.senderAddress ?? row.fromAddress, name: row.senderName ?? '' });
+}
+
+/** 一封来信的收件地址（Delivered-To 里落到的邮箱自己不算，同入库时） */
+function recipientsOfRow(row: Pick<QueueRow, 'headers' | 'mailbox'>) {
+  return recipientsOf(row.headers, row.mailbox);
 }
 
 /**
@@ -84,7 +92,7 @@ function customerOf(
  * 不会入队，见 gmail-sync.ts）；万一没有就写落到的邮箱
  */
 function basisOf(row: Pick<QueueRow, 'headers' | 'mailbox'>): Recipient {
-  return recipientsOf(row.headers)[0] ?? { header: 'to', address: row.mailbox };
+  return recipientsOfRow(row)[0] ?? { header: 'to', address: row.mailbox };
 }
 
 /** 入队时通知客服主管（11.4：站内 + 钉钉工作通知，按角色发给全部在职客服主管，来信没有店铺）；回放模式下 notifyMembers 不发 */
@@ -113,7 +121,7 @@ export async function listUnassignedMail(db: DbExecutor): Promise<UnassignedMail
     .orderBy(desc(message.receivedAt), desc(message.id));
   return rows.map((row) => ({
     id: row.id,
-    customer: customerOf(row),
+    customer: customerOfRow(row),
     subject: row.subject,
     basis: basisOf(row),
     fromDomain: domainOf(row.fromAddress),
@@ -140,6 +148,19 @@ const placementStoreColumns = {
   defaultSite: store.defaultSite,
 };
 
+/** 一个店铺（指定店铺用）；没有为 null */
+export async function findPlacementStore(
+  db: DbExecutor,
+  storeId: string,
+): Promise<PlacementStore | null> {
+  const [row] = await db
+    .select(placementStoreColumns)
+    .from(store)
+    .where(eq(store.id, storeId))
+    .limit(1);
+  return row ?? null;
+}
+
 /** 全部进线邮箱（地址小写）→ 所属店铺：按收件地址识别店铺（入库与自动归位） */
 export async function mailboxStores(db: DbExecutor): Promise<Map<string, PlacementStore>> {
   const rows = await db
@@ -149,12 +170,15 @@ export async function mailboxStores(db: DbExecutor): Promise<Map<string, Placeme
   return new Map(rows.map(({ address, ...rest }) => [address, rest]));
 }
 
-/** 锁住队列里的这些来信（还在队列里的才返回；别人先指定了、已自动归位的不在） */
-async function lockQueued(tx: Tx, ids?: readonly string[]) {
+/**
+ * 锁住队列里的这些来信（还在队列里的才返回；别人先指定了、已自动归位的不在）。按到达先后加锁，几处同时锁时不互相等死
+ */
+async function lockQueued(tx: Tx, ids: readonly string[]) {
+  if (ids.length === 0) return [];
   return tx.db
     .select(queueColumns)
     .from(message)
-    .where(and(inQueue, ids ? inArray(message.id, [...ids]) : undefined))
+    .where(and(inQueue, inArray(message.id, [...ids])))
     .orderBy(message.receivedAt, message.id)
     .for('update');
 }
@@ -170,11 +194,11 @@ async function place(
   how: {
     readonly actor: Actor;
     readonly action: 'message.assign_store' | 'message.auto_place';
-    readonly autoPlaced: boolean;
+    readonly rules: readonly SenderRule[];
   },
   logger: Logger,
 ): Promise<void> {
-  const rules = await loadSenderRules(tx.db);
+  const { rules } = how;
   const recognized = recognizeInbound(
     {
       from: { address: row.fromAddress, name: row.fromName },
@@ -202,7 +226,7 @@ async function place(
     action: how.action,
     objectType: 'message',
     objectId: row.id,
-    objectLabel: `${customerOf(row).name} · ${basis.address}`,
+    objectLabel: `${customerOfRow(row).name} · ${basis.address}`,
     storeId: target.id,
     before: { storeId: null, site: null, channel: row.channel, ...shared },
     after: { storeId: target.id, site: recognized.site, channel: recognized.channel, ...shared },
@@ -214,33 +238,28 @@ async function place(
     );
     return;
   }
+  // 自动归位的归并成工单后通知客服主管（ticket 的 mergeInbound）
   await tx.enqueue(inboundReceivedJob, {
     messageId: row.id,
-    ...(how.autoPlaced ? { autoPlaced: true } : {}),
+    ...(how.action === 'message.auto_place' ? { autoPlaced: true } : {}),
   });
 }
 
 /**
  * 指定店铺的结果：归入的店铺；来信已不在队列里（别人先指定了、已自动归位，或没有这封）为 not_in_queue，带它已归入的店铺；
- * 没有这个店铺为 unknown_store
+ * 店铺由调用方先取好（接口先查店铺在不在，再校验店铺范围）
  */
 export type AssignStoreOutcome =
   | { readonly kind: 'placed'; readonly store: PlacementStore }
-  | { readonly kind: 'not_in_queue'; readonly storeName: string | null }
-  | { readonly kind: 'unknown_store' };
+  | { readonly kind: 'not_in_queue'; readonly storeName: string | null };
 
 export async function assignStore(
   runtime: Runtime,
-  input: { readonly actor: Actor; readonly messageId: string; readonly storeId: string },
+  input: { readonly actor: Actor; readonly messageId: string; readonly target: PlacementStore },
   logger: Logger,
 ): Promise<AssignStoreOutcome> {
+  const { target } = input;
   return transaction(runtime, async (tx) => {
-    const [target] = await tx.db
-      .select(placementStoreColumns)
-      .from(store)
-      .where(eq(store.id, input.storeId))
-      .limit(1);
-    if (!target) return { kind: 'unknown_store' };
     const [row] = await lockQueued(tx, [input.messageId]);
     if (!row) {
       // 别人先指定了或已自动归位：告诉客服主管它归入了哪个店铺
@@ -256,7 +275,7 @@ export async function assignStore(
       tx,
       row,
       target,
-      { actor: input.actor, action: 'message.assign_store', autoPlaced: false },
+      { actor: input.actor, action: 'message.assign_store', rules: await loadSenderRules(tx.db) },
       logger,
     );
     logger.info({ messageId: row.id, store: target.name }, '未归属来信已指定店铺');
@@ -266,22 +285,33 @@ export async function assignStore(
 
 /**
  * 自动归位（「店铺已变更」的处理器，AC-P1-16）：队列里收件地址已登记为进线邮箱的来信，按收件地址识别出的店铺归位
- * （同 storeOfRecipients：第一个登记过的收件地址）。不只看这次新登记的地址——漏处理过的事件也能在下一次变更时补上
+ * （同 storeOfRecipients：第一个登记过的收件地址）。不只看这次新登记的地址：每 5 分钟的兜底任务也调它。
+ * 先不加锁读出队列、算出命中的，只锁命中的那几封并按锁住时的样子重判，不挡住同时进行的「指定店铺」
  */
 export async function placeMatchingMail(runtime: Runtime, logger: Logger): Promise<number> {
   return transaction(runtime, async (tx) => {
-    const rows = await lockQueued(tx);
-    if (rows.length === 0) return 0;
     const stores = await mailboxStores(tx.db);
+    const hitOf = (row: Pick<QueueRow, 'headers' | 'mailbox'>) =>
+      storeOfRecipients(recipientsOfRow(row), stores);
+    const queued = await tx.db
+      .select({ id: message.id, headers: message.headers, mailbox: message.mailbox })
+      .from(message)
+      .where(inQueue);
+    const rows = await lockQueued(
+      tx,
+      queued.filter((row) => hitOf(row)).map((row) => row.id),
+    );
+    if (rows.length === 0) return 0;
+    const rules = await loadSenderRules(tx.db);
     let placed = 0;
     for (const row of rows) {
-      const hit = storeOfRecipients(recipientsOf(row.headers), stores);
+      const hit = hitOf(row);
       if (!hit) continue;
       await place(
         tx,
         row,
         hit.store,
-        { actor: systemActor, action: 'message.auto_place', autoPlaced: true },
+        { actor: systemActor, action: 'message.auto_place', rules },
         logger,
       );
       placed += 1;

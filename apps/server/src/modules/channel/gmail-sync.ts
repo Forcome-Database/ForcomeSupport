@@ -31,6 +31,7 @@ import {
   type GmailRawMessage,
   type IntegrationClients,
 } from '../integration';
+import { inboundReceivedJob, outboundSyncedJob } from './events';
 import { recordMailboxFailure, recordMailboxSuccess, type SyncedMail } from './mailbox-health';
 import {
   provisionalStore,
@@ -42,7 +43,7 @@ import {
 } from './recognition';
 import { mailboxSync, message, store, storeMailbox } from './schema';
 import { loadSenderRules } from './sender-rules';
-import { mailboxStores, notifyUnassignedMail, type PlacementStore } from './unassigned';
+import { customerOf, mailboxStores, notifyUnassignedMail, type PlacementStore } from './unassigned';
 
 /*
  * 收信（规格 channel「Gmail 客户端」「去重」，ADR 0008 修订；待办 08 是最小形态，09 补健壮性）：
@@ -95,26 +96,6 @@ export const gmailRenewWatchJob = defineJob(
   z.object({}),
   { policy: 'stately', retryLimit: 3, retryDelay: 30 * 60 },
   { cron: '0 3 * * *', tz: 'Asia/Shanghai' },
-);
-
-/**
- * 领域事件「来信已接收」：一封来信入库并识别出店铺（不是别的邮箱已收过的同一封信，来源也不是归档的平台通知与营销），
- * 或未归属店铺的来信被指定店铺、自动归位（待办 15），ticket 据此归并成工单。autoPlaced：自动归位的，归并成工单后通知客服主管
- */
-export const inboundReceivedJob = defineJob(
-  'channel.inbound_received',
-  z.object({ messageId: z.uuid(), autoPlaced: z.boolean().optional() }),
-  { retryLimit: 5, retryDelay: 10, retryBackoff: true },
-);
-
-/**
- * 领域事件「我方发信已同步」：店铺邮箱「已发送」里的一封我方邮件入库（不是别的邮箱已收过的同一封），
- * ticket 据此按 In-Reply-To、References、Gmail 线程把它归到工单（回复识别，R-SL-08，待办 16）
- */
-export const outboundSyncedJob = defineJob(
-  'channel.outbound_synced',
-  z.object({ messageId: z.uuid() }),
-  { retryLimit: 5, retryDelay: 10, retryBackoff: true },
 );
 
 /** 一个进线邮箱与它所属的店铺（按店铺的数据来源取 Gmail 客户端） */
@@ -375,16 +356,10 @@ function messageIdOf(value: string | undefined): string | null {
 /** 一封邮件入库的结果：新的一封、别的邮箱已收过的同一封（只记「同时发送到」）、同一邮箱里重复投递的（丢弃） */
 type IngestResult = 'created' | 'copy' | 'duplicate';
 
-/** 识别要用的、每次同步一个邮箱读一次的：来源规则与全部进线邮箱 */
-interface IngestContext {
-  readonly rules: readonly SenderRule[];
-  readonly mailboxes: ReadonlyMap<string, PlacementStore>;
-}
-
 async function ingestMessage(
   runtime: Runtime,
   target: MailboxTarget,
-  { rules, mailboxes }: IngestContext,
+  rules: readonly SenderRule[],
   raw: GmailRawMessage,
   parsed: Email,
   direction: MessageDirection,
@@ -413,7 +388,10 @@ async function ingestMessage(
       : [];
     // 同一封邮件的其余副本不识别（R-TK-07：只按最早收到的一封识别店铺并归并）；我方发出的不识别来源
     const inbound = !canonical && direction === 'inbound';
-    const recipients = recipientsOf(headers);
+    // Delivered-To 里落到的邮箱自己不算收件地址（Gmail 可能把同步的邮箱写进去，寄到别名、群组或转发地址的信就认不出来了）
+    const recipients = recipientsOf(headers, target.address);
+    // 进线邮箱在事务里读：管理员刚登记的邮箱，这一轮同步后面的信就能认出来
+    const mailboxes = inbound ? await mailboxStores(tx.db) : new Map<string, PlacementStore>();
     // 店铺按收件地址；一个收件地址都没有（只有密送、也没写 Delivered-To）时只能按落到的邮箱
     const recognizedStore: Pick<PlacementStore, 'id' | 'platform' | 'defaultSite'> | null = inbound
       ? (storeOfRecipients(recipients, mailboxes)?.store ??
@@ -492,10 +470,7 @@ async function ingestMessage(
     if (recognized && !recognizedStore) {
       await notifyUnassignedMail(tx, {
         id: row.id,
-        customer: {
-          ...recognized.sender,
-          name: recognized.sender.name || recognized.sender.address,
-        },
+        customer: customerOf(recognized.sender),
         basis: recipients[0]!,
       });
       logger.info(
@@ -518,10 +493,7 @@ async function ingestAll(
   logger: Logger,
 ): Promise<SyncedMail> {
   const address = target.address;
-  const context: IngestContext = {
-    rules: await loadSenderRules(runtime.db),
-    mailboxes: await mailboxStores(runtime.db),
-  };
+  const rules = await loadSenderRules(runtime.db);
   let count = 0;
   let from: Date | null = null;
   let to: Date | null = null;
@@ -555,7 +527,7 @@ async function ingestAll(
       continue;
     }
     const parsed = await PostalMime.parse(raw.raw);
-    const result = await ingestMessage(runtime, target, context, raw, parsed, direction, logger);
+    const result = await ingestMessage(runtime, target, rules, raw, parsed, direction, logger);
     // 补拉了几封来信：新入库的来信（含归档的平台通知），别的邮箱已收过的副本不算
     if (result === 'created' && direction === 'inbound') {
       count += 1;

@@ -1,5 +1,6 @@
 import {
   amazonDomains,
+  domainOf,
   isAmazonDomain,
   isTicketSource,
   recipientHeaders,
@@ -107,11 +108,6 @@ const SHOPIFY_OWN_ADDRESSES: ReadonlySet<string> = new Set([
 
 function normalized(mailbox: MailAddress): MailAddress {
   return { address: mailbox.address.trim().toLowerCase(), name: mailbox.name.trim() };
-}
-
-function domainOf(address: string): string {
-  const at = address.lastIndexOf('@');
-  return at < 0 ? '' : address.slice(at + 1);
 }
 
 /** 联系表单正文里的一栏（「Name: Emily Chen」「Email: emily@…」），没有为 null */
@@ -222,13 +218,16 @@ export function addressesInHeader(headers: Headers, key: string): MailAddress[] 
 
 /**
  * 一封来信的收件地址（店铺识别的依据）：Delivered-To（Gmail 写实际投递到的地址，在最上面；转进来的信可能没有）、To、Cc 依次，
- * 去重、小写，各记取自哪个头字段
+ * 去重、小写，各记取自哪个头字段。landingMailbox 是信落到的同步邮箱：Delivered-To 里它自己不算——Gmail 可能把同步的邮箱本身写进去，
+ * 寄到它的别名、群组或转发地址的信就会被当成写给它的（To、Cc 里写的仍然算：客户直接写给店铺邮箱）
  */
-export function recipientsOf(headers: Headers): Recipient[] {
+export function recipientsOf(headers: Headers, landingMailbox?: string): Recipient[] {
+  const landing = landingMailbox?.trim().toLowerCase();
   const seen = new Set<string>();
   const out: Recipient[] = [];
   for (const header of recipientHeaders) {
     for (const { address } of addressesInHeader(headers, header)) {
+      if (header === 'delivered-to' && address === landing) continue;
       if (seen.has(address)) continue;
       seen.add(address);
       out.push({ header, address });
@@ -259,7 +258,7 @@ export function storeOfRecipients<T>(
  */
 export function provisionalStore(from: MailAddress): StoreFacts {
   return {
-    platform: isAmazonDomain(domainOf(from.address.trim().toLowerCase())) ? 'amazon' : 'shopify',
+    platform: isAmazonDomain(domainOf(from.address)) ? 'amazon' : 'shopify',
     defaultSite: 'US',
   };
 }

@@ -82,6 +82,19 @@ export const adminContactsQuery = queryOptions({
   staleTime: 5 * 60 * 1000,
 });
 
+/** 会话结束时要撤掉的本机待办（退出登录、会话失效、换成别的成员；例如还在撤销窗口里、到点才提交的「指定店铺」） */
+const sessionEndListeners = new Set<() => void>();
+
+/** 登记一件会话结束时要撤掉的事，返回取消登记 */
+export function onSessionEnd(listener: () => void): () => void {
+  sessionEndListeners.add(listener);
+  return () => sessionEndListeners.delete(listener);
+}
+
+function sessionEnded(): void {
+  for (const listener of sessionEndListeners) listener();
+}
+
 /**
  * 会话已结束（接口返回 401：过期、被停用、在别处退出）时：当前成员置空，外壳随之换成登录入口，
  * 留着的浮层一并撤掉。返回是否是这种情况。查询与写操作的统一处理、以及不经查询缓存的请求（如浮层里的重试）都用它。
@@ -89,6 +102,7 @@ export const adminContactsQuery = queryOptions({
 export function endSessionIfUnauthenticated(queryClient: QueryClient, error: unknown): boolean {
   if (!(error instanceof ApiRequestError && error.status === 401)) return false;
   noteSessionEnd(error);
+  sessionEnded();
   queryClient.setQueryData(currentMemberQuery.queryKey, null);
   dismissAllToasts();
   return true;
@@ -108,6 +122,7 @@ export function createQueryClient(): QueryClient {
 
 /** 登录成功后换掉上一位成员留下的缓存，记下当前成员（不必再请求一次 /api/me） */
 export function resetCacheForMember(queryClient: QueryClient, member: CurrentMember): void {
+  sessionEnded();
   queryClient.clear();
   queryClient.setQueryData(currentMemberQuery.queryKey, member);
 }
@@ -202,6 +217,7 @@ export function useLogout() {
     mutationFn: api.logout,
     // 会话已经失效（401）也当作已退出
     onSettled: async () => {
+      sessionEnded();
       queryClient.clear();
       dismissAllToasts();
       applyDensity(null);

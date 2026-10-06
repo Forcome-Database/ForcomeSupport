@@ -14,6 +14,8 @@ import {
 } from '@forcome/contracts';
 import { getDemoFixture } from '@forcome/fixtures';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { sql } from 'drizzle-orm';
+import { placeUnassignedJob } from '../src/modules/channel';
 import { sendWorkNotificationsJob } from '../src/modules/core';
 import {
   amazonOrdersClient,
@@ -245,6 +247,27 @@ describe('未归属店铺来信', () => {
       expect(mails.filter((m) => m.customer.name === 'Paz Duplicada')).toHaveLength(1);
     });
 
+    it('Delivered-To 写的是信落到的同步邮箱本身（寄到它的别名）：落到的邮箱不算收件地址，按 To 的别名进队列', async () => {
+      gmail().deliver(
+        buyerMessage('Hal Alias', 'amz-ca9x@forcome.com', { deliveredTo: DIRECT.mailbox }),
+      );
+      await t.runJobs();
+      const mail = await queued('Hal Alias');
+      expect(mail?.basis).toEqual({ header: 'to', address: 'amz-ca9x@forcome.com' });
+      expect(await ticketsOf('Hal Alias')).toEqual([]);
+    });
+
+    it('一个收件地址都没有（只密送、也没有 Delivered-To）：按落到的邮箱识别店铺', async () => {
+      gmail().deliver({
+        ...forwardedLetter('Bea Blind', 'unused@example.com', { mailbox: MX.mailbox }),
+        to: [],
+      });
+      await t.runJobs();
+      expect(await queued('Bea Blind')).toBeUndefined();
+      const [ticket] = await ticketsOf('Bea Blind');
+      expect(ticket?.store.name).toBe('forcome.mx');
+    });
+
     it('收件地址登记在店铺时按它识别店铺，不看信落在哪个邮箱（R-ST-02「按收件邮箱」）', async () => {
       gmail().deliver(
         forwardedLetter('Iris Bello', MX.mailbox, { mailbox: COM.mailbox, deliveredTo: null }),
@@ -376,6 +399,11 @@ describe('未归属店铺来信', () => {
       expect(denied[0]).toMatchObject({ objectType: 'message', storeId: DIRECT.id });
       expect(await queued('Rita Scope')).toBeDefined();
 
+      // 没有这个店铺：先报 400，不当成越权
+      expect(
+        (await assign(mxSupervisor, mail.id, '00000000-0000-7000-8000-000000000000')).status,
+      ).toBe(400);
+      expect(await t.auditRecords({ action: 'access.denied', objectId: mail.id })).toHaveLength(1);
       expect((await assign(mxSupervisor, mail.id, MX.id)).status).toBe(200);
     });
 
@@ -457,6 +485,21 @@ describe('未归属店铺来信', () => {
           recipient: 'amz-ca2@forcome.com',
         },
       });
+    });
+
+    it('兜底扫描：信在新邮箱生效前入队的，每 5 分钟的扫描按已登记的收件地址归位', async () => {
+      await arrive(buyerMessage('Gus Late', 'amz-late@forcome.com'), 'Gus Late');
+      // 模拟「店铺已变更」已处理完、这封信才入队：直接改库登记邮箱，不发事件
+      await t.runtime.db.execute(
+        sql`INSERT INTO channel.store_mailbox (store_id, address, position, created_at)
+            VALUES (${DIRECT.id}, 'amz-late@forcome.com', 9, now())`,
+      );
+      expect(await queued('Gus Late')).toBeDefined();
+      await t.enqueue(placeUnassignedJob, {});
+      await t.runJobs();
+      expect(await queued('Gus Late')).toBeUndefined();
+      const [ticket] = await ticketsOf('Gus Late');
+      expect(ticket?.store.name).toBe('Forcome Direct');
     });
 
     it('编辑现有店铺、加一个进线邮箱（别名）后同样自动归位到该店铺', async () => {

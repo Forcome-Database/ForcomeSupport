@@ -384,6 +384,19 @@ describe('按收件地址识别店铺（R-ST-02、E-13，待办 15）', () => {
     expect(recipientsOf([h('subject', 'hi')])).toEqual([]);
   });
 
+  it('Delivered-To 里信落到的同步邮箱自己不算（Gmail 可能把它写进去）；To、Cc 里写的仍然算', () => {
+    const headers = [h('delivered-to', 'amz-direct@forcome.com'), h('to', 'amz-ca2@forcome.com')];
+    expect(recipientsOf(headers, 'AMZ-DIRECT@forcome.com')).toEqual([
+      { header: 'to', address: 'amz-ca2@forcome.com' },
+    ]);
+    expect(
+      recipientsOf(
+        [h('delivered-to', 'support@forcome.mx'), h('to', 'support@forcome.mx')],
+        'support@forcome.mx',
+      ),
+    ).toEqual([{ header: 'to', address: 'support@forcome.mx' }]);
+  });
+
   it('店铺取第一个登记为进线邮箱的收件地址所属的店铺；都没登记为空（未归属店铺）', () => {
     const mailboxes = new Map([
       ['amz-direct@forcome.com', 'Forcome Direct'],

@@ -131,7 +131,9 @@ describe('未归属店铺来信队列（I17 与补充小样，第一期参照页
     expectText(STATES_INBOX, assignStoreMessages.placedIn('forcome.mx'));
   });
 
-  it('「指定」置灰的悬停说明照 PRD I17（原型画的是选好店铺后的样子）', () => {
+  it('「指定」没选店铺时置灰，悬停说明逐字照原型（I17 的 title）与 PRD', () => {
+    expect(QUEUE).toContain(`title="${UNASSIGNED.assignDisabled}"`);
+    expect(STATES_INBOX).toContain(`title="${UNASSIGNED.assignDisabled}"`);
     expect(PRD).toContain(`悬停「${UNASSIGNED.assignDisabled}」`);
   });
 });

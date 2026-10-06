@@ -106,7 +106,7 @@ export async function findInboundMessage(
     recognition: recognitionOf(row),
     subject,
     receivedAt,
-    addressedTo: recipientsOf(row.headers)[0]?.address ?? null,
+    addressedTo: recipientsOf(row.headers, row.mailbox)[0]?.address ?? null,
     duplicateOfId,
     orderNumbers: platform
       ? extractOrderNumbers(platform, { subject, text: row.textBody, html: row.htmlBody })

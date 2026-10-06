@@ -35,7 +35,7 @@ import {
   toStore,
   updateStore,
 } from './stores';
-import { assignStore, listUnassignedMail } from './unassigned';
+import { assignStore, findPlacementStore, listUnassignedMail } from './unassigned';
 
 const json = <T extends z.ZodType>(schema: T, description: string) => ({
   description,
@@ -246,16 +246,17 @@ export function createChannelRoutes(deps: {
     const { id } = c.req.valid('param');
     const { storeId } = c.req.valid('json');
     const access = c.get('access');
+    const target = await findPlacementStore(runtime.db, storeId);
+    if (!target) {
+      return c.json({ error: 'invalid_request', message: assignStoreMessages.unknownStore }, 400);
+    }
     // 下拉只列授权店铺；越过界面指定范围外的店铺：记「越权访问被拒」并 403（E-24）
     await access.requireStores({ storeIds: [storeId], objectType: 'message', objectId: id });
     const outcome = await assignStore(
       runtime,
-      { actor: access.actor, messageId: id, storeId },
+      { actor: access.actor, messageId: id, target },
       logger,
     );
-    if (outcome.kind === 'unknown_store') {
-      return c.json({ error: 'invalid_request', message: assignStoreMessages.unknownStore }, 400);
-    }
     if (outcome.kind === 'not_in_queue') {
       const message = outcome.storeName
         ? assignStoreMessages.placedIn(outcome.storeName)

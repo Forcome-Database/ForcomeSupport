@@ -4,6 +4,7 @@ import { useSyncExternalStore } from 'react';
 import { UNASSIGNED } from './p04-copy';
 import { api, ApiRequestError } from '@/lib/api';
 import { dismissToast, showError, showUndo } from '@/lib/notify';
+import { endSessionIfUnauthenticated, onSessionEnd } from '@/lib/session';
 import { TICKETS_QUERY_KEY } from '@/lib/tickets';
 
 /*
@@ -12,7 +13,9 @@ import { TICKETS_QUERY_KEY } from '@/lib/tickets';
  * 等着提交的指定放在模块里（不放组件状态）：窗口内离开 P04 或切回工单列表，到点照样提交，回来时行也还是移出的。
  * 刷新或关掉页面时还没到点的不提交（来信留在队列里，重新指定即可）。
  * 提交失败分两种（协调者 2026-10-07 决定 Q8）：别人已先指定或已自动归位（409）——浮层写已归入哪个店铺、不带重试，这一行随刷新移出；
- * 其余（断网、服务器出错）——行回到队列，浮层写「来信仍在未归属店铺队列里」，可以立即重试。
+ * 断网、服务器出错——行回到队列，浮层写「来信仍在未归属店铺队列里」，可以立即重试；被拒（400 没有这个店铺、403 店铺不在范围内）
+ * 同样写仍在队列里，但不给重试（重试也不会成功）；会话失效（401）按会话结束处理。
+ * 会话结束（退出登录、会话失效、换人）时，还在撤销窗口里的指定一律撤销，不拿下一位成员的会话提交。
  */
 
 export const UNASSIGNED_MAIL_QUERY_KEY = ['unassigned-mail'] as const;
@@ -55,6 +58,11 @@ async function refresh(queryClient: QueryClient): Promise<void> {
   ]);
 }
 
+/** 被拒、重试也不会成功的（400 没有这个店铺、403 店铺不在范围内） */
+function isRefused(error: unknown): boolean {
+  return error instanceof ApiRequestError && (error.status === 400 || error.status === 403);
+}
+
 /** 别人已先指定或已自动归位（409）：失败浮层写已归入的店铺（后端的说明），不带重试 */
 function isTaken(error: unknown): error is ApiRequestError {
   return error instanceof ApiRequestError && error.status === 409;
@@ -71,40 +79,51 @@ function showTaken(mailId: string, error: ApiRequestError): void {
 }
 
 /** 窗口结束：提交。成功或 409 后刷新（行随之移出），其余失败时行回到队列、浮层可重试 */
-async function commit(queryClient: QueryClient, mail: UnassignedMail, store: StoreOption) {
+/** 提交一次（提交中这一行不显示）：成功或 409 后刷新（行随之移出）；会话失效时按会话结束处理。其余失败照常抛出 */
+async function submit(queryClient: QueryClient, mail: UnassignedMail, store: StoreOption) {
   pending.set(mail.id, null);
-  // 撤销浮层的倒计时与提交的计时器各走各的，可能还差一点没到 0：开始提交就撤掉它，不留一个已经撤销不了的「撤销」
-  dismissToast(undoToastId(mail.id));
+  changed();
   try {
     await api.assignStore(mail.id, store.id);
     await refresh(queryClient);
   } catch (error) {
-    if (isTaken(error)) {
-      showTaken(mail.id, error);
-      await refresh(queryClient);
-    } else {
-      showError({
-        id: toastId(mail.id),
-        action: UNASSIGNED.failedAction,
-        error,
-        description: UNASSIGNED.stillQueued,
-        retry: async () => {
-          try {
-            await api.assignStore(mail.id, store.id);
-          } catch (retryError) {
-            if (!isTaken(retryError)) throw retryError;
-            // 重试时发现别人已先指定：重试的浮层消失，换成 409 的浮层
-            showTaken(mail.id, retryError);
-          }
-          await refresh(queryClient);
-        },
-      });
-    }
+    if (endSessionIfUnauthenticated(queryClient, error)) return;
+    if (!isTaken(error)) throw error;
+    showTaken(mail.id, error);
+    await refresh(queryClient);
   } finally {
     pending.delete(mail.id);
     changed();
   }
 }
+
+/** 窗口结束：提交。断网、出错时行回到队列、浮层可重试（重试期间这一行同样不显示，不会再点一次「指定」） */
+async function commit(queryClient: QueryClient, mail: UnassignedMail, store: StoreOption) {
+  // 撤销浮层的倒计时与提交的计时器各走各的，可能还差一点没到 0：开始提交就撤掉它，不留一个已经撤销不了的「撤销」
+  dismissToast(undoToastId(mail.id));
+  try {
+    await submit(queryClient, mail, store);
+  } catch (error) {
+    showError({
+      id: toastId(mail.id),
+      action: UNASSIGNED.failedAction,
+      error,
+      description: UNASSIGNED.stillQueued,
+      ...(isRefused(error) ? {} : { retry: () => submit(queryClient, mail, store) }),
+    });
+  }
+}
+
+/** 会话结束：还在撤销窗口里的指定一律撤销（什么都不提交）；已在提交的照常结束 */
+onSessionEnd(() => {
+  for (const [mailId, timer] of pending) {
+    if (!timer) continue;
+    clearTimeout(timer);
+    pending.delete(mailId);
+    dismissToast(undoToastId(mailId));
+  }
+  changed();
+});
 
 /**
  * 点「指定」：行立即移出，弹撤销浮层「已归入 <店铺> · 5 秒后归并成工单」；窗口结束后才提交，窗口内点「撤销」什么都不提交

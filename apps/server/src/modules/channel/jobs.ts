@@ -13,6 +13,17 @@ import {
 import { placeMatchingMail } from './unassigned';
 
 /**
+ * 未归属店铺来信的兜底归位（待办 15）：每 5 分钟（worker 启动时也一次）再扫一次队列，收件地址已登记的归位。
+ * 「店铺已变更」时已立即归位过；这里补上收信与登记邮箱同时进行、信在新邮箱生效前入队的那几封
+ */
+export const placeUnassignedJob = defineJob(
+  'channel.place_unassigned',
+  z.object({}),
+  { policy: 'stately', retryLimit: 0 },
+  { cron: '*/5 * * * *', tz: 'Asia/Shanghai', runAtStartup: true },
+);
+
+/**
  * 领域事件「店铺已变更」（待办 07 发出）：新增或编辑店铺后，在同一事务里排入。
  * addedMailboxes 是这次新登记的进线邮箱（新增店铺时为全部）：有新登记的地址时，未归属队列中收件地址已登记的来信
  * 按 R-ST-02 重新识别并归位（E-13、AC-P1-16，unassigned.ts 的 placeMatchingMail，待办 15）。新登记的邮箱由收信的常驻拉取
@@ -31,6 +42,10 @@ export function createChannelJobHandlers(deps: { clients: IntegrationClients }):
       if (payload.addedMailboxes.length === 0) return;
       const placed = await placeMatchingMail(runtime, logger);
       logger.info({ ...payload, placed }, '店铺已变更：未归属来信自动归位');
+    }),
+    handleJob(placeUnassignedJob, async (_payload, { runtime, logger }) => {
+      const placed = await placeMatchingMail(runtime, logger);
+      if (placed > 0) logger.info({ placed }, '兜底扫描：未归属来信自动归位');
     }),
     handleJob(gmailSyncJob, (payload, context) => syncMailbox(deps.clients, payload, context)),
     handleJob(gmailPollJob, (_payload, { runtime, logger }) => pollMailboxes(runtime, logger)),

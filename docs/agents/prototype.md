@@ -17,7 +17,7 @@
 | P01 收件箱 · 亚马逊工单 | `Main` | 二起 | 第二阶段为人工处理界面 I19–I21，完整版随第三阶段 | 只参考顶栏外壳 |
 | P02 收件箱 · 邮件工单 | `TicketEmail` | 二起 | 同 P01 | |
 | P03 收件箱 · 转人工工单 | `TicketEscalated` | 二起 | 同 P01 | |
-| P04 工单列表 | `Tickets` | 一起 | 第一阶段 I16、I17；第二阶段见 P04「第二阶段」 | ✓ `P04_Tickets`、`P04_Tickets_drill` |
+| P04 工单列表 | `Tickets` | 一起 | 第一阶段 I16、I17；第二阶段见 P04「第二阶段」 | ✓ `P04_Tickets`、`P04_Tickets_drill`、`P04_Tickets_unassigned`、`P04_Tickets_unassigned_empty`（未归属店铺队列与空队列，I17 补充小样③④） |
 | P05 工单详情 · 全程记录 | `TicketDetail` | 一起 | 第一阶段 I18；第二阶段见 P05「第二阶段」 | ✓ `P05_TicketDetail` |
 | P06 客户档案 | `Customer` | 二起 | | |
 | P07 售后单列表 | `AfterSalesList` | 二起 | 第一阶段遗留的手工登记单 S16 | |

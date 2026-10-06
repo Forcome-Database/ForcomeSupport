@@ -13,6 +13,7 @@ import {
   inboundReceivedJob,
   listOrderStores,
   outboundSyncedJob,
+  placeUnassignedJob,
   storeChangedJob,
 } from './modules/channel';
 import {
@@ -50,6 +51,7 @@ export const jobDefinitions: readonly AnyJobDefinition[] = [
   dingtalkReconcileJob,
   dingtalkEventJob,
   storeChangedJob,
+  placeUnassignedJob,
   gmailSyncJob,
   gmailPollJob,
   gmailRenewWatchJob,

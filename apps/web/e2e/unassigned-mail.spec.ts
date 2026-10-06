@@ -223,6 +223,47 @@ test('窗口结束提交时断网：行回到队列，失败浮层「来信仍�
   await expect(row(page, 'Tom Harris')).toHaveCount(0);
 });
 
+test('店铺范围外（403）：浮层写仍在队列里、不带重试（重试也不会成功），行回到队列', async ({
+  page,
+}) => {
+  await loginAs(page, '周敏');
+  await openQueue(page);
+  await page.route('**/api/channel/unassigned-mail/*/store', (route) =>
+    route.fulfill({
+      status: 403,
+      json: { error: 'forbidden', message: '这条数据不在你的店铺范围内' },
+    }),
+  );
+  await page.clock.install();
+  await pick(page, 'Tom Harris', 'Forcome Direct');
+  await row(page, 'Tom Harris').getByRole('button', { name: '指定' }).click();
+  await page.clock.runFor(5_500);
+  await expect(page.getByText('指定店铺失败：这条数据不在你的店铺范围内')).toBeVisible();
+  await expect(page.getByText('来信仍在未归属店铺队列里')).toBeVisible();
+  await expect(page.getByRole('button', { name: '立即重试' })).toHaveCount(0);
+  await expect(row(page, 'Tom Harris')).toBeVisible();
+});
+
+test('撤销窗口内退出登录：还没提交的指定一律撤销，不拿下一位成员的会话提交', async ({ page }) => {
+  await loginAs(page, '周敏');
+  await openQueue(page);
+  const posts: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/api/channel/unassigned-mail/')) {
+      posts.push(request.url());
+    }
+  });
+  await page.clock.install();
+  await pick(page, 'Lucía Herrera', 'forcome.mx');
+  await row(page, 'Lucía Herrera').getByRole('button', { name: '指定' }).click();
+  await expect(page.getByText('已归入 forcome.mx')).toBeVisible();
+  await page.getByRole('banner').getByRole('button', { name: /周敏/ }).click();
+  await page.getByRole('menuitem', { name: '退出登录' }).click();
+  await expect(page).toHaveURL(/dev-login|login/);
+  await page.clock.runFor(10_000);
+  expect(posts).toEqual([]);
+});
+
 test('提交时别人已先指定：失败浮层写已归入的店铺、不带重试，行随刷新移出（I17 ⑥）', async ({
   page,
 }) => {

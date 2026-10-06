@@ -305,7 +305,8 @@ I17_TPL = 'minmax(0, 1fr) minmax(0, 1.3fr) 44px 132px 222px'
 
 
 def i17_table(mails, template=I17_TPL):
-    """没有 ✦ 推荐列；识别依据 = 收件头字段名 + 收件地址 +「未登记」（发件域作补充）；指定店铺下拉未预选，只列当前客服主管的授权店铺。
+    """没有 ✦ 推荐列；识别依据 = 收件头字段名 + 收件地址 +「未登记」（发件域作补充）；指定店铺下拉未预选，只列当前客服主管的授权店铺，
+    没选店铺时「指定」置灰、悬停「先选择店铺」。
     队列为空时保留表头，表体为空状态（同 I10 的空状态组件，没有按钮）。"""
     if not mails:
         return table_empty(I17_COLS, template, empty('inbox', UNASSIGNED_EMPTY))
@@ -313,7 +314,8 @@ def i17_table(mails, template=I17_TPL):
              col(nowrap(m['to_hdr'], 11, T['ink4']) + row(nowrap(m['to'], 12, T['ink'], 600) + chip('未登记', 'warning', 10), 6) + nowrap('发件域 ' + m['from_domain'], 11, T['ink4']), 2),
              nowrap(m['at'], 12, T['ink2']),
              col(sla(m['sla'], 'normal') + nowrap(m['sla_kind'], 11, T['ink4']), 3),
-             row(select_box(None, '选择店铺', width='164px', h=28) + btn('指定', 'primary', 'sm'), 6)] for m in mails]
+             # 还没选店铺时「指定」置灰，悬停写原因（协调者 2026-10-07 决定 Q7）
+             row(select_box(None, '选择店铺', width='164px', h=28) + btn('指定', 'primary', 'sm', disabled=True, reason='先选择店铺'), 6)] for m in mails]
     return mtable(I17_COLS, rows, template, py=10)
 
 
