@@ -157,6 +157,8 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 
 **订单回补与夜间对账**（待办 13）：`pnpm db:seed`（与开发测试环境、Playwright 的示例数据）灌完数据即开始回补，worker 起来后逐页把 Fake 回放的历史订单读进镜像，P18 两张卡的回补行为亚马逊「订单回补 90 天 · 已完成」、Shopify「订单回补 60 天 · 未开通 read_all_orders」（示例的 Shopify 应用没开通 read_all_orders）。本机手动开始：`pnpm --filter @forcome/server order-backfill [--store <店铺名>]… [--again]`（已完成的跳过、`--again` 从头重来）。夜间对账每天 03:30 跑一次。集成测试里开始回补用 order 的 `startOrderBackfill(t.runtime, listOrderStores, { storeIds })` 后 `t.runJobs()`，对账用 `t.enqueue(orderReconcileJob, {})`；Fake Shopify 没开通 read_all_orders 用 `.limitHistory()`，模拟配额用完用 Fake 的 `.quota.limit(0)` / `.grant(1)`（`apps/server/test/order-backfill.int.test.ts`）。上线前的执行时机与用法见 `docs/部署说明.md` 第 15 节。
 
+**按订单归并**（待办 14）：来信里的订单号（亚马逊 3-7-7、Shopify 订单名 `#1063` 与「order 1063」等写法）在该店铺的订单镜像中校验、镜像没有时补拉，按 R-TK-01 追加、重开或新建；抽不到或校验不到时 Shopify 店铺按客户邮箱反查镜像，唯一命中才关联，否则按客户归并（R-TK-02）。本机与开发测试环境的示例来信回放后，P04 订单号列与原型一致（Priya Raman 的 #1057、#1049 分成两张）。归并口径变了，已有的开发库与开发测试环境要重放来信（`pnpm db:reset-inbound`、`pnpm deploy:staging --reset-inbound`）。集成测试写法见 `apps/server/test/order-merge.int.test.ts`。
+
 **演示时刻**：非生产环境可设 `CLOCK_START`（带时区的 ISO 时刻，例如 `CLOCK_START=2026-09-11T10:20:00+08:00 pnpm --filter @forcome/server dev:api`，worker 同样设），api 与 worker 的时钟从该时刻起随系统时钟前进，本机截图与演示对上原型的演示时刻（例如当月登记完整率落在 9 月）；生产环境配置了就拒绝启动，开发测试环境不设（ADR 0008「待办 21 落地」修订）。
 
 **CI 与合并**：`.github/workflows/ci.yml` 在 PR 与 main 上跑类型检查、lint、迁移一致性、示例数据夹具一致性、构建、单元与集成测试、镜像构建与部署配置检查，最后由「CI 通过」汇总。仓库推到 GitHub 后，在 Settings → Branches 为 `main` 加保护规则：Require a pull request before merging（至少 1 个批准）、Require status checks to pass（必需检查选「CI 通过」）。仓库暂不上 GitHub，期间用 `pnpm ci:local` 代替。
