@@ -95,7 +95,7 @@ type Body =
   | { readonly kind: 'form'; readonly value: Readonly<Record<string, string>> };
 
 /** 查询参数里像凭证的（access_token、appsecret、appkey、授权码、分页令牌等）：调用记录里写成 *** */
-const SECRET_PARAM = /token|secret|key|password|assertion|code|ticket/i;
+const SECRET_PARAM = /token|secret|key|password|assertion|code|ticket|signature|sig/i;
 
 /** 调用记录里的请求：方法与地址，查询参数照写（排错要看 startHistoryId 这类参数），像凭证的值换成 *** */
 function requestSummary(method: string, url: string): string {
@@ -103,7 +103,13 @@ function requestSummary(method: string, url: string): string {
   for (const name of new Set(parsed.searchParams.keys())) {
     if (SECRET_PARAM.test(name)) parsed.searchParams.set(name, '***');
   }
-  return `${method} ${parsed.origin}${parsed.pathname}${decodeURIComponent(parsed.search)}`;
+  let search = parsed.search;
+  try {
+    search = decodeURIComponent(search);
+  } catch {
+    // 不合法的 % 编码：照原样写，不让调用记录盖掉调用本身的结果
+  }
+  return `${method} ${parsed.origin}${parsed.pathname}${search}`;
 }
 
 /**
