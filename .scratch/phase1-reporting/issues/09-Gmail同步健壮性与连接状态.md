@@ -143,3 +143,7 @@ Blocked by: 05, 08, 31
 3. **原型截图工具缺陷**：`design/spec/check.py` 的元素截图受 Chrome 单次截图 16384 像素上限所限，StatesAdmin（1920 × 20071）的 K20 补充小样与 K21–K24 没截进去。改为超过 8000 像素的画板按段 `clip + full_page` 截再用 PIL 竖着拼成一张（其余画板照旧按元素截，生成逻辑不变）；重新生成 `design/spec/shots/StatesAdmin.png`，核对 K20 补充小样（Gmail 同步延迟、连接异常、几个邮箱同时异常、钉钉连接异常与从没同步成功、测试连接浮层）与 K21–K24 完整可见。其余画板都不超过 16384 像素（最高 StatesAfterSales 12268），原来就是完整的，没有重拍。
 
 **测试**（6cdb761）：`pnpm typecheck` 0 错误；`pnpm lint` 通过；`pnpm test:unit` 69 个文件 619 项全过；`pnpm test:integration` 30 个文件 340 项全过；`pnpm test:e2e`（单 worker 前台）93 项全过。
+
+**部署**：`pnpm deploy:staging`（0f03d5d，工作区干净，前台等待）八步全过，冒烟 93 通过 / 0 失败 / 0 不稳定 / 0 跳过（报告 `deploy/.state/staging/report.md`，版本 `0f03d5d`）；跑完后 4516–4519 端口空闲。
+
+**返工提交**：6cdb761 代码、测试、截图工具与文档；0f03d5d 本节记录；以及本条部署结果。
