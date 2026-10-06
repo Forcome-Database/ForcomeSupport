@@ -164,7 +164,11 @@ test('新增店铺：字段下方逐项报错、定位到第一个错误；改�
   await expect(e2eRow).toContainText(E2E_STORE);
   await expect(e2eRow).toContainText('MX');
   await expect(e2eRow).toContainText(`e2e-${stamp}.myshopify.com`);
-  await expect(e2eRow).toContainText('已连接');
+  // 状态列按邮箱的同步记录（待办 09）：新登记的邮箱由 worker 开始监听并同步一次后为已连接（之前是「Gmail 未连接」）
+  await expect(async () => {
+    await page.reload();
+    await expect(e2eRow).toContainText('已连接', { timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
 
   // 编辑时有未保存的修改，按 Esc 先确认（G8）；放弃后不保存
   const avatar = await avatarCenter(page);

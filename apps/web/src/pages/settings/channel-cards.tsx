@@ -207,7 +207,7 @@ function ConnectedCard({
           </>
         }
       />
-      <div className="flex flex-col gap-0.5">
+      <div data-testid="channel-card-lines" className="flex flex-col gap-0.5">
         {channelCardLines(card, stores).map((line) => (
           <div key={line} className="text-12 text-muted-foreground">
             {line}
