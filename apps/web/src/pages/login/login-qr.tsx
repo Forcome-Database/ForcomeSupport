@@ -106,7 +106,7 @@ function DingtalkFrame({
   return (
     <div className="relative size-42">
       <div id={id} className="size-42 overflow-hidden" aria-label="钉钉登录二维码" />
-      {!shown && <Skeleton className="absolute inset-0 rounded-md" />}
+      {!shown && <Skeleton className="absolute inset-0" />}
     </div>
   );
 }
@@ -133,7 +133,7 @@ export function LoginQr({
       data-mode={start?.mode}
     >
       {!start ? (
-        <Skeleton className="size-42 rounded-md" />
+        <Skeleton className="size-42" />
       ) : start.mode === 'fake' ? (
         <DemoQr />
       ) : (
