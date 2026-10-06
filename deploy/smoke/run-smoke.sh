@@ -11,6 +11,8 @@ NSSDB="sql:$HOME/.pki/nssdb"
 mkdir -p "$HOME/.pki/nssdb" /report
 certutil -d "$NSSDB" -N --empty-password
 certutil -d "$NSSDB" -A -t "C,," -n "Forcome Support Internal Root CA" -i "$ROOT_CERT"
+# Node 一侧（route.fetch 取真实响应再改写、APIRequestContext）不读 NSS 库，同一张根证书另经 NODE_EXTRA_CA_CERTS 交给 Node（待办 06）
+export NODE_EXTRA_CA_CERTS="$ROOT_CERT"
 
 # 报告写到 /report，部署脚本跑完后用 docker cp 取出（不挂宿主机目录，免得文件属主变成 root）
 export PLAYWRIGHT_HTML_OUTPUT_DIR=/report/html

@@ -72,3 +72,7 @@ status: accepted
 ## 修订（2026-10-06，待办 27 落地）
 
 - **售后登记表导入是镜像里的一次性命令**：`node dist/import-aftersales.mjs <登记表.xlsx|.csv> [--mapping <映射表.json>] [--dry-run]`，开发测试与生产都用（不像 `seed`、`reset-inbound` 只限非生产）。部署脚本子命令 `node deploy/deploy.mjs <环境> import-aftersales …`（本机 `pnpm staging import-aftersales …`）用当前部署的版本起一次性 `migrate` 容器，表格与映射表只读挂进容器的 `/import/`（本机路径按调用者所在目录解析），报告直接打到终端，有未导入的行时退出码为 1。落地口径（待办 32 上线前事项）：客户的真实登记表到位后只改映射表 → 开发测试环境试运行、正式导入一次并核对台账 → 生产环境同样执行；生产环境随待办 28 加入部署脚本，在那之前在生产机上用 `docker compose run --rm --no-deps -v …:/import/…:ro migrate node dist/import-aftersales.mjs …` 执行同一条命令（`docs/部署说明.md`「售后登记表导入」）。
+
+## 修订（2026-10-06，待办 06 落地）
+
+- **冒烟容器的 Node 一侧同样信任本环境根证书**：e2e 用例可以用 `route.fetch()` 取真实响应再改写（P20 的接口桩按 contracts 严格解析），也可以用 `APIRequestContext`；这些请求由 Playwright 在 Node 里发出，不读 Chromium 的 NSS 证书库，原来在开发测试环境以 `unable to get local issuer certificate` 失败（本机 e2e 走 http，暴露不出来）。冒烟入口 `deploy/smoke/run-smoke.sh` 在加 NSS 证书之后另设 `NODE_EXTRA_CA_CERTS` 为同一张 caddy 根证书：只在这个一次性容器里生效，仍按正常规则校验证书链与域名，不忽略证书错误（`ignoreHTTPSErrors` 不用）。
