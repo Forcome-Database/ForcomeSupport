@@ -10,7 +10,7 @@ import {
 import { getDemoFixture } from '@forcome/fixtures';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { gmailPollJob, gmailRenewWatchJob } from '../src/modules/channel';
+import { createChannelFeeds, gmailPollJob, gmailRenewWatchJob } from '../src/modules/channel';
 import { sendWorkNotificationsJob } from '../src/modules/core';
 import {
   dingtalkClient,
@@ -582,5 +582,58 @@ describe('Gmail 同步健壮性与连接状态', () => {
     expect(await channelNotices(admin)).toEqual(before);
     // Gmail 卡为最差的「未连接」，但没有异常的邮箱可列
     expect(await gmailCard()).toMatchObject({ status: 'not_connected', issues: [] });
+  });
+});
+
+describe('生产环境没有配置 Google 凭据（用户 2026-10-04 口径：Google 资质还没有，验收返工）', () => {
+  let p: TestHarness;
+  let admin: ApiClient;
+
+  beforeAll(async () => {
+    // 只挂收信的常驻拉取：钉钉 Stream 在生产要凭据（钉钉资质已有，部署时必填），这里不测它
+    p = await startTestHarness({ appEnv: 'production', feeds: (deps) => createChannelFeeds(deps) });
+    admin = await p.loginAs('管理员');
+  });
+
+  afterAll(async () => {
+    await p.close();
+  });
+
+  it('照常运行：店铺（真实接口）的 Gmail 与 Gmail 卡为未连接，没有异常的邮箱、不出横幅、不发通知；推送拉取安静跳过', async () => {
+    const res = await admin.post('/api/channel/stores', {
+      name: 'forcome.mx',
+      platform: 'shopify',
+      sites: ['MX'],
+      defaultSite: 'MX',
+      mailboxes: ['support@forcome.mx'],
+      platformId: 'forcome-mx.myshopify.com',
+    });
+    expect(res.status).toBe(201);
+    // 开始监听（按退避重试）、每 5 分钟的兜底同步、每天续订都跑几轮：都不抛错、不记失败
+    for (const minutes of [0, 1, 2, 4, 8, 16]) {
+      p.clock.advance({ minutes });
+      await p.enqueue(gmailPollJob, {});
+      await p.enqueue(gmailRenewWatchJob, {});
+      await p.runJobs();
+    }
+    const data = channelSettingsSchema.parse(
+      await (await admin.get('/api/channel/settings')).json(),
+    );
+    expect(data.channels.find((c) => c.kind === 'gmail')).toMatchObject({
+      status: 'not_connected',
+      simulated: false,
+      lastSyncAt: null,
+      issues: [],
+    });
+    expect(data.stores[0]?.connections.find((c) => c.kind === 'gmail')?.status).toBe(
+      'not_connected',
+    );
+    const alertsRes = await admin.get('/api/channel/alerts');
+    expect(channelAlertsSchema.parse(await alertsRes.json()).alerts).toEqual([]);
+    const notices = notificationListSchema
+      .parse(await (await admin.get('/api/notifications')).json())
+      .items.filter((n) => n.type === 'channel_disconnected' || n.type === 'channel_recovered');
+    expect(notices).toEqual([]);
+    expect(await p.auditRecords({ objectType: 'channel' })).toEqual([]);
   });
 });

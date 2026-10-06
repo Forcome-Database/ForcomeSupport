@@ -20,8 +20,8 @@ import { z } from 'zod';
  *   用 Fake 时不读。CorpId 第一期用不到（第二期钉钉内免登时再加）。
  * - `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` / `GMAIL_PUBSUB_TOPIC` / `GMAIL_PUBSUB_SUBSCRIPTION`：Gmail 真实现用的 Google 服务账号密钥
  *   文件（JSON，全域委派到 4 个店铺邮箱）、watch 推送的 Pub/Sub 主题与本环境的订阅（docs/部署说明.md 第 12 节；待办 09）。
- *   三项要么都不填、要么都填；Gmail 推送用真实接口时（生产环境默认，或 `CLIENT_MODE_GMAIL_PUSH=real`）必填。
- *   店铺级的 Gmail 邮箱按店铺选择真实或模拟，启动时不知道要不要，没配置时真实邮箱的调用以「未配置」失败（P18 显示连接异常）。
+ *   三项要么都不填、要么都填（只填一部分拒绝启动）。都不填时照常启动（生产环境也一样，用户 2026-10-04 口径：缺某个外部系统的配置时
+ *   系统照常可用）：真实接口的推送与邮箱调用以「未配置」失败、不算连接失败，P18 的 Gmail 与各店铺为「未连接」，不出横幅、不发通知。
  * 空值视同未设置。
  */
 const envSchema = z.object({
@@ -152,7 +152,7 @@ export interface AppConfig {
   clockStart: Date | null;
   /** 钉钉企业内部应用的凭据：钉钉用真实接口时必有；用 Fake 时为 null（不读） */
   dingtalk: DingtalkCredentials | null;
-  /** Gmail 的 Google 凭据：Gmail 推送用真实接口时必有；三项都没填为 null */
+  /** Gmail 的 Google 凭据；三项都没填为 null（照常启动，真实接口的 Gmail 为未连接） */
   google: GoogleCredentials | null;
 }
 
@@ -251,18 +251,14 @@ export function loadConfig(
     }
   }
 
-  // Gmail 的 Google 凭据：三项要么都填要么都不填；推送用真实接口时（生产默认）必填。只列变量名与原因，不回显密钥
+  // Gmail 的 Google 凭据：三项要么都填要么都不填。都没填时照常启动（用户 2026-10-04 口径：Google 资质还没有，
+  // 缺某个外部系统的配置时系统照常可用，该渠道为「未连接」）；只填一部分是配错了，拒绝启动。只列变量名与原因，不回显密钥
   let google: GoogleCredentials | null = null;
   if (result.success) {
     const given = GOOGLE_VARIABLES.filter((name) => result.data[name]);
-    const pushReal = (clientModes.gmail_push ?? defaultClientMode(result.data.APP_ENV)) === 'real';
-    if (given.length > 0 || pushReal) {
+    if (given.length > 0) {
       const missing = GOOGLE_VARIABLES.filter((name) => !result.data[name]);
-      for (const name of missing) {
-        problems.push(
-          `${name}：${pushReal ? 'Gmail 推送用真实接口时必填' : '与其他两项 Google 配置一起填'}`,
-        );
-      }
+      for (const name of missing) problems.push(`${name}：与其他两项 Google 配置一起填`);
       if (missing.length === 0) {
         const file = result.data.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ?? '';
         let key: z.infer<typeof serviceAccountKeySchema> | null = null;

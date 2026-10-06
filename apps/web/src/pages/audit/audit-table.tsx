@@ -41,7 +41,7 @@ import { A11Y, COLUMNS, EMPTY, EXPAND, MORE, NONE, SYSTEM } from './p27-copy';
  * 时间列 76）写在列的 meta；行展开用 rowExpandingFeature，展开状态由页面受控（同一时间只展开一行）。
  * 越权访问被拒的行浅红底、左侧红条；展开的行浅主色底、左侧主色条，下方浅灰底的两栏对照（左缩进 92），变化的后值主色浅底高亮，
  * 财务字段名旁标钱的图标，没有财务权限时值为「已隐藏」（K18）。点行任意处展开或收起；对象编号在查看者能打开目标页时是链接
- * （售后单进 P13 并打开该单，店铺进 P18 并打开店铺抽屉，成员进 P20 并选中该行），工单、来信、渠道随各自页面上线后在 objectLink 里接上
+ * （售后单进 P13 并打开该单，店铺进 P18 并打开店铺抽屉，成员进 P20 并选中该行，渠道进 P18），工单、来信随各自页面上线后在 objectLink 里接上
  * （PRD P27 v2.20）。
  */
 
@@ -89,6 +89,14 @@ function objectLink(entry: AuditLogEntry, member: CurrentMember): ReactNode {
         className={linkClass}
         onClick={stopRowToggle}
       >
+        {entry.objectLabel}
+      </Link>
+    );
+  }
+  // 渠道（Gmail 邮箱的连接异常与恢复，待办 09）进 P18；P18 只对管理员开放（PRD P27「第一阶段」v2.25）
+  if (entry.objectType === 'channel' && canOpenPage(member, pages.settingsChannels)) {
+    return (
+      <Link to={pages.settingsChannels.path} className={linkClass} onClick={stopRowToggle}>
         {entry.objectLabel}
       </Link>
     );

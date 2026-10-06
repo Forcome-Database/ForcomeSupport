@@ -1,3 +1,4 @@
+import { auditLogSchema, type AuditLogEntry } from '@forcome/contracts';
 import { expect, test, type Page } from '@playwright/test';
 
 /*
@@ -271,4 +272,48 @@ test('P18 页头「查看审计日志」进入 P27；店铺编号点进 P18 并�
   await expect(page).toHaveURL(/\/settings\/channels\?store=/);
   await expect(page.getByRole('dialog')).toContainText('编辑店铺');
   await expect(page.getByRole('dialog').getByLabel('店铺名')).toHaveValue(name);
+});
+
+test('渠道记录（Gmail 连接异常，待办 09 验收返工）：对象「Gmail · 邮箱」对管理员可点进 P18，客服主管打不开 P18、只显示文字', async ({
+  page,
+}) => {
+  // 开发测试环境的 Gmail 一直正常、没有渠道记录：取真实响应（按 contracts 严格解析）后在最前面加一条
+  const channelEntry: AuditLogEntry = {
+    id: '01920000-0000-7000-8000-00000000e091',
+    at: new Date().toISOString(),
+    actor: { system: true, id: null, name: '系统', roles: [], roleText: '' },
+    ip: null,
+    objectType: 'channel',
+    objectId: 'gmail:support@forcome.mx',
+    objectLabel: 'Gmail · support@forcome.mx',
+    action: 'channel.disconnected',
+    actionLabel: '连接异常',
+    denied: false,
+    summary: '状态：已连接 → 连接异常（连续 3 次失败）',
+    more: 0,
+    fields: [],
+  };
+  await page.route(
+    (url) => url.pathname === '/api/audit',
+    async (route) => {
+      const real = auditLogSchema.parse(await (await route.fetch()).json());
+      await route.fulfill({ json: { ...real, entries: [channelEntry, ...real.entries] } });
+    },
+  );
+
+  await loginAs(page, '刘洋');
+  await page.goto('/audit');
+  const row = rows(page).filter({ hasText: '连接异常' }).first();
+  await expect(row).toContainText('状态：已连接 → 连接异常（连续 3 次失败）');
+  await row.getByRole('link', { name: 'Gmail · support@forcome.mx' }).click();
+  await expect(page).toHaveURL(/\/settings\/channels$/);
+  await expect(page.getByRole('heading', { name: '渠道与店铺' })).toBeVisible();
+
+  await loginAs(page, '周敏');
+  await page.goto('/audit');
+  const supervisorRow = rows(page).filter({ hasText: '连接异常' }).first();
+  await expect(supervisorRow.getByText('Gmail · support@forcome.mx')).toBeVisible();
+  await expect(supervisorRow.getByRole('link', { name: 'Gmail · support@forcome.mx' })).toHaveCount(
+    0,
+  );
 });

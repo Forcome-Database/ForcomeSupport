@@ -12,8 +12,11 @@
 """
 import sys, os, io, re, json
 from playwright.sync_api import sync_playwright
+from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# Chrome 单次截图最多 16384 像素高，更高的画板分段截再拼接（StatesAdmin 等长状态板，待办 09）
+SEGMENT = 8000
 DESIGN = os.path.dirname(HERE)
 SHOTS = os.path.join(HERE, 'shots')
 
@@ -37,6 +40,22 @@ JS = r"""
 """
 
 
+def save_shot(pg, root, path):
+    """画板截图：不超过一段的照旧按元素截；更高的按 SEGMENT 分段截（clip + full_page，不受视口限制）再竖着拼成一张。"""
+    box = root.bounding_box()
+    x, y = int(round(box['x'])), int(round(box['y']))
+    w, h = int(round(box['width'])), int(round(box['height']))
+    if h <= SEGMENT:
+        root.screenshot(path=path)
+        return
+    out = Image.new('RGB', (w, h), 'white')
+    for top in range(0, h, SEGMENT):
+        part_h = min(SEGMENT, h - top)
+        png = pg.screenshot(clip={'x': x, 'y': y + top, 'width': w, 'height': part_h}, full_page=True)
+        out.paste(Image.open(io.BytesIO(png)).convert('RGB'), (0, top))
+    out.save(path, optimize=True)
+
+
 def main(files, shots=False):
     os.makedirs(SHOTS, exist_ok=True)
     out = {}
@@ -55,7 +74,7 @@ def main(files, shots=False):
             if shots:
                 root = pg.query_selector('x-dc > div')
                 if root:
-                    root.screenshot(path=os.path.join(SHOTS, f.replace('.dc.html', '.png')))
+                    save_shot(pg, root, os.path.join(SHOTS, f.replace('.dc.html', '.png')))
         b.close()
     for f, r in out.items():
         flag = []

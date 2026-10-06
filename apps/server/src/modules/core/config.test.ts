@@ -28,7 +28,7 @@ const GOOGLE = {
   GMAIL_PUBSUB_SUBSCRIPTION: 'projects/forcome-mail/subscriptions/gmail-production',
 };
 
-/** 生产环境默认全部用真实接口：钉钉与 Gmail 的凭据都要填 */
+/** 钉钉与 Gmail 的凭据都填齐（生产环境钉钉必填；Gmail 不填也能启动） */
 const REAL = { ...DINGTALK, ...GOOGLE };
 
 describe('配置读取', () => {
@@ -293,18 +293,30 @@ describe('钉钉企业内部应用的凭据（用户上线时填进环境文件�
 });
 
 describe('Gmail 的 Google 凭据（待办 09）', () => {
-  it('生产环境（Gmail 推送默认真实接口）三项必填，只列变量名', () => {
+  it('生产环境三项都没填时照常启动（用户 2026-10-04 口径：Google 资质还没有），google 为 null', () => {
+    const config = loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'production' });
+    expect(config.google).toBeNull();
+    // 推送仍按生产默认用真实接口（调用时以「未配置」失败，Gmail 为未连接），不会退回 Fake
+    expect(config.clientModes.gmail_push).toBeUndefined();
+  });
+
+  it('生产环境只填了一部分：拒绝启动，只列缺的变量名', () => {
     let error: unknown;
     try {
-      loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'production' });
+      loadConfig({
+        DATABASE_URL,
+        ...DINGTALK,
+        APP_ENV: 'production',
+        GMAIL_PUBSUB_TOPIC: GOOGLE.GMAIL_PUBSUB_TOPIC,
+      });
     } catch (e) {
       error = e;
     }
     expect(error).toBeInstanceOf(ConfigError);
     const message = (error as Error).message;
-    expect(message).toContain('GOOGLE_SERVICE_ACCOUNT_KEY_FILE：Gmail 推送用真实接口时必填');
-    expect(message).toContain('GMAIL_PUBSUB_TOPIC：Gmail 推送用真实接口时必填');
-    expect(message).toContain('GMAIL_PUBSUB_SUBSCRIPTION：Gmail 推送用真实接口时必填');
+    expect(message).toContain('GOOGLE_SERVICE_ACCOUNT_KEY_FILE：与其他两项 Google 配置一起填');
+    expect(message).toContain('GMAIL_PUBSUB_SUBSCRIPTION：与其他两项 Google 配置一起填');
+    expect(message).not.toContain('GMAIL_PUBSUB_TOPIC：');
   });
 
   it('填齐时读出密钥文件里的服务账号与 Pub/Sub 主题、订阅', () => {
@@ -344,9 +356,9 @@ describe('Gmail 的 Google 凭据（待办 09）', () => {
     expect(() =>
       loadConfig({ DATABASE_URL, APP_ENV: 'staging', ...GOOGLE, GMAIL_PUBSUB_TOPIC: 'gmail' }),
     ).toThrow(/GMAIL_PUBSUB_TOPIC：写成 projects\/<项目>\/topics\/<主题>/);
-    // 开发测试环境把推送切到真实接口时同样要填
-    expect(() =>
-      loadConfig({ DATABASE_URL, APP_ENV: 'staging', CLIENT_MODE_GMAIL_PUSH: 'real' }),
-    ).toThrow(/GMAIL_PUBSUB_SUBSCRIPTION：Gmail 推送用真实接口时必填/);
+    // 开发测试环境把推送切到真实接口、但三项都没填：照常启动（Gmail 为未连接）
+    expect(
+      loadConfig({ DATABASE_URL, APP_ENV: 'staging', CLIENT_MODE_GMAIL_PUSH: 'real' }).google,
+    ).toBeNull();
   });
 });

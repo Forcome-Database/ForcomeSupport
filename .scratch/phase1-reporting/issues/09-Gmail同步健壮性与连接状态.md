@@ -55,7 +55,7 @@ Blocked by: 05, 08, 31
 - 推送拉取改独占（咨询锁选主）；每 5 分钟兜底（worker 启动时也一次）；每天 03:00 续订 watch（不按标签过滤、不动游标）。「已发送」入库为方向 outbound、店铺为发件邮箱的店铺，不发事件（回复识别随 16）；Message-ID 判重按方向分开（迁移 0022 改唯一索引）。已被删除的邮件（messages.get 404）跳过。
 - 「重新检测」与「测试连接」同一个接口：能访问但开始监听还在退避的邮箱当场 watch（写游标用 coalesce，与 worker 并发安全）。
 - 出站工厂：按「系统 × 接口」限流（p-throttle，进程级共用；Gmail 每个接口每秒 20 次，汇率、钉钉暂不限——汇率每天一次、钉钉另有月度配额，积加与 17TRACK 随第二期配）；每次调用写 `integration.call_record`（请求摘要写方法与地址、查询参数里像凭证的值换成 ***；换令牌、扫码换用户凭证、钉钉 Stream 票据的响应体不记）。表没有清理策略，量大了随待办 28 的运维定。
-- Google 凭据：`GOOGLE_SERVICE_ACCOUNT_KEY_FILE`、`GMAIL_PUBSUB_TOPIC`、`GMAIL_PUBSUB_SUBSCRIPTION` 三项要么都填要么都不填，推送用真实接口时（生产默认）必填；Compose 把密钥目录 `GOOGLE_KEY_DIR` 只读挂到 `/run/forcome-keys`（`docs/部署说明.md` 第 12 节）。注意：生产环境从此要求这三项才能启动（同钉钉凭据）。
+- Google 凭据：`GOOGLE_SERVICE_ACCOUNT_KEY_FILE`、`GMAIL_PUBSUB_TOPIC`、`GMAIL_PUBSUB_SUBSCRIPTION` 三项要么都填要么都不填（只填一部分拒绝启动；都不填照常启动，生产也一样，Gmail 为「未连接」——验收返工改正，见文末「验收返工」）；Compose 把密钥目录 `GOOGLE_KEY_DIR` 只读挂到 `/run/forcome-keys`（`docs/部署说明.md` 第 12 节）。
 
 **交付了什么**
 
@@ -122,7 +122,7 @@ Blocked by: 05, 08, 31
 - 11、12（订单）：在 `connections.ts` 用同步记录替换订单的 `statusOf`，横幅的 `channelAlertSchema.kind` 加 amazon / shopify，`CHANNEL_ALERT_COPY` 类型上会要求补文案；SP-API 预签名地址的 signature 参数已在调用记录的脱敏名单里；订单的「测试连接」在 `connectionTestKinds` 加。
 - 16（回复识别）：「已发送」已入库（direction outbound、店铺为发件邮箱的店铺），在 `gmail-sync.ts` 的 `ingestMessage` outbound 分支发「我方发信已同步」；Fake 用 `send(…)` 放我方回信。示例数据回放目前只回放来信。
 - 26（历史回放）：`notifyMembers` 在回放运行时不发通知，渠道异常 / 恢复同样不会在回放中产生。
-- 28（生产部署）：生产环境启动要求三项 Google 配置与密钥目录挂载；调用记录表需要定清理周期。
+- 28（生产部署）：Google 三项配置与密钥目录不是启动条件（资质到位前生产照常启动，Gmail 为「未连接」），到位后按 `docs/部署说明.md` 第 12 节填入并重新部署；调用记录表需要定清理周期。
 - 29（真实环境验收）：服务账号授权、推送到达、游标过期补拉与断线恢复、调用记录核对，步骤见 `docs/部署说明.md` 第 12 节。
 
 **部署到开发测试环境**（`pnpm deploy:staging`，代码 7c611a0，工作区干净）：八步全过——准备、构建镜像、启动数据库、执行迁移（含 0022）、灌示例数据、启动 api / worker / caddy、内网 HTTPS 核对、Playwright 冒烟 92 通过 / 0 失败（报告 `deploy/.state/staging/report.md`，版本 `7c611a099026`）。冒烟里的 `channel-status.spec.ts` 6 项在开发测试环境照常通过（worker 启动时兜底同步一次，邮箱几秒内为已连接）。本机内存紧张，Claude Code 在部署接近结束时回收了后台 shell 的外壳，部署进程本身跑完并写出报告，冒烟容器退出码 0；没有重跑。跑完后 4516–4519 端口空闲。

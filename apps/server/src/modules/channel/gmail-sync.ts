@@ -180,7 +180,9 @@ async function ensureWatches(
       const failures = (retry?.failures ?? 0) + 1;
       const delay = Math.min(WATCH_RETRY_MS * 2 ** (failures - 1), WATCH_RETRY_MAX_MS);
       retries.set(target.address, { failures, retryAt: runtime.clock.now().getTime() + delay });
-      logger.warn(
+      // 没配置 Google 凭据（生产上线初期，Gmail 为未连接）：不是故障，只记调试日志
+      const level = error instanceof ClientNotConfiguredError ? 'debug' : 'warn';
+      logger[level](
         { err: error, mailbox: target.address, failures, retryInMs: delay },
         '邮箱开始监听失败，稍后重试',
       );
@@ -227,12 +229,25 @@ async function startWatching(
  */
 export function createGmailPushFeed(clients: IntegrationClients): Feed {
   const watchRetries: WatchRetries = new Map();
+  let reportedNotConfigured = false;
   return defineFeed(
     'channel.gmail_push',
     async ({ runtime, logger, waitSeconds }) => {
       await ensureWatches(runtime, clients, logger, watchRetries);
       const push = clients.global(gmailPushClient);
-      const notifications = await push.pull({ maxMessages: 100, waitSeconds });
+      let notifications: Awaited<ReturnType<typeof push.pull>>;
+      try {
+        notifications = await push.pull({ maxMessages: 100, waitSeconds });
+      } catch (error) {
+        // 推送用真实接口但没配置 Google 凭据（生产上线初期，用户 2026-10-04 口径）：安静跳过，不当作拉取出错去退避，
+        // 只在第一次记一条日志；配置好重新部署后自然开始拉
+        if (!(error instanceof ClientNotConfiguredError)) throw error;
+        if (!reportedNotConfigured) {
+          logger.info('没有配置 Google 凭据，Gmail 推送不拉取（Gmail 为未连接）');
+          reportedNotConfigured = true;
+        }
+        return 0;
+      }
       if (notifications.length === 0) return 0;
       const mailboxes = [
         ...new Set(notifications.map((n) => n.mailbox.toLowerCase()).filter(Boolean)),

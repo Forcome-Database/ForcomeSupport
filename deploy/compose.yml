@@ -31,7 +31,7 @@ x-app: &app
     DINGTALK_CLIENT_SECRET: ${DINGTALK_CLIENT_SECRET:-}
     DINGTALK_AGENT_ID: ${DINGTALK_AGENT_ID:-}
     # Gmail（待办 09，docs/部署说明.md 第 12 节）：推送不设 CLIENT_MODE_GMAIL_PUSH 时非生产环境用 Fake、生产用真实接口；
-    # 邮箱按店铺的「数据来源」选择。用真实 Gmail 时三项必填（推送用真实接口时 api 启动时校验）；
+    # 邮箱按店铺的「数据来源」选择。三项要么都填要么都不填（只填一部分 api 启动时拒绝；都不填照常启动，Gmail 为「未连接」）；
     # 密钥文件写容器里的路径：服务器上放密钥的目录由 GOOGLE_KEY_DIR 只读挂到 /run/forcome-keys
     CLIENT_MODE_GMAIL_PUSH: ${CLIENT_MODE_GMAIL_PUSH:-}
     GOOGLE_SERVICE_ACCOUNT_KEY_FILE: ${GOOGLE_SERVICE_ACCOUNT_KEY_FILE:-}
