@@ -239,19 +239,22 @@ async function fetchPage(
   }
 }
 
-/** 从第一页重来（窗口因平台权限缩短、分页令牌过期）：进度清零，返回新的样子 */
+/**
+ * 从第一页重来（窗口因平台权限缩短、分页令牌过期）：进度清零，返回新的样子。这期间这一轮已被夜间对账或 --again 从头重开
+ * （started_at 变了）时不动，返回 null——新的一轮由它自己排的任务做
+ */
 async function restartPaging(
   runtime: Runtime,
   row: SweepRow,
   changes: Partial<Pick<SweepRow, 'windowDays' | 'historyLimited' | 'since'>> = {},
-): Promise<SweepRow> {
+): Promise<SweepRow | null> {
   const now = runtime.clock.now();
   const [updated] = await runtime.db
     .update(orderSweep)
     .set({ ...changes, cursor: null, cursorAt: null, pages: 0, orders: 0, updatedAt: now })
-    .where(eq(orderSweep.id, row.id))
+    .where(and(eq(orderSweep.id, row.id), eq(orderSweep.startedAt, row.startedAt)))
     .returning();
-  return updated ?? row;
+  return updated ?? null;
 }
 
 /** 失败的原因记下来（排错用；记录本身出错只记日志，不盖掉原来的错误） */
@@ -293,7 +296,9 @@ export async function runOrderSweepPage(
   if (row.cursor && row.cursorAt && ttl !== null) {
     if (runtime.clock.now().getTime() - row.cursorAt.getTime() > ttl) {
       logger.info({ store: store.name, kind }, '分页令牌已过期，从第一页重来');
-      row = await restartPaging(runtime, row);
+      const restarted = await restartPaging(runtime, row);
+      if (!restarted) return;
+      row = restarted;
     }
   }
 
@@ -306,13 +311,15 @@ export async function runOrderSweepPage(
       if (!(error instanceof HistoryLimitedError) || kind !== 'backfill' || row.cursor !== null) {
         throw error;
       }
-      row = await restartPaging(runtime, row, {
+      const narrowed = await restartPaging(runtime, row, {
         windowDays: Math.min(row.windowDays, error.days),
         historyLimited: true,
         since: new Date(
           runtime.clock.now().getTime() - toMilliseconds({ days: error.days }) + NARROW_MARGIN_MS,
         ),
       });
+      if (!narrowed) return;
+      row = narrowed;
       logger.info(
         { store: store.name, days: error.days },
         `${error.message}：回补窗口改为 ${error.days} 天`,

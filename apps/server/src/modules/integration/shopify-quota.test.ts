@@ -78,6 +78,16 @@ describe('Shopify 查询成本配额', () => {
     expect(quota.available(SHOP)).toBe(0);
   });
 
+  it('响应校准后点数够了：排队的立即放行，不等原来约好的时刻', async () => {
+    respond('orders', 800, 100);
+    const high = quota.acquire(SHOP, 'orders', 'high');
+    await vi.waitFor(() => expect(waits.map((w) => w.ms)).toEqual([14_000]));
+    // 别的查询的响应说桶里其实还有 900 点
+    respond('shop', 10, 900);
+    await high;
+    expect(quota.available(SHOP)).toBe(100);
+  });
+
   it('不同店铺各一个桶', async () => {
     respond('orders', 900, 0);
     await quota.acquire('forcome-mx.myshopify.com', 'orders', 'low');

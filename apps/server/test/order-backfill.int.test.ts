@@ -644,3 +644,45 @@ describe('生产环境没有配置 SP-API 与 Shopify（用户 2026-10-04 口径
     }
   });
 });
+
+describe('一页取到一半时被从头重开（--again 或夜间对账重开）', () => {
+  let t: TestHarness;
+  let amazon: FakeAmazonOrders;
+
+  beforeAll(async () => {
+    ({ t, amazon } = await start());
+  });
+
+  afterAll(async () => {
+    await t.close();
+  });
+
+  it('旧一轮在途的那一页不记进新的一轮：新一轮只算自己窗口里的订单', async () => {
+    for (let i = 0; i < 60; i += 1) amazon.put(DIRECT.id, amazonOrder(t, 1 + i));
+    // 只在旧窗口里（89.5 天前下的单）：2 天后重开的新窗口（往前 90 天）已不含它
+    amazon.put(DIRECT.id, amazonOrder(t, 89.5));
+    await backfill(t, [DIRECT.id]);
+    const before = amazon.faultsOf(DIRECT.id).calls.length;
+    amazon.quota.limit(0);
+    const running = t.runJobs({ concurrently: true });
+    await expect.poll(() => amazon.quota.waiting('low')).toBe(1);
+
+    // 旧一轮的第 1 页还在等配额时，2 天后有人 --again 从头重开
+    t.clock.advance({ days: 2 });
+    await backfill(t, [DIRECT.id], true);
+    amazon.quota.unlimit();
+    await running;
+    await t.runJobs();
+
+    expect((await orderBackfills(t.runtime.db)).get(DIRECT.id)).toMatchObject({
+      completed: true,
+      orders: 60,
+    });
+    // 旧一轮的那一页取到了但没认领：新一轮自己从第 1 页取到第 2 页（共 3 次）；认领了的话新一轮会接着旧游标只取 1 页
+    expect(amazon.faultsOf(DIRECT.id).calls.slice(before)).toEqual([
+      'searchOrders',
+      'searchOrders',
+      'searchOrders',
+    ]);
+  });
+});

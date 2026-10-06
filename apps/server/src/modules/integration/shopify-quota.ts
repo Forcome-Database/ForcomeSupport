@@ -150,6 +150,8 @@ export class ShopifyQuota {
       bucket.available = Math.min(status.maximumAvailable, Math.max(0, status.currentlyAvailable));
       bucket.last = this.#clock.now().getTime();
     }
+    // 校准后点数可能比估的多：排队的够了就立即放行，不等原来约好的时刻
+    this.#pump(bucket);
   }
 
   /** 在排队的查询数（排错与测试用） */
