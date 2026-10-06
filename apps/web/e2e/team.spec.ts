@@ -1,3 +1,4 @@
+import { teamCandidatesSchema, teamSchema } from '@forcome/contracts';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
 /*
@@ -6,7 +7,7 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
  * 格内修改与吸底保存栏（已修改、摘要、成功浮层、只剩一个角色不能取消）、保存时的报错、离开本页（G8）、并发（G7）、断网后自动重试（K6），
  * 以及 P27 点成员进 P20 选中该行。
  * 开发测试环境长期运行、数据会累积：用例只动示例数据里新入职待添加的吴桐（钉钉用户 ID wutong），开头经开发工具
- * 「模拟离职后又回到通讯录」（POST /api/dev/dingtalk/rejoin）让他回到没有角色的样子，「添加成员」每次都能重复执行；
+ * 「模拟回到通讯录」（POST /api/dev/dingtalk/rejoin）让他回到没有角色的样子，「添加成员」每次都能重复执行；
  * 示例成员只改不存（放弃或报错不保存）。接口调用在页面里 fetch（与页面同一个会话）。
  */
 
@@ -19,7 +20,7 @@ async function loginAs(page: Page, name: string): Promise<void> {
   await expect(page.getByRole('banner').getByText(name, { exact: true })).toBeVisible();
 }
 
-/** 让吴桐回到「钉钉通讯录里、还没分配角色」的样子（开发工具：模拟离职后又回到通讯录） */
+/** 让吴桐回到「钉钉通讯录里、还没分配角色」的样子（开发工具：模拟回到通讯录） */
 async function resetNewcomer(page: Page): Promise<void> {
   const status = await page.evaluate(async (userId) => {
     const res = await fetch('/api/dev/dingtalk/rejoin', {
@@ -419,4 +420,44 @@ test('P27 点成员进 P20 并选中该行（PRD P27 v2.24）', async ({ page })
   await record.getByRole('link', { name: NEWCOMER }).click();
   await expect(page).toHaveURL(/\/settings\/team\?member=/);
   await expect(row(page, NEWCOMER)).toHaveAttribute('aria-selected', 'true');
+});
+
+test('已停用的成员不能改（悬停写原因）；「从钉钉添加」没有可添加的人、搜不到人时的写法', async ({
+  page,
+}) => {
+  await loginAs(page, '刘洋');
+  // 接口桩：按 contracts 严格解析（钉钉离职停用由集成测试覆盖；e2e 里不改 Fake 通讯录）。陈晨停用、候选为空
+  await page.route('**/api/org/team', async (route) => {
+    const team = teamSchema.parse(await (await route.fetch()).json());
+    await route.fulfill({
+      json: teamSchema.parse({
+        ...team,
+        members: team.members.map((m) => (m.name === '陈晨' ? { ...m, status: 'disabled' } : m)),
+      }),
+    });
+  });
+  await openTeam(page);
+  const chenchen = row(page, '陈晨');
+  await expect(chenchen).toContainText('已停用');
+  await expect(page.getByRole('button', { name: '修改陈晨的角色' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '修改陈晨的数据范围' })).toHaveCount(0);
+  await chenchen.getByText('坐席').hover();
+  await expect(page.getByRole('tooltip')).toHaveText('已停用的成员不能修改角色与数据范围');
+
+  // 搜不到人
+  await page.getByRole('button', { name: '从钉钉添加' }).click();
+  await drawer(page).getByLabel(/^成员/).click();
+  await page.getByPlaceholder('搜索姓名或邮箱').fill('不存在的人');
+  await expect(page.getByText('没有匹配的人', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await drawer(page).getByRole('button', { name: '取消' }).click();
+
+  // 没有可添加的人
+  await page.route('**/api/org/team/candidates', (route) =>
+    route.fulfill({ json: teamCandidatesSchema.parse({ candidates: [] }) }),
+  );
+  await page.reload();
+  await page.getByRole('button', { name: '从钉钉添加' }).click();
+  await drawer(page).getByLabel(/^成员/).click();
+  await expect(page.getByText('钉钉通讯录里的人都已分配角色', { exact: true })).toBeVisible();
 });

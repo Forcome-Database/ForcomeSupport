@@ -281,7 +281,7 @@ describe('从钉钉添加成员（AC-ST-06）', () => {
     );
   });
 
-  it('开发工具「模拟离职后又回到通讯录」：角色与店铺范围清空、又成为候选（P20 的 e2e 在开发测试环境重复执行靠它）', async () => {
+  it('开发工具「模拟回到通讯录」：角色与店铺范围清空、又成为候选（P20 的 e2e 在开发测试环境重复执行靠它）', async () => {
     const before = (await team()).members.find((m) => m.name === '吴桐')!;
     expect(before.roles).toEqual(['agent']);
     const res = await t.api.post('/api/dev/dingtalk/rejoin', { userId: 'wutong' });

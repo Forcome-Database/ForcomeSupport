@@ -242,7 +242,7 @@ export function devDingtalkScanAvailable(
  * 钉钉的开发工具（与开发登录同一个开关，钉钉用 Fake 时才有）：
  * - 模拟扫码：本机演示与 Playwright 用它拿到授权码，再像钉钉一样把浏览器带到 /login/dingtalk?authCode=…&state=…，
  *   走真实的回调页与换会话。授权码由本进程的 Fake 钉钉发出、一次有效。
- * - 模拟离职后又回到通讯录（待办 06）：走通讯录同步的同一条写入（applyFetchedUser）——先按离职停用、再按回到通讯录恢复在职，
+ * - 模拟回到通讯录（待办 06）：走通讯录同步的同一条写入（applyFetchedUser）——先按离职停用、再按回到通讯录恢复在职，
  *   角色与店铺范围清空，审计记「钉钉离职停用」「钉钉恢复在职」。这个人仍在 Fake 通讯录里（api 与 worker 的通讯录一致，
  *   之后的对账不受影响）。长期运行的开发测试环境里 Playwright 用它让 P20「添加成员」可以重复执行。
  */

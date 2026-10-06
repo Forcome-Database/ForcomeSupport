@@ -29,7 +29,8 @@ import { A11Y, CELL_EDIT, EDITED } from './p20-copy';
  * 「角色」点开为勾选列表（P20 能分配的五个角色，没有生产厂对接人），只剩一个角色时它不能取消（悬停写原因）；
  * 「数据范围」点开为「全部店铺（含以后新增的）/ 指定店铺」单选，选指定店铺时下方勾选店铺（列全部店铺）。
  * 改了立即记为待保存的修改（吸底保存栏统一保存），格旁标黄色「已修改」；保存时的报错写在格子下方。
- * 已停用的成员不能改：格子照常显示，悬停写原因。格子外观与原型静态的成员表相同，悬停与键盘聚焦时浅灰底并露出笔形图标。
+ * 已停用的成员不能改：格子照常显示，悬停写原因。格子外观与原型静态的成员表相同（笔形图标平时不占位置），悬停、键盘聚焦与
+ * 展开时浅灰底并露出笔形图标。
  */
 
 /** 格子共用的外框：可改时是按钮（DOM id 供保存后定位），改过的旁边标「已修改」，报错写在下方 */
@@ -60,13 +61,13 @@ function CellFrame({
 }
 
 const triggerClass =
-  'group/cell -mx-1.5 -my-1 flex max-w-[calc(100%+0.75rem)] min-w-0 items-center gap-1.5 rounded-sm px-1.5 py-1 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-invalid:ring-1 aria-invalid:ring-destructive data-[state=open]:bg-accent';
+  'group/cell -mx-1.5 -my-1 flex max-w-[calc(100%+0.75rem)] min-w-0 items-center gap-1.5 rounded-sm px-1.5 py-1 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-accent';
 
 function EditHint() {
   return (
     <Pencil
       aria-hidden
-      className="size-3 shrink-0 text-subtle-foreground opacity-0 group-hover/cell:opacity-100 group-focus-visible/cell:opacity-100 group-data-[state=open]/cell:opacity-100"
+      className="hidden size-3 shrink-0 text-subtle-foreground group-hover/cell:block group-focus-visible/cell:block group-data-[state=open]/cell:block"
     />
   );
 }

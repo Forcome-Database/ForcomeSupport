@@ -100,7 +100,8 @@ function CapabilityRow({
       <div role="cell" className="text-12 font-bold text-muted-foreground">
         {groupLabel}
       </div>
-      <div role="rowheader" className="min-w-0 text-13 whitespace-nowrap text-ink-2">
+      {/* 能力文案较长：放不下时换行（原型画布更宽、写在一行） */}
+      <div role="rowheader" className="min-w-0 text-13 text-ink-2">
         {capability.label}
       </div>
       {roles.map((role) => (

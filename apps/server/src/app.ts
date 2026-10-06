@@ -115,7 +115,7 @@ export function createApp(deps: ServerDeps) {
     app.route('/', createDevNotificationRoutes({ runtime, appEnv: config.appEnv }));
   }
   if (devDingtalkScanAvailable(config, clients)) {
-    // 钉钉的开发工具（钉钉用 Fake 时）：模拟扫码走扫码登录的回调页；模拟离职后又回到通讯录（P20 的 e2e 可重复执行）
+    // 钉钉的开发工具（钉钉用 Fake 时）：模拟扫码走扫码登录的回调页；模拟回到通讯录（P20 的 e2e 可重复执行）
     app.route('/', createDevDingtalkRoutes({ clients, appEnv: config.appEnv, runtime }));
   }
 
