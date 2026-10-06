@@ -206,6 +206,79 @@ describe('Stream 通讯录事件：新增、变更、离职分别反映到成员
     expect(await memberNamed('钱峰')).toBeDefined();
   });
 
+  it('用户 ID 给了另一个人（unionid 不同）：旧成员按钉钉离职停用并解绑，新人另建、没有角色，不接手旧成员的角色', async () => {
+    await t.addMember({
+      dingtalkUserId: 'reused-id',
+      name: '老员工',
+      dept: 'FSH / 客服部',
+      roles: ['agent'],
+      allStores: true,
+    });
+    dingtalk().addUser({
+      userId: 'reused-id',
+      unionId: 'union-old-staff',
+      name: '老员工',
+      departmentIds: [await departmentId('FSH / 客服部')],
+      email: null,
+    });
+    await t.runJobs();
+    expect(await memberNamed('老员工')).toMatchObject({ roles: ['agent'] });
+
+    // 老员工离职的事件漏了；钉钉把这个用户 ID 给了新来的人
+    dingtalk().removeUser('reused-id', { silent: true });
+    dingtalk().addUser({
+      userId: 'reused-id',
+      unionId: 'union-new-staff',
+      name: '新员工',
+      departmentIds: [await departmentId('FSH / 客服部')],
+      email: null,
+    });
+    await t.runJobs();
+    expect(await memberNamed('老员工')).toBeUndefined();
+    expect(await memberNamed('新员工')).toMatchObject({ dept: 'FSH / 客服部', roles: [] });
+    expect(await t.auditRecords({ action: 'member.dingtalk_left' })).toContainEqual(
+      expect.objectContaining({ objectLabel: '老员工' }),
+    );
+    // 之后对账两人都对得上，不再变化
+    await reconcile();
+    expect(await memberNamed('老员工')).toBeUndefined();
+    expect(await memberNamed('新员工')).toBeDefined();
+  });
+
+  it('离职没同步到就换了新的用户 ID 重新入职：按离职后又回来处理，恢复在职但角色清空', async () => {
+    await t.addMember({
+      dingtalkUserId: 'rehire-1',
+      name: '回来的人',
+      dept: 'FSH / 客服部',
+      roles: ['supervisor'],
+      allStores: true,
+    });
+    dingtalk().addUser({
+      userId: 'rehire-1',
+      unionId: 'union-rehire',
+      name: '回来的人',
+      departmentIds: [await departmentId('FSH / 客服部')],
+      email: null,
+    });
+    await t.runJobs();
+    dingtalk().removeUser('rehire-1', { silent: true });
+    dingtalk().addUser({
+      userId: 'rehire-2',
+      unionId: 'union-rehire',
+      name: '回来的人',
+      departmentIds: [await departmentId('FSH / 客服部')],
+      email: null,
+    });
+    await t.runJobs();
+    expect((await activeMembers()).filter((m) => m.name === '回来的人')).toEqual([
+      expect.objectContaining({ roles: [] }),
+    ]);
+    const audits = async (action: 'member.dingtalk_left' | 'member.dingtalk_rejoined') =>
+      (await t.auditRecords({ action })).filter((r) => r.objectLabel === '回来的人');
+    expect(await audits('member.dingtalk_left')).toHaveLength(1);
+    expect(await audits('member.dingtalk_rejoined')).toHaveLength(1);
+  });
+
   it('断线期间漏掉的离职事件，由每小时的全量对账补上', async () => {
     dingtalk().removeUser('zhaoqian', { silent: true });
     await t.runJobs();

@@ -8,7 +8,6 @@ const DINGTALK = {
   DINGTALK_CLIENT_ID: 'dingexampleclientid',
   DINGTALK_CLIENT_SECRET: 'example-client-secret-value',
   DINGTALK_AGENT_ID: '3100000001',
-  DINGTALK_CORP_ID: 'dingexamplecorpid',
 };
 
 describe('配置读取', () => {
@@ -246,8 +245,6 @@ describe('钉钉企业内部应用的凭据（用户上线时填进环境文件�
     expect(error).toBeInstanceOf(ConfigError);
     const message = (error as Error).message;
     expect(message).toContain('DINGTALK_AGENT_ID：钉钉用真实接口时必填');
-    // CorpId 第一期不用（第二期钉钉内免登用），不要求
-    expect(message).not.toContain('DINGTALK_CORP_ID');
     expect(message).not.toContain('DINGTALK_CLIENT_ID：');
     expect(message).not.toContain('top-secret-value');
     // 开发测试环境显式切到真实接口时同样要填
@@ -256,17 +253,12 @@ describe('钉钉企业内部应用的凭据（用户上线时填进环境文件�
     ).toThrow(/DINGTALK_CLIENT_ID：钉钉用真实接口时必填/);
   });
 
-  it('填齐时读出凭据（CorpId 没填为 null）；AgentId 只能是数字', () => {
+  it('填齐时读出凭据；AgentId 只能是数字', () => {
     expect(loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'production' }).dingtalk).toEqual({
       clientId: 'dingexampleclientid',
       clientSecret: 'example-client-secret-value',
       agentId: '3100000001',
-      corpId: 'dingexamplecorpid',
     });
-    expect(
-      loadConfig({ DATABASE_URL, ...DINGTALK, DINGTALK_CORP_ID: '', APP_ENV: 'production' })
-        .dingtalk?.corpId,
-    ).toBeNull();
     expect(() =>
       loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'production', DINGTALK_AGENT_ID: 'abc' }),
     ).toThrow(/DINGTALK_AGENT_ID：只能是数字/);

@@ -228,17 +228,18 @@ export interface FetchedUser {
   readonly fetchedAt: Date;
 }
 
-/** 向钉钉取一位成员的最新样子（在事务之外取，再交给 applyFetchedUser 在加锁的事务里写）；钉钉出错原样抛出 */
+/**
+ * 向钉钉取一位成员的最新样子（在事务之外取，再交给 applyFetchedUser 在加锁的事务里写）。只调钉钉、不查库：
+ * 部门表 tree 与开始取的时刻 fetchedAt 由调用方先读好，钉钉出错原样抛出，调用方能与查库出错分开处理
+ */
 export async function fetchUser(
-  runtime: Runtime,
   client: DingtalkClient,
+  tree: DepartmentTree,
   userId: string,
+  fetchedAt: Date,
 ): Promise<FetchedUser> {
-  const fetchedAt = runtime.clock.now();
   const user = await client.getUser(userId);
-  const departments = user
-    ? await departmentsToFetch(client, await loadDepartmentTree(runtime.db), user.departmentIds)
-    : [];
+  const departments = user ? await departmentsToFetch(client, tree, user.departmentIds) : [];
   return { userId, user, departments, fetchedAt };
 }
 
@@ -268,7 +269,12 @@ async function handleEvent(
 ): Promise<void> {
   if (USER_EVENTS.has(event.type)) {
     for (const userId of event.userIds) {
-      const changes = await applyFetchedUser(runtime, await fetchUser(runtime, client, userId));
+      const fetchedAt = runtime.clock.now();
+      const tree = await loadDepartmentTree(runtime.db);
+      const changes = await applyFetchedUser(
+        runtime,
+        await fetchUser(client, tree, userId, fetchedAt),
+      );
       context.logger.info({ type: event.type, userId, ...changes }, '钉钉通讯录事件已处理');
     }
     return;

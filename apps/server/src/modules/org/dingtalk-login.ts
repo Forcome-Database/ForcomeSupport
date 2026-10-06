@@ -21,6 +21,7 @@ import {
   type IntegrationClients,
 } from '../integration';
 import { applyFetchedUser, fetchUser } from './dingtalk-sync';
+import { loadDepartmentTree } from './directory';
 import { loginDenial } from './login';
 import { findMemberByDingtalkUnionId, findMemberByDingtalkUserId } from './members';
 import { json } from './openapi';
@@ -176,7 +177,9 @@ export function createDingtalkLoginRoutes(deps: {
       : found?.status === 'active';
     const userId = identity.userId ?? found?.dingtalkUserId;
     if (stale && userId) {
-      const fetched = await callDingtalk(() => fetchUser(runtime, dingtalk, userId));
+      const fetchedAt = runtime.clock.now();
+      const tree = await loadDepartmentTree(runtime.db);
+      const fetched = await callDingtalk(() => fetchUser(dingtalk, tree, userId, fetchedAt));
       if (typeof fetched === 'string') return failed('dingtalk_unavailable', 502);
       await applyFetchedUser(runtime, fetched);
       found = await findMemberByDingtalkUnionId(runtime.db, identity.unionId);

@@ -156,7 +156,7 @@ describe('全局客户端按环境变量选择', () => {
         reset: () => undefined,
       }),
     });
-    const credentials = { clientId: 'id', clientSecret: 'secret', agentId: '1', corpId: 'corp' };
+    const credentials = { clientId: 'id', clientSecret: 'secret', agentId: '1' };
     const clients = new IntegrationClients({
       appEnv: 'production',
       definitions: [counted],

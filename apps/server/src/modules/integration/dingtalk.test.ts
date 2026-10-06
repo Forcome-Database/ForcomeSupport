@@ -24,7 +24,6 @@ const CREDENTIALS = {
   clientId: 'dingclientid',
   clientSecret: 'client-secret',
   agentId: '3100000001',
-  corpId: 'dingcorp',
 };
 
 /** 测试里不连 Stream */
