@@ -1,17 +1,17 @@
 import { and, eq } from 'drizzle-orm';
 import { MockAgent } from 'undici';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { openSecret } from '../src/modules/integration/credential-vault';
-import { databaseCredentialVault } from '../src/modules/integration';
-import { ExternalCallFailedError } from '../src/modules/integration/faults';
-import { createHttpClient } from '../src/modules/integration/http';
-import { credential } from '../src/modules/integration/schema';
 import {
-  createRealShopifyClient,
-  createShopifyTokens,
-  SHOPIFY_API_VERSION,
-} from '../src/modules/integration/shopify-real';
-import { startTestHarness, TEST_CREDENTIAL_MASTER_KEY, type TestHarness } from './harness';
+  createTestDatabase,
+  createTestRuntime,
+  type TestDatabase,
+  type TestRuntime,
+} from '../../../test/database';
+import { databaseCredentialVault, openSecret } from './credential-vault';
+import { ExternalCallFailedError } from './faults';
+import { createHttpClient } from './http';
+import { credential } from './schema';
+import { createRealShopifyClient, createShopifyTokens, SHOPIFY_API_VERSION } from './shopify-real';
 
 /*
  * Shopify 的访问令牌与 Admin GraphQL 真实现（待办 11；规格 order「令牌 24 小时过期、每 20 小时提前刷新（动态凭据用主密钥 AES-GCM 加密存库）」、
@@ -24,7 +24,11 @@ const STORE_ID = '0190a5c4-0000-7000-8000-000000000011';
 const GRAPHQL = `/admin/api/${SHOPIFY_API_VERSION}/graphql.json`;
 const CREDENTIALS = { clientId: 'client-id-123', clientSecret: 'client-secret-456' };
 
-let t: TestHarness;
+/** 加密动态凭据的主密钥（只在本测试里） */
+const MASTER_KEY = Buffer.alloc(32, 0x5a);
+
+let database: TestDatabase;
+let t: TestRuntime;
 let agent: MockAgent;
 /** 换令牌时提交的表单（按先后） */
 let grants: URLSearchParams[];
@@ -32,11 +36,13 @@ let grants: URLSearchParams[];
 let usedTokens: string[];
 
 beforeAll(async () => {
-  t = await startTestHarness();
+  database = await createTestDatabase();
+  t = await createTestRuntime(database.url);
 });
 
 afterAll(async () => {
   await t.close();
+  await database.drop();
 });
 
 beforeEach(() => {
@@ -95,7 +101,7 @@ function client() {
     shop: SHOP,
     storeId: STORE_ID,
     credentials: CREDENTIALS,
-    vault: databaseCredentialVault(t.runtime, TEST_CREDENTIAL_MASTER_KEY)!,
+    vault: databaseCredentialVault(t.runtime, MASTER_KEY)!,
     clock: t.clock,
   });
   return createRealShopifyClient(http, tokens, SHOP);
@@ -133,11 +139,9 @@ describe('Shopify 访问令牌', () => {
     expect(row!.ciphertext.toString('hex')).not.toContain(
       Buffer.from('shpat_first_token').toString('hex'),
     );
-    expect(openSecret(TEST_CREDENTIAL_MASTER_KEY, `shopify:${STORE_ID}`, row!)).toBe(
-      'shpat_first_token',
-    );
+    expect(openSecret(MASTER_KEY, `shopify:${STORE_ID}`, row!)).toBe('shpat_first_token');
     // 附加数据把密文绑在这一行上：换个店铺就解不开
-    expect(() => openSecret(TEST_CREDENTIAL_MASTER_KEY, 'shopify:other', row!)).toThrow();
+    expect(() => openSecret(MASTER_KEY, 'shopify:other', row!)).toThrow();
     expect(row!.issuedAt).toEqual(t.clock.now());
     expect(row!.expiresAt.getTime() - row!.issuedAt.getTime()).toBe(86399 * 1000);
   });
@@ -159,9 +163,7 @@ describe('Shopify 访问令牌', () => {
     const after = await storedRow();
     expect(after!.issuedAt).toEqual(t.clock.now());
     expect(after!.iv.equals(before!.iv)).toBe(false);
-    expect(openSecret(TEST_CREDENTIAL_MASTER_KEY, `shopify:${STORE_ID}`, after!)).toBe(
-      'shpat_second_token',
-    );
+    expect(openSecret(MASTER_KEY, `shopify:${STORE_ID}`, after!)).toBe('shpat_second_token');
   });
 
   it('令牌被拒（401）时立即换新再试一次；新令牌也被拒则以 401 失败', async () => {

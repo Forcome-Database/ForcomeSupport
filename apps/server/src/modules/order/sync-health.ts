@@ -23,7 +23,7 @@ import { SHOPIFY_CONNECTION_NOTICES, shopifyAuditObject } from './shopify-copy';
  * 订单同步记录与连接状态（PRD 6.9、E-01、11.4，待办 11；同 Gmail 的 mailbox-health.ts）：
  * - 每个店铺按 order.order_sync 的「最近同步成功的时间」与「连续失败的次数」算状态（contracts 的 syncConnectionStatus：
  *   连续 3 次失败为连接异常，从没成功过为未连接，超过 10 分钟没同步成功为同步延迟）；
- * - 失败：同步、补拉的外部调用失败各记一次；连续第 3 次时转为连接异常——给在职的管理员与客服主管发站内通知
+ * - 失败：每分钟增量同步的外部调用失败各记一次（按订单名补拉是归并时的按需查询，失败由调用方重试，不记）；连续第 3 次时转为连接异常——给在职的管理员与客服主管发站内通知
  *   （连接异常另排钉钉工作通知，org 的 notifyMembers 按 11.4 自动），记审计「连接异常」，全站横幅随之出现；
  * - 成功：一轮增量把水位之后的订单全部写进镜像才算，清零失败次数、记下时间；之前是连接异常的，
  *   发「Shopify 已恢复」（写补拉了几笔订单）并记审计「恢复连接」，横幅随之消失。
@@ -125,6 +125,8 @@ async function disconnected(tx: Tx, store: SyncedStore, lastSuccessAt: Date | nu
     action: 'channel.disconnected',
     objectType: 'channel',
     ...shopifyAuditObject(store),
+    // 按店铺的记录：P27 按查看者的店铺范围过滤（PRD 10.2）
+    storeId: store.id,
     before: {
       channel: 'shopify',
       // 第 3 次失败之前的状态：上次成功的时间决定是已连接、同步延迟还是未连接
@@ -190,6 +192,7 @@ export async function recordOrderSyncSuccess(
     action: 'channel.recovered',
     objectType: 'channel',
     ...shopifyAuditObject(store),
+    storeId: store.id,
     before: {
       channel: 'shopify',
       status: 'error',

@@ -82,8 +82,8 @@ export async function listStoreChoices(db: DbExecutor): Promise<{ id: string; na
 }
 
 /**
- * 订单同步要知道的全部店铺（order 的 OrderStore：店铺名、平台、平台标识、数据来源），按建立先后。同步是系统操作，不按范围过滤；
- * 由组装根注入 order（order 不依赖 channel）
+ * 订单同步要知道的全部店铺（order 的 OrderStore：店铺名、平台、平台标识、数据来源），按建立先后。同步与连接状态是系统操作，不按范围过滤
+ * （ADR 0010 修订登记的例外）：由组装根注入 order（order 不依赖 channel），全站横幅用它列出连接异常的店铺
  */
 export async function listOrderStores(db: DbExecutor) {
   return db

@@ -8,10 +8,9 @@ import {
   type ConnectionStatus,
 } from '@forcome/contracts';
 import { getDemoFixture } from '@forcome/fixtures';
-import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { gmailPollJob } from '../src/modules/channel';
-import { sendWorkNotificationsJob } from '../src/modules/core';
+import { gmailPollJob, listOrderStores } from '../src/modules/channel';
+import { memberStoreScope, sendWorkNotificationsJob } from '../src/modules/core';
 import {
   dingtalkClient,
   gmailClient,
@@ -19,7 +18,7 @@ import {
   type FakeShopify,
   type FakeShopifyOrderInput,
 } from '../src/modules/integration';
-import { shopifyPollJob } from '../src/modules/order';
+import { findOrder, findOrdersByEmail, shopifyPollJob } from '../src/modules/order';
 import type { ApiClient } from './api-client';
 import { startTestHarness, type TestHarness } from './harness';
 
@@ -87,12 +86,9 @@ async function pollShopify(options: { allowFailures?: boolean } = {}) {
   return t.runJobs(options);
 }
 
-/** 镜像里某店铺的行数（核对「不产生重复行」） */
-async function mirrorRows(storeId: string): Promise<number> {
-  const result = await t.runtime.db.execute(
-    sql`SELECT count(*)::int AS n FROM "order".platform_order WHERE store_id = ${storeId}`,
-  );
-  return (result.rows[0] as { n: number }).n;
+/** 镜像里这位客户在该店铺的订单名（每笔测试订单的邮箱各不相同：核对「不产生重复行」） */
+async function namesByEmail(storeId: string, email: string | null): Promise<(string | null)[]> {
+  return (await t.ordersByEmail(storeId, email ?? '')).map((o) => o.name);
 }
 
 let orderNo = 2000;
@@ -167,15 +163,16 @@ describe('Shopify 订单镜像', () => {
       customerEmail: 'olivia.turner@example.com',
       platformUpdatedAt: first.updatedAt,
     });
-    expect(await mirrorRows(COM.id)).toBe(1);
-    expect(await mirrorRows(MX.id)).toBe(60);
-    expect(await t.findOrder(MX.id, { name: many[59]!.name })).not.toBeNull();
+    const eachOnce = async () => {
+      expect(await namesByEmail(COM.id, first.email)).toEqual([first.name]);
+      for (const o of many) expect(await namesByEmail(MX.id, o.email)).toEqual([o.name]);
+    };
+    await eachOnce();
 
-    // 下一分钟再拉（水位前 2 分钟起重叠）：不重复
+    // 下一分钟再拉（水位前 2 分钟起重叠，同一批订单又拉到一遍）：不重复
     t.clock.advance({ minutes: 1 });
     await pollShopify();
-    expect(await mirrorRows(COM.id)).toBe(1);
-    expect(await mirrorRows(MX.id)).toBe(60);
+    await eachOnce();
 
     // 订单发货：平台更新时间前进，镜像改成新版本
     const shipped = shopify.put(COM.id, {
@@ -202,19 +199,32 @@ describe('Shopify 订单镜像', () => {
       shipCountry: 'CA',
       platformUpdatedAt: shipped.updatedAt,
     });
-    expect(await mirrorRows(COM.id)).toBe(1);
+    expect(await namesByEmail(COM.id, first.email)).toEqual([first.name]);
+
+    // 只进不退：重叠窗口里拉到一个更旧的版本（平台搜索索引滞后），镜像不改回去
+    shopify.put(COM.id, {
+      ...shipped,
+      fulfillmentStatus: 'UNFULFILLED',
+      updatedAt: new Date(shipped.updatedAt.getTime() - 30_000),
+    });
+    t.clock.advance({ minutes: 1 });
+    await pollShopify();
+    expect(await t.findOrder(COM.id, { platformOrderId: first.id })).toMatchObject({
+      status: 'FULFILLED',
+      platformUpdatedAt: shipped.updatedAt,
+    });
   });
 
   it('镜像中没有的订单名触发补拉并入库；再查不再补拉；平台也没有的为空；亚马逊店铺不按订单名补拉', async () => {
     // 上线前的历史订单（回补随 13）：平台更新时间早于水位，增量拉不到
     const old = shopify.put(COM.id, {
       name: '#1063',
-      email: 'olivia.turner@example.com',
+      email: 'olivia.t@example.com',
       updatedAt: new Date('2026-08-09T08:45:00Z'),
       createdAt: new Date('2026-08-05T05:30:00Z'),
     });
     await pollShopify();
-    expect(await mirrorRows(COM.id)).toBe(1);
+    expect(await namesByEmail(COM.id, old.email)).toEqual([]);
 
     const calls = () => shopify.faultsOf(COM.id).calls.filter((c) => c === 'order_by_name').length;
     // 来信里常写成「order 1063」：补上 # 再找
@@ -224,7 +234,7 @@ describe('Shopify 订单镜像', () => {
       placedAt: old.createdAt,
     });
     expect(calls()).toBe(1);
-    expect(await mirrorRows(COM.id)).toBe(2);
+    expect(await namesByEmail(COM.id, old.email)).toEqual(['#1063']);
     // 已在镜像里：不再调平台
     expect(await t.findOrder(COM.id, { name: '#1063' })).toMatchObject({ platformOrderId: old.id });
     expect(calls()).toBe(1);
@@ -232,7 +242,17 @@ describe('Shopify 订单镜像', () => {
     expect(await t.findOrder(MX.id, { name: '#1063' })).toBeNull();
     // 平台也没有：为空，镜像不变
     expect(await t.findOrder(COM.id, { name: '#9999' })).toBeNull();
-    expect(await mirrorRows(COM.id)).toBe(2);
+    expect(await namesByEmail(COM.id, old.email)).toEqual(['#1063']);
+    // 店铺范围外（ADR 0010）：只授权 forcome.mx 的范围查不到 forcome.com 的订单，也不去平台补拉
+    const onlyMx = memberStoreScope({ allStores: false, storeIds: [MX.id] });
+    const comStore = (await listOrderStores(t.runtime.db)).find((s) => s.id === COM.id)!;
+    const before = calls();
+    expect(await findOrder(t.runtime, t.clients, onlyMx, comStore, { name: '#1063' })).toBeNull();
+    expect(await findOrder(t.runtime, t.clients, onlyMx, comStore, { name: '#4242' })).toBeNull();
+    expect(calls()).toBe(before);
+    expect(
+      await findOrdersByEmail(t.runtime.db, onlyMx, { storeId: COM.id, email: old.email ?? '' }),
+    ).toEqual([]);
     // 亚马逊店铺不调 Shopify（亚马逊按订单号 getOrder 补拉随 12）
     expect(await t.findOrder(DIRECT.id, { name: '#1063' })).toBeNull();
     expect(shopify.faultsOf(DIRECT.id).calls).toEqual([]);
@@ -399,13 +419,18 @@ describe('Shopify 订单镜像', () => {
     t.clock.advance({ minutes: 6 });
     await t.enqueue(sendWorkNotificationsJob, {});
     await t.runJobs();
-    const texts = t.clients
-      .fake(dingtalkClient)
-      .sent.map((n) => n.text)
-      .join('\n');
-    expect(texts).toContain('Shopify 连接异常');
-    expect(texts).toContain('forcome.mx 连续 3 次失败，订单暂停同步');
-    expect(texts).not.toContain('Shopify 已恢复');
+    const sent = t.clients.fake(dingtalkClient).sent;
+    const disconnectedSent = sent.filter((n) => n.text.includes('Shopify 连接异常'));
+    expect(disconnectedSent.map((n) => n.text).join('\n')).toContain(
+      'forcome.mx 连续 3 次失败，订单暂停同步',
+    );
+    // 接收人：在职的管理员与客服主管（钉钉用户 ID 是示例成员的 key），坐席没有
+    const recipients = getDemoFixture()
+      .members.filter((m) => m.role === '管理员' || m.role === '客服主管')
+      .map((m) => m.key)
+      .sort();
+    expect([...new Set(disconnectedSent.flatMap((n) => n.userIds))].sort()).toEqual(recipients);
+    expect(sent.map((n) => n.text).join('\n')).not.toContain('Shopify 已恢复');
   });
 
   it('恢复时一笔也没补拉到：照写「补拉 0 笔订单」', async () => {

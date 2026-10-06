@@ -1,5 +1,5 @@
 {
-  "id": "2dc01690-2620-4fbf-8e11-ee70d1bc72b1",
+  "id": "f69f053d-fe60-4deb-9e12-8098139457d1",
   "prevId": "ca29ae58-73c7-4b7f-98f5-fb8e82f90523",
   "version": "7",
   "dialect": "postgresql",
@@ -2343,8 +2343,8 @@
           "method": "btree",
           "with": {}
         },
-        "platform_order_store_name_key": {
-          "name": "platform_order_store_name_key",
+        "platform_order_store_name_idx": {
+          "name": "platform_order_store_name_idx",
           "columns": [
             {
               "expression": "store_id",
@@ -2359,7 +2359,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": true,
+          "isUnique": false,
           "where": "\"order\".\"platform_order\".\"name\" is not null",
           "concurrently": false,
           "method": "btree",

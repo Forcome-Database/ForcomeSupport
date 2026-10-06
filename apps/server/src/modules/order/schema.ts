@@ -45,7 +45,8 @@ export interface MirroredTracking {
 
 /**
  * 本地订单镜像（规格 order、ADR 0011，待办 11 起）：平台订单的快照，一笔订单一行，以「店铺 + 平台订单号」为关联键
- * （Shopify 为 Admin API 的全局 ID），Shopify 另存订单名（店铺内唯一，来信里写的是它）。同步按平台更新时间只进不退：
+ * （Shopify 为 Admin API 的全局 ID），Shopify 另存订单名（平台保证店铺内唯一，来信里写的是它）。订单名只建普通索引、不加唯一约束：
+ * 万一平台那边改名撞名，也不能让整页写入失败、同步卡住；按订单名查时取平台更新时间最新的一笔。同步按平台更新时间只进不退：
  * 拉到的版本比镜像里的旧就不改。亚马逊（MFN/AFN、承诺时效等）随 12 加列。
  */
 export const platformOrder = orderSchema.table(
@@ -83,7 +84,7 @@ export const platformOrder = orderSchema.table(
   },
   (t) => [
     uniqueIndex('platform_order_store_order_key').on(t.storeId, t.platformOrderId),
-    uniqueIndex('platform_order_store_name_key')
+    index('platform_order_store_name_idx')
       .on(t.storeId, t.name)
       .where(sql`${t.name} is not null`),
     index('platform_order_store_email_idx').on(t.storeId, t.customerEmail),

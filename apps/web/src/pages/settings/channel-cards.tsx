@@ -168,14 +168,12 @@ function CardHead({
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <div className="flex min-w-0 items-center gap-2.5">
+      <div className="flex shrink-0 items-center gap-2.5">
         <IconTile icon={icon} tone={tone} />
-        <div className="flex min-w-0 flex-col">
-          {/* 卡头右侧标签多时（开发测试环境另有「模拟数据」）卡名放不下：截断，悬停看全称 */}
+        <div className="flex flex-col">
           <div
-            title={name}
             className={cn(
-              'truncate text-14 font-semibold',
+              'text-14 font-semibold whitespace-nowrap',
               muted ? 'text-ink-2' : 'text-foreground',
             )}
           >
@@ -184,7 +182,8 @@ function CardHead({
           {sub && <div className="text-11 whitespace-nowrap text-subtle-foreground">{sub}</div>}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">{right}</div>
+      {/* 卡头右侧标签多时（开发测试环境另有「模拟数据」）一行放不下：标签折到下一行，卡名照原型完整显示 */}
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">{right}</div>
     </div>
   );
 }

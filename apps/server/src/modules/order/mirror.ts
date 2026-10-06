@@ -1,5 +1,6 @@
 import type { Currency, Platform } from '@forcome/contracts';
 import { and, desc, eq, sql } from 'drizzle-orm';
+import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { storeScopeCondition, type DbExecutor, type StoreScope, type Tx } from '../core';
 import type { ShopifyOrder } from '../integration';
 import {
@@ -74,8 +75,8 @@ export interface MirrorWrites {
 
 export const noWrites = (): MirrorWrites => ({ count: 0, from: null, to: null });
 
-/** 列名 → excluded 里同名的值（upsert 时整行换成拉到的版本） */
-const excluded = (column: string) => sql.raw(`excluded.${column}`);
+/** upsert 时这一列换成拉到的版本（excluded 里同名的值；按列对象取列名，写错列编译不过） */
+const excluded = (column: AnyPgColumn) => sql.raw(`excluded.${column.name}`);
 
 /**
  * 把一笔 Shopify 订单写进镜像（只进不退）；返回是否新增或改了。邮箱存小写（R-ST-03 反查不分大小写）
@@ -111,20 +112,20 @@ export async function upsertShopifyOrder(
     .onConflictDoUpdate({
       target: [platformOrder.storeId, platformOrder.platformOrderId],
       set: {
-        name: excluded('name'),
-        status: excluded('status'),
-        financialStatus: excluded('financial_status'),
-        cancelledAt: excluded('cancelled_at'),
-        lineItems: excluded('line_items'),
-        totalAmount: excluded('total_amount'),
-        totalCurrency: excluded('total_currency'),
-        customerEmail: excluded('customer_email'),
-        shipCountry: excluded('ship_country'),
-        shipAddress: excluded('ship_address'),
-        tracking: excluded('tracking'),
-        placedAt: excluded('placed_at'),
-        platformUpdatedAt: excluded('platform_updated_at'),
-        syncedAt: excluded('synced_at'),
+        name: excluded(platformOrder.name),
+        status: excluded(platformOrder.status),
+        financialStatus: excluded(platformOrder.financialStatus),
+        cancelledAt: excluded(platformOrder.cancelledAt),
+        lineItems: excluded(platformOrder.lineItems),
+        totalAmount: excluded(platformOrder.totalAmount),
+        totalCurrency: excluded(platformOrder.totalCurrency),
+        customerEmail: excluded(platformOrder.customerEmail),
+        shipCountry: excluded(platformOrder.shipCountry),
+        shipAddress: excluded(platformOrder.shipAddress),
+        tracking: excluded(platformOrder.tracking),
+        placedAt: excluded(platformOrder.placedAt),
+        platformUpdatedAt: excluded(platformOrder.platformUpdatedAt),
+        syncedAt: excluded(platformOrder.syncedAt),
       },
       // 只进不退：同一版本（平台更新时间相同）或更旧的版本不改
       setWhere: sql`${platformOrder.platformUpdatedAt} < excluded.platform_updated_at`,
@@ -148,7 +149,7 @@ export async function mirrorShopifyOrders(
   }
 }
 
-/** 镜像里按订单名或平台订单号找一笔（店铺范围外的店铺找不到） */
+/** 镜像里按订单名或平台订单号找一笔（店铺范围外的店铺找不到；同名的取平台更新时间最新的一笔） */
 export async function mirroredOrder(
   db: DbExecutor,
   scope: StoreScope,
@@ -167,6 +168,7 @@ export async function mirroredOrder(
           : eq(platformOrder.platformOrderId, ref.platformOrderId),
       ),
     )
+    .orderBy(desc(platformOrder.platformUpdatedAt))
     .limit(1);
   return row ? toMirrored(row) : null;
 }

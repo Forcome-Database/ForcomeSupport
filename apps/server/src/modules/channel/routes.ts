@@ -188,7 +188,8 @@ export function createChannelRoutes(deps: {
   );
 
   routes.openapi(alertsRoute, async (c) => {
-    const stores = await listAllStores(runtime.db);
+    // 横幅是系统状态（哪个渠道断了），对所有登录成员一样，不按成员的店铺范围过滤（ADR 0010 修订登记的例外）
+    const stores = await listOrderStores(runtime.db);
     const connections = await loadConnections(runtime.db, runtime.clock.now());
     return c.json({ alerts: channelAlerts(stores, connections) }, 200);
   });

@@ -48,5 +48,5 @@ CREATE TABLE "order"."platform_order" (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX "platform_order_store_order_key" ON "order"."platform_order" USING btree ("store_id","platform_order_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "platform_order_store_name_key" ON "order"."platform_order" USING btree ("store_id","name") WHERE "order"."platform_order"."name" is not null;--> statement-breakpoint
+CREATE INDEX "platform_order_store_name_idx" ON "order"."platform_order" USING btree ("store_id","name") WHERE "order"."platform_order"."name" is not null;--> statement-breakpoint
 CREATE INDEX "platform_order_store_email_idx" ON "order"."platform_order" USING btree ("store_id","customer_email");

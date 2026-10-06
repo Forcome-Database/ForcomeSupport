@@ -370,4 +370,36 @@ test('全站横幅（G4）：Gmail 与 Shopify 同时连接异常时各一条，
   ).toBeVisible();
   // 客服主管打不开 P18：没有「查看渠道状态」
   await expect(banners.nth(1).getByRole('link', { name: '查看渠道状态' })).toHaveCount(0);
+
+  // 管理员：Shopify 横幅也有「查看渠道状态」，点进 P18
+  await loginAs(page, '刘洋');
+  const adminShopify = page.getByRole('alert').filter({ hasText: 'Shopify 订单同步中断' });
+  await adminShopify.getByRole('link', { name: '查看渠道状态' }).click();
+  await expect(page).toHaveURL(/\/settings\/channels$/);
+});
+
+test('Shopify 卡未连接（生产环境还没配置 Shopify 凭据，或从没同步成功过）：「尚未授权」、没有最近同步与异常行（待办 11）', async ({
+  page,
+}) => {
+  await stubCards(
+    page,
+    { shopify: { status: 'not_connected', lastSyncAt: null, issues: [] } },
+    {
+      'forcome.mx': 'not_connected',
+      'forcome.com': 'not_connected',
+    },
+  );
+  await loginAs(page, '刘洋');
+  await page.goto('/settings/channels');
+  const shopify = card(page, 'shopify');
+  await expect(shopify).toContainText('未连接');
+  await expect(shopify).toContainText('尚未授权');
+  await expect(shopify).not.toContainText('最近同步');
+  await expect(shopify.getByTestId('channel-card-lines').locator('> div')).toHaveText([
+    /^\d+ 个店铺 · 订单经 Admin API 准实时同步$/,
+  ]);
+  await expect(shopify.getByRole('button', { name: '重新检测' })).toHaveCount(0);
+  await expect(page.getByRole('row').filter({ hasText: 'forcome-mx.myshopify.com' })).toContainText(
+    'Admin API 未连接',
+  );
 });

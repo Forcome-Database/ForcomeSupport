@@ -214,7 +214,7 @@ function earliestFailure(
  * （协调者 2026-10-06 决定）。亚马逊随 12
  */
 export function channelAlerts(
-  stores: readonly StoreConnectionSource[],
+  stores: readonly Pick<StoreConnectionSource, 'id' | 'name' | 'platform'>[],
   snapshot: ConnectionSnapshot,
 ): ChannelAlert[] {
   const alerts: ChannelAlert[] = [];
