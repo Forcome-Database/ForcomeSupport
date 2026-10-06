@@ -14,6 +14,13 @@ async function loginAs(page: Page, name: string): Promise<void> {
 
 const drawer = (page: Page) => page.getByRole('dialog');
 
+/** 顶栏头像按钮（头像菜单：审计日志、密度、退出登录）的中心点，抽屉打开前取 */
+async function avatarCenter(page: Page): Promise<{ x: number; y: number }> {
+  const box = await page.getByRole('banner').getByRole('button').last().boundingBox();
+  if (!box) throw new Error('没找到顶栏的头像按钮');
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
 const E2E_STORE = 'E2E 冒烟店铺';
 const E2E_MAILBOX = 'e2e-smoke@forcome.test';
 
@@ -160,9 +167,17 @@ test('新增店铺：字段下方逐项报错、定位到第一个错误；改�
   await expect(e2eRow).toContainText('已连接');
 
   // 编辑时有未保存的修改，按 Esc 先确认（G8）；放弃后不保存
+  const avatar = await avatarCenter(page);
   await page.getByRole('button', { name: `编辑 ${E2E_STORE}` }).click();
   await expect(drawer(page).getByRole('heading', { name: '编辑店铺' })).toBeVisible();
   await drawer(page).getByRole('textbox', { name: '店铺名' }).fill(`${E2E_STORE} 改`);
+  // 抽屉开着时点不到头像菜单（退出登录）：点击被抽屉的遮罩接住，菜单不打开，抽屉与输入都在，会话照旧（待办 06 验收返工）
+  await page.mouse.click(avatar.x, avatar.y);
+  await expect(page.getByRole('menuitem', { name: '退出登录' })).toHaveCount(0);
+  await expect(drawer(page).getByRole('textbox', { name: '店铺名' })).toHaveValue(
+    `${E2E_STORE} 改`,
+  );
+  expect(await page.evaluate(async () => (await fetch('/api/me')).status)).toBe(200);
   await page.keyboard.press('Escape');
   const leave = page.getByRole('alertdialog');
   await expect(leave.getByRole('heading', { name: '离开前保存修改？' })).toBeVisible();

@@ -188,7 +188,13 @@ export function useSaveDensity() {
   });
 }
 
-/** 退出登录：结束服务端会话，清掉本机缓存的数据，回到登录入口 */
+/** 头像菜单「退出登录」去的地址（退出登录页，`pages/logout.tsx`） */
+export const LOGOUT_PATH = '/logout';
+
+/**
+ * 结束会话：结束服务端会话，清掉本机缓存的数据，回到登录入口。只在退出登录页（`pages/logout.tsx`）里用——头像菜单先导航
+ * 到那里，离开当前页面先过 G8，不在原页面上直接结束会话
+ */
 export function useLogout() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -199,7 +205,7 @@ export function useLogout() {
       queryClient.clear();
       dismissAllToasts();
       applyDensity(null);
-      await navigate({ to: '/' });
+      await navigate({ to: '/', replace: true });
     },
   });
 }

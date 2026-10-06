@@ -15,6 +15,13 @@ async function loginAs(page: Page, name: string): Promise<void> {
 }
 
 const drawer = (page: Page) => page.getByRole('dialog');
+
+/** 顶栏头像按钮（头像菜单：审计日志、密度、退出登录）的中心点，抽屉打开前取 */
+async function avatarCenter(page: Page): Promise<{ x: number; y: number }> {
+  const box = await page.getByRole('banner').getByRole('button').last().boundingBox();
+  if (!box) throw new Error('没找到顶栏的头像按钮');
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
 /** 只读抽屉底部的「关闭」（右上角的 × 读屏名也叫「关闭」） */
 const closeButton = (page: Page) =>
   drawer(page).locator('[data-slot=sheet-footer]').getByRole('button', { name: '关闭' });
@@ -364,6 +371,7 @@ test('编辑登记：登记人修改进行中的单（寄出后补寄出日期�
   await loginAs(page, '王磊');
   const number = await register(page, { customer });
   await openLedger(page);
+  const avatar = await avatarCenter(page);
 
   await row(page, number)
     .getByRole('button', { name: `打开 ${number} 的登记` })
@@ -373,6 +381,11 @@ test('编辑登记：登记人修改进行中的单（寄出后补寄出日期�
   const tracking = drawer(page).getByRole('textbox', { name: '快递单号', exact: true });
   await expect(tracking).toBeEnabled();
   await tracking.fill('1Z-E2E-EDIT');
+  // 抽屉开着时点不到头像菜单（退出登录）：点击被抽屉的遮罩接住，菜单不打开，抽屉与输入都在，会话照旧（待办 06 验收返工）
+  await page.mouse.click(avatar.x, avatar.y);
+  await expect(page.getByRole('menuitem', { name: '退出登录' })).toHaveCount(0);
+  await expect(tracking).toHaveValue('1Z-E2E-EDIT');
+  expect(await page.evaluate(async () => (await fetch('/api/me')).status)).toBe(200);
   // 有未保存的修改就关闭：G8 写有几项未保存
   await page.keyboard.press('Escape');
   await expect(

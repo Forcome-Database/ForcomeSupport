@@ -401,6 +401,55 @@ test('有未保存的修改时离开本页（G8）：继续编辑留在本页；
   await expect(row(page, NEWCOMER)).not.toContainText('知识库负责人');
 });
 
+test('有未保存的修改时退出登录（G8，验收返工）：先弹 G8 再结束会话——继续编辑后会话仍有效、修改仍在；放弃修改后退出；保存并离开后保存成功再退出', async ({
+  page,
+}) => {
+  await loginAs(page, '刘洋');
+  await addNewcomerByApi(page);
+  await openTeam(page);
+  const startLogout = async () => {
+    await page.getByRole('banner').getByRole('button', { name: /刘洋/ }).click();
+    await page.getByRole('menuitem', { name: '退出登录' }).click();
+  };
+  const sessionStatus = () => page.evaluate(async () => (await fetch('/api/me')).status);
+  const dialog = page.getByRole('alertdialog');
+
+  // 继续编辑：留在本页，会话没有结束，修改还在
+  await editScope(page, '全部店铺（含以后新增的）');
+  await startLogout();
+  await expect(dialog.getByRole('heading', { name: '离开前保存修改？' })).toBeVisible();
+  await expect(dialog).toContainText(
+    '「团队与权限」有 1 项未保存的修改。放弃后恢复为上次保存的值。',
+  );
+  await dialog.getByRole('button', { name: '继续编辑' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/\/settings\/team$/);
+  expect(await sessionStatus()).toBe(200);
+  await expect(page.getByTestId('team-row').first()).toBeVisible();
+  await expect(saveBar(page)).toContainText('有 1 项未保存修改');
+  await expect(row(page, NEWCOMER)).toContainText('全部店铺');
+
+  // 放弃修改：不保存，退出登录
+  await startLogout();
+  await dialog.getByRole('button', { name: '放弃修改' }).click();
+  await expect(page).toHaveURL(/\/dev-login$/);
+  expect(await sessionStatus()).toBe(401);
+
+  // 保存并离开：先保存成功，再退出登录
+  await loginAs(page, '刘洋');
+  await openTeam(page);
+  await expect(row(page, NEWCOMER)).toContainText('Forcome Direct');
+  await editScope(page, '全部店铺（含以后新增的）');
+  await startLogout();
+  await dialog.getByRole('button', { name: '保存并离开' }).click();
+  await expect(page).toHaveURL(/\/dev-login$/);
+  expect(await sessionStatus()).toBe(401);
+  await loginAs(page, '刘洋');
+  await openTeam(page);
+  await expect(row(page, NEWCOMER)).toContainText('全部店铺');
+  await expect(saveBar(page)).toContainText('没有未保存的修改');
+});
+
 async function adminPage(browser: Browser, baseURL: string | undefined): Promise<Page> {
   const context = await browser.newContext({ baseURL, viewport: { width: 1440, height: 900 } });
   const other = await context.newPage();

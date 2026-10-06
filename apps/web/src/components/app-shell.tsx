@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { avatarText } from '@/lib/avatar';
 import { pages, sectionPaths } from '@/lib/pages';
-import { useLogout, useSaveDensity } from '@/lib/session';
+import { LOGOUT_PATH, useSaveDensity } from '@/lib/session';
 import { Brand } from './brand';
 import { NotificationBell } from './notification-bell';
 
@@ -100,7 +100,6 @@ function DensityButton({ density }: { density: Density }) {
 /** 当前成员与头像菜单（原型 avatar_menu，设计规范「头像菜单（G10）」）：审计日志 · 密度 · 退出登录 */
 function UserMenu({ member }: { member: CurrentMember }) {
   const saveDensity = useSaveDensity();
-  const logout = useLogout();
   const roles = roleNames(member.roles);
   return (
     <DropdownMenu>
@@ -163,9 +162,12 @@ function UserMenu({ member }: { member: CurrentMember }) {
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => logout.mutate()}>
-          <ArrowRight />
-          退出登录
+        {/* 先导航到退出登录页再结束会话：有未保存修改的页面先弹 G8，「继续编辑」就不退出 */}
+        <DropdownMenuItem asChild>
+          <Link to={LOGOUT_PATH}>
+            <ArrowRight />
+            退出登录
+          </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

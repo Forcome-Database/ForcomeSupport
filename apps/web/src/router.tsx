@@ -20,6 +20,7 @@ import {
   applyDensity,
   currentMemberQuery,
   devMembersQuery,
+  LOGOUT_PATH,
   signedOutTarget,
   takeSessionExpired,
 } from '@/lib/session';
@@ -28,6 +29,7 @@ import { ledgerSearchSchema } from '@/pages/aftersales/ledger-search';
 import { AuditPage } from '@/pages/audit/audit-page';
 import { auditSearchSchema } from '@/pages/audit/audit-search';
 import { DevLoginPage } from '@/pages/dev-login';
+import { LogoutPage } from '@/pages/logout';
 import { LoginCallbackPage } from '@/pages/login/login-callback';
 import { LoginPage, loginSearchSchema } from '@/pages/login/login-page';
 import { ChannelsPage, channelsSearchSchema } from '@/pages/settings/channels-page';
@@ -92,6 +94,13 @@ const loginCallbackRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login/dingtalk',
   component: LoginCallbackPage,
+});
+
+/** 退出登录（头像菜单）：先导航到这里（离开原页面先过 G8），到了才结束会话；不在 app 布局下，原页面随之卸载 */
+const logoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: LOGOUT_PATH,
+  component: LogoutPage,
 });
 
 const appRoute = createRoute({
@@ -233,6 +242,7 @@ const routeTree = rootRoute.addChildren([
   devLoginRoute,
   loginRoute,
   loginCallbackRoute,
+  logoutRoute,
   appRoute.addChildren([
     homeRoute,
     pageRoute(pages.tickets, TicketsPage),
