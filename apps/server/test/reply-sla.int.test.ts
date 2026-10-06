@@ -331,6 +331,39 @@ describe('回复识别与 SLA（R-SL-08）', () => {
     expect(outbound(detail)).toEqual([]);
   });
 
+  it('In-Reply-To 指向的来信已归到别的店铺的工单：不等它，接着按 References 归到本店铺的工单', async () => {
+    t.clock.set('2026-09-10T16:00:00+08:00');
+    gmail.deliver(
+      amazonLetter('Lyn Cho', '<cross-auto@buyer.example>', '2026-09-10T15:00:00+08:00'),
+    );
+    gmail.deliver({
+      to: COM.mailbox,
+      from: { name: 'Lyn Cho', address: 'lyn.cho@example.com' },
+      subject: 'Same question to the other store',
+      text: 'Hello again',
+      at: '2026-09-10T15:05:00+08:00',
+      messageId: '<cross-com@buyer.example>',
+    });
+    await t.runJobs();
+    gmail.send(
+      reply(
+        'Lyn Cho',
+        '2026-09-10T15:20:00+08:00',
+        {
+          'In-Reply-To': '<cross-auto@buyer.example>',
+          References: '<cross-com@buyer.example> <cross-auto@buyer.example>',
+        },
+        { from: COM.mailbox },
+      ),
+    );
+    await t.runJobs();
+    const tickets = await ticketsOf(agent, 'Lyn Cho');
+    expect(tickets.map((ticket) => [ticket.store.name, ticket.status]).sort()).toEqual([
+      ['Forcome Auto', 'awaiting_reply'],
+      ['forcome.com', 'awaiting_customer'],
+    ]);
+  });
+
   it('同一封回信重复同步、回复识别重跑：只入工单一次，状态只迁一次', async () => {
     t.clock.set('2026-09-10T16:30:00+08:00');
     gmail.deliver(amazonLetter('Lou Fenn', '<dup@buyer.example>', '2026-09-10T16:00:00+08:00'));
