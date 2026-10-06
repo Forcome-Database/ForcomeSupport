@@ -128,3 +128,18 @@ Blocked by: 05, 08, 31
 **部署到开发测试环境**（`pnpm deploy:staging`，代码 7c611a0，工作区干净）：八步全过——准备、构建镜像、启动数据库、执行迁移（含 0022）、灌示例数据、启动 api / worker / caddy、内网 HTTPS 核对、Playwright 冒烟 92 通过 / 0 失败（报告 `deploy/.state/staging/report.md`，版本 `7c611a099026`）。冒烟里的 `channel-status.spec.ts` 6 项在开发测试环境照常通过（worker 启动时兜底同步一次，邮箱几秒内为已连接）。本机内存紧张，Claude Code 在部署接近结束时回收了后台 shell 的外壳，部署进程本身跑完并写出报告，冒烟容器退出码 0；没有重跑。跑完后 4516–4519 端口空闲。
 
 **提交**：90859a4 主体（后端、契约、前端、原型与 PRD v2.25）；c00bb93 e2e、截图、部署配置与文档；58febeb 评审修复；4da09d1 复核小修；7c611a0 本条记录与收尾（勾选验收项、Status 改 resolved）；以及补记部署结果的提交。
+
+## 验收返工（2026-10-06，协调者核查不通过的三项）
+
+**问题与修复**（6cdb761）
+
+1. **生产缺 Google 配置拒绝启动，违背用户 2026-10-04 口径**（外部资质只有钉钉已有；缺某个外部系统的配置时系统照常可用，该渠道「未连接」，只有配置了却连不上才算异常）。原来 `loadConfig` 在推送用真实接口（生产默认）时要求三项必填，api、worker、migrate 都以 ConfigError 退出，`CLIENT_MODE_GMAIL_PUSH=fake` 又被「生产不允许 Fake」拒绝，无法绕过。
+   - 改：三项都不填时 `google = null` 照常启动（生产也一样），只填一部分仍拒绝；推送与邮箱的真实现以 `ClientNotConfiguredError` 失败、不计失败；推送常驻拉取遇到它安静跳过（第一次记一条 info 日志，返回 0、不进出错退避），开始监听失败只记调试日志；Gmail 与各店铺为「未连接」，不出横幅、不报连接异常、不发通知。
+   - 其他已实现的外部客户端：只有钉钉在生产必填凭据（钉钉资质已有，按口径保留）；汇率是公开源、不要凭据；SP-API、SQS、Shopify 还没实现（11、12 接入时照同样口径）。
+   - 测试：`config.test.ts` 改为「生产三项都不填照常启动、google 为 null」「只填一部分拒绝启动、只列缺的」；`gmail-sync-health.int.test.ts` 新增「生产环境没有配置 Google 凭据」——`startTestHarness({ appEnv: 'production' })`（只挂收信的常驻拉取），建真实接口店铺后跑六轮开始监听、兜底同步、续订都不抛错，Gmail 卡与店铺为未连接、`issues` 为空、横幅接口为空、没有渠道通知与渠道审计。变异核对：把推送拉取改回遇到未配置就抛错，该用例失败（`ClientNotConfiguredError: gmail_push pull…`）；还原后通过。
+   - 生产实测（构建产物 `apps/server/dist`，临时库 `forcome_prodcheck`，`APP_ENV=production`、钉钉三项占位、不给 Google 配置；`HTTPS_PROXY` 指向不监听的 127.0.0.1:4515，保证不连真实外部服务）：`node dist/migrate.mjs` 退出 0（「迁移完成」）；`node dist/api.mjs` 启动（「api 已启动」，appEnv production），`/api/health` 200；`node dist/worker.mjs` 启动（「worker 已启动」），日志「没有配置 Google 凭据，Gmail 推送不拉取（Gmail 为未连接）」只一条；SQL 灌一个真实接口店铺后，`channel.mailbox_sync` 没有失败记录、通知 0 条、渠道审计 0 条。worker 另有钉钉 Stream 连不上与钉钉对账、欧洲央行失败的日志——是占位凭据加故意不通的代理所致，属预期。测完停进程、删临时库，4515–4519 端口空闲。
+   - 文档：ADR 0009「待办 09 落地」配置条、`docs/部署说明.md` 第 12 节第 2 步、`deploy/.env.example` 与 `deploy/compose.yml` 注释、`config.ts` 头注释（「P18 显示连接异常」改为「未连接」）；本待办上文「技术口径」的配置说明与给 28 的衔接已改正（28 部署时 Google 三项不是启动条件，资质到位后填入重新部署即可）。
+2. **P27 渠道对象不能点**：`apps/web/src/pages/audit/audit-table.tsx` 的 `objectLink` 加渠道分支——能打开 P18 的人（管理员）点「Gmail · 邮箱」进 `/settings/channels`，打不开的（客服主管）只显示文字。e2e `audit-log.spec.ts` 新增一项（真实响应按 contracts 解析后在最前面加一条渠道记录）：管理员点进 P18，客服主管没有链接。
+3. **原型截图工具缺陷**：`design/spec/check.py` 的元素截图受 Chrome 单次截图 16384 像素上限所限，StatesAdmin（1920 × 20071）的 K20 补充小样与 K21–K24 没截进去。改为超过 8000 像素的画板按段 `clip + full_page` 截再用 PIL 竖着拼成一张（其余画板照旧按元素截，生成逻辑不变）；重新生成 `design/spec/shots/StatesAdmin.png`，核对 K20 补充小样（Gmail 同步延迟、连接异常、几个邮箱同时异常、钉钉连接异常与从没同步成功、测试连接浮层）与 K21–K24 完整可见。其余画板都不超过 16384 像素（最高 StatesAfterSales 12268），原来就是完整的，没有重拍。
+
+**测试**（6cdb761）：`pnpm typecheck` 0 错误；`pnpm lint` 通过；`pnpm test:unit` 69 个文件 619 项全过；`pnpm test:integration` 30 个文件 340 项全过；`pnpm test:e2e`（单 worker 前台）93 项全过。
