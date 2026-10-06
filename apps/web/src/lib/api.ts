@@ -8,12 +8,14 @@ import {
   channelSettingsSchema,
   currentMemberSchema,
   devMembersResponseSchema,
+  dingtalkLoginStartSchema,
   exchangeRatesOnSchema,
   EXPORT_ROWS_HEADER,
   ledgerItemSchema,
   ledgerOptionsSchema,
   ledgerSchema,
   loginDeniedSchema,
+  loginFailedSchema,
   notificationListSchema,
   notificationUnreadSchema,
   preferencesSchema,
@@ -32,6 +34,8 @@ import {
   type ChannelSettings,
   type CurrentMember,
   type DevMember,
+  type DingtalkLoginRequest,
+  type DingtalkLoginStart,
   type ExchangeRatesOn,
   type FieldErrors,
   type Ledger,
@@ -39,6 +43,8 @@ import {
   type LedgerOptions,
   type LedgerQuery,
   type LoginDenialReason,
+  type LoginDenied,
+  type LoginFailureReason,
   type NotificationList,
   type NotificationView,
   type Preferences,
@@ -90,13 +96,26 @@ export function failureReason(error: unknown): string {
   return error instanceof ApiRequestError ? error.message : '请稍后再试';
 }
 
-/** 登录被拒（G12）：reason 决定显示哪一种被拒画面 */
+/** 登录被拒（G12）：reason 决定显示哪一种被拒画面；扫码登录时另给出被拒的是谁（生产厂对接人那一种写在卡片上） */
 export class LoginDeniedError extends ApiRequestError {
   override name = 'LoginDeniedError';
   readonly reason: LoginDenialReason;
+  readonly member: LoginDenied['member'];
 
-  constructor(reason: LoginDenialReason, message: string) {
+  constructor(reason: LoginDenialReason, message: string, member?: LoginDenied['member']) {
     super(403, 'login_denied', message);
+    this.reason = reason;
+    this.member = member;
+  }
+}
+
+/** 扫码登录失败（不是被拒）：授权码已失效、这次登录的 state 对不上、连不上钉钉；界面回到二维码并弹失败浮层 */
+export class LoginFailedError extends ApiRequestError {
+  override name = 'LoginFailedError';
+  readonly reason: LoginFailureReason;
+
+  constructor(status: number, reason: LoginFailureReason, message: string) {
+    super(status, 'login_failed', message);
     this.reason = reason;
   }
 }
@@ -122,7 +141,13 @@ async function send(path: string, init?: RequestInit): Promise<Response> {
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
     const denied = loginDeniedSchema.safeParse(body);
-    if (denied.success) throw new LoginDeniedError(denied.data.reason, denied.data.message);
+    if (denied.success) {
+      throw new LoginDeniedError(denied.data.reason, denied.data.message, denied.data.member);
+    }
+    const failed = loginFailedSchema.safeParse(body);
+    if (failed.success) {
+      throw new LoginFailedError(response.status, failed.data.reason, failed.data.message);
+    }
     const error = apiErrorSchema.safeParse(body);
     throw new ApiRequestError(
       response.status,
@@ -183,6 +208,14 @@ export const api = {
   /** 开发登录；被拒时抛 LoginDeniedError（G12） */
   devLogin: (memberId: string): Promise<CurrentMember> =>
     call('/api/dev/login', currentMemberSchema, jsonBody('POST', { memberId })),
+
+  /** 开始一次钉钉扫码登录（G11）：服务端记下 state，返回画二维码的参数；「刷新」二维码即再开始一次 */
+  dingtalkLoginStart: (): Promise<DingtalkLoginStart> =>
+    call('/api/auth/dingtalk/start', dingtalkLoginStartSchema, { method: 'POST' }),
+
+  /** 扫码确认后用授权码换会话；被拒抛 LoginDeniedError（G12），失败抛 LoginFailedError */
+  dingtalkLogin: (request: DingtalkLoginRequest): Promise<CurrentMember> =>
+    call('/api/auth/dingtalk/login', currentMemberSchema, jsonBody('POST', request)),
 
   logout: async (): Promise<void> => {
     await send('/api/logout', { method: 'POST' });

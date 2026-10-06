@@ -17,6 +17,29 @@ import { api, ApiRequestError } from './api';
 import { dismissAllToasts, dismissToast, showError } from './notify';
 
 /**
+ * 会话是不是因为 7 天未操作而过期的（服务端只在过期后的第一个请求返回 session_expired，之后都是普通的 401）：
+ * 记下来，登录入口据此先显示 G12「已退出登录」，取走后清掉
+ */
+let sessionExpired = false;
+
+function noteSessionEnd(error: unknown): void {
+  if (
+    error instanceof ApiRequestError &&
+    error.status === 401 &&
+    error.code === 'session_expired'
+  ) {
+    sessionExpired = true;
+  }
+}
+
+/** 取走「会话已过期」的标记（登录入口用一次） */
+export function takeSessionExpired(): boolean {
+  const expired = sessionExpired;
+  sessionExpired = false;
+  return expired;
+}
+
+/**
  * 当前成员；未登录或会话过期（401）为 null（不当作错误）。一分钟后过期：切回窗口时重新取，
  * 管理员在 P20 改了角色与店铺范围，不刷新页面也能跟上。
  */
@@ -26,7 +49,10 @@ export const currentMemberQuery = queryOptions({
     try {
       return await api.me();
     } catch (error) {
-      if (error instanceof ApiRequestError && error.status === 401) return null;
+      if (error instanceof ApiRequestError && error.status === 401) {
+        noteSessionEnd(error);
+        return null;
+      }
       throw error;
     }
   },
@@ -62,6 +88,7 @@ export const adminContactsQuery = queryOptions({
  */
 export function endSessionIfUnauthenticated(queryClient: QueryClient, error: unknown): boolean {
   if (!(error instanceof ApiRequestError && error.status === 401)) return false;
+  noteSessionEnd(error);
   queryClient.setQueryData(currentMemberQuery.queryKey, null);
   dismissAllToasts();
   return true;
@@ -83,6 +110,18 @@ export function createQueryClient(): QueryClient {
 export function resetCacheForMember(queryClient: QueryClient, member: CurrentMember): void {
   queryClient.clear();
   queryClient.setQueryData(currentMemberQuery.queryKey, member);
+}
+
+/**
+ * 没登录时去哪里：开启了开发登录（非生产环境）去开发登录页；否则去钉钉扫码登录页（G11），会话是 7 天未操作过期的
+ * 先显示 G12「已退出登录」（expired）
+ */
+export function signedOutTarget(
+  devLogin: boolean,
+  expired: boolean,
+): { to: '/dev-login' } | { to: '/login'; search: { expired?: true } } {
+  if (devLogin) return { to: '/dev-login' };
+  return { to: '/login', search: expired ? { expired: true } : {} };
 }
 
 /**

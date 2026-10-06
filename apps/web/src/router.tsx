@@ -8,7 +8,7 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router';
-import { useEffect, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { AppShell } from '@/components/app-shell';
 import { Forbidden } from '@/components/forbidden';
 import { Toaster, UndoToaster } from '@/components/ui/sonner';
@@ -16,19 +16,28 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { LoadError } from '@/components/load-error';
 import { CurrentMemberContext, useCurrentMember } from '@/lib/current-member';
 import { canOpenPage, pages, sectionPaths, type PageDefinition } from '@/lib/pages';
-import { applyDensity, currentMemberQuery, devMembersQuery } from '@/lib/session';
+import {
+  applyDensity,
+  currentMemberQuery,
+  devMembersQuery,
+  signedOutTarget,
+  takeSessionExpired,
+} from '@/lib/session';
 import { LedgerPage } from '@/pages/aftersales/ledger-page';
 import { ledgerSearchSchema } from '@/pages/aftersales/ledger-search';
 import { AuditPage } from '@/pages/audit/audit-page';
 import { auditSearchSchema } from '@/pages/audit/audit-search';
 import { DevLoginPage } from '@/pages/dev-login';
+import { LoginCallbackPage } from '@/pages/login/login-callback';
+import { LoginPage, loginSearchSchema } from '@/pages/login/login-page';
 import { ChannelsPage, channelsSearchSchema } from '@/pages/settings/channels-page';
 import { TeamPage } from '@/pages/settings/team-page';
 import { TicketsPage } from '@/pages/tickets/tickets-page';
 
 /*
  * 路由（ADR 0007：TanStack Router，代码定义）。登录后的页面都挂在 app 布局下：
- * 没登录（含会话 7 天无操作过期）时，开启了开发登录就去开发登录页；钉钉扫码登录页（G11）随 05 号待办。
+ * 没登录（含会话 7 天无操作过期）时，开启了开发登录（非生产环境）就去开发登录页，否则去钉钉扫码登录页（G11，/login；
+ * 过期的先显示 G12「已退出登录」）；扫码确认后钉钉把浏览器带到 /login/dingtalk 换会话（待办 05）。
  * 「/」按角色进入默认首页（PRD 4.1）；各页面按能力把关，没有权限时在原地址显示 G2。
  * 第一期各页面的内容随各自的待办加进来（P05 17、P17 24、P20 06），在那之前内容区为空；P27 已有（30）；
  * P18 已有（07），P04 先是最简列表（08，完整版随 18），P13 已是第一期完整版（19–22）。
@@ -64,13 +73,35 @@ const devLoginRoute = createRoute({
   component: DevLoginPage,
 });
 
+/** 钉钉扫码登录（G11）与会话过期（G12「已退出登录」）；已登录时回到默认首页 */
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/login',
+  validateSearch: loginSearchSchema,
+  beforeLoad: async ({ context }) => {
+    if (await context.queryClient.ensureQueryData(currentMemberQuery)) throw redirect({ to: '/' });
+  },
+  component: function LoginRouteComponent() {
+    const { expired } = loginRoute.useSearch();
+    return <LoginPage expired={expired === true} />;
+  },
+});
+
+/** 扫码确认后钉钉带回的地址（钉钉开放平台「重定向 URL」）：用授权码换会话 */
+const loginCallbackRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/login/dingtalk',
+  component: LoginCallbackPage,
+});
+
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'app',
   beforeLoad: async ({ context }) => {
     const member = await context.queryClient.ensureQueryData(currentMemberQuery);
-    if (!member && (await context.queryClient.ensureQueryData(devMembersQuery))) {
-      throw redirect({ to: '/dev-login' });
+    if (!member) {
+      const devLogin = Boolean(await context.queryClient.ensureQueryData(devMembersQuery));
+      throw redirect(signedOutTarget(devLogin, takeSessionExpired()));
     }
     // 先落密度再渲染外壳，刷新时不会先闪一下舒适档
     applyDensity(member?.density ?? null);
@@ -90,11 +121,12 @@ function AppLayout() {
   );
 }
 
-/** 会话在使用中结束（过期、被停用、退出）：回到登录入口；钉钉扫码登录页（G11）随 05 号待办，在那之前只有开发登录 */
+/** 会话在使用中结束（过期、被停用、退出）：回到登录入口（开发登录页，或钉钉扫码登录页；7 天未操作过期的先显示「已退出登录」） */
 function SignedOut() {
   const { data: devMembers } = useSuspenseQuery(devMembersQuery);
+  const [target] = useState(() => signedOutTarget(Boolean(devMembers), takeSessionExpired()));
   useEffect(() => applyDensity(null), []);
-  return devMembers ? <Navigate to="/dev-login" /> : null;
+  return <Navigate {...target} />;
 }
 
 function SignedIn({ member }: { member: CurrentMember }) {
@@ -187,6 +219,8 @@ const settingsRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   devLoginRoute,
+  loginRoute,
+  loginCallbackRoute,
   appRoute.addChildren([
     homeRoute,
     pageRoute(pages.tickets, TicketsPage),

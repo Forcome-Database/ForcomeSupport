@@ -1,7 +1,13 @@
 import type { CurrentMember } from '@forcome/contracts';
 import { describe, expect, it } from 'vitest';
 import { ApiRequestError } from './api';
-import { createQueryClient, currentMemberQuery, resetCacheForMember } from './session';
+import {
+  createQueryClient,
+  currentMemberQuery,
+  resetCacheForMember,
+  signedOutTarget,
+  takeSessionExpired,
+} from './session';
 
 const member: CurrentMember = {
   id: '39550bdf-7cae-59d1-bece-97afd552daa0',
@@ -45,5 +51,34 @@ describe('会话在使用中结束', () => {
       .catch(() => undefined);
 
     expect(client.getQueryData(currentMemberQuery.queryKey)).toEqual(member);
+  });
+});
+
+describe('没登录时去哪里（G11、G12）', () => {
+  it('开启了开发登录（非生产环境）去开发登录页；否则去钉钉扫码登录页，7 天未操作过期的先显示「已退出登录」', () => {
+    expect(signedOutTarget(true, true)).toEqual({ to: '/dev-login' });
+    expect(signedOutTarget(false, false)).toEqual({ to: '/login', search: {} });
+    expect(signedOutTarget(false, true)).toEqual({ to: '/login', search: { expired: true } });
+  });
+
+  it('只有 7 天未操作（session_expired）才记为过期，取走一次后清掉', async () => {
+    takeSessionExpired();
+    const client = createQueryClient();
+    resetCacheForMember(client, member);
+    const fail = (error: ApiRequestError) =>
+      client
+        .fetchQuery({
+          queryKey: ['x', error.code],
+          queryFn: () => Promise.reject(error),
+          retry: false,
+        })
+        .catch(() => undefined);
+
+    await fail(new ApiRequestError(401, 'unauthenticated', '未登录或会话已失效，请重新登录'));
+    expect(takeSessionExpired()).toBe(false);
+
+    await fail(new ApiRequestError(401, 'session_expired', '7 天未操作，已退出登录'));
+    expect(takeSessionExpired()).toBe(true);
+    expect(takeSessionExpired()).toBe(false);
   });
 });
