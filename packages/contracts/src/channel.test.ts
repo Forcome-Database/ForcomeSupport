@@ -3,6 +3,8 @@ import {
   mailboxError,
   normalizeStoreInput,
   storeInputErrors,
+  SYNC_DELAY_MS,
+  syncConnectionStatus,
   worstConnectionStatus,
   type StoreInput,
 } from './channel';
@@ -114,5 +116,34 @@ describe('渠道卡显示最差的连接状态（PRD 6.9）', () => {
     expect(worstConnectionStatus(['not_connected', 'error'])).toBe('error');
     expect(worstConnectionStatus(['connected', 'connected'])).toBe('connected');
     expect(worstConnectionStatus([])).toBe('not_connected');
+  });
+});
+
+describe('按同步记录算连接状态（PRD 6.9：钉钉超过 2 小时未同步为同步延迟，连续 3 次失败为连接异常）', () => {
+  const now = new Date('2026-09-11T10:20:00+08:00');
+  const at = (time: string) => new Date(`2026-09-11T${time}:00+08:00`);
+
+  it('最近一次成功在阈值以内为已连接，超过阈值为同步延迟', () => {
+    const delay = SYNC_DELAY_MS.dingtalk;
+    expect(
+      syncConnectionStatus({ lastSuccessAt: at('08:20'), consecutiveFailures: 0 }, delay, now),
+    ).toBe('connected');
+    expect(
+      syncConnectionStatus({ lastSuccessAt: at('08:19'), consecutiveFailures: 2 }, delay, now),
+    ).toBe('delayed');
+    expect(SYNC_DELAY_MS.gmail).toBe(10 * 60_000);
+  });
+
+  it('连续 3 次失败为连接异常（不论最近一次成功是什么时候）；从没成功过为未连接', () => {
+    const delay = SYNC_DELAY_MS.dingtalk;
+    expect(
+      syncConnectionStatus({ lastSuccessAt: at('10:00'), consecutiveFailures: 3 }, delay, now),
+    ).toBe('error');
+    expect(syncConnectionStatus({ lastSuccessAt: null, consecutiveFailures: 1 }, delay, now)).toBe(
+      'not_connected',
+    );
+    expect(syncConnectionStatus({ lastSuccessAt: null, consecutiveFailures: 3 }, delay, now)).toBe(
+      'error',
+    );
   });
 });

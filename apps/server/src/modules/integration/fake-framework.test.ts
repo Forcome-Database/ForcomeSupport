@@ -11,6 +11,7 @@ import {
   FaultInjector,
   IntegrationClients,
   type FakeClient,
+  type RealClientContext,
 } from './index';
 
 /*
@@ -139,6 +140,31 @@ describe('全局客户端按环境变量选择', () => {
   it('生产默认用真实现', async () => {
     const clients = new IntegrationClients({ appEnv: 'production', definitions });
     await expect(clients.global(exampleDirectory).whoami()).resolves.toBe('real');
+  });
+
+  it('全局客户端的真实现一个进程只建一次（缓存访问凭证与长连接），并拿到钉钉凭据', () => {
+    const contexts: RealClientContext[] = [];
+    const counted = defineClient({
+      system: 'counted_directory',
+      scope: 'global',
+      createReal: (context): ExampleDirectoryClient => {
+        contexts.push(context);
+        return { whoami: () => Promise.resolve('real') };
+      },
+      createFake: () => ({
+        client: (): ExampleDirectoryClient => ({ whoami: () => Promise.resolve('fake') }),
+        reset: () => undefined,
+      }),
+    });
+    const credentials = { clientId: 'id', clientSecret: 'secret', agentId: '1', corpId: 'corp' };
+    const clients = new IntegrationClients({
+      appEnv: 'production',
+      definitions: [counted],
+      dingtalk: credentials,
+    });
+    expect(clients.global(counted)).toBe(clients.global(counted));
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0]?.dingtalk).toEqual(credentials);
   });
 
   it('配置了没有登记的全局客户端（多半是写错了系统名）拒绝启动', () => {
@@ -298,7 +324,12 @@ describe('Fake 从示例数据夹具回放（ADR 0009 修订）', () => {
   it('非生产环境的进程（开发、开发测试环境、Playwright 的 api）组装客户端时自动回放', async () => {
     for (const appEnv of ['development', 'staging', 'test'] as const) {
       const clients = createIntegrationClients(
-        { appEnv, clientModes: {}, mailSend: { allowlistOnly: true, allowlist: [] } },
+        {
+          appEnv,
+          clientModes: {},
+          mailSend: { allowlistOnly: true, allowlist: [] },
+          dingtalk: null,
+        },
         { definitions: withReplay, fixture: () => demo },
       );
       await expect(clients.global(replayableDirectory).whoami()).resolves.toContain('王磊');
@@ -308,7 +339,12 @@ describe('Fake 从示例数据夹具回放（ADR 0009 修订）', () => {
   it('生产环境组装客户端时不回放，也不解析夹具', () => {
     let parsed = false;
     createIntegrationClients(
-      { appEnv: 'production', clientModes: {}, mailSend: { allowlistOnly: false, allowlist: [] } },
+      {
+        appEnv: 'production',
+        clientModes: {},
+        mailSend: { allowlistOnly: false, allowlist: [] },
+        dingtalk: null,
+      },
       {
         definitions: withReplay,
         fixture: () => {

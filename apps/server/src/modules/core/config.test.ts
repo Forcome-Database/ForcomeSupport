@@ -3,6 +3,14 @@ import { ConfigError, loadConfig } from './index';
 
 const DATABASE_URL = 'postgres://forcome:secret@127.0.0.1:4520/forcome';
 
+/** 钉钉企业内部应用的凭据（示例值）：钉钉客户端用真实接口时（生产环境默认）必填 */
+const DINGTALK = {
+  DINGTALK_CLIENT_ID: 'dingexampleclientid',
+  DINGTALK_CLIENT_SECRET: 'example-client-secret-value',
+  DINGTALK_AGENT_ID: '3100000001',
+  DINGTALK_CORP_ID: 'dingexamplecorpid',
+};
+
 describe('配置读取', () => {
   it('只给数据库地址时其余取默认值', () => {
     expect(loadConfig({ DATABASE_URL })).toEqual({
@@ -14,12 +22,14 @@ describe('配置读取', () => {
       clientModes: {},
       mailSend: { allowlistOnly: true, allowlist: [] },
       clockStart: null,
+      dingtalk: null,
     });
   });
 
   it('读取环境、端口与日志级别', () => {
     const config = loadConfig({
       DATABASE_URL,
+      ...DINGTALK,
       APP_ENV: 'production',
       PORT: '8080',
       LOG_LEVEL: 'warn',
@@ -103,7 +113,7 @@ describe('发信白名单开关（ADR 0013：开发测试环境默认禁止向�
         allowlist: [],
       });
     }
-    expect(loadConfig({ DATABASE_URL, APP_ENV: 'production' }).mailSend).toEqual({
+    expect(loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'production' }).mailSend).toEqual({
       allowlistOnly: false,
       allowlist: [],
     });
@@ -125,8 +135,12 @@ describe('发信白名单开关（ADR 0013：开发测试环境默认禁止向�
         .allowlistOnly,
     ).toBe(false);
     expect(
-      loadConfig({ DATABASE_URL, APP_ENV: 'production', MAIL_SEND_ALLOWLIST_ONLY: 'true' }).mailSend
-        .allowlistOnly,
+      loadConfig({
+        DATABASE_URL,
+        ...DINGTALK,
+        APP_ENV: 'production',
+        MAIL_SEND_ALLOWLIST_ONLY: 'true',
+      }).mailSend.allowlistOnly,
     ).toBe(true);
   });
 
@@ -188,6 +202,7 @@ describe('全局外部客户端的真实 / Fake 选择（CLIENT_MODE_<系统>）
     expect(
       loadConfig({
         DATABASE_URL,
+        ...DINGTALK,
         CLIENT_MODE_DINGTALK: 'real',
         CLIENT_MODE_EXCHANGE_RATE: 'fake',
       }).clientModes,
@@ -205,7 +220,55 @@ describe('全局外部客户端的真实 / Fake 选择（CLIENT_MODE_<系统>）
       loadConfig({ DATABASE_URL, APP_ENV: 'production', CLIENT_MODE_DINGTALK: 'fake' }),
     ).toThrow(/CLIENT_MODE_DINGTALK：生产环境不允许使用 Fake/);
     expect(
-      loadConfig({ DATABASE_URL, APP_ENV: 'production', CLIENT_MODE_DINGTALK: 'real' }).clientModes,
+      loadConfig({
+        DATABASE_URL,
+        ...DINGTALK,
+        APP_ENV: 'production',
+        CLIENT_MODE_DINGTALK: 'real',
+      }).clientModes,
     ).toEqual({ dingtalk: 'real' });
+  });
+});
+
+describe('钉钉企业内部应用的凭据（用户上线时填进环境文件，开发与测试用 Fake 不需要）', () => {
+  it('钉钉用真实接口时四项凭据都要填：生产环境默认真实接口，缺了拒绝启动且不回显取值', () => {
+    let error: unknown;
+    try {
+      loadConfig({
+        DATABASE_URL,
+        APP_ENV: 'production',
+        DINGTALK_CLIENT_ID: 'dingexampleclientid',
+        DINGTALK_CLIENT_SECRET: 'top-secret-value',
+      });
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ConfigError);
+    const message = (error as Error).message;
+    expect(message).toContain('DINGTALK_AGENT_ID：钉钉用真实接口时必填');
+    expect(message).toContain('DINGTALK_CORP_ID：钉钉用真实接口时必填');
+    expect(message).not.toContain('DINGTALK_CLIENT_ID：');
+    expect(message).not.toContain('top-secret-value');
+    // 开发测试环境显式切到真实接口时同样要填
+    expect(() =>
+      loadConfig({ DATABASE_URL, APP_ENV: 'staging', CLIENT_MODE_DINGTALK: 'real' }),
+    ).toThrow(/DINGTALK_CLIENT_ID：钉钉用真实接口时必填/);
+  });
+
+  it('填齐时读出凭据；AgentId 只能是数字', () => {
+    expect(loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'production' }).dingtalk).toEqual({
+      clientId: 'dingexampleclientid',
+      clientSecret: 'example-client-secret-value',
+      agentId: '3100000001',
+      corpId: 'dingexamplecorpid',
+    });
+    expect(() =>
+      loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'production', DINGTALK_AGENT_ID: 'abc' }),
+    ).toThrow(/DINGTALK_AGENT_ID：只能是数字/);
+  });
+
+  it('用 Fake 时（非生产环境默认）不要求凭据，填了也不用', () => {
+    expect(loadConfig({ DATABASE_URL, APP_ENV: 'staging' }).dingtalk).toBeNull();
+    expect(loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'staging' }).dingtalk).toBeNull();
   });
 });

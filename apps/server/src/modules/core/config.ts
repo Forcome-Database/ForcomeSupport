@@ -14,6 +14,9 @@ import { z } from 'zod';
  * - `HTTPS_PROXY` / `HTTP_PROXY`（大小写两种写法）：出站代理（ADR 0003），只校验是不是代理地址；`NO_PROXY` 不校验。
  * - `CLOCK_START`：起始时刻（带时区，如 2026-09-11T10:20:00+08:00），只在非生产环境可设：api 与 worker 的「当前时间」
  *   从它起走（core 的 startingAt），截图与演示时对上原型的演示时刻（待办 21，ADR 0008 修订）。
+ * - `DINGTALK_CLIENT_ID` / `DINGTALK_CLIENT_SECRET` / `DINGTALK_AGENT_ID` / `DINGTALK_CORP_ID`：钉钉企业内部应用的凭据
+ *   （用户上线时自己填进环境文件，docs/部署说明.md「钉钉」一节；待办 05）。钉钉用真实接口时（生产环境默认，或
+ *   `CLIENT_MODE_DINGTALK=real`）四项必填，缺了拒绝启动；用 Fake 时不读。
  * 空值视同未设置。
  */
 const envSchema = z.object({
@@ -35,6 +38,10 @@ const envSchema = z.object({
   CLOCK_START: z.iso
     .datetime({ offset: true, error: '必须是带时区的时刻，如 2026-09-11T10:20:00+08:00' })
     .optional(),
+  DINGTALK_CLIENT_ID: z.string().optional(),
+  DINGTALK_CLIENT_SECRET: z.string().optional(),
+  DINGTALK_AGENT_ID: z.string().regex(/^\d+$/, '只能是数字').optional(),
+  DINGTALK_CORP_ID: z.string().optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>['APP_ENV'];
@@ -62,6 +69,33 @@ export function clientModeVariable(system: string): string {
   return `${CLIENT_MODE_PREFIX}${system.toUpperCase()}`;
 }
 
+/** 全局外部客户端没有显式配置 CLIENT_MODE_<系统> 时的实现：非生产用 Fake、生产用真实接口（ADR 0009 修订） */
+export function defaultClientMode(appEnv: AppEnv): AdapterMode {
+  return appEnv === 'production' ? 'real' : 'fake';
+}
+
+/**
+ * 钉钉企业内部应用的凭据（ADR 0010 修订，待办 05）：在钉钉开放平台的应用详情里取，用户上线时填进环境文件。
+ * 只在钉钉客户端用真实接口时用到。
+ */
+export interface DingtalkCredentials {
+  /** Client ID（原 AppKey）：换访问凭证、扫码登录的 client_id、Stream 注册 */
+  readonly clientId: string;
+  /** Client Secret（原 AppSecret） */
+  readonly clientSecret: string;
+  /** 应用的 AgentId：发工作通知 */
+  readonly agentId: string;
+  /** 组织的 CorpId：扫码登录时核对扫码人属于本组织 */
+  readonly corpId: string;
+}
+
+const DINGTALK_VARIABLES = {
+  clientId: 'DINGTALK_CLIENT_ID',
+  clientSecret: 'DINGTALK_CLIENT_SECRET',
+  agentId: 'DINGTALK_AGENT_ID',
+  corpId: 'DINGTALK_CORP_ID',
+} as const satisfies Record<keyof DingtalkCredentials, string>;
+
 export interface AppConfig {
   appEnv: AppEnv;
   databaseUrl: string;
@@ -75,6 +109,8 @@ export interface AppConfig {
   mailSend: MailSendPolicy;
   /** 起始时刻（只在非生产环境）：设了时「当前时间」从它起走；没设为 null，用系统时钟 */
   clockStart: Date | null;
+  /** 钉钉企业内部应用的凭据：钉钉用真实接口时必有；用 Fake 时为 null（不读） */
+  dingtalk: DingtalkCredentials | null;
 }
 
 export interface MailSendPolicy {
@@ -149,6 +185,24 @@ export function loadConfig(rawEnv: Record<string, string | undefined> = process.
     problems.push('CLOCK_START：生产环境不能设定起始时刻');
   }
 
+  // 钉钉用真实接口时（生产默认）四项凭据必填；只列变量名，不回显取值
+  let dingtalk: DingtalkCredentials | null = null;
+  if (
+    result.success &&
+    (clientModes.dingtalk ?? defaultClientMode(result.data.APP_ENV)) === 'real'
+  ) {
+    const missing = Object.values(DINGTALK_VARIABLES).filter((name) => !result.data[name]);
+    for (const name of missing) problems.push(`${name}：钉钉用真实接口时必填`);
+    if (missing.length === 0) {
+      dingtalk = {
+        clientId: result.data.DINGTALK_CLIENT_ID ?? '',
+        clientSecret: result.data.DINGTALK_CLIENT_SECRET ?? '',
+        agentId: result.data.DINGTALK_AGENT_ID ?? '',
+        corpId: result.data.DINGTALK_CORP_ID ?? '',
+      };
+    }
+  }
+
   if (!result.success || problems.length > 0) {
     throw new ConfigError(`环境变量配置有误：\n${problems.join('\n')}`);
   }
@@ -173,5 +227,6 @@ export function loadConfig(rawEnv: Record<string, string | undefined> = process.
       allowlist,
     },
     clockStart: CLOCK_START ? new Date(CLOCK_START) : null,
+    dingtalk,
   };
 }

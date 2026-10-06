@@ -33,6 +33,7 @@ import {
   type AuditLogEntry,
   type AuditLogField,
 } from './audit-log';
+import { memberStatusLabels } from './auth';
 import { platformLabels } from './channel';
 import { formatRate, formatRateDate } from './exchange-rate';
 import { FINANCE_HIDDEN, maskFinanceFields } from './finance';
@@ -165,6 +166,12 @@ const snapshotFields: Record<AuditSnapshotKind, readonly FieldDefinition[]> = {
     field('rows', '行数'),
   ],
   login: [field('method', '登录方式', 'text', loginMethodLabels)],
+  member: [
+    field('status', '状态', 'text', memberStatusLabels),
+    field('roles', '角色', 'list', roleLabels),
+    field('name', '姓名'),
+    field('dept', '钉钉部门'),
+  ],
   accessDenied: [
     field('reason', '原因', 'text', { store_scope: '店铺不在授权范围内' }),
     field('storeIds', '店铺', 'stores'),

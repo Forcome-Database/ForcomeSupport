@@ -89,6 +89,18 @@ export async function closeSession(db: DbExecutor, sessionId: string): Promise<v
   await db.delete(session).where(eq(session.id, sessionId));
 }
 
+/**
+ * 结束某位成员的全部会话（钉钉离职停用时立即失效，AC-ST-05）。即使不删，停用的成员下一次请求也会被 requireSession 拒绝；
+ * 删掉是为了不留可用的令牌。返回删了几个
+ */
+export async function closeMemberSessions(db: DbExecutor, memberId: string): Promise<number> {
+  const removed = await db
+    .delete(session)
+    .where(eq(session.memberId, memberId))
+    .returning({ id: session.id });
+  return removed.length;
+}
+
 export function sessionToken(c: Context): string | undefined {
   return getCookie(c, SESSION_COOKIE);
 }

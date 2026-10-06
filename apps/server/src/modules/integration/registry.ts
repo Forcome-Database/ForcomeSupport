@@ -1,4 +1,5 @@
 import type { AnyClientDefinition } from './definition';
+import { dingtalkClient } from './dingtalk';
 import { exchangeRateClient } from './exchange-rate';
 import { gmailClient, gmailPushClient } from './gmail';
 
@@ -11,4 +12,5 @@ export const clientDefinitions: readonly AnyClientDefinition[] = [
   gmailPushClient,
   gmailClient,
   exchangeRateClient,
+  dingtalkClient,
 ];

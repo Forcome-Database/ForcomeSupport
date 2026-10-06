@@ -1,4 +1,5 @@
 import type { DemoFixture } from '@forcome/fixtures';
+import type { DingtalkCredentials } from '../core';
 import type { MailRecipientGuard } from './mail-recipient-guard';
 
 /*
@@ -8,11 +9,13 @@ import type { MailRecipientGuard } from './mail-recipient-guard';
 
 export type ClientScope = 'store' | 'global';
 
-/** 真实现的构造参数；店铺级客户端带店铺 ID。凭据与出站 HTTP 客户端随各集成的待办加入 */
+/** 真实现的构造参数；店铺级客户端带店铺 ID。凭据随各集成的待办加入 */
 export interface RealClientContext {
   readonly storeId?: string;
   /** 发信白名单（ADR 0013 修订）：会发信的真实现在发出前对全部收件人调用 assertAllowed */
   readonly mailRecipientGuard: MailRecipientGuard;
+  /** 钉钉企业内部应用的凭据（core 的 loadConfig 读环境变量）；钉钉用 Fake 时为 null */
+  readonly dingtalk: DingtalkCredentials | null;
 }
 
 /** Fake 的最小约定：给出（某店铺视角的）客户端，能重置到初始状态 */

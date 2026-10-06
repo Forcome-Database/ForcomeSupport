@@ -13,16 +13,26 @@ import {
 } from './modules/channel';
 import {
   createCoreJobHandlers,
+  sendWorkNotificationsJob,
   syncExchangeRatesJob,
   type AnyJobDefinition,
   type AnyJobHandler,
   type Feed,
 } from './modules/core';
-import { exchangeRateClient } from './modules/integration';
+import { dingtalkClient, exchangeRateClient } from './modules/integration';
+import {
+  createOrgFeeds,
+  createOrgJobHandlers,
+  dingtalkEventJob,
+  dingtalkReconcileJob,
+} from './modules/org';
 import { createTicketJobHandlers } from './modules/ticket';
 
 export const jobDefinitions: readonly AnyJobDefinition[] = [
   syncExchangeRatesJob,
+  sendWorkNotificationsJob,
+  dingtalkReconcileJob,
+  dingtalkEventJob,
   storeChangedJob,
   gmailSyncJob,
   inboundReceivedJob,
@@ -30,13 +40,20 @@ export const jobDefinitions: readonly AnyJobDefinition[] = [
 
 export function createJobHandlers(deps: ServerDeps): readonly AnyJobHandler[] {
   return [
-    // 汇率的两个来源（欧洲央行、Frankfurter）是全局外部客户端，按 CLIENT_MODE_EXCHANGE_RATE 给真实现或 Fake
-    ...createCoreJobHandlers({ exchangeRates: () => deps.clients.global(exchangeRateClient) }),
+    // 汇率的两个来源（欧洲央行、Frankfurter）与发工作通知的钉钉都是全局外部客户端，按 CLIENT_MODE_<系统> 给真实现或 Fake
+    ...createCoreJobHandlers({
+      exchangeRates: () => deps.clients.global(exchangeRateClient),
+      workNotifications: () => deps.clients.global(dingtalkClient),
+    }),
+    ...createOrgJobHandlers({ dingtalk: () => deps.clients.global(dingtalkClient) }),
     ...createChannelJobHandlers(deps),
     ...createTicketJobHandlers(),
   ];
 }
 
 export function createFeeds(deps: ServerDeps): readonly Feed[] {
-  return [...createChannelFeeds(deps)];
+  return [
+    ...createChannelFeeds(deps),
+    ...createOrgFeeds({ dingtalk: () => deps.clients.global(dingtalkClient) }),
+  ];
 }

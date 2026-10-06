@@ -2,12 +2,19 @@ import type { AdapterMode } from '@forcome/contracts';
 import { getDemoFixture, type DemoFixture } from '@forcome/fixtures';
 import {
   clientModeVariable,
+  defaultClientMode,
   defaultMailSendPolicy,
   type AppConfig,
   type AppEnv,
+  type DingtalkCredentials,
   type MailSendPolicy,
 } from '../core';
-import type { AnyClientDefinition, ClientDefinition, FakeClient } from './definition';
+import type {
+  AnyClientDefinition,
+  ClientDefinition,
+  FakeClient,
+  RealClientContext,
+} from './definition';
 import { MailRecipientGuard } from './mail-recipient-guard';
 import { clientDefinitions } from './registry';
 
@@ -18,6 +25,7 @@ import { clientDefinitions } from './registry';
  *   CLIENT_MODE_<系统> 选择，不设时非生产用 Fake、生产用真实现；生产环境任何时候都不给 Fake；
  * - 一个进程一个 IntegrationClients，Fake 实例在其中共享：测试往 Fake 里放数据、注入故障，
  *   被测代码经同一个 IntegrationClients 取到的就是这个 Fake（apps/server/test/harness.ts）；
+ *   全局客户端的真实现同样一个进程只建一次（缓存访问凭证、钉钉 Stream 的长连接），店铺级的真实现按店铺每次新建；
  * - 非生产环境的进程（本机开发、开发测试环境、Playwright 的 api）启动时，Fake 从示例数据夹具回放数据；
  *   api 与 worker 各有一份 Fake，靠同一份夹具保持一致。测试不自动回放，需要时自己调 replayFixtures。
  */
@@ -41,6 +49,8 @@ export interface IntegrationClientsOptions {
   readonly definitions?: readonly AnyClientDefinition[];
   /** 发信白名单（AppConfig.mailSend）；不传时取 core 的 defaultMailSendPolicy（与没配置环境变量时一致） */
   readonly mailSend?: MailSendPolicy;
+  /** 钉钉企业内部应用的凭据（AppConfig.dingtalk），交给钉钉的真实现；不传为 null */
+  readonly dingtalk?: DingtalkCredentials | null;
 }
 
 export class IntegrationClients {
@@ -48,6 +58,9 @@ export class IntegrationClients {
   readonly #definitions: ReadonlySet<AnyClientDefinition>;
   readonly #modes: Readonly<Record<string, AdapterMode>>;
   readonly #fakes = new Map<AnyClientDefinition, FakeClient<unknown>>();
+  /** 全局客户端的真实现：一个进程只建一次 */
+  readonly #globals = new Map<AnyClientDefinition, unknown>();
+  readonly #dingtalk: DingtalkCredentials | null;
   /** 发信白名单守卫，经 RealClientContext 交给真实现 */
   readonly mailRecipientGuard: MailRecipientGuard;
 
@@ -58,6 +71,7 @@ export class IntegrationClients {
     );
     this.#definitions = new Set(options.definitions ?? clientDefinitions);
     this.#modes = options.clientModes ?? {};
+    this.#dingtalk = options.dingtalk ?? null;
     for (const [system, mode] of Object.entries(this.#modes)) {
       const definition = [...this.#definitions].find((d) => d.system === system);
       const variable = clientModeVariable(system);
@@ -88,21 +102,27 @@ export class IntegrationClients {
       }
       return this.fake(definition).client(store.id);
     }
-    return definition.createReal({
-      storeId: store.id,
-      mailRecipientGuard: this.mailRecipientGuard,
-    });
+    return definition.createReal(this.#realContext(store.id));
   }
 
-  /** 取全局客户端：按 CLIENT_MODE_<系统> 给真实现或 Fake */
+  #realContext(storeId?: string): RealClientContext {
+    return {
+      ...(storeId === undefined ? {} : { storeId }),
+      mailRecipientGuard: this.mailRecipientGuard,
+      dingtalk: this.#dingtalk,
+    };
+  }
+
+  /** 取全局客户端：按 CLIENT_MODE_<系统> 给真实现或 Fake；真实现一个进程只建一次 */
   global<C>(definition: ClientDefinition<C>): C {
     this.#assertRegistered(definition);
     if (definition.scope !== 'global') {
       throw new Error(`${definition.system} 是店铺级客户端，用 forStore() 按店铺取`);
     }
-    return this.globalMode(definition.system) === 'fake'
-      ? this.fake(definition).client()
-      : definition.createReal({ mailRecipientGuard: this.mailRecipientGuard });
+    if (this.globalMode(definition.system) === 'fake') return this.fake(definition).client();
+    const key = definition as unknown as AnyClientDefinition;
+    if (!this.#globals.has(key)) this.#globals.set(key, definition.createReal(this.#realContext()));
+    return this.#globals.get(key) as C;
   }
 
   /**
@@ -110,7 +130,7 @@ export class IntegrationClients {
    * 只读配置、不建客户端，所以不要求已登记（钉钉客户端随 05 号待办登记）。
    */
   globalMode(system: string): AdapterMode {
-    return this.#modes[system] ?? (this.#production ? 'real' : 'fake');
+    return this.#modes[system] ?? defaultClientMode(this.#production ? 'production' : 'test');
   }
 
   /** 本进程里该客户端的 Fake 实例（测试与开发环境往里放数据、注入故障）；生产环境拒绝 */
@@ -166,13 +186,14 @@ export class IntegrationClients {
  * 生产环境不回放，也不解析夹具。options 只给测试用：换登记清单与夹具。
  */
 export function createIntegrationClients(
-  config: Pick<AppConfig, 'appEnv' | 'clientModes' | 'mailSend'>,
+  config: Pick<AppConfig, 'appEnv' | 'clientModes' | 'mailSend' | 'dingtalk'>,
   options: { definitions?: readonly AnyClientDefinition[]; fixture?: () => DemoFixture } = {},
 ): IntegrationClients {
   const clients = new IntegrationClients({
     appEnv: config.appEnv,
     clientModes: config.clientModes,
     mailSend: config.mailSend,
+    dingtalk: config.dingtalk,
     definitions: options.definitions,
   });
   if (config.appEnv !== 'production') {

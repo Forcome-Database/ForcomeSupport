@@ -9,9 +9,10 @@ import {
 
 /*
  * 渠道连接状态（PRD 6.9、K20）：按店铺计算，渠道卡显示该渠道下最差的状态，店铺表「状态」列显示该店铺各连接的状态。
- * 待办 07 还没有同步记录，状态只由数据来源决定：模拟数据（Fake）视为已连接、卡头另标「模拟数据」；
- * 真实接口在对应客户端与同步接上之前是未连接。同步延迟、连接异常与最近同步时间随 05（钉钉）、09（Gmail）、
- * 11（Shopify）、12（SP-API）按同步记录补上，替换这里的 statusOf。
+ * 钉钉卡按通讯录的同步记录（org 的 dingtalkConnection，待办 05：超过 2 小时没成功为同步延迟、连续 3 次失败为连接异常）。
+ * Gmail 与订单还没有同步记录，状态只由数据来源决定：模拟数据（Fake）视为已连接、卡头另标「模拟数据」；
+ * 真实接口在对应客户端与同步接上之前是未连接。同步延迟、连接异常与最近同步时间随 09（Gmail）、
+ * 11（Shopify）、12（SP-API）按同步记录补上，替换这里的 statusOf（规则在 contracts 的 syncConnectionStatus）。
  */
 
 function statusOf(mode: AdapterMode): ConnectionStatus {
@@ -49,13 +50,20 @@ function storesCard(
   };
 }
 
+/** 钉钉卡：实现（CLIENT_MODE_DINGTALK）与通讯录同步的状态 */
+export interface DingtalkCardSource {
+  readonly mode: AdapterMode;
+  readonly status: ConnectionStatus;
+  readonly lastSyncAt: Date | null;
+}
+
 /**
  * 第一期四张渠道卡（K20 的顺序）：亚马逊 SP-API、Shopify Admin API（订单，按平台的店铺）、Gmail（全部店铺的邮箱）、
- * 钉钉（全局客户端，按 CLIENT_MODE_DINGTALK）。积加、易仓是前端的静态卡「第二阶段接入」。
+ * 钉钉（全局客户端，按通讯录的同步记录）。积加、易仓是前端的静态卡「第二阶段接入」。
  */
 export function channelCards(
   stores: readonly StoreConnectionSource[],
-  dingtalkMode: AdapterMode,
+  dingtalk: DingtalkCardSource,
 ): ChannelCard[] {
   return [
     storesCard(
@@ -71,9 +79,9 @@ export function channelCards(
     storesCard('gmail', stores, 'gmail'),
     {
       kind: 'dingtalk',
-      status: statusOf(dingtalkMode),
-      simulated: dingtalkMode === 'fake',
-      lastSyncAt: null,
+      status: dingtalk.status,
+      simulated: dingtalk.mode === 'fake',
+      lastSyncAt: dingtalk.lastSyncAt?.toISOString() ?? null,
     },
   ];
 }

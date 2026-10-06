@@ -14,10 +14,13 @@ import {
 } from './modules/core';
 import {
   createAuditLogRoutes,
+  createDevDingtalkRoutes,
   createDevLoginRoutes,
   createDevNotificationRoutes,
+  createDingtalkLoginRoutes,
   createNotificationRoutes,
   createOrgRoutes,
+  devDingtalkScanAvailable,
   devLoginAvailable,
 } from './modules/org';
 import { createTicketRoutes } from './modules/ticket';
@@ -91,6 +94,8 @@ export function createApp(deps: ServerDeps) {
   });
 
   app.route('/', createOrgRoutes({ runtime, appEnv: config.appEnv }));
+  // 钉钉扫码登录（G11、G12）：换出与开发登录同一种会话
+  app.route('/', createDingtalkLoginRoutes({ runtime, appEnv: config.appEnv, clients, logger }));
   // 站内通知（G10）的铃铛面板：只看自己的通知，在 org（会话与店铺范围）；写入与查询在 core
   app.route('/', createNotificationRoutes({ runtime, appEnv: config.appEnv }));
   app.route('/', createChannelRoutes({ runtime, appEnv: config.appEnv, clients }));
@@ -102,6 +107,10 @@ export function createApp(deps: ServerDeps) {
     app.route('/', createDevLoginRoutes({ runtime, appEnv: config.appEnv }));
     // 示例通知与开发登录同一个开关（产生通知的业务上线前，演示与 Playwright 用）
     app.route('/', createDevNotificationRoutes({ runtime, appEnv: config.appEnv }));
+  }
+  if (devDingtalkScanAvailable(config, clients)) {
+    // 模拟扫码：钉钉用 Fake 时，演示与 Playwright 走扫码登录的回调页
+    app.route('/', createDevDingtalkRoutes({ clients, appEnv: config.appEnv }));
   }
 
   app.doc31('/api/openapi.json', {

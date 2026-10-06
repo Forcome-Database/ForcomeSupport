@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { apiErrorSchema } from './api';
+import { adapterModeSchema } from './integration';
 import { navSectionSchema } from './navigation';
 import { roleSchema } from './roles';
 
@@ -9,6 +10,19 @@ import { roleSchema } from './roles';
 export const memberStatuses = ['active', 'disabled'] as const;
 export const memberStatusSchema = z.enum(memberStatuses);
 export type MemberStatus = z.infer<typeof memberStatusSchema>;
+/** 成员状态的叫法（P20 成员表「状态」列、P27 成员记录） */
+export const memberStatusLabels: Record<MemberStatus, string> = {
+  active: '已启用',
+  disabled: '已停用',
+};
+
+/**
+ * 停用的原因：钉钉离职（通讯录同步自动停用，待办 05）、管理员停用（P20，待办 23）。
+ * 只有钉钉离职停用的，在通讯录里重新出现时才会自动恢复在职；管理员停用的不随通讯录变化。
+ */
+export const memberDisabledReasons = ['dingtalk_left', 'manual'] as const;
+export const memberDisabledReasonSchema = z.enum(memberDisabledReasons);
+export type MemberDisabledReason = z.infer<typeof memberDisabledReasonSchema>;
 
 /** 界面密度（G9、设计规范第 12 节）：舒适（默认）与紧凑两档，按成员保存在服务端 */
 export const densities = ['comfortable', 'compact'] as const;
@@ -82,8 +96,75 @@ export function loginDenialMessage(
 export const loginDeniedSchema = apiErrorSchema.extend({
   error: z.literal('login_denied'),
   reason: loginDenialReasonSchema,
+  /** 被拒的是谁（第一期的生产厂对接人在卡片上方写「陈工 · FQD / 品质部 · 生产厂对接人」）；扫码登录时给出 */
+  member: z.object({ name: z.string(), dept: z.string(), roles: z.array(roleSchema) }).optional(),
 });
 export type LoginDenied = z.infer<typeof loginDeniedSchema>;
+
+// ---------------------------------------------------------------- 钉钉扫码登录（G11，待办 05）
+
+/** 登录页二维码的有效期（G11：2 分钟过期，过期后二维码上加蒙层与「刷新」） */
+export const LOGIN_QR_EXPIRES_SECONDS = 120;
+
+/**
+ * 开始一次扫码登录（POST /api/auth/dingtalk/start）：服务端把这次的 state 记在 Cookie 里，返回画二维码要用的参数。
+ * 「刷新」二维码就是再开始一次。
+ */
+export const dingtalkLoginStartSchema = z.object({
+  /** 钉钉用真实接口还是 Fake（Fake 画示意二维码，扫码由开发工具模拟） */
+  mode: adapterModeSchema,
+  /** 真实接口的 Client ID（钉钉二维码的 client_id）；Fake 为 null */
+  clientId: z.string().nullable(),
+  /** 扫码确认后钉钉把浏览器带回的地址（钉钉开放平台「重定向 URL」填的就是它） */
+  redirectUri: z.string(),
+  /** 这次登录的随机串：钉钉原样带回，与 Cookie 里的核对（防跨站伪造登录） */
+  state: z.string(),
+});
+export type DingtalkLoginStart = z.infer<typeof dingtalkLoginStartSchema>;
+
+/** 扫码确认后，用浏览器带回的授权码与 state 换会话（POST /api/auth/dingtalk/login） */
+export const dingtalkLoginRequestSchema = z.object({
+  authCode: z.string().min(1),
+  state: z.string().min(1),
+});
+export type DingtalkLoginRequest = z.infer<typeof dingtalkLoginRequestSchema>;
+
+/**
+ * 扫码登录失败（不是被拒）：授权码已失效或用过、这次登录的 state 对不上（登录页开得太久或换了浏览器）、连不上钉钉。
+ * 界面照 G5 弹失败浮层并回到二维码（标题「登录失败：<message>」，说明取 loginFailureDescriptions）。
+ */
+export const loginFailureReasons = [
+  'code_invalid',
+  'state_mismatch',
+  'dingtalk_unavailable',
+] as const;
+export const loginFailureReasonSchema = z.enum(loginFailureReasons);
+export type LoginFailureReason = z.infer<typeof loginFailureReasonSchema>;
+
+/** 失败浮层的标题后半（接口的 message） */
+export const loginFailureMessages: Record<LoginFailureReason, string> = {
+  code_invalid: '扫码结果已失效',
+  state_mismatch: '登录已过期',
+  dingtalk_unavailable: '暂时连不上钉钉',
+};
+
+/** 失败浮层的说明 */
+export const loginFailureDescriptions: Record<LoginFailureReason, string> = {
+  code_invalid: '请重新扫码。',
+  state_mismatch: '请重新扫码。',
+  dingtalk_unavailable: '请稍后重新扫码；仍不行请联系管理员。',
+};
+
+/** 扫码登录失败（400 code_invalid、state_mismatch；502 dingtalk_unavailable） */
+export const loginFailedSchema = apiErrorSchema.extend({
+  error: z.literal('login_failed'),
+  reason: loginFailureReasonSchema,
+});
+export type LoginFailed = z.infer<typeof loginFailedSchema>;
+
+/** 开发工具：模拟某人在手机上扫码并确认（只在非生产环境开启开发登录、钉钉用 Fake 时存在），返回钉钉会带回的授权码 */
+export const devDingtalkScanRequestSchema = z.object({ userId: z.string().min(1) });
+export const devDingtalkScanResponseSchema = z.object({ authCode: z.string() });
 
 /** 管理员的联系人（无权限 G2、登录被拒 G12 写「请联系管理员刘洋」） */
 export const adminContactsSchema = z.object({

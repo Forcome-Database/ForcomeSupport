@@ -15,6 +15,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   memberStoreScope,
+  queueWorkNotifications,
   sendNotification,
   transaction,
   type AppEnv,
@@ -29,20 +30,26 @@ import { member } from './schema';
 /*
  * 站内通知（PRD 11.4、G10，待办 31）在 org 的两部分：
  * - 按 11.4 取接收人：notifyMembers 给有该类型接收人角色的在职成员写通知（core 的 sendNotification），按店铺发的类型
- *   只发给店铺范围包含该店铺的（R-ST-06）。业务模块（channel、ticket、aftersales）在自己的事务里调用它；
+ *   只发给店铺范围包含该店铺的（R-ST-06）；11.4「渠道」里有钉钉工作通知的类型，同时给同一批人排入钉钉工作通知
+ *   （core 的 queueWorkNotifications，同一人 5 分钟内合并发出，待办 05）。业务模块（channel、ticket、aftersales）在自己的事务里调用它；
  * - 铃铛面板的接口：查看、未读数、标为已读与全部已读，都只针对当前成员自己的通知（任何角色都有铃铛，不要求能力）。
  * 标记已读是个人的界面状态，不记审计（同密度偏好）。
  */
 
 /**
  * 按 11.4 发站内通知：接收人是有该类型接收人角色之一的在职成员（多角色只收一条）；按店铺发的类型只发给店铺范围包含
- * 关联对象店铺的成员。返回发给了谁（成员 ID）——要同时发钉钉工作通知的类型（11.4「渠道」）由调用方按它另行发送；
- * 历史回放里不发，返回空列表。
+ * 关联对象店铺的成员。要同时发钉钉工作通知的类型（11.4「渠道」，contracts 的 definition.dingtalk）给同一批人中有钉钉账号的
+ * 排入工作通知。返回发给了谁（成员 ID）；历史回放里都不发，返回空列表。
  */
 export async function notifyMembers(tx: Tx, content: NotificationContent): Promise<string[]> {
   const definition = notificationTypeDefinitions[content.type];
   const candidates = await tx.db
-    .select({ id: member.id, allStores: member.allStores, storeIds: member.storeIds })
+    .select({
+      id: member.id,
+      allStores: member.allStores,
+      storeIds: member.storeIds,
+      dingtalkUserId: member.dingtalkUserId,
+    })
     .from(member)
     .where(
       and(eq(member.status, 'active'), arrayOverlaps(member.roles, [...definition.recipients])),
@@ -52,7 +59,25 @@ export async function notifyMembers(tx: Tx, content: NotificationContent): Promi
   const recipients = candidates.filter(
     (row) => !definition.storeScoped || !storeId || isStoreInScope(memberStoreScope(row), storeId),
   );
-  return sendNotification(tx, { ...content, recipientIds: recipients.map((row) => row.id) });
+  const sent = await sendNotification(tx, {
+    ...content,
+    recipientIds: recipients.map((row) => row.id),
+  });
+  if (definition.dingtalk && sent.length > 0) {
+    const sentTo = new Set(sent);
+    await queueWorkNotifications(tx, {
+      type: content.type,
+      title: content.title,
+      body: content.body,
+      object: content.object,
+      recipients: recipients.flatMap((row) =>
+        sentTo.has(row.id) && row.dingtalkUserId
+          ? [{ memberId: row.id, dingtalkUserId: row.dingtalkUserId }]
+          : [],
+      ),
+    });
+  }
+  return sent;
 }
 
 const listRoute = createRoute({

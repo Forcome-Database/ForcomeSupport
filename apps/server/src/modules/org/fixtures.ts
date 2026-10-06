@@ -1,7 +1,9 @@
 import { roleByLabel } from '@forcome/contracts';
 import type { FixtureMember } from '@forcome/fixtures';
+import { and, eq, isNull } from 'drizzle-orm';
 import { defineFixtureStep } from '../core';
 import { createMember, type NewMember } from './members';
+import { member } from './schema';
 
 /** 示例数据里「全部店铺」的写法；生产厂对接人没有店铺范围（null） */
 const ALL_STORES = '全部店铺';
@@ -15,8 +17,11 @@ function newMemberOf(fixture: FixtureMember): NewMember {
   }
   return {
     id: fixture.id,
+    // 与 Fake 钉钉回放的通讯录一致（integration/dingtalk-replay.ts）：全量对账时对得上，不会重复建或停用
+    dingtalkUserId: fixture.key,
     name: fixture.name,
     dept: fixture.dept,
+    email: fixture.email,
     roles: [role],
     allStores: fixture.stores === ALL_STORES,
     factoryCode: fixture.factory,
@@ -25,13 +30,19 @@ function newMemberOf(fixture: FixtureMember): NewMember {
 
 /**
  * 示例成员（原型 data.py 的 STAFF）：沿用夹具里确定的 id（待办 02 的开发登录也用这组 id）；已存在则跳过。
- * 钉钉通讯录同步（05）上线后，开发测试环境的成员仍来自这里（钉钉用 Fake）。
+ * 角色与店铺范围来自这里；姓名、部门与在职状态之后随 Fake 钉钉的通讯录同步（待办 05）。待办 05 之前灌进去的示例成员
+ * 没有钉钉用户 ID，这里补上（幂等），否则对账会把他们当成通讯录之外的人、另建一份。
  */
 export const orgMembersFixtureStep = defineFixtureStep({
   name: 'org.members',
   async load(tx, fixture) {
     for (const fixtureMember of fixture.members) {
-      await createMember(tx, newMemberOf(fixtureMember));
+      const input = newMemberOf(fixtureMember);
+      await createMember(tx, input);
+      await tx.db
+        .update(member)
+        .set({ dingtalkUserId: fixtureMember.key, email: fixtureMember.email })
+        .where(and(eq(member.id, fixtureMember.id), isNull(member.dingtalkUserId)));
     }
   },
 });

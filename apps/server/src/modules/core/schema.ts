@@ -139,3 +139,42 @@ export const notification = coreSchema.table(
       .where(sql`${t.readAt} IS NULL`),
   ],
 );
+
+/**
+ * 钉钉工作通知的待发与已发（规格 core「钉钉工作通知发送」、ADR 0010「钉钉通知」，待办 05）：每个接收人一行。
+ * 写入只经 core 的 queueWorkNotifications（11.4 渠道里有钉钉的通知类型由 org 的 notifyMembers 一并排入）；
+ * 每分钟的发送任务把同一人最早一条已等满 5 分钟的全部待发合成一条发出（同一人 5 分钟内合并）。
+ * 接收人存成员 ID 与当时的钉钉用户 ID（org 的成员，跨模块不设外键）。
+ */
+export const workNotification = coreSchema.table(
+  'work_notification',
+  {
+    id: primaryId(),
+    /** 接收人（成员 ID） */
+    recipientId: uuid('recipient_id').notNull(),
+    /** 接收人的钉钉用户 ID（排入时的）：按它合并、发送 */
+    dingtalkUserId: text('dingtalk_user_id').notNull(),
+    type: text('type', { enum: notificationTypes }).notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    /** 关联对象（通知里写对象编号与时间，避免钉钉「同一内容一天一条」吞掉通知） */
+    objectType: text('object_type', { enum: notificationObjectTypes }).notNull(),
+    objectId: text('object_id').notNull(),
+    objectLabel: text('object_label').notNull(),
+    createdAt: timestamptz('created_at').notNull(),
+    /** 发出时间；待发为空 */
+    sentAt: timestamptz('sent_at'),
+    /** 钉钉返回的任务 ID（查发送结果、统计调用量用） */
+    taskId: text('task_id'),
+    /** 发送失败的次数；到上限后不再重试（failed_at 记放弃的时间） */
+    attempts: integer('attempts').notNull().default(0),
+    failedAt: timestamptz('failed_at'),
+  },
+  (t) => [
+    // 每分钟找待发的：同一人最早一条的时间
+    index('work_notification_pending_idx')
+      .on(t.dingtalkUserId, t.createdAt)
+      .where(sql`${t.sentAt} IS NULL AND ${t.failedAt} IS NULL`),
+    check('work_notification_attempts_check', sql`${t.attempts} >= 0`),
+  ],
+);

@@ -10,6 +10,18 @@ export {
 } from './access';
 export { createAuditLogRoutes, type StoreNamesById } from './audit-log';
 export { createDevLoginRoutes, devLoginAvailable } from './dev-login';
+export {
+  createDevDingtalkRoutes,
+  createDingtalkLoginRoutes,
+  devDingtalkScanAvailable,
+} from './dingtalk-login';
+export {
+  createOrgFeeds,
+  createOrgJobHandlers,
+  dingtalkConnection,
+  dingtalkEventJob,
+  dingtalkReconcileJob,
+} from './dingtalk-sync';
 export { createDevNotificationRoutes } from './dev-notifications';
 export { orgMembersFixtureStep } from './fixtures';
 export { createMember, listAftersalesOwners, memberNamesById, type NewMember } from './members';

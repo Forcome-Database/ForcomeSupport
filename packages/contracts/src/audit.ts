@@ -11,9 +11,11 @@ import {
   responsibilitySchema,
   shipperSchema,
 } from './aftersales';
+import { memberStatusSchema } from './auth';
 import { platformSchema, siteSchema } from './channel';
 import { financeField } from './finance';
 import { adapterModeSchema } from './integration';
+import { roleSchema } from './roles';
 
 /**
  * 审计对象类型与中文名（PRD 11.1 AuditLog、P27 筛选「对象类型」）。
@@ -153,6 +155,14 @@ export const loginMethodLabels: Record<(typeof loginMethods)[number], string> = 
 };
 export const loginAuditSnapshotSchema = z.object({ method: z.enum(loginMethods) });
 
+/** 成员（钉钉同步改变的在职状态，待办 05；P20 的角色与店铺范围随待办 06）：姓名、钉钉部门、状态、角色 */
+export const memberAuditSnapshotSchema = z.object({
+  name: z.string(),
+  dept: z.string(),
+  status: memberStatusSchema,
+  roles: z.array(roleSchema),
+});
+
 /** 越权访问（E-24）：原因、越权的店铺、请求 */
 export const accessDeniedAuditSnapshotSchema = z.object({
   reason: z.literal('store_scope'),
@@ -170,6 +180,7 @@ export const auditSnapshotSchemas = {
   ledgerExport: ledgerExportAuditSnapshotSchema,
   auditExport: auditExportAuditSnapshotSchema,
   login: loginAuditSnapshotSchema,
+  member: memberAuditSnapshotSchema,
   accessDenied: accessDeniedAuditSnapshotSchema,
   empty: emptyAuditSnapshotSchema,
 } as const;
@@ -225,6 +236,9 @@ export const auditActions = {
   },
   'access.denied': { label: '越权访问被拒', objectType: null, snapshot: 'accessDenied' },
   'auth.login': { label: '登录', objectType: 'login', snapshot: 'login' },
+  // 钉钉通讯录同步（待办 05）：只记影响能否进入的两种，操作人「系统」。新增成员、改名与换部门只是通讯录镜像，不记
+  'member.dingtalk_left': { label: '钉钉离职停用', objectType: 'member', snapshot: 'member' },
+  'member.dingtalk_rejoined': { label: '钉钉恢复在职', objectType: 'member', snapshot: 'member' },
   'auth.logout': { label: '退出登录', objectType: 'login', snapshot: 'empty' },
 } as const satisfies Record<string, AuditActionDefinition>;
 

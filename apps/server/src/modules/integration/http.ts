@@ -4,7 +4,7 @@ import { ExternalCallFailedError, ExternalTimeoutError } from './faults';
 /*
  * 出站 HTTP 客户端工厂（规格 integration 一节、ADR 0003、0009 修订）：所有外部 HTTP 调用经这里——
  * - 代理：undici 的 EnvHttpProxyAgent 读 HTTPS_PROXY / HTTP_PROXY / NO_PROXY（大小写都认），境外经固定代理、
- *   NO_PROXY 里的境内域名直连；整个进程共用一个；
+ *   NO_PROXY 里的境内域名直连；整个进程共用一个（钉钉 Stream 的 WebSocket 也经它，同样遵守 NO_PROXY）；
  * - 超时：每次调用有上限，到点以 ExternalTimeoutError 结束；
  * - 错误：非 2xx 抛 ExternalCallFailedError（带状态码；429 与 5xx 可重试），网络错误抛不带状态码、可重试的
  *   ExternalCallFailedError——业务代码只处理 faults.ts 的这一套错误（同 Fake）。
@@ -13,8 +13,8 @@ import { ExternalCallFailedError, ExternalTimeoutError } from './faults';
 
 let sharedDispatcher: Dispatcher | undefined;
 
-/** 本进程共用的出站连接（按代理环境变量分流） */
-function outboundDispatcher(): Dispatcher {
+/** 本进程共用的出站连接（按代理环境变量分流）；HTTP 调用与钉钉 Stream 的 WebSocket 共用 */
+export function outboundDispatcher(): Dispatcher {
   sharedDispatcher ??= new EnvHttpProxyAgent();
   return sharedDispatcher;
 }
@@ -34,6 +34,8 @@ export interface HttpClient {
   getText(url: string, options: HttpRequestOptions): Promise<string>;
   /** GET 并按 JSON 解析（解析结果由调用方用 zod 校验） */
   getJson(url: string, options: HttpRequestOptions): Promise<unknown>;
+  /** POST JSON 并按 JSON 解析返回（解析结果由调用方用 zod 校验） */
+  postJson(url: string, body: unknown, options: HttpRequestOptions): Promise<unknown>;
 }
 
 /**
@@ -43,14 +45,24 @@ export function createHttpClient(
   system: string,
   options: { dispatcher?: Dispatcher } = {},
 ): HttpClient {
-  async function get(url: string, request: HttpRequestOptions) {
+  async function send(url: string, request: HttpRequestOptions, body?: unknown) {
     const signal = AbortSignal.timeout(request.timeoutMs ?? DEFAULT_TIMEOUT_MS);
     let response: Awaited<ReturnType<typeof fetch>>;
     try {
       response = await fetch(url, {
         dispatcher: options.dispatcher ?? outboundDispatcher(),
         signal,
-        headers: request.headers,
+        ...(body === undefined
+          ? { headers: request.headers }
+          : {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json',
+                accept: 'application/json',
+                ...request.headers,
+              },
+              body: JSON.stringify(body),
+            }),
       });
     } catch (error) {
       throw translate(error, request.operation, signal);
@@ -83,23 +95,35 @@ export function createHttpClient(
     }
   }
 
+  async function readJson(
+    response: Awaited<ReturnType<typeof fetch>>,
+    request: HttpRequestOptions,
+    signal: AbortSignal,
+  ): Promise<unknown> {
+    const text = await read(request, signal, () => response.text());
+    try {
+      return JSON.parse(text) as unknown;
+    } catch (error) {
+      throw new ExternalCallFailedError(system, request.operation, {
+        message: `返回的不是 JSON：${error instanceof Error ? error.message : String(error)}`,
+        retryable: false,
+        cause: error,
+      });
+    }
+  }
+
   return {
     async getText(url, request) {
-      const { response, signal } = await get(url, request);
+      const { response, signal } = await send(url, request);
       return read(request, signal, () => response.text());
     },
     async getJson(url, request) {
-      const { response, signal } = await get(url, request);
-      const text = await read(request, signal, () => response.text());
-      try {
-        return JSON.parse(text) as unknown;
-      } catch (error) {
-        throw new ExternalCallFailedError(system, request.operation, {
-          message: `返回的不是 JSON：${error instanceof Error ? error.message : String(error)}`,
-          retryable: false,
-          cause: error,
-        });
-      }
+      const { response, signal } = await send(url, request);
+      return readJson(response, request, signal);
+    },
+    async postJson(url, body, request) {
+      const { response, signal } = await send(url, request, body);
+      return readJson(response, request, signal);
     },
   };
 }

@@ -185,6 +185,35 @@ export function worstConnectionStatus(statuses: readonly ConnectionStatus[]): Co
   return statuses.reduce((worst, status) => (SEVERITY[status] > SEVERITY[worst] ? status : worst));
 }
 
+/** 同步延迟的阈值（6.9）：最近一次同步成功超过这么久为同步延迟。Gmail、订单 10 分钟，钉钉 2 小时 */
+export const SYNC_DELAY_MS = {
+  gmail: 10 * 60_000,
+  orders: 10 * 60_000,
+  dingtalk: 2 * 60 * 60_000,
+} as const;
+
+/** 连续失败这么多次为连接异常（6.9） */
+export const CONNECTION_FAILURE_LIMIT = 3;
+
+/** 一个数据源的同步记录：最近一次成功的时间与连续失败的次数 */
+export interface SyncHealth {
+  readonly lastSuccessAt: Date | null;
+  readonly consecutiveFailures: number;
+}
+
+/**
+ * 按同步记录算连接状态（6.9）：连续 3 次失败为连接异常；从没成功过为未连接；最近一次成功超过阈值为同步延迟；否则已连接
+ */
+export function syncConnectionStatus(
+  health: SyncHealth,
+  delayAfterMs: number,
+  now: Date,
+): ConnectionStatus {
+  if (health.consecutiveFailures >= CONNECTION_FAILURE_LIMIT) return 'error';
+  if (!health.lastSuccessAt) return 'not_connected';
+  return now.getTime() - health.lastSuccessAt.getTime() > delayAfterMs ? 'delayed' : 'connected';
+}
+
 /** 店铺的一个连接：Gmail（收件与「已发送」）或订单（亚马逊 SP-API、Shopify Admin API） */
 export const storeConnectionSchema = z.object({
   kind: z.enum(['gmail', 'orders']),

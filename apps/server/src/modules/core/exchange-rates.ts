@@ -10,7 +10,7 @@ import {
 import { and, desc, eq, lte, max } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbExecutor } from './db';
-import { defineJob, handleJob, type AnyJobHandler } from './jobs';
+import { defineJob } from './jobs';
 import type { Logger } from './logger';
 import { transaction, type Runtime } from './runtime';
 import { exchangeRate } from './schema';
@@ -91,7 +91,7 @@ interface ExchangeRateSyncReport {
  * 先欧洲央行、失败改 Frankfurter，两者都失败抛错（不写任何数据，按日期取汇率时自然回退到此前的日期）。
  * 已有的日期不覆盖：汇率只增不改，已保存的金额冻结了自己的汇率，不受影响（E-20「恢复后不回改」）。
  */
-async function syncExchangeRates(
+export async function syncExchangeRates(
   runtime: Runtime,
   source: ExchangeRateSource,
   logger: Logger,
@@ -159,15 +159,3 @@ export const syncExchangeRatesJob = defineJob(
   { policy: 'stately', retryLimit: 3, retryDelay: 1800 },
   { cron: '0 6 * * *', tz: 'Asia/Shanghai', runAtStartup: true },
 );
-
-/** core 的任务处理器；汇率来源由入口给出（integration 的 exchangeRateClient，测试里是 Fake） */
-export function createCoreJobHandlers(deps: {
-  exchangeRates: () => ExchangeRateSource;
-}): AnyJobHandler[] {
-  return [
-    handleJob(syncExchangeRatesJob, async (_payload, context) => {
-      const report = await syncExchangeRates(context.runtime, deps.exchangeRates(), context.logger);
-      context.logger.info(report, '汇率已同步');
-    }),
-  ];
-}

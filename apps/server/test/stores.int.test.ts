@@ -132,12 +132,13 @@ describe('P18 店铺表（非生产环境）', () => {
       ]);
       expect(store.updatedBy).toBeNull();
     }
-    // 渠道卡：亚马逊 SP-API、Shopify Admin API、Gmail、钉钉；同步记录随后续待办，暂无最近同步时间
+    // 渠道卡：亚马逊 SP-API、Shopify Admin API、Gmail、钉钉。订单与 Gmail 的同步记录随后续待办，暂无最近同步时间；
+    // 钉钉卡按通讯录的同步记录（待办 05），这里还没对账过，为未连接（对账后的状态见 dingtalk-sync.int.test.ts）
     expect(data.channels).toEqual([
       { kind: 'amazon', status: 'connected', simulated: true, lastSyncAt: null },
       { kind: 'shopify', status: 'connected', simulated: true, lastSyncAt: null },
       { kind: 'gmail', status: 'connected', simulated: true, lastSyncAt: null },
-      { kind: 'dingtalk', status: 'connected', simulated: true, lastSyncAt: null },
+      { kind: 'dingtalk', status: 'not_connected', simulated: true, lastSyncAt: null },
     ]);
   });
 

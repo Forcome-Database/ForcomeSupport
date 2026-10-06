@@ -10,12 +10,15 @@ import type { DbExecutor, Tx } from '../core';
 import { member } from './schema';
 import type { MemberRow } from './session';
 
-/** 新建成员的内容（示例数据夹具、测试工具；钉钉同步与 P20 随 05、06 号待办） */
+/** 新建成员的内容（示例数据夹具、测试工具；钉钉通讯录同步建的成员见 directory.ts） */
 export interface NewMember {
   /** 不填由数据库生成 UUIDv7；示例数据用夹具里确定的 id */
   readonly id?: string;
+  /** 钉钉用户 ID：示例成员与 Fake 钉钉的通讯录对得上（夹具的 key）；测试里建的成员可以不给 */
+  readonly dingtalkUserId?: string | null;
   readonly name: string;
   readonly dept: string;
+  readonly email?: string | null;
   readonly roles: readonly Role[];
   /** 全部店铺（含以后新增的）；为 false 时只限 storeIds */
   readonly allStores: boolean;
@@ -30,8 +33,10 @@ export async function createMember(tx: Tx, input: NewMember): Promise<string> {
     .insert(member)
     .values({
       id: input.id,
+      dingtalkUserId: input.dingtalkUserId ?? null,
       name: input.name,
       dept: input.dept,
+      email: input.email ?? null,
       roles: [...input.roles],
       allStores: input.allStores,
       storeIds: [...(input.storeIds ?? [])],
@@ -49,6 +54,19 @@ export async function createMember(tx: Tx, input: NewMember): Promise<string> {
 
 export async function findMember(db: DbExecutor, id: string): Promise<MemberRow | null> {
   const [row] = await db.select().from(member).where(eq(member.id, id)).limit(1);
+  return row ?? null;
+}
+
+/** 按钉钉用户 ID 找成员（扫码登录） */
+export async function findMemberByDingtalkUserId(
+  db: DbExecutor,
+  dingtalkUserId: string,
+): Promise<MemberRow | null> {
+  const [row] = await db
+    .select()
+    .from(member)
+    .where(eq(member.dingtalkUserId, dingtalkUserId))
+    .limit(1);
   return row ?? null;
 }
 

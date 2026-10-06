@@ -17,6 +17,20 @@ export {
   type RealClientContext,
 } from './definition';
 export {
+  dingtalkClient,
+  DingtalkAuthCodeError,
+  DINGTALK_ROOT_DEPARTMENT,
+  FakeDingtalk,
+  WORK_NOTIFICATION_MAX_USERS,
+  type DingtalkClient,
+  type DingtalkDepartment,
+  type DingtalkDirectory,
+  type DingtalkEvent,
+  type DingtalkUser,
+  type SentWorkNotification,
+} from './dingtalk';
+export { factoryHeadUserId } from './dingtalk-replay';
+export {
   exchangeRateClient,
   FakeExchangeRates,
   type ExchangeRateClient,

@@ -1,4 +1,11 @@
-import { devMembersResponseSchema, roleByLabel, roles, type Role } from '@forcome/contracts';
+import {
+  devDingtalkScanResponseSchema,
+  devMembersResponseSchema,
+  dingtalkLoginStartSchema,
+  roleByLabel,
+  roles,
+  type Role,
+} from '@forcome/contracts';
 import { getDemoFixture } from '@forcome/fixtures';
 import type { Hono } from 'hono';
 import type { JobOptions } from 'pg-boss';
@@ -134,8 +141,17 @@ export interface TestHarness {
   /** 经开发登录以某个角色或成员登录，返回带会话的客户端；每次调用都是一个新会话 */
   loginAs(target: LoginTarget, options?: { ip?: string }): Promise<ApiClient>;
   /**
-   * 新增一位成员（多角色、店铺范围受限等示例数据里没有的情形），返回成员 id。
-   * 钉钉通讯录同步与 P20 成员管理（05、06 号待办）上线前，测试经 org 的 createMember 建成员。
+   * 钉钉扫码登录（Fake 钉钉，待办 05）：像浏览器一样开一次登录（拿到 state 的 Cookie）→ 模拟这位钉钉用户在手机上扫码确认
+   * （开发工具 /api/dev/dingtalk/scan）→ 带着授权码与 state 换会话。返回这个浏览器与换会话的响应（被拒、失败也照常返回）。
+   * 示例成员的钉钉用户 ID 是夹具的 key（如 liting）；通讯录里的人见 Fake 钉钉（t.clients.fake(dingtalkClient)）
+   */
+  scanLogin(
+    dingtalkUserId: string,
+    options?: { ip?: string },
+  ): Promise<{ client: ApiClient; response: Response }>;
+  /**
+   * 新增一位成员（多角色、店铺范围受限等示例数据里没有的情形），返回成员 id。经 org 的 createMember 直接建（P20 成员管理随 06）；
+   * 要扫码登录的给出 dingtalkUserId，并在 Fake 钉钉的通讯录里放一个同 ID 的人（否则对账会把他当成离职）。
    */
   addMember(member: Omit<NewMember, 'id'>): Promise<string>;
   /**
@@ -296,6 +312,20 @@ export async function startTestHarness(
         throw new Error(`开发登录失败（${res.status}）：${await res.text()}`);
       }
       return client;
+    },
+
+    async scanLogin(dingtalkUserId, loginOptions = {}) {
+      const client = createApiClient(app, { ip: loginOptions.ip ?? TEST_CLIENT_IP });
+      const start = await client.post('/api/auth/dingtalk/start');
+      if (start.status !== 200)
+        throw new Error(`开始扫码登录失败（${start.status}）：${await start.text()}`);
+      const { state } = dingtalkLoginStartSchema.parse(await start.json());
+      const scan = await client.post('/api/dev/dingtalk/scan', { userId: dingtalkUserId });
+      if (scan.status !== 200)
+        throw new Error(`模拟扫码失败（${scan.status}）：${await scan.text()}`);
+      const { authCode } = devDingtalkScanResponseSchema.parse(await scan.json());
+      const response = await client.post('/api/auth/dingtalk/login', { authCode, state });
+      return { client, response };
     },
 
     addMember: (member) => transaction(runtime, (tx) => createMember(tx, member)),

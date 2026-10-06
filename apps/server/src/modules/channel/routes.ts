@@ -9,7 +9,12 @@ import {
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { AppEnv, Runtime } from '../core';
 import type { IntegrationClients } from '../integration';
-import { requireCapability, requireSession, type AccessVariables } from '../org';
+import {
+  dingtalkConnection,
+  requireCapability,
+  requireSession,
+  type AccessVariables,
+} from '../org';
 import { channelCards } from './connections';
 import { createStore, listAllStores, listStoreOptions, toStore, updateStore } from './stores';
 
@@ -96,9 +101,11 @@ export function createChannelRoutes(deps: {
 
   routes.openapi(settingsRoute, async (c) => {
     const stores = await listAllStores(runtime.db);
+    // 钉钉卡按通讯录的同步记录（org，待办 05）
+    const dingtalk = await dingtalkConnection(runtime.db, runtime.clock.now());
     return c.json(
       {
-        channels: channelCards(stores, clients.globalMode('dingtalk')),
+        channels: channelCards(stores, { mode: clients.globalMode('dingtalk'), ...dingtalk }),
         stores: stores.map(toStore),
         dataSourceEditable: appEnv !== 'production',
       },
