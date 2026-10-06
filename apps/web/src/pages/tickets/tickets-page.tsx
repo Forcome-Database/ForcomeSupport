@@ -23,9 +23,9 @@ import { A11Y, COLUMNS, EMPTY_TITLE, EMPTY_VALUE, PAGE_DESCRIPTION, PAGE_TITLE }
 
 /*
  * P04 工单列表（第一阶段，PRD P04「第一阶段」、I16；参照图 design/spec/shots/phase1/P04_Tickets.png）。
- * 现在是最简列表：页头 + 表格（工单号 · 主题 · 来源 · 渠道与店铺 · 客户 · 状态 · 最近来信，来源列自待办 10），按
- * 待回复 → 等客户 → 已解决 → 已关闭、组内最近来信倒序（后端排好）。筛选行与「未归属店铺」入口、订单号 / SLA 剩余列、
- * SLA 排序与分页、「只读 · 数据变化时自动刷新」与 SSE、点击行进入 P05 随 14、15、16、17、18 号待办。
+ * 现在是最简列表：页头 + 表格（工单号 · 主题 · 来源 · 渠道与店铺 · 客户 · 订单号 · 状态 · 最近来信，来源列自待办 10、
+ * 订单号列自待办 14），按待回复 → 等客户 → 已解决 → 已关闭、组内最近来信倒序（后端排好）。筛选行与「未归属店铺」入口、
+ * SLA 剩余列、SLA 排序与分页、「只读 · 数据变化时自动刷新」与 SSE、点击行进入 P05 随 15、16、17、18 号待办。
  * 表格照原型 tk_table()：外框圆角 8、表头 11 / 700 次要色、行上下 7；列宽照 P1_TPL 换算（含单元格内边距）。
  */
 
@@ -56,6 +56,12 @@ function TicketRow({ ticket, now }: { ticket: TicketListItem; now: Date }) {
         </div>
       </TableCell>
       <TableCell className="py-1.75">
+        {/* 原型：12 / 400、次要正文色、不折行；没有关联订单写「—」 */}
+        <span className="text-minor whitespace-nowrap text-ink-2" data-testid="ticket-order">
+          {ticket.orderNumber ?? EMPTY_VALUE}
+        </span>
+      </TableCell>
+      <TableCell className="py-1.75">
         <TicketStatusBadge status={ticket.status} />
       </TableCell>
       <TableCell className="py-1.75">
@@ -77,6 +83,7 @@ function TicketsTable({ tickets }: { tickets: readonly TicketListItem[] | null }
         <col className="w-21" />
         <col className="w-52" />
         <col className="w-31" />
+        <col className="w-40" />
         <col className="w-20.5" />
         <col className="w-24.5" />
       </colgroup>

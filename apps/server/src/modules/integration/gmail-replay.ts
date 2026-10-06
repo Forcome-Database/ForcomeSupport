@@ -6,7 +6,7 @@ import type { FakeMailInput } from './gmail-mime';
 /*
  * 示例数据夹具 → Fake Gmail 的来信（开发测试环境、本机开发与 Playwright 的 worker 启动时回放，ADR 0009 修订）。
  * 待办 08 只回放来信：每张示例工单一封（到达时间取「最近来信」，正文是主题，有订单号的另起一行写订单号）；
- * P05 时间线那张工单（P1_OLIVER）按时间线里的各封来信回放。我方回复、标记无需回复与关闭随 09、16、17 补上。
+ * P05 时间线那张工单（P1_OLIVER）按时间线里的各封来信回放，每封同样另起一行写订单号（14 按订单归并）。我方回复、标记无需回复与关闭随 09、16、17 补上。
  * 夹具里没有客户邮箱：亚马逊来信用按站点的买家消息中转域名、其余用 example.com，地址由客户名推出（fixture-customers.ts，
  * 与 Fake Shopify 订单上的邮箱一致）；
  * 夹具写明发件地址的（如生产厂来信）照用。渠道为 Shopify 的来信做成 Shopify 联系表单通知的样子（R-TK-08，待办 10）：
@@ -38,17 +38,14 @@ export function fixtureMails(fixture: DemoFixture): FakeMailInput[] {
       name: ticket.customer,
       address: ticket.from ?? fixtureCustomerAddress(ticket.customer, domain),
     };
+    // 有订单号的另起一行写订单号（亚马逊买家消息的真实正文同样带订单号）；P05 时间线那张的每封来信都写，按订单归并到同一张（14）
+    const withOrder = (text: string) => (ticket.order ? `${text}\n\nOrder: ${ticket.order}` : text);
     const letters =
       ticket.no === timeline.ticket
         ? timeline.entries
             .filter((e) => e.direction === 'inbound')
-            .map((e) => ({ at: e.at, text: e.body }))
-        : [
-            {
-              at: ticket.lastInboundAt,
-              text: ticket.order ? `${ticket.subject}\n\nOrder: ${ticket.order}` : ticket.subject,
-            },
-          ];
+            .map((e) => ({ at: e.at, text: withOrder(e.body) }))
+        : [{ at: ticket.lastInboundAt, text: withOrder(ticket.subject) }];
     const contactForm = ticket.channel === 'Shopify';
     return letters.map((letter, index) => ({
       to: store.mailbox,

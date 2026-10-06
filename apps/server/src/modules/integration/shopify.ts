@@ -252,7 +252,7 @@ export class FakeShopify implements FakeClient<ShopifyClient> {
     };
   }
 
-  /** 示例数据夹具里第一阶段的 Shopify 订单（data.py 的 SHOPIFY_ORDERS_P1），客户邮箱同 Fake 来信 */
+  /** 示例数据夹具里第一阶段的 Shopify 订单（data.py 的 SHOPIFY_ORDERS_P1），客户邮箱同 Fake 来信（夹具写了的照用） */
   replay(fixture: DemoFixture): void {
     // 示例数据：应用没开通 read_all_orders，订单只能回补 60 天（K19、K20，待办 13）
     if (!fixture.shopifyReadAllOrders) this.limitHistory();
@@ -262,7 +262,8 @@ export class FakeShopify implements FakeClient<ShopifyClient> {
       if (!storeId) throw new Error(`示例订单 ${order.name} 的店铺 ${order.storeKey} 不在夹具里`);
       this.put(storeId, {
         name: order.name,
-        email: fixtureCustomerAddress(order.customer),
+        // 夹具写了下单邮箱的照用（#0991 是 Emily Chen 用另一个邮箱下的单，待办 14），否则同 Fake 来信按客户名推出
+        email: order.email ?? fixtureCustomerAddress(order.customer),
         createdAt: new Date(order.placedAt),
         updatedAt: new Date(order.updatedAt),
         financialStatus: order.financialStatus,

@@ -69,6 +69,11 @@ export interface JobContext {
   readonly logger: Logger;
   /** 任务过期或 worker 停止时触发 */
   readonly signal: AbortSignal;
+  /**
+   * 这是最后一次尝试：再失败就不再重试（pg-boss 的 retryCount 已到 retryLimit）。外部系统一直不可用时，处理器可以据此
+   * 退而求其次把事情做完，而不是让任务就此失败（例如按订单归并在订单平台一直连不上时不关联订单照常建单，待办 14）
+   */
+  readonly lastAttempt: boolean;
 }
 
 export interface JobHandler<T extends object> {
@@ -145,11 +150,14 @@ export interface WorkerOptions {
   pollingIntervalSeconds?: number;
 }
 
-/** 已从队列取到的一个任务（pg-boss 的 Job 的子集） */
+/** 已从队列取到的一个任务（pg-boss 的 JobWithMetadata 的子集） */
 export interface FetchedJob {
   readonly id: string;
   readonly data: unknown;
   readonly signal: AbortSignal;
+  /** 已重试了几次、最多重试几次 */
+  readonly retryCount: number;
+  readonly retryLimit: number;
 }
 
 /**
@@ -165,7 +173,13 @@ export async function runJob(
   const log = logger.child({ job: handler.job.name, jobId: job.id });
   // 载荷不符合模式说明发送端与消费端版本不一致：抛错让任务失败，留待排查
   const payload: unknown = handler.job.payload.parse(job.data);
-  await handler.handle(payload, { jobId: job.id, runtime, logger: log, signal: job.signal });
+  await handler.handle(payload, {
+    jobId: job.id,
+    runtime,
+    logger: log,
+    signal: job.signal,
+    lastAttempt: job.retryCount >= job.retryLimit,
+  });
 }
 
 /**
@@ -186,6 +200,8 @@ export async function startWorker(
       handler.job.name,
       {
         batchSize: 1,
+        // 带上重试次数（retryCount、retryLimit），处理器据此知道是不是最后一次尝试
+        includeMetadata: true,
         localConcurrency: handler.job.concurrency ?? 1,
         pollingIntervalSeconds: options.pollingIntervalSeconds ?? 2,
       },

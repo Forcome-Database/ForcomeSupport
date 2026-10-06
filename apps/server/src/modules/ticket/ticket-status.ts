@@ -1,4 +1,5 @@
 import { SYSTEM_ACTOR_NAME, type TicketEvent, type TicketTrigger } from '@forcome/contracts';
+import { desc, inArray } from 'drizzle-orm';
 import { updateWithVersion, type Actor, type Tx } from '../core';
 import { transition, type Transition } from './lifecycle';
 import { statusChange, ticket } from './schema';
@@ -83,6 +84,40 @@ export async function applyTransition(
   });
   await recordChange(tx, current.id, result, event, actor);
   return updated;
+}
+
+/**
+ * 几张已关闭工单的关闭时刻（R-TK-01「30 天内关闭」的判断，待办 14）：已关闭的工单最近一条状态变更就是迁到已关闭的那一条
+ * （数据库守卫保证状态等于最近一条的目标状态；「最近」同守卫按写入先后，即 UUIDv7 主键），取它的发生时刻。
+ * 给的工单不是已关闭的抛错（调用方判断错了）。
+ */
+export async function closedTimes(
+  tx: Tx,
+  closed: readonly TicketRow[],
+): Promise<Map<string, Date>> {
+  if (closed.length === 0) return new Map();
+  const rows = await tx.db
+    .selectDistinctOn([statusChange.ticketId], {
+      ticketId: statusChange.ticketId,
+      toStatus: statusChange.toStatus,
+      occurredAt: statusChange.occurredAt,
+    })
+    .from(statusChange)
+    .where(
+      inArray(
+        statusChange.ticketId,
+        closed.map((row) => row.id),
+      ),
+    )
+    .orderBy(statusChange.ticketId, desc(statusChange.id));
+  const times = new Map<string, Date>();
+  for (const row of rows) {
+    if (row.toStatus !== 'closed') {
+      throw new Error(`工单 ${row.ticketId} 最近一次迁移不是关闭，没有关闭时刻`);
+    }
+    times.set(row.ticketId, row.occurredAt);
+  }
+  return times;
 }
 
 /**

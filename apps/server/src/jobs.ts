@@ -74,7 +74,8 @@ export function createJobHandlers(deps: ServerDeps): readonly AnyJobHandler[] {
     ...createChannelJobHandlers(deps),
     // 订单同步要的店铺来自 channel 的店铺配置（order 不依赖 channel）
     ...createOrderJobHandlers({ clients: deps.clients, stores: listOrderStores }),
-    ...createTicketJobHandlers(),
+    // 按订单归并：镜像没有时经 order 去平台补拉，用同一组外部客户端
+    ...createTicketJobHandlers({ clients: deps.clients }),
   ];
 }
 

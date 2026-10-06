@@ -1,0 +1,1 @@
+CREATE INDEX "ticket_store_order_idx" ON "ticket"."ticket" USING btree ("store_id","order_number") WHERE "ticket"."ticket"."order_number" IS NOT NULL;

@@ -334,9 +334,11 @@ ORDERS = {
 }
 # 第一阶段 Shopify 订单镜像的示例（待办 11）：第一阶段工单与台账引用的 Shopify 订单，Fake Shopify 回放它们（经夹具）。
 # 下单与最近更新（平台 updated_at）、商品行（名称, 数量）、金额（美元）、付款与履约状态、收件地址（街道, 门牌, 城市, 州, 邮编, 国家）、
-# 履约单号（承运商, 单号）；客户邮箱由夹具按客户名推出（同 Fake 来信）。#1063 的商品、金额、下单日同 ORDERS
+# 履约单号（承运商, 单号）；客户邮箱由夹具按客户名推出（同 Fake 来信），写了 email 的照用。#1063 的商品、金额、下单日同 ORDERS。
+# #0991 是 Emily Chen 用另一个邮箱下的单：她 P04 那张联系表单工单（问能不能用在 Tesla 上）按邮箱反查零笔、不关联订单，
+# 原型 P04 订单号写「—」（待办 14，协调者 2026-10-07 决定）
 SHOPIFY_ORDERS_P1 = {
-    '#0991': {'store': 'forcome.com', 'customer': 'Emily Chen', 'placed': '08-14 16:05', 'updated': '08-18 11:20',
+    '#0991': {'store': 'forcome.com', 'customer': 'Emily Chen', 'email': 'emily.c@example.com', 'placed': '08-14 16:05', 'updated': '08-18 11:20',
               'items': [('V2 车载吸尘器 白色', 1)], 'total': 48.99, 'paid': 'PAID', 'fulfilled': 'FULFILLED',
               'ship_to': ('418 SE Morrison St', None, 'Portland', 'OR', '97214', 'US'), 'tracking': ('UPS', '1Z9X4E770312345678')},
     '#1049': {'store': 'forcome.com', 'customer': 'Priya Raman', 'placed': '08-22 20:15', 'updated': '09-02 10:11',

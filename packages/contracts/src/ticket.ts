@@ -122,18 +122,25 @@ export type MessageDirection = z.infer<typeof messageDirectionSchema>;
 /** 工单号 T-日期-4 位当日序号（11.2；日期取首封来信日期，北京时间） */
 export const ticketNumberSchema = z.string().regex(/^T-\d{8}-\d{4}$/, '工单号的格式是 T-日期-序号');
 
-/** P04 工单列表的一行（第一阶段；订单号、SLA 剩余随 14、16、18） */
+/** P04 工单列表的一行（第一阶段；SLA 剩余随 16、18） */
 export const ticketListItemSchema = z.object({
   id: z.uuid(),
   number: ticketNumberSchema,
   subject: z.string(),
   /** 工单的来源：首封来信的来源（11.1 Ticket） */
   source: ticketSourceSchema,
-  /** 渠道（R-TK-08）与站点（亚马逊按发件域，其余取店铺默认站点；Shopify 按订单收件国家随 14），都取首封来信 */
+  /**
+   * 渠道（R-TK-08）与站点，都取首封来信：亚马逊按发件域；Shopify 店铺关联到订单时按订单收件国家（收件国家不是 US / CA / MX
+   * 时取店铺默认站点），没有订单时取店铺默认站点；邮件取店铺默认站点（R-ST-02，待办 14）
+   */
   channel: ticketChannelSchema,
   site: siteSchema,
   store: z.object({ id: z.uuid(), name: z.string() }),
   customer: z.object({ name: z.string() }),
+  /**
+   * 关联的订单号（R-TK-01，待办 14）：亚马逊为订单号（3-7-7），Shopify 为订单名（如 #1063）；没有关联订单为空（P04 写「—」）
+   */
+  orderNumber: z.string().nullable(),
   status: ticketStatusSchema,
   /** 工单内最近一封来信的到达时间（Gmail internalDate） */
   lastInboundAt: z.iso.datetime({ offset: true }),

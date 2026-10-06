@@ -90,6 +90,8 @@ describe('来信到工单', () => {
         site: 'US',
         store: { id: AUTO.id, name: 'Forcome Auto' },
         customer: { name: 'James Walker' },
+        // 来信没有订单号、直邮的店铺是亚马逊店铺（不按邮箱反查）：无订单工单（R-TK-02）
+        orderNumber: null,
         status: 'awaiting_reply',
         lastInboundAt: '2026-09-10T00:15:00.000Z',
       },
@@ -519,12 +521,12 @@ describe('开发测试环境的示例来信回放（ADR 0009 修订）', () => {
     await t.close();
   });
 
-  it('示例工单的来信都归并成待回复工单；同一客户的无订单来信归到一张（订单号归并随 14）', async () => {
+  it('示例工单的来信都归并成待回复工单，一张示例工单一张（按订单归并的核对见 order-merge）', async () => {
     const fixture = getDemoFixture();
     const tickets = await ticketList(await t.loginAs('客服主管'));
     const customers = new Set(fixture.tickets.map((ticket) => ticket.customer));
-    // Priya Raman 在 forcome.com 有两张示例工单（两笔订单），08 还不按订单号归并，两封来信归到一张
-    expect(tickets).toHaveLength(customers.size);
+    // Priya Raman 在 forcome.com 有两张示例工单（#1057、#1049 两笔订单），按订单归并成两张（14）
+    expect(tickets).toHaveLength(fixture.tickets.length);
     expect(new Set(tickets.map((ticket) => ticket.customer.name))).toEqual(customers);
     expect(new Set(tickets.map((ticket) => ticket.status))).toEqual(new Set(['awaiting_reply']));
 

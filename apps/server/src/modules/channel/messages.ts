@@ -7,8 +7,9 @@ import {
 } from '@forcome/contracts';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
+import { extractOrderNumbers } from './order-numbers';
 import type { MailAddress, Recognition } from './recognition';
-import { message } from './schema';
+import { message, store } from './schema';
 
 /*
  * 收取的邮件对外的读服务（ADR 0005：别的模块只经 index.ts 读 channel 的数据）：
@@ -40,7 +41,7 @@ function recognitionOf(row: RecognitionColumns): Recognition | null {
   return { channel, site, source, sender: { address: senderAddress, name: senderName ?? '' } };
 }
 
-/** 归并要用的一封来信：识别出的店铺与识别结果（渠道、站点、来源、客户渠道身份） */
+/** 归并要用的一封来信：识别出的店铺与识别结果（渠道、站点、来源、客户渠道身份）、抽出的候选订单号 */
 export interface InboundMessage {
   readonly id: string;
   readonly direction: MessageDirection;
@@ -53,6 +54,11 @@ export interface InboundMessage {
   readonly receivedAt: Date;
   /** 同一封邮件已在别的邮箱收到时指向准的那封（不归并） */
   readonly duplicateOfId: string | null;
+  /**
+   * 按店铺平台从主题与正文抽出的候选订单号（order-numbers.ts，待办 14）：读的时候按当前的店铺抽，指定店铺（15）后照样能抽；
+   * 没有店铺时为空。候选要由归并交 order 校验
+   */
+  readonly orderNumbers: readonly string[];
 }
 
 export async function findInboundMessage(
@@ -67,14 +73,18 @@ export async function findInboundMessage(
       storeId: message.storeId,
       ...recognitionColumns,
       subject: message.subject,
+      textBody: message.textBody,
+      htmlBody: message.htmlBody,
       receivedAt: message.receivedAt,
       duplicateOfId: message.duplicateOfId,
+      platform: store.platform,
     })
     .from(message)
+    .leftJoin(store, eq(store.id, message.storeId))
     .where(and(eq(message.id, id), storeScopeCondition(scope, message.storeId)))
     .limit(1);
   if (!row) return null;
-  const { id: messageId, direction, storeId, subject, receivedAt, duplicateOfId } = row;
+  const { id: messageId, direction, storeId, subject, receivedAt, duplicateOfId, platform } = row;
   return {
     id: messageId,
     direction,
@@ -83,6 +93,9 @@ export async function findInboundMessage(
     subject,
     receivedAt,
     duplicateOfId,
+    orderNumbers: platform
+      ? extractOrderNumbers(platform, { subject, text: row.textBody, html: row.htmlBody })
+      : [],
   };
 }
 

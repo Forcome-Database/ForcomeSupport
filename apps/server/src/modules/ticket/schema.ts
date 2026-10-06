@@ -46,7 +46,7 @@ export const customerIdentity = ticketSchema.table(
  * 工单（PRD 11.1 Ticket，第一期用到的字段）：编号 T-首封来信日期-当日序号；店铺、渠道、站点、来源取首封来信的识别结果；
  * 状态只能经迁移表改变（lifecycle.ts → ticket-status.ts 的 createTicket / applyTransition，同一事务写 status_change），
  * 数据库约束保证状态等于最近一条状态变更记录的目标状态（迁移 0007）。
- * 订单号的取值（14）、SLA（16）随后续待办；负责人第一期为空，不建列。
+ * 订单号在归并时关联（14）；SLA（16）随后续待办；负责人第一期为空，不建列。
  */
 export const ticket = ticketSchema.table(
   'ticket',
@@ -63,7 +63,10 @@ export const ticket = ticketSchema.table(
       .references(() => customer.id),
     /** 首封来信的主题 */
     subject: text('subject').notNull(),
-    /** 关联的平台订单号（R-TK-01，14 号待办抽取并校验）；为空即「无订单工单」（R-TK-02） */
+    /**
+     * 关联的订单（R-TK-01，归并时抽取并在该店铺的订单镜像中校验，待办 14）：亚马逊为订单号，Shopify 为订单名（如 #1063）；
+     * 为空即「无订单工单」（R-TK-02）
+     */
     orderNumber: text('order_number'),
     status: text('status', { enum: ticketStatuses }).notNull(),
     /** 关闭原因（迁移到已关闭时写入，6.1 三种） */
@@ -78,6 +81,10 @@ export const ticket = ticketSchema.table(
   },
   (t) => [
     unique('ticket_number_key').on(t.number),
+    // R-TK-01：同店铺同订单的工单（追加、重开或新建，待办 14）
+    index('ticket_store_order_idx')
+      .on(t.storeId, t.orderNumber)
+      .where(sql`${t.orderNumber} IS NOT NULL`),
     // R-TK-02：同店铺同客户的未关闭无订单工单
     index('ticket_open_without_order_idx')
       .on(t.storeId, t.customerId)

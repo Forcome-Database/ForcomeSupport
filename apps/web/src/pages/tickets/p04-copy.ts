@@ -8,13 +8,15 @@
 export const PAGE_TITLE = '工单';
 export const PAGE_DESCRIPTION = '全部渠道 · 全部店铺';
 
-/** 已有的七列（订单号、SLA 剩余随 14、18 加在原型的位置上）；来源的取值叫法在 contracts 的 messageSourceLabels */
+/** 已有的八列（SLA 剩余随 18 加在原型的位置上）；来源的取值叫法在 contracts 的 messageSourceLabels */
 export const COLUMNS = {
   number: '工单号',
   subject: '主题',
   source: '来源',
   channelStore: '渠道与店铺',
   customer: '客户',
+  /** 关联的订单号（R-TK-01，待办 14）：亚马逊订单号或 Shopify 订单名，没有关联订单写「—」 */
+  orderNumber: '订单号',
   status: '状态',
   lastInbound: '最近来信',
 } as const;

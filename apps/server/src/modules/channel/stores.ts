@@ -96,21 +96,34 @@ function queueOrderSync(
   return QUEUE_ORDER_SYNC[saved.platform](tx, saved.id);
 }
 
+/** order 的 OrderStore 要的列 */
+const orderStoreColumns = {
+  id: store.id,
+  name: store.name,
+  platform: store.platform,
+  platformId: store.platformId,
+  adapterMode: store.adapterMode,
+};
+
 /**
  * 订单同步要知道的全部店铺（order 的 OrderStore：店铺名、平台、平台标识、数据来源），按建立先后。同步与连接状态是系统操作，不按范围过滤
  * （ADR 0010 修订登记的例外）：由组装根注入 order（order 不依赖 channel），全站横幅用它列出连接异常的店铺
  */
 export async function listOrderStores(db: DbExecutor) {
-  return db
-    .select({
-      id: store.id,
-      name: store.name,
-      platform: store.platform,
-      platformId: store.platformId,
-      adapterMode: store.adapterMode,
-    })
+  return db.select(orderStoreColumns).from(store).orderBy(asc(store.createdAt), asc(store.id));
+}
+
+/**
+ * 店铺范围内的一个店铺，写成 order 要的样子（OrderStore）：按订单归并时把来信所在的店铺交给 order 查订单（ticket，待办 14；
+ * 系统操作用 SYSTEM_STORE_SCOPE）。没有或不在范围内为 null
+ */
+export async function findOrderStore(db: DbExecutor, scope: StoreScope, storeId: string) {
+  const [row] = await db
+    .select(orderStoreColumns)
     .from(store)
-    .orderBy(asc(store.createdAt), asc(store.id));
+    .where(and(eq(store.id, storeId), storeScopeCondition(scope, store.id)))
+    .limit(1);
+  return row ?? null;
 }
 
 /** 店铺范围内的店铺（各页面的店铺筛选、指定店铺）；新增的店铺对「全部店铺」的成员立即可见 */

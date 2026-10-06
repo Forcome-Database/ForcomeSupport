@@ -1,30 +1,45 @@
-import { isTicketSource } from '@forcome/contracts';
+import { isTicketSource, sites, type Site } from '@forcome/contracts';
 import { and, desc, eq, isNull, ne } from 'drizzle-orm';
-import { findInboundMessage } from '../channel';
+import { findInboundMessage, findOrderStore, type InboundMessage } from '../channel';
 import {
   advisoryLock,
   nextBusinessNumber,
   storeScopeCondition,
   SYSTEM_STORE_SCOPE,
   systemActor,
+  toMilliseconds,
   transaction,
   updateWithVersion,
   type JobContext,
+  type Runtime,
   type StoreScope,
   type Tx,
 } from '../core';
+import { ExternalServiceError, type IntegrationClients } from '../integration';
+import { findOrder, findOrdersByEmail, type MirroredOrder, type OrderStore } from '../order';
 import { customer, customerIdentity, ticket, ticketMessage } from './schema';
-import { applyTransition, createTicket } from './ticket-status';
+import { applyTransition, closedTimes, createTicket } from './ticket-status';
 
 /*
- * 归并（规格 ticket「归并」，PRD R-TK-02、6.1 第一阶段迁移表；处理 channel 的「来信已接收」）：
- * 无订单号的来信——同一店铺、同一客户渠道身份有未关闭的无订单工单则追加，否则新建「待回复」工单。
- * 客户渠道身份、渠道、站点、来源都在 channel 入库时识别好（亚马逊中转地址、Shopify 联系表单的回复邮箱，待办 10）；
- * 生产厂与其他供应商的来信照常归并、建工单，工单的来源取首封来信的来源，追加不改（11.1 Ticket）。
- * 在事务内按「店铺 + 客户渠道身份」取 pg_advisory_xact_lock 后再查再写，并发到达的同一客户来信不会各建一张；
- * 任务幂等：一封信只归并一次（工单消息按邮件 id 唯一），重跑结果不变。
- * 带订单号的来信按 R-TK-01 追加、重开或新建随 14；未归属店铺的来信进队列随 15。
+ * 归并（规格 ticket「归并」，PRD R-TK-01、R-TK-02、R-ST-02、6.1 第一阶段迁移表；处理 channel 的「来信已接收」）：
+ * 1. 关联订单（事务外，可能要去平台补拉）：channel 按店铺平台从主题与正文抽出候选订单号（亚马逊 3-7-7、Shopify 订单名），
+ *    逐个交 order 在该店铺内校验，镜像没有时按需补拉；第一个查得到的即这封信的订单。查不到的候选不算，按抽不到处理
+ *    （协调者 2026-10-07 决定）。抽不到时 Shopify 店铺按客户渠道身份（邮箱）在该店铺反查镜像，唯一命中才关联；亚马逊读不到买家邮箱，不反查。
+ * 2. 有订单（R-TK-01）：同店铺同订单有未关闭工单则追加；有 30 天内关闭的则重开为待回复（取最近关闭的那张）；否则新建。
+ *    无订单（R-TK-02）：同店铺同客户渠道身份有未关闭的无订单工单则追加，否则新建。
+ * 3. 新建的工单站点：Shopify 店铺关联到订单时按订单收件国家（不是 US / CA / MX 时取识别出的站点，即店铺默认站点）；
+ *    其余取 channel 识别出的站点（亚马逊按发件域）。工单的来源取首封来信，追加与重开都不改（11.1 Ticket）。
+ * 在事务内先取客户身份锁（建客户），再按「店铺 + 订单号」或「店铺 + 客户渠道身份」取 pg_advisory_xact_lock，加锁后再查再写，
+ * 顺序固定、不会互相等死；同一订单或同一客户的几封信同时归并只建一张工单。
+ * 任务幂等：一封信只归并一次（工单消息按邮件 id 唯一），重跑结果不变。补拉的外部调用失败时任务失败、稍后重试；
+ * 最后一次尝试仍失败就不再等这个候选（按查不到处理），照常归并——来信不能因订单平台连不上而一直不成工单。
+ * 未归属店铺的来信进队列随 15。
  */
+
+/** R-TK-01、R-TK-05：关闭后 30 天内（含第 30 天）同一订单来信重开，超过新建 */
+const REOPEN_WITHIN_MS = toMilliseconds({ days: 30 });
+
+type TicketRow = typeof ticket.$inferSelect;
 
 async function alreadyMerged(tx: Tx, channelMessageId: string): Promise<boolean> {
   const [row] = await tx.db
@@ -59,13 +74,109 @@ async function customerOf(tx: Tx, sender: { address: string; name: string }): Pr
   return created.id;
 }
 
-/** R-TK-02：同店铺同客户的未关闭无订单工单（取最近来信的一张），锁住它再追加 */
-async function openTicketWithoutOrder(
+/** 订单在工单上的写法：亚马逊为订单号，Shopify 为订单名（如 #1063，P04 显示的就是它） */
+function orderNumberOf(order: MirroredOrder): string {
+  return order.platform === 'shopify' && order.name ? order.name : order.platformOrderId;
+}
+
+/** 新建工单的站点（R-ST-02）：Shopify 店铺按订单收件国家，收件国家不是我们的站点时取识别出的站点 */
+function siteOf(store: OrderStore, order: MirroredOrder | null, recognized: Site): Site {
+  if (store.platform !== 'shopify' || !order?.shipCountry) return recognized;
+  const country = order.shipCountry.toUpperCase();
+  return (sites as readonly string[]).includes(country) ? (country as Site) : recognized;
+}
+
+/**
+ * 在该店铺内按一个候选订单号找订单（order 的 findOrder：先查镜像，没有时按需补拉）。补拉的外部调用失败照常抛出、任务稍后重试；
+ * 最后一次尝试时不再抛，记日志后按查不到处理
+ */
+async function verifiedOrder(
+  runtime: Runtime,
+  clients: IntegrationClients,
+  store: OrderStore,
+  candidate: string,
+  { lastAttempt, logger }: Pick<JobContext, 'lastAttempt' | 'logger'>,
+): Promise<MirroredOrder | null> {
+  try {
+    return await findOrder(runtime, clients, SYSTEM_STORE_SCOPE, store, { name: candidate });
+  } catch (error) {
+    if (!(error instanceof ExternalServiceError) || !lastAttempt) throw error;
+    logger.warn(
+      { err: error, store: store.name, candidate },
+      '订单平台一直连不上，最后一次尝试不再等这个订单号，按查不到处理',
+    );
+    return null;
+  }
+}
+
+/** 这封信关联的订单（见文件头第 1 点）；没有为 null */
+async function linkedOrder(
+  runtime: Runtime,
+  clients: IntegrationClients,
+  store: OrderStore,
+  mail: InboundMessage & { readonly recognition: NonNullable<InboundMessage['recognition']> },
+  context: Pick<JobContext, 'lastAttempt' | 'logger'>,
+): Promise<MirroredOrder | null> {
+  for (const candidate of mail.orderNumbers) {
+    const order = await verifiedOrder(runtime, clients, store, candidate, context);
+    if (order) return order;
+  }
+  if (store.platform !== 'shopify') return null;
+  const byEmail = await findOrdersByEmail(runtime.db, SYSTEM_STORE_SCOPE, {
+    storeId: store.id,
+    email: mail.recognition.sender.address,
+  });
+  return byEmail.length === 1 ? byEmail[0]! : null;
+}
+
+/** 归并到哪：追加到未关闭的工单、重开 30 天内关闭的工单，或新建 */
+type Target =
+  | { readonly kind: 'append'; readonly ticket: TicketRow }
+  | { readonly kind: 'reopen'; readonly ticket: TicketRow }
+  | { readonly kind: 'create' };
+
+/** R-TK-01：同店铺同订单的工单（锁住）→ 追加、重开或新建 */
+async function targetForOrder(
+  tx: Tx,
+  scope: StoreScope,
+  storeId: string,
+  orderNumber: string,
+  receivedAt: Date,
+): Promise<Target> {
+  const rows = await tx.db
+    .select()
+    .from(ticket)
+    .where(
+      and(
+        storeScopeCondition(scope, ticket.storeId),
+        eq(ticket.storeId, storeId),
+        eq(ticket.orderNumber, orderNumber),
+      ),
+    )
+    .orderBy(desc(ticket.lastInboundAt), desc(ticket.number))
+    .for('update');
+  const open = rows.find((row) => row.status !== 'closed');
+  if (open) return { kind: 'append', ticket: open };
+  const closedAt = await closedTimes(tx, rows);
+  let latest: { row: TicketRow; at: Date } | null = null;
+  for (const row of rows) {
+    const at = closedAt.get(row.id)!;
+    if (!latest || at > latest.at) latest = { row, at };
+  }
+  // 来信可能晚于关闭时刻才同步进来，也可能在关闭前到达（关闭在后）：都按到达时间与关闭时刻的间隔判断
+  if (latest && receivedAt.getTime() - latest.at.getTime() <= REOPEN_WITHIN_MS) {
+    return { kind: 'reopen', ticket: latest.row };
+  }
+  return { kind: 'create' };
+}
+
+/** R-TK-02：同店铺同客户的未关闭无订单工单（取最近来信的一张，锁住）→ 追加或新建 */
+async function targetForCustomer(
   tx: Tx,
   scope: StoreScope,
   storeId: string,
   customerId: string,
-): Promise<typeof ticket.$inferSelect | null> {
+): Promise<Target> {
   const [open] = await tx.db
     .select()
     .from(ticket)
@@ -81,14 +192,22 @@ async function openTicketWithoutOrder(
     .orderBy(desc(ticket.lastInboundAt))
     .limit(1)
     .for('update');
-  return open ?? null;
+  return open ? { kind: 'append', ticket: open } : { kind: 'create' };
 }
+
+const MERGED_LOG: Record<Target['kind'], string> = {
+  append: '来信已追加到工单',
+  reopen: '来信已重开工单',
+  create: '来信已新建工单',
+};
 
 /** 把一封来信归并成工单（「来信已接收」的处理器；系统操作，不受店铺范围限制） */
 export async function mergeInbound(
+  clients: IntegrationClients,
   { messageId }: { messageId: string },
-  { runtime, logger }: JobContext,
+  context: JobContext,
 ): Promise<void> {
+  const { runtime, logger } = context;
   const mail = await findInboundMessage(runtime.db, SYSTEM_STORE_SCOPE, messageId);
   if (!mail) throw new Error(`没有这封来信：${messageId}`);
   if (mail.direction !== 'inbound' || mail.duplicateOfId) {
@@ -112,56 +231,74 @@ export async function mergeInbound(
     logger.warn({ messageId }, '来信没有客户渠道身份（发件地址），无法确定客户，暂不归并');
     return;
   }
+  const store = await findOrderStore(runtime.db, SYSTEM_STORE_SCOPE, storeId);
+  if (!store) throw new Error(`来信 ${messageId} 的店铺 ${storeId} 不在了`);
+  // 已归并过的（任务重跑）不再去查订单、补拉
+  if (await transaction(runtime, (tx) => alreadyMerged(tx, messageId))) return;
+
+  const order = await linkedOrder(runtime, clients, store, { ...mail, recognition }, context);
+  const orderNumber = order ? orderNumberOf(order) : null;
 
   await transaction(runtime, async (tx) => {
     if (await alreadyMerged(tx, messageId)) return;
     const customerId = await customerOf(tx, sender);
-    await advisoryLock(tx, `ticket.merge:${storeId}:customer:${sender.address}`);
+    await advisoryLock(
+      tx,
+      orderNumber
+        ? `ticket.merge:${storeId}:order:${orderNumber}`
+        : `ticket.merge:${storeId}:customer:${sender.address}`,
+    );
     // 加锁后再查一次：同一封信的归并任务可能被重复执行
     if (await alreadyMerged(tx, messageId)) return;
 
-    const open = await openTicketWithoutOrder(tx, SYSTEM_STORE_SCOPE, storeId, customerId);
-    let target: { id: string; number: string };
-    if (open) {
-      // 追加（R-TK-02）：状态按迁移表变化（待回复保持待回复），最近来信取较晚的一封（来信可能乱序到达）
-      const current = await applyTransition(tx, open, 'inbound', systemActor);
-      const latest =
-        mail.receivedAt > current.lastInboundAt ? mail.receivedAt : current.lastInboundAt;
-      target = await updateWithVersion(tx, ticket, current, {
-        lastInboundAt: latest,
-        updatedAt: tx.now,
-      });
-    } else {
-      const created = await createTicket(
+    const target = orderNumber
+      ? await targetForOrder(tx, SYSTEM_STORE_SCOPE, storeId, orderNumber, mail.receivedAt)
+      : await targetForCustomer(tx, SYSTEM_STORE_SCOPE, storeId, customerId);
+    let merged: { id: string; number: string };
+    if (target.kind === 'create') {
+      merged = await createTicket(
         tx,
         {
           number: await nextBusinessNumber(tx, 'ticket', mail.receivedAt),
           storeId,
           channel,
-          site,
+          site: siteOf(store, order, site),
           source,
           customerId,
           subject: mail.subject,
-          orderNumber: null,
+          orderNumber,
           firstInboundAt: mail.receivedAt,
           lastInboundAt: mail.receivedAt,
         },
         'inbound',
         systemActor,
       );
-      target = created;
+    } else {
+      // 追加（待回复保持待回复）或重开（已关闭 → 待回复）：状态按迁移表变化；最近来信取较晚的一封（来信可能乱序到达）
+      const current = await applyTransition(
+        tx,
+        target.ticket,
+        target.kind === 'reopen' ? 'inbound_reopen' : 'inbound',
+        systemActor,
+      );
+      const latest =
+        mail.receivedAt > current.lastInboundAt ? mail.receivedAt : current.lastInboundAt;
+      merged = await updateWithVersion(tx, ticket, current, {
+        lastInboundAt: latest,
+        updatedAt: tx.now,
+      });
     }
 
     await tx.db.insert(ticketMessage).values({
-      ticketId: target.id,
+      ticketId: merged.id,
       channelMessageId: messageId,
       direction: 'inbound',
       receivedAt: mail.receivedAt,
       createdAt: tx.now,
     });
     logger.info(
-      { messageId, ticket: target.number, appended: Boolean(open) },
-      open ? '来信已追加到工单' : '来信已新建工单',
+      { messageId, ticket: merged.number, orderNumber, merged: target.kind },
+      MERGED_LOG[target.kind],
     );
   });
 }

@@ -51,6 +51,7 @@ function toListItem(row: TicketRow, storeNames: Map<string, string>): TicketList
     site: row.site,
     store: { id: row.storeId, name: storeNames.get(row.storeId) ?? '' },
     customer: { name: row.customerName },
+    orderNumber: row.orderNumber,
     status: row.status,
     lastInboundAt: row.lastInboundAt.toISOString(),
   };

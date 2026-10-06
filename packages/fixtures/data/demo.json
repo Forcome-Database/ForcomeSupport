@@ -1505,6 +1505,7 @@
       "name": "#0991",
       "storeKey": "shop-com",
       "customer": "Emily Chen",
+      "email": "emily.c@example.com",
       "placedAt": "2026-08-14T16:05:00+08:00",
       "updatedAt": "2026-08-18T11:20:00+08:00",
       "lineItems": [
@@ -1536,6 +1537,7 @@
       "name": "#1049",
       "storeKey": "shop-com",
       "customer": "Priya Raman",
+      "email": null,
       "placedAt": "2026-08-22T20:15:00+08:00",
       "updatedAt": "2026-09-02T10:11:00+08:00",
       "lineItems": [
@@ -1567,6 +1569,7 @@
       "name": "#1052",
       "storeKey": "shop-com",
       "customer": "David Park",
+      "email": null,
       "placedAt": "2026-08-26T09:40:00+08:00",
       "updatedAt": "2026-08-30T15:02:00+08:00",
       "lineItems": [
@@ -1598,6 +1601,7 @@
       "name": "#1057",
       "storeKey": "shop-com",
       "customer": "Priya Raman",
+      "email": null,
       "placedAt": "2026-09-09T18:20:00+08:00",
       "updatedAt": "2026-09-09T18:21:00+08:00",
       "lineItems": [
@@ -1626,6 +1630,7 @@
       "name": "#1063",
       "storeKey": "shop-com",
       "customer": "Olivia Turner",
+      "email": null,
       "placedAt": "2026-08-05T13:30:00+08:00",
       "updatedAt": "2026-08-09T16:45:00+08:00",
       "lineItems": [

@@ -35,7 +35,7 @@ describe('P04 第一期参照页', () => {
     expectText(P04, EMPTY_VALUE);
   });
 
-  it('已有的七列表头逐字一致，顺序与原型相同（订单号、SLA 剩余随 14、18）', () => {
+  it('已有的八列表头逐字一致，顺序与原型相同（SLA 剩余随 18）', () => {
     for (const title of Object.values(COLUMNS)) expectText(P04, title);
     // 表头从「工单号」起（之前的筛选行也有「来源」「状态」等字样）
     const header = P04.indexOf(`>${COLUMNS.number}<`);

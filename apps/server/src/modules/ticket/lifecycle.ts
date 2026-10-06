@@ -11,7 +11,7 @@ import {
  * 一行 = 当前状态（null 为还没有工单）+ 事件 + 触发方 → 目标状态（到已关闭的行另带关闭原因）。
  * 表结构（事件、触发方、关闭原因）一次定好，见 contracts 的 ticket.ts；各行随待办补齐：
  * - 08：新建（新来信，无可追加或重开的工单 → 待回复）与追加（待回复收到新来信，状态不变）；
- * - 14：已关闭（30 天内）同一订单来信 → 待回复（重开）；
+ * - 14：已关闭（30 天内）同一订单来信 → 待回复（重开），已加；
  * - 16：待回复 → 等客户（识别到我方回复）、等客户 / 已解决 → 待回复（新来信）、三条按时关闭；
  * - 17：待回复 → 已解决（全部未回复来信被标记无需回复）及其 5 秒内撤销。
  * 写库只经 ticket-status.ts 的 createTicket / applyTransition（同一事务写状态变更记录；数据库约束保证状态与最近一条记录一致）。
@@ -32,6 +32,8 @@ const PHASE1_TRANSITIONS: readonly TransitionRule[] = [
   // 追加：待回复的工单收到新来信，仍是待回复。6.1 的表只列状态有变化的行，这一行写出来是为了让
   // 「追加」也经迁移表判断（已关闭的工单不能追加），它不产生状态变更记录
   { from: 'awaiting_reply', event: 'inbound', trigger: 'system', to: 'awaiting_reply' },
+  // 已关闭（30 天内）· 同一订单来信 → 待回复（重开）· 系统（R-TK-01）。「30 天内」由归并判断（merge.ts），关闭原因随之清空
+  { from: 'closed', event: 'inbound_reopen', trigger: 'system', to: 'awaiting_reply' },
 ];
 
 /** 迁移的结果：changed 为 false 时状态不变（追加），不记状态变更 */

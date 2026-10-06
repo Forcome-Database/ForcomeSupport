@@ -147,12 +147,13 @@ export const fixtureTicketTimelineSchema = z.object({
 
 /**
  * Shopify 订单（待办 11，data.py 的 SHOPIFY_ORDERS_P1）：Fake Shopify 回放它们。状态保留 Admin API 的枚举写法；
- * 客户邮箱不在夹具里，回放按客户名推出（同 Fake 来信）
+ * 客户邮箱：data.py 写了的照用（#0991 是 Emily Chen 用另一个邮箱下的单，待办 14），没写的为 null、回放按客户名推出（同 Fake 来信）
  */
 export const fixtureShopifyOrderSchema = z.object({
   name: z.string().regex(/^#\d+$/),
   storeKey: z.string(),
   customer: z.string(),
+  email: z.email().nullable(),
   placedAt: instant,
   updatedAt: instant,
   lineItems: z.array(z.object({ title: z.string(), quantity: z.int().positive() })).min(1),
