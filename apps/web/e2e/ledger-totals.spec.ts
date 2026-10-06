@@ -534,6 +534,12 @@ test('导出中：按钮写「导出中」并转圈；导出失败按 G5「导�
   release();
   await download;
   await expect(page.getByRole('button', { name: '导出 Excel' })).not.toHaveAttribute('aria-busy');
+  // 成功浮层（右上）会盖住「导出 Excel」；鼠标停在浮层上时它不会自动消失（悬停暂停计时），
+  // 先把鼠标移开、等它 3 秒后消失再点，否则第二次点击可能一直被挡（待办 11 部署冒烟发现的偶发失败）
+  const exported = page.getByText('登记台账已导出');
+  await expect(exported).toBeVisible();
+  await page.mouse.move(0, 0);
+  await expect(exported).toHaveCount(0);
 
   await page.unroute('**/api/aftersales/ledger/export**');
   let fail = true;
