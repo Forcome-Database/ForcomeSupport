@@ -112,6 +112,8 @@ test('铃铛未读数 → 打开面板 → 点一条跳到对象并变为已读�
   });
   await openPanel(page);
   await expect.poll(() => listRequests).toEqual([null]);
+  // 等这次列表取回来再快进：取数还没回来时 TanStack Query 会跳过这一轮定时重新拉取（待办 06 发现的偶发失败）
+  await expect(panel(page).getByTestId('notification-item').first()).toContainText(body);
   await page.clock.fastForward(30_000);
   await expect.poll(() => listRequests).toEqual([null, '1']);
   await expect(panel(page).getByRole('tab', { name: '全部' })).toHaveAttribute(
