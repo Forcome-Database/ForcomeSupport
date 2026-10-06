@@ -3,6 +3,7 @@ import {
   SYNC_DELAY_MS,
   syncConnectionStatus,
   type ConnectionStatus,
+  type Platform,
   type SyncHealth,
 } from '@forcome/contracts';
 import { and, eq, sql } from 'drizzle-orm';
@@ -71,6 +72,33 @@ export async function orderSyncHealths(
 /** 订单同步的连接状态（6.9：订单超过 10 分钟没同步成功为同步延迟） */
 export function orderSyncStatus(health: SyncHealth, now: Date): ConnectionStatus {
   return syncConnectionStatus(health, SYNC_DELAY_MS.orders, now);
+}
+
+/** 各平台订单同步的数据源 */
+const SOURCE_OF = { shopify: 'shopify_orders', amazon: 'amazon_orders' } as const satisfies Record<
+  Platform,
+  OrderSource
+>;
+
+/** 这些店铺订单同步的连接状态（按店铺 ID；还没同步记录的为未连接，同 P18 店铺表「状态」列的订单一项） */
+export async function orderStoreStatuses(
+  db: DbExecutor,
+  stores: readonly { readonly id: string; readonly platform: Platform }[],
+  now: Date,
+): Promise<Map<string, ConnectionStatus>> {
+  const healths = {
+    shopify: await orderSyncHealths(db, SOURCE_OF.shopify),
+    amazon: await orderSyncHealths(db, SOURCE_OF.amazon),
+  };
+  return new Map(
+    stores.map((store) => {
+      const health = healths[store.platform].get(store.id);
+      return [
+        store.id,
+        orderSyncStatus(health ?? { lastSuccessAt: null, consecutiveFailures: 0 }, now),
+      ];
+    }),
+  );
 }
 
 /** 失败的原因（排错用；只留前一段） */

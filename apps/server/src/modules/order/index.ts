@@ -55,6 +55,7 @@ export {
   type OrderBackfill,
 } from './sweep';
 export {
+  orderStoreStatuses,
   orderSyncHealths,
   orderSyncStatus,
   resetOrderSync,

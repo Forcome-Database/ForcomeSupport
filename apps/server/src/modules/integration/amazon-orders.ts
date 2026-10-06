@@ -8,7 +8,7 @@ import type { CallPriority } from './call-priority';
 
 /*
  * 亚马逊订单（店铺级，规格 order「亚马逊：SP-API Orders v2026-01-01，只用非受限角色」、ADR 0011，待办 12）：只读——
- * 按平台更新时间（lastUpdatedAfter）分页搜订单（每 4 分钟的增量兜底，回补与对账随 13 也用它）、按订单号取一笔
+ * 分页搜订单——按平台更新时间（lastUpdatedAfter：每 4 分钟的增量兜底与夜间对账）或按下单时间（createdAfter：回补，待办 13）——、按订单号取一笔
  * （ORDER_CHANGE 通知触发的拉取与镜像缺失时的补拉）、读卖家参与的站点（「测试连接」，不占订单接口的配额）。
  * 真实现（amazon-orders-real.ts）用 LWA 以卖家授权的刷新令牌（主密钥加密存库，部署子命令录入）换访问令牌，经出站 HTTP 客户端工厂调
  * SP-API 北美端点；每个「卖家 × 接口」一个令牌桶，排队按优先级取（sp-api-quota.ts）。

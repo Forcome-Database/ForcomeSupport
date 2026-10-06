@@ -333,6 +333,26 @@ describe('夜间对账修正镜像中与平台不一致的订单', () => {
     await t.enqueue(shopifySyncJob, { storeId: SHOPIFY_COM.id });
     await t.runJobs();
 
+    // 30 天前下的单，当时按订单号（名）补拉进了镜像；2 天前在平台上又改过（发货），增量拉不到（水位在此刻）——
+    // 按平台更新时间对账才取得到（按下单时间取近 7 天取不到它）
+    const edited = amazonOrder(t, 30);
+    const shopEdited = shopifyOrder(t, 30);
+    amazon.put(DIRECT.id, edited);
+    shopify.put(SHOPIFY_COM.id, shopEdited);
+    expect(await t.findOrder(DIRECT.id, { platformOrderId: edited.orderId })).toMatchObject({
+      status: 'UNSHIPPED',
+    });
+    expect(await t.findOrder(SHOPIFY_COM.id, { name: shopEdited.name })).toMatchObject({
+      status: 'UNFULFILLED',
+    });
+    const twoDaysAgo = new Date(t.clock.now().getTime() - 2 * DAY);
+    amazon.put(DIRECT.id, { ...edited, status: 'SHIPPED', updatedAt: twoDaysAgo });
+    shopify.put(SHOPIFY_COM.id, {
+      ...shopEdited,
+      fulfillmentStatus: 'FULFILLED',
+      updatedAt: twoDaysAgo,
+    });
+
     // 平台上变了而更新时间没变（镜像与平台不一致）；另有 3 天前更新、镜像里没有的两笔；10 天前更新的一笔
     amazon.put(DIRECT.id, { ...stale, status: 'SHIPPED' });
     shopify.put(SHOPIFY_COM.id, { ...shopStale, fulfillmentStatus: 'FULFILLED' });
@@ -355,6 +375,12 @@ describe('夜间对账修正镜像中与平台不一致的订单', () => {
       'UNFULFILLED',
     );
     expect(await t.ordersByEmail(SHOPIFY_COM.id, shopMissed.email!)).toEqual([]);
+    expect(await t.findOrder(DIRECT.id, { platformOrderId: edited.orderId })).toMatchObject({
+      status: 'UNSHIPPED',
+    });
+    expect((await t.ordersByEmail(SHOPIFY_COM.id, shopEdited.email!))[0]?.status).toBe(
+      'UNFULFILLED',
+    );
 
     // 夜间对账（每天 03:30）：按平台更新时间取近 7 天，低优先级
     const before = amazonCalls().length;
@@ -373,6 +399,13 @@ describe('夜间对账修正镜像中与平台不一致的订单', () => {
       status: 'FULFILLED',
     });
     expect(await t.ordersByEmail(SHOPIFY_COM.id, shopMissed.email!)).toHaveLength(1);
+    // 30 天前下单、2 天前改过的：对账后改正
+    expect(await t.findOrder(DIRECT.id, { platformOrderId: edited.orderId })).toMatchObject({
+      status: 'SHIPPED',
+    });
+    expect((await t.ordersByEmail(SHOPIFY_COM.id, shopEdited.email!))[0]).toMatchObject({
+      status: 'FULFILLED',
+    });
     // 上面两笔是对账写进镜像的，查的时候没有按订单号补拉；10 天前更新的不在对账窗口里，查的时候才补拉
     expect(amazonCalls().slice(before)).toEqual(['searchOrders']);
     await t.findOrder(DIRECT.id, { platformOrderId: old.orderId });
