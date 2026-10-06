@@ -123,6 +123,15 @@ describe('Shopify 订单名（规范写法 #数字）', () => {
 });
 
 describe('HTML 正文里的 # 写成字符实体', () => {
+  it('其他数字字符实体（&#8217; 等）解码成字符，不当订单名', () => {
+    expect(
+      extractOrderNumbers(
+        'shopify',
+        mail('', null, '<p>I&#8217;m writing about #1063 &#x201C;soon&#x201D;</p>'),
+      ),
+    ).toEqual(['#1063']);
+  });
+
   it('&#35;、&#x23; 还原成 #', () => {
     expect(
       extractOrderNumbers('shopify', mail('', null, '<p>Order &#35;1063</p><p>and &#x23;1064</p>')),

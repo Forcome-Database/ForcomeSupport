@@ -8,7 +8,8 @@ import { AMAZON_ORDER_NUMBER_PATTERN, type Platform } from '@forcome/contracts';
  * - Shopify：订单名的规范写法 #数字（Shopify 默认的订单名，从 #1001 起），来信里常写成「#1063」「order 1063」「Order No. 1063」，
  *   墨西哥站的客户写西班牙语「pedido 1063」「orden 1063」「número de pedido: 1063」；不到 4 位的数字不算（「Apt #305」「#1 fan」
  *   「order 12 times」）。带「order / pedido / orden」字样的候选排在只写 # 的前面（「Ticket #4521 … order 1063」先试 #1063）。
- * 没有文本正文的来信从 HTML 里抽：去掉 head、style、script 的内容与全部标签（样式里的 #333333 之类不当订单名）。
+ * 没有文本正文的来信从 HTML 里抽：去掉 head、style、script 的内容与全部标签（样式里的 #333333 之类不当订单名），
+ * 数字字符实体（&#35;、&#x23;、&#8217; 等）一律解码成字符，免得「&#8217;」被当成订单名 #8217。
  * 候选最多取前 MAX_ORDER_NUMBER_CANDIDATES 个：每个候选在镜像里没有时都可能要去平台补拉一次。
  */
 
@@ -28,13 +29,20 @@ const SHOPIFY_HASH_NAME = /#\s?(\d{4,})(?!\d)/g;
 const SHOPIFY_KEYWORD_NAME =
   /\b(?:order|pedido|orden)\b\s*(?:number|num\.?|no\.?|nr\.?|id|n[úu]mero)?\s*[:#]?\s*:?\s*#?\s*(\d{4,})(?!\d)/gi;
 
+/** 数字字符实体对应的字符；码位不合法的换成空格 */
+function codePointText(code: number): string {
+  return Number.isInteger(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : ' ';
+}
+
 /** HTML 去掉标签后的文字（只为抽订单号，不追求排版） */
 function htmlText(html: string): string {
   return html
     .replace(/<(head|style|script)\b[\s\S]*?<\/\1\s*>/gi, ' ')
     .replace(/<[^>]*>/g, ' ')
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => codePointText(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec: string) => codePointText(Number(dec)))
     .replace(/&nbsp;/gi, ' ')
-    .replace(/&#35;|&#x23;|&num;/gi, '#');
+    .replace(/&num;/gi, '#');
 }
 
 /** 主题与正文里按某个写法抽到的候选（先主题后正文、按出现先后）；Shopify 的写法取第 1 组数字、补成 #数字 */
