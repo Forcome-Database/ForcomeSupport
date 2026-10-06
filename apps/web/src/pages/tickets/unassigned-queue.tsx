@@ -165,7 +165,7 @@ function MailRow({
         </span>
       </TableCell>
       <TableCell>
-        <div className="flex flex-col items-start gap-0.75">
+        <div className="flex flex-col gap-0.75">
           <SlaBadge dueAt={mail.sla.dueAt} now={now} target={mail.sla.target} />
           <span className="text-11 whitespace-nowrap text-subtle-foreground">
             {unassignedSlaTargetLabels[mail.sla.target]}

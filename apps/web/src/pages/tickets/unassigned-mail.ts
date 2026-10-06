@@ -3,7 +3,7 @@ import { queryOptions, type QueryClient } from '@tanstack/react-query';
 import { useSyncExternalStore } from 'react';
 import { UNASSIGNED } from './p04-copy';
 import { api, ApiRequestError } from '@/lib/api';
-import { showError, showUndo } from '@/lib/notify';
+import { dismissToast, showError, showUndo } from '@/lib/notify';
 import { TICKETS_QUERY_KEY } from '@/lib/tickets';
 
 /*
@@ -43,7 +43,9 @@ export function usePendingAssignments(): ReadonlySet<string> {
   return useSyncExternalStore(subscribe, () => snapshot);
 }
 
+/** 失败浮层的 id（撤销浮层另用 undoToastId：提交开始时撤掉它，不与失败浮层混在一起） */
 const toastId = (mailId: string) => `assign-store-${mailId}`;
+const undoToastId = (mailId: string) => `assign-store-undo-${mailId}`;
 
 /** 队列与工单列表都重新拉取（提交后来信移出队列，归并成的工单出现在列表里） */
 async function refresh(queryClient: QueryClient): Promise<void> {
@@ -71,6 +73,8 @@ function showTaken(mailId: string, error: ApiRequestError): void {
 /** 窗口结束：提交。成功或 409 后刷新（行随之移出），其余失败时行回到队列、浮层可重试 */
 async function commit(queryClient: QueryClient, mail: UnassignedMail, store: StoreOption) {
   pending.set(mail.id, null);
+  // 撤销浮层的倒计时与提交的计时器各走各的，可能还差一点没到 0：开始提交就撤掉它，不留一个已经撤销不了的「撤销」
+  dismissToast(undoToastId(mail.id));
   try {
     await api.assignStore(mail.id, store.id);
     await refresh(queryClient);
@@ -115,13 +119,13 @@ export function assignWithUndo(
   pending.set(mail.id, timer);
   changed();
   showUndo({
-    id: toastId(mail.id),
+    id: undoToastId(mail.id),
     title: UNASSIGNED.undoTitle(store.name),
     description: UNASSIGNED.undoDescription,
     seconds: ASSIGN_UNDO_SECONDS,
     onUndo: () => {
       const waiting = pending.get(mail.id);
-      // 已经到点在提交了（撤销按钮在最后一刻才点）：撤销不了，提交照常进行
+      // 提交开始时撤销浮层已撤掉；这里只剩窗口内的撤销
       if (waiting) {
         clearTimeout(waiting);
         pending.delete(mail.id);

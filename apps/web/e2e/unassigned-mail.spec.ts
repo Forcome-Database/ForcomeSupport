@@ -213,6 +213,8 @@ test('窗口结束提交时断网：行回到队列，失败浮层「来信仍�
   await page.clock.runFor(5_500);
   await expect(page.getByText('指定店铺失败：网络不可用')).toBeVisible();
   await expect(page.getByText('来信仍在未归属店铺队列里')).toBeVisible();
+  // 开始提交时撤销浮层已撤掉：不留一个撤销不了的「撤销」
+  await expect(page.getByRole('button', { name: '撤销' })).toHaveCount(0);
   await expect(row(page, 'Tom Harris')).toBeVisible();
 
   online = true;
