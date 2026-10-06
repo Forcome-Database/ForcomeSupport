@@ -46,7 +46,9 @@ export async function firstReplyAfter(tx: Tx, ticketId: string, at: Date): Promi
 
 /**
  * 一封我方回复结束它之前该工单内所有未回复来信的计时（R-SL-08）：在它之前到达、还没有首次回复（或首次回复晚于它，
- * 回复乱序归属时）的来信，首次回复改为它，应回复来信的结果按它与截止重新比（无需回复的不动）
+ * 回复乱序归属时）的来信，首次回复改为它，应回复来信的结果按它与截止重新比（无需回复的不动）。
+ * 已关闭的工单同样记（关闭后才同步进来的回信）：第一期只有满 7、14 天的按时关闭，关闭时未回复的早已过截止，重算仍是未达标；
+ * 第二期有人工关闭、合并（R-SL-07）后，关闭后才发出、却没过截止的回复会把关闭时记的未达标改成达标，届时要按关闭时刻区分
  */
 export async function endTimersBefore(tx: Tx, ticketId: string, replyAt: Date): Promise<void> {
   await tx.db

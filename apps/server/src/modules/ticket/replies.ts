@@ -97,7 +97,11 @@ async function matchTicket(
   final: boolean,
 ): Promise<string | typeof WAIT | null> {
   const linked = await tx.db
-    .select({ channelMessageId: ticketMessage.channelMessageId, ticketId: ticketMessage.ticketId })
+    .select({
+      channelMessageId: ticketMessage.channelMessageId,
+      ticketId: ticketMessage.ticketId,
+      storeId: ticket.storeId,
+    })
     .from(ticketMessage)
     .innerJoin(ticket, eq(ticket.id, ticketMessage.ticketId))
     .where(
@@ -107,10 +111,15 @@ async function matchTicket(
           targets.map((target) => target.id),
         ),
         storeScopeCondition(scope, ticket.storeId),
-        eq(ticket.storeId, reply.storeId),
       ),
     );
-  const ticketOf = new Map(linked.map((row) => [row.channelMessageId, row.ticketId]));
+  // 只归到发件邮箱所属店铺的工单；已归到别的店铺工单的邮件不算候选，但也不用再等它归并
+  const ticketOf = new Map(
+    linked
+      .filter((row) => row.storeId === reply.storeId)
+      .map((row) => [row.channelMessageId, row.ticketId]),
+  );
+  const merged = new Set(linked.map((row) => row.channelMessageId));
   const byMessageId = (rfcMessageId: string) =>
     targets
       .filter((target) => target.rfcMessageId === rfcMessageId)
@@ -121,7 +130,8 @@ async function matchTicket(
     const found = byMessageId(reply.inReplyTo);
     if (found) return found;
     const repliedTo = targets.filter((target) => target.rfcMessageId === reply.inReplyTo);
-    if (repliedTo.length === 0 || repliedTo.some((target) => target.mergeable)) return WAIT;
+    const pending = repliedTo.some((target) => target.mergeable && !merged.has(target.id));
+    if (repliedTo.length === 0 || pending) return WAIT;
   }
   // 2. References，从最近的一封往前（最后一次识别时 In-Reply-To 也在这里再看一遍）
   for (const rfcMessageId of [reply.inReplyTo, ...[...reply.references].reverse()]) {
@@ -154,10 +164,14 @@ async function waitForInbound(tx: Tx, reply: OutboundMessage): Promise<void> {
     .onConflictDoNothing({ target: pendingReply.channelMessageId });
 }
 
-/** 识别一封我方回复（「我方发信已同步」与「重新识别等着的回复」的处理器；系统操作，不受店铺范围限制） */
+/**
+ * 识别一封我方回复（系统操作，不受店铺范围限制）。retry 为重新识别等着的回复（ticket.attribute_reply）：
+ * 还要等时等待表里那一行原样留着；行已不在（扫描刚把它移出、排了最后一次识别）就不再插回去，最长只等 24 小时
+ */
 export async function attributeReply(
   { messageId, final = false }: { messageId: string; final?: boolean },
   { runtime, logger }: JobContext,
+  retry = false,
 ): Promise<void> {
   const reply = await findOutboundMessage(runtime.db, SYSTEM_STORE_SCOPE, messageId);
   if (!reply) throw new Error(`没有这封我方发信：${messageId}`);
@@ -189,6 +203,7 @@ export async function attributeReply(
       return;
     }
     if (ticketId === null || ticketId === WAIT) {
+      if (retry) return;
       await waitForInbound(tx, reply);
       logger.info({ messageId }, '我方回复还找不到对应的来信，等来信归并（最多 24 小时）');
       return;

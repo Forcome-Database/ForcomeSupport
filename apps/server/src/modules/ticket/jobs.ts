@@ -17,8 +17,8 @@ export function createTicketJobHandlers(deps: { clients: IntegrationClients }): 
     handleJob(inboundReceivedJob, (payload, context) =>
       mergeInbound(deps.clients, payload, context),
     ),
-    handleJob(outboundSyncedJob, attributeReply),
-    handleJob(attributeReplyJob, attributeReply),
+    handleJob(outboundSyncedJob, (payload, context) => attributeReply(payload, context)),
+    handleJob(attributeReplyJob, (payload, context) => attributeReply(payload, context, true)),
     handleJob(ticketTimeLimitsJob, async (_payload, { runtime, logger }) => {
       await scanTimeLimits(runtime, runtime.clock.now(), logger);
     }),

@@ -103,6 +103,13 @@ function slaOf(message: TicketMessage) {
   return { firstReplyAt: message.firstReplyAt, result: message.sla?.result ?? null };
 }
 
+/** 等待表里回复某个 Message-ID 的我方回复有几封 */
+async function waitingFor(t: TestHarness, rfcMessageId: string): Promise<number> {
+  const { rows } = await t.runtime.db.execute<{ n: number }>(sql`
+    SELECT count(*)::int AS n FROM ticket.pending_reply WHERE ${rfcMessageId} = ANY(reply_to)`);
+  return rows[0]!.n;
+}
+
 /** 工单的状态变更记录（事件、目标状态、触发方、关闭原因），按先后 */
 async function statusChanges(t: TestHarness, number: string) {
   const { rows } = await t.runtime.db.execute<{
@@ -440,10 +447,18 @@ describe('乱序：回复先于它所回复的来信入库（R-SL-08）', () => 
       reply('Cal Hart', '2026-09-11T07:50:00+08:00', { 'In-Reply-To': '<gone@buyer.example>' }),
     );
     await t.runJobs();
-    // 24 小时后的扫描不再等它
+    expect(await waitingFor(t, '<gone@buyer.example>')).toBe(1);
+    // 24 小时后的扫描移出等待表、最后识别一次（找不到，放弃）
     t.clock.set('2026-09-12T08:01:00+08:00');
     await t.enqueue(ticketTimeLimitsJob, {});
     await t.runJobs();
+    expect(await waitingFor(t, '<gone@buyer.example>')).toBe(0);
+    // 之前排下、晚于扫描才跑的重新识别不把它插回等待表（最长只等 24 小时）
+    const { rows } = await t.runtime.db.execute<{ id: string }>(sql`
+      SELECT id FROM channel.message WHERE direction = 'outbound' AND in_reply_to = '<gone@buyer.example>'`);
+    await t.enqueue(attributeReplyJob, { messageId: rows[0]!.id });
+    await t.runJobs();
+    expect(await waitingFor(t, '<gone@buyer.example>')).toBe(0);
 
     gmail.deliver(amazonLetter('Cal Hart', '<gone@buyer.example>', '2026-09-11T07:40:00+08:00'));
     await t.runJobs();
