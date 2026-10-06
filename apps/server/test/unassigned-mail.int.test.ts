@@ -257,6 +257,20 @@ describe('未归属店铺来信', () => {
       expect(await ticketsOf('Hal Alias')).toEqual([]);
     });
 
+    it('只写给第三方、密送店铺邮箱（Delivered-To 是落到的邮箱）：与寄到没登记的别名分不出来，进队列由客服主管指定（取舍，不丢信）', async () => {
+      gmail().deliver(
+        forwardedLetter('Cy Copy', 'friend.of.cy@example.com', {
+          mailbox: MX.mailbox,
+          deliveredTo: MX.mailbox,
+        }),
+      );
+      await t.runJobs();
+      expect((await queued('Cy Copy'))?.basis).toEqual({
+        header: 'to',
+        address: 'friend.of.cy@example.com',
+      });
+    });
+
     it('一个收件地址都没有（只密送、也没有 Delivered-To）：按落到的邮箱识别店铺', async () => {
       gmail().deliver({
         ...forwardedLetter('Bea Blind', 'unused@example.com', { mailbox: MX.mailbox }),

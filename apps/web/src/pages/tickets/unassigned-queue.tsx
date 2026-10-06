@@ -31,6 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { storeOptionsQuery } from '@/lib/channel';
+import { useCurrentMember } from '@/lib/current-member';
 import { formatLastInbound } from '@/lib/tickets';
 import { cn } from '@/lib/utils';
 import { UNASSIGNED } from './p04-copy';
@@ -90,6 +91,7 @@ function AssignCell({
   stores: readonly StoreOption[] | undefined;
 }) {
   const queryClient = useQueryClient();
+  const member = useCurrentMember();
   const [storeId, setStoreId] = useState<string>('');
   const store = stores?.find((s) => s.id === storeId);
   return (
@@ -113,7 +115,7 @@ function AssignCell({
         <Button
           size="sm"
           disabled={!store}
-          onClick={() => store && assignWithUndo(queryClient, mail, store)}
+          onClick={() => store && assignWithUndo(queryClient, mail, store, member.id)}
         >
           {UNASSIGNED.assign}
         </Button>

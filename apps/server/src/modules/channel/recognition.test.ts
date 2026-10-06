@@ -4,6 +4,7 @@ import {
   provisionalStore,
   recipientsOf,
   recognizeInbound,
+  storeForMail,
   storeOfRecipients,
   type InboundMailFacts,
   type SenderRule,
@@ -411,6 +412,32 @@ describe('按收件地址识别店铺（R-ST-02、E-13，待办 15）', () => {
       address: 'support@forcome.mx',
     });
     expect(storeOfRecipients(recipients.slice(0, 1), mailboxes)).toBeNull();
+  });
+
+  it('这封信的店铺：落到的邮箱写在 To/Cc 里按它；否则第一个登记过的收件地址；一个都没有按落到的邮箱；其余未归属', () => {
+    const mailboxes = new Map([
+      ['amz-auto@forcome.com', 'Forcome Auto'],
+      ['amz-direct@forcome.com', 'Forcome Direct'],
+    ]);
+    const landing = { address: 'amz-direct@forcome.com', store: 'Forcome Direct' };
+    const of = (headers: { key: string; value: string }[]) =>
+      storeForMail(recipientsOf(headers, landing.address), landing, mailboxes);
+    // 同一封信写给两个店铺邮箱：落在哪个邮箱的那份就按哪个（R-TK-07 以先入库的一份为准）
+    expect(of([h('to', 'amz-auto@forcome.com, amz-direct@forcome.com')])).toBe('Forcome Direct');
+    // 寄到别的店铺邮箱、转进这个邮箱
+    expect(of([h('delivered-to', 'amz-direct@forcome.com'), h('to', 'amz-auto@forcome.com')])).toBe(
+      'Forcome Auto',
+    );
+    // 一个收件地址都没有（Delivered-To 只有落到的邮箱）
+    expect(of([h('delivered-to', 'amz-direct@forcome.com')])).toBe('Forcome Direct');
+    expect(of([])).toBe('Forcome Direct');
+    // 寄到没登记的别名；只写给第三方、密送店铺邮箱的也分不出来，一律未归属
+    expect(of([h('delivered-to', 'amz-direct@forcome.com'), h('to', 'amz-ca2@forcome.com')])).toBe(
+      null,
+    );
+    expect(of([h('delivered-to', 'amz-direct@forcome.com'), h('to', 'friend@example.com')])).toBe(
+      null,
+    );
   });
 
   it('Reply-To 等地址头解析出地址与解码后的显示名，解析不出地址的跳过', () => {

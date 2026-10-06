@@ -264,6 +264,27 @@ test('撤销窗口内退出登录：还没提交的指定一律撤销，不拿�
   expect(posts).toEqual([]);
 });
 
+test('撤销窗口内另一个标签页换人登录：到点时不是点「指定」的那位成员，不提交', async ({ page }) => {
+  await loginAs(page, '周敏');
+  await openQueue(page);
+  const posts: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/api/channel/unassigned-mail/')) {
+      posts.push(request.url());
+    }
+  });
+  await page.clock.install();
+  await pick(page, 'Lucía Herrera', 'forcome.mx');
+  await row(page, 'Lucía Herrera').getByRole('button', { name: '指定' }).click();
+  // 同一浏览器的另一个标签页（会话 Cookie 共用）以王磊登录
+  const other = await page.context().newPage();
+  await loginAs(other, '王磊');
+  await other.close();
+  await page.clock.runFor(6_000);
+  await expect(row(page, 'Lucía Herrera')).toBeVisible();
+  expect(posts).toEqual([]);
+});
+
 test('提交时别人已先指定：失败浮层写已归入的店铺、不带重试，行随刷新移出（I17 ⑥）', async ({
   page,
 }) => {

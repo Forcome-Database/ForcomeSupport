@@ -68,6 +68,16 @@ function isTaken(error: unknown): error is ApiRequestError {
   return error instanceof ApiRequestError && error.status === 409;
 }
 
+/** 重试时才发现被拒（400/403）：换成不带重试的浮层（另用一个 id，重试的浮层随重试结束消失） */
+function showRefused(mailId: string, error: unknown): void {
+  showError({
+    id: `${toastId(mailId)}-refused`,
+    action: UNASSIGNED.failedAction,
+    error,
+    description: UNASSIGNED.stillQueued,
+  });
+}
+
 function showTaken(mailId: string, error: ApiRequestError): void {
   showError({
     // 另用一个 id：重试时才发现被抢先，重试的浮层随重试结束消失，这一条要留下
@@ -97,10 +107,33 @@ async function submit(queryClient: QueryClient, mail: UnassignedMail, store: Sto
   }
 }
 
+/**
+ * 提交前确认还是点「指定」的那位成员：别的标签页退出后换了人登录（会话 Cookie 共用），这一页收不到会话结束，
+ * 不能拿下一位成员的会话提交——换了人就当撤销。会话已失效按会话结束处理；连不上照常提交，失败时走失败浮层
+ */
+async function sameMember(queryClient: QueryClient, memberId: string): Promise<boolean> {
+  try {
+    return (await api.me()).id === memberId;
+  } catch (error) {
+    return !endSessionIfUnauthenticated(queryClient, error);
+  }
+}
+
 /** 窗口结束：提交。断网、出错时行回到队列、浮层可重试（重试期间这一行同样不显示，不会再点一次「指定」） */
-async function commit(queryClient: QueryClient, mail: UnassignedMail, store: StoreOption) {
+async function commit(
+  queryClient: QueryClient,
+  mail: UnassignedMail,
+  store: StoreOption,
+  memberId: string,
+) {
   // 撤销浮层的倒计时与提交的计时器各走各的，可能还差一点没到 0：开始提交就撤掉它，不留一个已经撤销不了的「撤销」
   dismissToast(undoToastId(mail.id));
+  pending.set(mail.id, null);
+  if (!(await sameMember(queryClient, memberId))) {
+    pending.delete(mail.id);
+    changed();
+    return;
+  }
   try {
     await submit(queryClient, mail, store);
   } catch (error) {
@@ -109,7 +142,18 @@ async function commit(queryClient: QueryClient, mail: UnassignedMail, store: Sto
       action: UNASSIGNED.failedAction,
       error,
       description: UNASSIGNED.stillQueued,
-      ...(isRefused(error) ? {} : { retry: () => submit(queryClient, mail, store) }),
+      ...(isRefused(error)
+        ? {}
+        : {
+            retry: async () => {
+              try {
+                await submit(queryClient, mail, store);
+              } catch (retryError) {
+                if (!isRefused(retryError)) throw retryError;
+                showRefused(mail.id, retryError);
+              }
+            },
+          }),
     });
   }
 }
@@ -132,9 +176,13 @@ export function assignWithUndo(
   queryClient: QueryClient,
   mail: UnassignedMail,
   store: StoreOption,
+  memberId: string,
 ): void {
   if (pending.has(mail.id)) return;
-  const timer = setTimeout(() => void commit(queryClient, mail, store), ASSIGN_UNDO_SECONDS * 1000);
+  const timer = setTimeout(
+    () => void commit(queryClient, mail, store, memberId),
+    ASSIGN_UNDO_SECONDS * 1000,
+  );
   pending.set(mail.id, timer);
   changed();
   showUndo({

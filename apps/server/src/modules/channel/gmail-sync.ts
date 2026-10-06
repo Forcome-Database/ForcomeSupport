@@ -37,7 +37,7 @@ import {
   provisionalStore,
   recipientsOf,
   recognizeInbound,
-  storeOfRecipients,
+  storeForMail,
   type MailAddress,
   type SenderRule,
 } from './recognition';
@@ -392,12 +392,10 @@ async function ingestMessage(
     const recipients = recipientsOf(headers, target.address);
     // 进线邮箱在事务里读：管理员刚登记的邮箱，这一轮同步后面的信就能认出来
     const mailboxes = inbound ? await mailboxStores(tx.db) : new Map<string, PlacementStore>();
-    // 店铺按收件地址；一个收件地址都没有（只有密送、也没写 Delivered-To）时只能按落到的邮箱
+    // 店铺按收件地址（recognition.ts 的 storeForMail）
+    const own = { id: target.storeId, platform: target.platform, defaultSite: target.defaultSite };
     const recognizedStore: Pick<PlacementStore, 'id' | 'platform' | 'defaultSite'> | null = inbound
-      ? (storeOfRecipients(recipients, mailboxes)?.store ??
-        (recipients.length === 0
-          ? { id: target.storeId, platform: target.platform, defaultSite: target.defaultSite }
-          : null))
+      ? storeForMail(recipients, { address: target.address, store: own }, mailboxes)
       : null;
     const recognized = inbound
       ? recognizeInbound(

@@ -252,6 +252,27 @@ export function storeOfRecipients<T>(
 }
 
 /**
+ * 这封信的店铺（R-ST-02「按收件邮箱」，待办 15）：
+ * 1. 落到的同步邮箱写在 To、Cc 里（客户直接写给店铺邮箱）：就是它的店铺——同一封信写给几个店铺邮箱时，以先入库那份落到的邮箱为准（R-TK-07）；
+ * 2. 否则取收件地址里第一个登记过的进线邮箱的店铺（寄到别的店铺邮箱的别名、转发）；
+ * 3. 一个收件地址都没有（只密送、也没写 Delivered-To，或 Delivered-To 只有落到的邮箱）：按落到的邮箱；
+ * 4. 其余为空（未归属店铺，E-13）。取舍：只写给第三方、密送店铺邮箱的信，与寄到没登记的别名、Delivered-To 却写主邮箱的信，
+ *    从头字段上分不出来，一律进队列由客服主管指定（不丢信）。recipients 是 recipientsOf(头字段, 落到的邮箱) 的结果
+ */
+export function storeForMail<T>(
+  recipients: readonly Recipient[],
+  landing: { readonly address: string; readonly store: T },
+  mailboxes: ReadonlyMap<string, T>,
+): T | null {
+  const own = landing.address.trim().toLowerCase();
+  if (recipients.some((r) => r.address === own)) return landing.store;
+  return (
+    storeOfRecipients(recipients, mailboxes)?.store ??
+    (recipients.length === 0 ? landing.store : null)
+  );
+}
+
+/**
  * 未归属来信识别渠道与来源时暂用的店铺（E-13「平台按发件域判断」）：发件域是亚马逊的域按亚马逊店铺（买家消息中转为亚马逊渠道），
  * 其余按 Shopify 店铺（mailer@shopify.com 代发的联系表单认得出客户、找不到客户的按 Shopify 系统邮件归档；其余为邮件）。
  * 站点要等有了店铺再定，不用这里的默认站点

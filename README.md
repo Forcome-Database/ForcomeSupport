@@ -159,6 +159,8 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 
 **按订单归并**（待办 14）：来信里的订单号（亚马逊 3-7-7、Shopify 订单名 `#1063` 与「order 1063」等写法）在该店铺的订单镜像中校验、镜像没有时补拉，按 R-TK-01 追加、重开或新建；抽不到或校验不到时 Shopify 店铺按客户邮箱反查镜像，唯一命中才关联，否则按客户归并（R-TK-02）。本机与开发测试环境的示例来信回放后，P04 订单号列与原型一致（Priya Raman 的 #1057、#1049 分成两张）。归并口径变了，已有的开发库与开发测试环境要重放来信（`pnpm db:reset-inbound`、`pnpm deploy:staging --reset-inbound`）。集成测试写法见 `apps/server/test/order-merge.int.test.ts`。
 
+**未归属店铺**（待办 15）：来信的店铺按收件地址识别（写给落到的店铺邮箱的按它，否则 Delivered-To、To、Cc 里第一个登记过的进线邮箱；Delivered-To 里信落到的同步邮箱自己不算），都没登记的进未归属店铺队列、通知客服主管。本机与开发测试环境的示例回放有两封（Tom Harris 寄到 amz-ca2@forcome.com、Lucía Herrera 寄到 info@forcome.mx，原型 I17），以客服主管周敏登录，P04 筛选行右侧「未归属店铺 2」打开队列（地址 `/tickets?view=unassigned`），选店铺后「指定」，5 秒撤销窗口结束才提交并归并成工单；管理员在 P18 新增店铺或加进线邮箱（如 amz-ca2@forcome.com）后，收件地址匹配的来信自动归位。识别口径变了，已有的开发库与开发测试环境要重放来信。集成测试里放未归属来信用 Fake Gmail 的 `deliver({ to: 未登记的地址, mailbox: 店铺邮箱, deliveredTo })`，写法见 `apps/server/test/unassigned-mail.int.test.ts`。
+
 **回复识别、SLA 与按时关闭**（待办 16）：店铺邮箱「已发送」里的我方邮件按 In-Reply-To、References、Gmail 线程归到工单（带 Auto-Submitted 等自动回复标记的不算回复），每封客户来信记首次回复与 SLA 结果；worker 每分钟扫描一次：SLA 过截止的记未达标，待回复 14 天、等客户与已解决 7 天无来信的按时关闭。本机与开发测试环境的 Fake Gmail 除了示例来信还回放我方回复（等客户的几张、P05 时间线、生产厂工单的自动回复），并按整天平移到当前日期——P04 的状态与原型一致，之后照规则随时间推进；本机按演示时刻 `CLOCK_START` 启动时不平移，截图对得上原型。集成测试写法见 `apps/server/test/reply-sla.int.test.ts`。
 
 **演示时刻**：非生产环境可设 `CLOCK_START`（带时区的 ISO 时刻，例如 `CLOCK_START=2026-09-11T10:20:00+08:00 pnpm --filter @forcome/server dev:api`，worker 同样设），api 与 worker 的时钟从该时刻起随系统时钟前进，本机截图与演示对上原型的演示时刻（例如当月登记完整率落在 9 月）；生产环境配置了就拒绝启动，开发测试环境不设（ADR 0008「待办 21 落地」修订）。

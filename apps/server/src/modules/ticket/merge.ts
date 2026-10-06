@@ -221,7 +221,7 @@ const MERGED_LOG: Record<Target['kind'], string> = {
 /** 把一封来信归并成工单（「来信已接收」的处理器；系统操作，不受店铺范围限制） */
 export async function mergeInbound(
   clients: IntegrationClients,
-  { messageId, autoPlaced = false }: { messageId: string; autoPlaced?: boolean | undefined },
+  { messageId, autoPlaced }: { messageId: string; autoPlaced?: { address: string } | undefined },
   context: JobContext,
 ): Promise<void> {
   const { runtime, logger } = context;
@@ -343,11 +343,7 @@ export async function mergeInbound(
       await notifyMembers(tx, {
         type: 'unassigned_mail_placed',
         title: copy.title,
-        body: copy.body(
-          sender.name || sender.address,
-          mail.addressedTo ?? mail.mailbox,
-          store.name,
-        ),
+        body: copy.body(sender.name || sender.address, autoPlaced.address, store.name),
         object: { type: 'ticket', id: merged.number, label: merged.number },
         storeId,
       });

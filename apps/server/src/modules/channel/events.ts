@@ -8,11 +8,15 @@ import { defineJob } from '../core';
 
 /**
  * 领域事件「来信已接收」：一封来信入库并识别出店铺（不是别的邮箱已收过的同一封信，来源也不是归档的平台通知与营销），
- * 或未归属店铺的来信被指定店铺、自动归位（待办 15），ticket 据此归并成工单。autoPlaced：自动归位的，归并成工单后通知客服主管
+ * 或未归属店铺的来信被指定店铺、自动归位（待办 15），ticket 据此归并成工单。autoPlaced：自动归位的（带命中的进线邮箱），
+ * 归并成工单后通知客服主管「客户 · 该地址 已归入 店铺」
  */
 export const inboundReceivedJob = defineJob(
   'channel.inbound_received',
-  z.object({ messageId: z.uuid(), autoPlaced: z.boolean().optional() }),
+  z.object({
+    messageId: z.uuid(),
+    autoPlaced: z.object({ address: z.string() }).optional(),
+  }),
   { retryLimit: 5, retryDelay: 10, retryBackoff: true },
 );
 

@@ -9,7 +9,7 @@ import { and, asc, eq, inArray, isNull, ne, or } from 'drizzle-orm';
 import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
 import { isAutoReply } from './auto-reply';
 import { extractOrderNumbers } from './order-numbers';
-import { recipientsOf, type MailAddress, type Recognition } from './recognition';
+import type { MailAddress, Recognition } from './recognition';
 import { message, store } from './schema';
 
 /*
@@ -57,8 +57,6 @@ export interface InboundMessage {
   readonly subject: string;
   /** 到达时间（Gmail internalDate） */
   readonly receivedAt: Date;
-  /** 第一个收件地址（Delivered-To、To、Cc 依次；未归属店铺队列的「识别依据」，自动归位的通知写它，待办 15） */
-  readonly addressedTo: string | null;
   /** 同一封邮件已在别的邮箱收到时指向准的那封（不归并） */
   readonly duplicateOfId: string | null;
   /**
@@ -86,7 +84,6 @@ export async function findInboundMessage(
       textBody: message.textBody,
       htmlBody: message.htmlBody,
       receivedAt: message.receivedAt,
-      headers: message.headers,
       duplicateOfId: message.duplicateOfId,
       platform: store.platform,
     })
@@ -106,7 +103,6 @@ export async function findInboundMessage(
     recognition: recognitionOf(row),
     subject,
     receivedAt,
-    addressedTo: recipientsOf(row.headers, row.mailbox)[0]?.address ?? null,
     duplicateOfId,
     orderNumbers: platform
       ? extractOrderNumbers(platform, { subject, text: row.textBody, html: row.htmlBody })

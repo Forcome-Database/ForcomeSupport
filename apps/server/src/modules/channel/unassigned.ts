@@ -36,7 +36,7 @@ import type { SenderRule } from './recognition';
 
 /*
  * 未归属店铺来信队列（PRD E-13、R-ST-02、P04「第一阶段」、I17、AC-TK-09、AC-TK-11、AC-P1-15、AC-P1-16，待办 15）：
- * - 入队：收件地址都没登记在任何店铺的来信（recognition.ts 的 storeOfRecipients 为空）入库时店铺为空、不发「来信已接收」，
+ * - 入队：认不出店铺的来信（recognition.ts 的 storeForMail 为空：收件地址都没登记在任何店铺）入库时店铺为空、不发「来信已接收」，
  *   在同一事务里通知客服主管（站内 + 钉钉工作通知，11.4；notifyUnassignedMail）。渠道与来源按发件域暂定（E-13），
  *   平台通知与营销照样归档、不进队列；同一封邮件的其余副本（R-TK-07）本来就不识别店铺，也不进队列。
  * - 队列（listUnassignedMail）：给客服主管看，不受店铺数据范围限制——来信还没有店铺（ADR 0010 修订登记的例外）。
@@ -195,6 +195,8 @@ async function place(
     readonly actor: Actor;
     readonly action: 'message.assign_store' | 'message.auto_place';
     readonly rules: readonly SenderRule[];
+    /** 自动归位命中的进线邮箱（通知写它）；客服主管指定的没有 */
+    readonly placedBy?: string;
   },
   logger: Logger,
 ): Promise<void> {
@@ -241,7 +243,7 @@ async function place(
   // 自动归位的归并成工单后通知客服主管（ticket 的 mergeInbound）
   await tx.enqueue(inboundReceivedJob, {
     messageId: row.id,
-    ...(how.action === 'message.auto_place' ? { autoPlaced: true } : {}),
+    ...(how.placedBy ? { autoPlaced: { address: how.placedBy } } : {}),
   });
 }
 
@@ -311,7 +313,7 @@ export async function placeMatchingMail(runtime: Runtime, logger: Logger): Promi
         tx,
         row,
         hit.store,
-        { actor: systemActor, action: 'message.auto_place', rules },
+        { actor: systemActor, action: 'message.auto_place', rules, placedBy: hit.address },
         logger,
       );
       placed += 1;
