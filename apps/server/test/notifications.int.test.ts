@@ -2,6 +2,7 @@ import {
   notificationContentSchema,
   notificationListSchema,
   notificationUnreadSchema,
+  teamSchema,
   type NotificationContent,
   type NotificationList,
   type NotificationType,
@@ -402,5 +403,59 @@ describe('示例数据（原型 G10 周敏的面板，第一期的类型）', ()
     const again = await fixtureItems();
     expect(again).toHaveLength(4);
     expect(again.find((i) => i.id === tom.id)?.read).toBe(true);
+  });
+});
+
+describe('店铺范围经 P20 收窄再放宽（待办 06 补的边界，ADR 0010「待办 31 落地」修订）', () => {
+  it('范围收窄期间「全部已读」只标看得到的；放宽后范围外的那条照常是未读', async () => {
+    await t.loadFixtures();
+    const admin = await t.loginAs({ member: 'liuyang' });
+    const id = await t.addMember({
+      name: '先收窄再放宽',
+      dept: 'FSH / 客服部',
+      roles: ['supervisor'],
+      allStores: true,
+    });
+    const client = await t.loginAs({ memberId: id });
+    const scope = async (stores: { all: true } | { all: false; storeIds: string[] }) => {
+      const team = teamSchema.parse(await (await admin.get('/api/org/team')).json());
+      const version = team.members.find((m) => m.id === id)!.version;
+      const res = await admin.put('/api/org/team', {
+        changes: [{ id, version, roles: ['supervisor'], stores }],
+      });
+      expect(res.status).toBe(200);
+    };
+    const queue = (storeId: string, title: string): NotificationContent & { storeId: string } => ({
+      type: 'reassign_queue',
+      title,
+      body: '1 张进行中的售后单进入改派队列',
+      object: { type: 'member', id: title, label: 'P13 · 待分配' },
+      storeId,
+    });
+    const mine = async () =>
+      (await list(client)).items.filter((item) => item.title.startsWith('改派·'));
+
+    t.clock.advance({ minutes: 1 });
+    expect(await notify(queue(DIRECT, '改派·Forcome Direct'))).toContain(id);
+    t.clock.advance({ minutes: 1 });
+    expect(await notify(queue(MX, '改派·forcome.mx'))).toContain(id);
+    expect((await mine()).map((i) => [i.title, i.read])).toEqual([
+      ['改派·forcome.mx', false],
+      ['改派·Forcome Direct', false],
+    ]);
+
+    // 收窄到 forcome.mx：Forcome Direct 的那条不显示、不计未读；「全部已读」只标看得到的
+    await scope({ all: false, storeIds: [MX] });
+    expect((await mine()).map((i) => i.title)).toEqual(['改派·forcome.mx']);
+    expect((await client.post('/api/notifications/read-all')).status).toBe(204);
+    expect(await unread(client)).toBe(0);
+
+    // 放宽回全部店铺：Forcome Direct 的那条重新出现，仍是未读
+    await scope({ all: true });
+    expect((await mine()).map((i) => [i.title, i.read])).toEqual([
+      ['改派·forcome.mx', true],
+      ['改派·Forcome Direct', false],
+    ]);
+    expect(await unread(client)).toBe(1);
   });
 });

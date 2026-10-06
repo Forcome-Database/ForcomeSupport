@@ -1,9 +1,11 @@
 import {
   roles as allRoles,
+  type AuditSnapshot,
   type Density,
   type MemberStatus,
   type OwnerOption,
   type Role,
+  type StoreScopeValue,
 } from '@forcome/contracts';
 import { and, arrayContains, eq, inArray } from 'drizzle-orm';
 import type { DbExecutor, Tx } from '../core';
@@ -25,6 +27,8 @@ export interface NewMember {
   readonly storeIds?: readonly string[];
   readonly factoryCode?: string | null;
   readonly status?: MemberStatus;
+  /** 加入的时刻（P20 同角色按加入先后排），不填为事务的当前时间 */
+  readonly createdAt?: Date;
 }
 
 /** 新建成员；id 已存在时跳过（示例数据重复加载不报错），返回成员 id */
@@ -42,7 +46,7 @@ export async function createMember(tx: Tx, input: NewMember): Promise<string> {
       storeIds: [...(input.storeIds ?? [])],
       factoryCode: input.factoryCode ?? null,
       status: input.status ?? 'active',
-      createdAt: tx.now,
+      createdAt: input.createdAt ?? tx.now,
       updatedAt: tx.now,
     })
     .onConflictDoNothing({ target: member.id })
@@ -50,6 +54,24 @@ export async function createMember(tx: Tx, input: NewMember): Promise<string> {
   const id = row?.id ?? input.id;
   if (!id) throw new Error('成员创建失败');
   return id;
+}
+
+/** 成员的店铺范围（接口与审计的写法）：全部店铺，或指定的几个店铺 */
+export function memberScopeValue(row: Pick<MemberRow, 'allStores' | 'storeIds'>): StoreScopeValue {
+  return row.allStores ? { all: true } : { all: false, storeIds: [...row.storeIds] };
+}
+
+/** 审计里成员的前后值：姓名、钉钉部门、状态、角色、店铺范围（钉钉同步与 P20 共用） */
+export function memberAuditSnapshot(
+  row: Pick<MemberRow, 'name' | 'dept' | 'status' | 'roles' | 'allStores' | 'storeIds'>,
+): AuditSnapshot<'member.add'> {
+  return {
+    name: row.name,
+    dept: row.dept,
+    status: row.status,
+    roles: [...row.roles],
+    stores: memberScopeValue(row),
+  };
 }
 
 export async function findMember(db: DbExecutor, id: string): Promise<MemberRow | null> {

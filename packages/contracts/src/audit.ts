@@ -11,7 +11,7 @@ import {
   responsibilitySchema,
   shipperSchema,
 } from './aftersales';
-import { memberStatusSchema } from './auth';
+import { memberStatusSchema, storeScopeSchema } from './auth';
 import { platformSchema, siteSchema } from './channel';
 import { financeField } from './finance';
 import { adapterModeSchema } from './integration';
@@ -155,12 +155,16 @@ export const loginMethodLabels: Record<(typeof loginMethods)[number], string> = 
 };
 export const loginAuditSnapshotSchema = z.object({ method: z.enum(loginMethods) });
 
-/** 成员（钉钉同步改变的在职状态，待办 05；P20 的角色与店铺范围随待办 06）：姓名、钉钉部门、状态、角色 */
+/**
+ * 成员（钉钉同步改变的在职状态，待办 05；P20 的角色与店铺范围，待办 06）：姓名、钉钉部门、状态、角色、店铺范围。
+ * 店铺范围是待办 06 加的，之前的钉钉同步记录没有它（可选）
+ */
 export const memberAuditSnapshotSchema = z.object({
   name: z.string(),
   dept: z.string(),
   status: memberStatusSchema,
   roles: z.array(roleSchema),
+  stores: storeScopeSchema.optional(),
 });
 
 /** 越权访问（E-24）：原因、越权的店铺、请求 */
@@ -239,6 +243,15 @@ export const auditActions = {
   // 钉钉通讯录同步（待办 05）：只记影响能否进入的两种，操作人「系统」。新增成员、改名与换部门只是通讯录镜像，不记
   'member.dingtalk_left': { label: '钉钉离职停用', objectType: 'member', snapshot: 'member' },
   'member.dingtalk_rejoined': { label: '钉钉恢复在职', objectType: 'member', snapshot: 'member' },
+  // P20（待办 06）：从钉钉添加（给通讯录同步进来、还没有角色的人分配角色与店铺范围）；吸底保存栏的保存按改了什么记一条
+  'member.add': { label: '添加成员', objectType: 'member', snapshot: 'member' },
+  'member.change_roles': { label: '修改角色', objectType: 'member', snapshot: 'member' },
+  'member.change_stores': { label: '修改店铺范围', objectType: 'member', snapshot: 'member' },
+  'member.change_access': {
+    label: '修改角色与店铺范围',
+    objectType: 'member',
+    snapshot: 'member',
+  },
   'auth.logout': { label: '退出登录', objectType: 'login', snapshot: 'empty' },
 } as const satisfies Record<string, AuditActionDefinition>;
 

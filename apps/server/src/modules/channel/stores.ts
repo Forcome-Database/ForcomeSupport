@@ -69,6 +69,17 @@ export async function listAllStores(db: DbExecutor): Promise<StoreRecord[]> {
   return withMailboxes(db, rows);
 }
 
+/**
+ * 全部店铺的 ID 与店铺名（P20 给成员授权店铺范围时的选项，待办 06）：授权是管理配置，不按管理员自己的数据范围过滤，
+ * 同 listAllStores（ADR 0010 修订登记的例外）；只给挂了 settings.channels_team 的接口用（经 app.ts 注入 org）
+ */
+export async function listStoreChoices(db: DbExecutor): Promise<{ id: string; name: string }[]> {
+  return db
+    .select({ id: store.id, name: store.name })
+    .from(store)
+    .orderBy(asc(store.createdAt), asc(store.id));
+}
+
 /** 店铺范围内的店铺（各页面的店铺筛选、指定店铺）；新增的店铺对「全部店铺」的成员立即可见 */
 export async function listStoreOptions(db: DbExecutor, scope: StoreScope): Promise<StoreOption[]> {
   return db

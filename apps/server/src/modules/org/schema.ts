@@ -56,6 +56,14 @@ export const member = orgSchema.table(
     dingtalkSyncedAt: timestamptz('dingtalk_synced_at'),
     /** 界面密度偏好（G9），按成员保存 */
     density: text('density', { enum: densities }).notNull().default('comfortable'),
+    /** 最近一次登录（开发登录、钉钉扫码登录换出会话的时刻；P20「最近登录」，待办 06） */
+    lastLoginAt: timestamptz('last_login_at'),
+    /**
+     * 最近一次改角色、店铺范围或在职状态（动版本号的修改）的时刻与操作人姓名（系统写「系统」）：
+     * P20 保存冲突时 G7 横幅写「刚被谁修改」（待办 06）。只改通讯录资料不算
+     */
+    changedAt: timestamptz('changed_at'),
+    changedByName: text('changed_by_name'),
     createdAt: timestamptz('created_at').notNull(),
     updatedAt: timestamptz('updated_at').notNull(),
     version: version(),

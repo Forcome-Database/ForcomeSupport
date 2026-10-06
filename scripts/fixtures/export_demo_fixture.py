@@ -94,6 +94,8 @@ def members():
             'email': s.get('email'),
             'stores': s.get('stores'),
             'factory': s.get('factory'),
+            # 最近登录（P20）：只写时:分的落在演示当天
+            'lastLogin': at(s['last_login'] if len(s['last_login']) > 5 else '%s %s' % (d.NOW[5:10], s['last_login'])),
         })
     return out
 

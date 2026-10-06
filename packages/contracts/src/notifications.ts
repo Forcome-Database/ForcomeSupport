@@ -1,7 +1,6 @@
-import { businessDateTime } from '@forcome/calendar';
 import { z } from 'zod';
 import type { AuditObjectType } from './audit';
-import { auditTimeWords } from './audit-log';
+import { relativeTimeWords } from './audit-log';
 import type { Role } from './roles';
 
 /*
@@ -181,7 +180,5 @@ export type DevNotificationRequest = z.infer<typeof devNotificationRequestSchema
 
 /** 通知的时间（北京时间）：当天只写「时:分」（原型「10:14」），之前的写「月-日 时:分」，不在今年的写全年份（同 P27 时间列） */
 export function notificationTimeWords(at: Date | string, now: Date): string {
-  const today = businessDateTime(now).slice(0, 10);
-  const day = businessDateTime(typeof at === 'string' ? new Date(at) : at).slice(0, 10);
-  return auditTimeWords(at, { withDate: day !== today, year: today.slice(0, 4) });
+  return relativeTimeWords(at, now);
 }

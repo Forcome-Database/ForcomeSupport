@@ -5,10 +5,12 @@ import {
   type LoginDenialReason,
   type LoginDenied,
 } from '@forcome/contracts';
+import { eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { recordAudit, transaction, type AppEnv, type DbExecutor, type Runtime } from '../core';
 import { currentMember, memberAccessOf, memberActor } from './access';
 import { listAdmins } from './members';
+import { member } from './schema';
 import { clientIp, openSession, setSessionCookie, type MemberRow } from './session';
 
 /*
@@ -35,7 +37,7 @@ export async function loginDeniedBody(
 }
 
 /**
- * 换出会话：开会话并记审计「登录」（对象写登录方式），在响应上设会话 Cookie，返回当前成员。
+ * 换出会话：开会话、记下最近登录（P20）并记审计「登录」（对象写登录方式），在响应上设会话 Cookie，返回当前成员。
  * 调用方已用 loginDenial 判断过能进入
  */
 export async function signIn(
@@ -48,6 +50,8 @@ export async function signIn(
   const access = memberAccessOf(row);
   const { token } = await transaction(runtime, async (tx) => {
     const opened = await openSession(tx, row.id);
+    // 最近登录只是记录，不动版本号（不与管理员在 P20 的修改冲突）
+    await tx.db.update(member).set({ lastLoginAt: tx.now }).where(eq(member.id, row.id));
     await recordAudit(tx, memberActor(access.member, clientIp(c)), {
       action: 'auth.login',
       objectType: 'login',

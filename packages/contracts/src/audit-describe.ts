@@ -33,13 +33,14 @@ import {
   type AuditLogEntry,
   type AuditLogField,
 } from './audit-log';
-import { memberStatusLabels } from './auth';
+import { memberStatusLabels, storeScopeSchema } from './auth';
 import { platformLabels } from './channel';
 import { formatRate, formatRateDate } from './exchange-rate';
 import { FINANCE_HIDDEN, maskFinanceFields } from './finance';
 import { adapterModeLabels } from './integration';
 import { formatMoney } from './money';
 import { roleLabels, roles } from './roles';
+import { storeScopeWords } from './team';
 
 /*
  * 一条审计记录怎么写成 P27 的一行（PRD P27「第一阶段」v2.20、10.2、K18 与补充小样）：操作人、对象、动作、变更摘要与
@@ -83,6 +84,7 @@ type ValueKind =
   | 'ratios'
   | 'store'
   | 'stores'
+  | 'storeScope'
   | 'list'
   | 'part'
   | 'feeItems'
@@ -169,6 +171,7 @@ const snapshotFields: Record<AuditSnapshotKind, readonly FieldDefinition[]> = {
   member: [
     field('status', '状态', 'text', memberStatusLabels),
     field('roles', '角色', 'list', roleLabels),
+    field('stores', '店铺范围', 'storeScope'),
     field('name', '姓名'),
     field('dept', '钉钉部门'),
   ],
@@ -207,6 +210,17 @@ function isEmptyValue(value: unknown): boolean {
     value === '' ||
     (Array.isArray(value) && value.length === 0)
   );
+}
+
+/** 店铺范围是「指定店铺」却一个都没有（通讯录同步进来、还没分配的成员）：同没有值 */
+function isEmptyScope(value: unknown): boolean {
+  const parsed = storeScopeSchema.safeParse(value);
+  return parsed.success && !parsed.data.all && parsed.data.storeIds.length === 0;
+}
+
+/** 字段的值是不是空的（展开里两侧都空的字段不列） */
+function isEmptyField(definition: FieldDefinition, value: unknown): boolean {
+  return isEmptyValue(value) || (definition.kind === 'storeScope' && isEmptyScope(value));
 }
 
 /** 两个值是否相同（快照是 JSON，按序列化比较） */
@@ -279,7 +293,7 @@ function auditFilterWords(value: unknown, ctx: FormatContext): string {
 
 /** 一个值的写法（值已按权限过滤；HIDDEN 由调用方处理） */
 function valueWords(definition: FieldDefinition, value: unknown, ctx: FormatContext): string {
-  if (isEmptyValue(value)) return EMPTY;
+  if (isEmptyField(definition, value)) return EMPTY;
   const labelOf = (item: unknown) =>
     definition.labels && typeof item === 'string' ? (definition.labels[item] ?? item) : text(item);
   switch (definition.kind) {
@@ -297,6 +311,10 @@ function valueWords(definition: FieldDefinition, value: unknown, ctx: FormatCont
       return storeName(value, ctx);
     case 'stores':
       return Array.isArray(value) ? value.map((id) => storeName(id, ctx)).join('、') : EMPTY;
+    case 'storeScope': {
+      const parsed = storeScopeSchema.safeParse(value);
+      return parsed.success ? storeScopeWords(parsed.data, ctx.names.stores) : EMPTY;
+    }
     case 'list':
       return Array.isArray(value) ? value.map(labelOf).join('、') : EMPTY;
     case 'part': {
@@ -429,7 +447,7 @@ export function describeAuditRecord(
   for (const definition of snapshotFields[kind]) {
     const rawB = valueAt(rawBefore, definition.path);
     const rawA = valueAt(rawAfter, definition.path);
-    if (isEmptyValue(rawB) && isEmptyValue(rawA)) continue;
+    if (isEmptyField(definition, rawB) && isEmptyField(definition, rawA)) continue;
     const shownB = valueAt(before, definition.path);
     const shownA = valueAt(after, definition.path);
     const hidden = shownB === HIDDEN || shownA === HIDDEN;
@@ -512,6 +530,12 @@ function collectIds(
     case 'stores':
       if (Array.isArray(value)) value.forEach((id) => add(ids.storeIds, id));
       break;
+    case 'storeScope': {
+      const parsed = storeScopeSchema.safeParse(value);
+      if (parsed.success && !parsed.data.all)
+        parsed.data.storeIds.forEach((id) => add(ids.storeIds, id));
+      break;
+    }
     case 'ledgerFilters':
       if (isPlainObject(value)) {
         add(ids.storeIds, value.store);

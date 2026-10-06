@@ -439,6 +439,110 @@ describe('P27 一条审计记录的写法（PRD P27、10.2、K18）', () => {
   });
 });
 
+describe('成员的记录（P20，待办 06）', () => {
+  const zhaoqian = { name: '赵倩', dept: 'FSH / 客服部', status: 'active' as const };
+  const memberRecord = (overrides: Partial<AuditRecordInput>) =>
+    record({
+      actorName: '刘洋',
+      actorRoles: ['admin'],
+      objectType: 'member',
+      objectId: '01920000-0000-7000-8000-0000000000b5',
+      objectLabel: '赵倩',
+      storeId: null,
+      ...overrides,
+    });
+
+  it('修改店铺范围：摘要照原型 P27「店铺范围：Forcome Direct → 全部店铺」', () => {
+    const entry = describeAuditRecord(
+      memberRecord({
+        action: 'member.change_stores',
+        before: {
+          ...zhaoqian,
+          roles: ['knowledge_owner'],
+          stores: { all: false, storeIds: [STORE_DIRECT] },
+        },
+        after: { ...zhaoqian, roles: ['knowledge_owner'], stores: { all: true } },
+      }),
+      { financeVisible: false, names },
+    );
+    expect(entry).toMatchObject({
+      actionLabel: '修改店铺范围',
+      summary: '店铺范围：Forcome Direct → 全部店铺',
+      more: 0,
+    });
+    expect(field(entry, '角色')).toMatchObject({ before: '知识库负责人', changed: false });
+  });
+
+  it('修改角色与店铺范围：摘要写第一个变化的字段，接「等 2 项」', () => {
+    const entry = describeAuditRecord(
+      memberRecord({
+        action: 'member.change_access',
+        before: { ...zhaoqian, roles: ['knowledge_owner'], stores: { all: true } },
+        after: {
+          ...zhaoqian,
+          roles: ['agent', 'knowledge_owner'],
+          stores: { all: false, storeIds: [STORE_DIRECT, STORE_MX] },
+        },
+      }),
+      { financeVisible: true, names },
+    );
+    expect(entry).toMatchObject({
+      actionLabel: '修改角色与店铺范围',
+      summary: '角色：知识库负责人 → 坐席、知识库负责人',
+      more: 2,
+    });
+    expect(field(entry, '店铺范围')).toMatchObject({
+      before: '全部店铺',
+      after: 'Forcome Direct、forcome.mx',
+      changed: true,
+    });
+  });
+
+  it('添加成员：原来没有角色与店铺范围，前值写「—」', () => {
+    const entry = describeAuditRecord(
+      memberRecord({
+        action: 'member.add',
+        before: { ...zhaoqian, roles: [], stores: { all: false, storeIds: [] } },
+        after: { ...zhaoqian, roles: ['agent'], stores: { all: true } },
+      }),
+      { financeVisible: true, names },
+    );
+    expect(entry).toMatchObject({
+      actionLabel: '添加成员',
+      summary: '角色：— → 坐席',
+      more: 2,
+    });
+    expect(field(entry, '店铺范围')).toMatchObject({ before: '—', after: '全部店铺' });
+  });
+
+  it('钉钉同步的两种记录没有店铺范围也照常写（待办 05 的旧记录）', () => {
+    const entry = describeAuditRecord(
+      memberRecord({
+        action: 'member.dingtalk_left',
+        actorType: 'system',
+        actorName: '系统',
+        actorRoles: [],
+        before: { ...zhaoqian, roles: ['agent'] },
+        after: { ...zhaoqian, status: 'disabled', roles: ['agent'] },
+      }),
+      { financeVisible: true, names },
+    );
+    expect(entry).toMatchObject({ summary: '状态：已启用 → 已停用' });
+    expect(field(entry, '店铺范围')).toBeUndefined();
+  });
+
+  it('店铺范围里的店铺也要查名字', () => {
+    const ids = auditNameIds([
+      memberRecord({
+        action: 'member.change_stores',
+        before: { ...zhaoqian, roles: ['agent'], stores: { all: false, storeIds: [STORE_MX] } },
+        after: { ...zhaoqian, roles: ['agent'], stores: { all: true } },
+      }),
+    ]);
+    expect([...ids.storeIds]).toEqual([STORE_MX]);
+  });
+});
+
 describe('要查名字的 ID', () => {
   it('收集快照与筛选里的店铺、成员 ID，以及没有编号的店铺对象', () => {
     const ids = auditNameIds([

@@ -141,6 +141,20 @@
       "when": 1791251314695,
       "tag": "0019_dingtalk_sync",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791261271570,
+      "tag": "0020_org_team",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791261287839,
+      "tag": "0021_org_member_backfill",
+      "breakpoints": true
     }
   ]
 }

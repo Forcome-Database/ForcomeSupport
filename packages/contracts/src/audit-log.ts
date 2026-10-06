@@ -182,6 +182,16 @@ export function auditTimeWords(
   return full.startsWith(options.year) ? full.slice(5) : full;
 }
 
+/**
+ * 相对当前时刻的写法（北京时间）：当天只写「时:分」，之前的写「月-日 时:分」，不在今年的写全年份。
+ * G10 通知的时间与 P20 的最近登录、同步时刻共用（同 P27 时间列）；「当天」按服务端给的当前时刻判断，不看浏览器的时钟
+ */
+export function relativeTimeWords(at: Date | string, now: Date): string {
+  const today = businessDateTime(now).slice(0, 10);
+  const day = businessDateTime(typeof at === 'string' ? new Date(at) : at).slice(0, 10);
+  return auditTimeWords(at, { withDate: day !== today, year: today.slice(0, 4) });
+}
+
 /** 筛选条件里时间以外的各项（P27 列表为空的「当前筛选」与导出记录的摘要共用）：操作人、对象类型、动作、对象编号 */
 export function auditConditionWords(condition: {
   readonly actorName?: string;

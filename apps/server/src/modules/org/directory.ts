@@ -1,9 +1,10 @@
-import type { AuditSnapshot } from '@forcome/contracts';
+import { SYSTEM_ACTOR_NAME } from '@forcome/contracts';
 import { and, eq, isNotNull, isNull, lte, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import { advisoryLock, recordAudit, systemActor, type DbExecutor, type Tx } from '../core';
 import type { DingtalkDepartment, DingtalkDirectory, DingtalkUser } from '../integration';
 import { department, member } from './schema';
 import { closeMemberSessions, type MemberRow } from './session';
+import { memberAuditSnapshot } from './members';
 
 /*
  * 钉钉通讯录 → 成员与部门（规格 org「钉钉 Stream 通讯录事件 + 每小时全量对账，同步成员与部门（只读）」，PRD D-16、11.1，待办 05）：
@@ -71,12 +72,6 @@ export interface DirectoryChanges {
 }
 
 const emptyChanges = (): DirectoryChanges => ({ created: 0, updated: 0, left: 0, rejoined: 0 });
-
-function memberSnapshot(
-  row: Pick<MemberRow, 'name' | 'dept' | 'status' | 'roles'>,
-): AuditSnapshot<'member.dingtalk_left'> {
-  return { name: row.name, dept: row.dept, status: row.status, roles: [...row.roles] };
-}
 
 /** 写一个部门；已有的只在 onlyIfSyncedBy（取数据的时刻）之前同步过时才改 */
 async function upsertDepartment(
@@ -233,6 +228,8 @@ async function refreshFromDirectory(
       roles: [],
       allStores: false,
       storeIds: [],
+      changedAt: tx.now,
+      changedByName: SYSTEM_ACTOR_NAME,
       version: sql`${member.version} + 1`,
     })
     .where(eq(member.id, row.id));
@@ -241,8 +238,15 @@ async function refreshFromDirectory(
     objectType: 'member',
     objectId: row.id,
     objectLabel: user.name,
-    before: memberSnapshot(row),
-    after: memberSnapshot({ name: user.name, dept, status: 'active', roles: [] }),
+    before: memberAuditSnapshot(row),
+    after: memberAuditSnapshot({
+      name: user.name,
+      dept,
+      status: 'active',
+      roles: [],
+      allStores: false,
+      storeIds: [],
+    }),
   });
   return 'rejoined';
 }
@@ -260,6 +264,8 @@ async function leaveFromDirectory(tx: Tx, row: MemberRow): Promise<void> {
       disabledAt: tx.now,
       dingtalkSyncedAt: tx.now,
       updatedAt: tx.now,
+      changedAt: tx.now,
+      changedByName: SYSTEM_ACTOR_NAME,
       version: sql`${member.version} + 1`,
     })
     .where(eq(member.id, row.id));
@@ -269,8 +275,8 @@ async function leaveFromDirectory(tx: Tx, row: MemberRow): Promise<void> {
     objectType: 'member',
     objectId: row.id,
     objectLabel: row.name,
-    before: memberSnapshot(row),
-    after: memberSnapshot({ ...row, status: 'disabled' }),
+    before: memberAuditSnapshot(row),
+    after: memberAuditSnapshot({ ...row, status: 'disabled' }),
   });
 }
 

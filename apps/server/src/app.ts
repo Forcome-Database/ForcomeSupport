@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import type { ServerDeps } from './deps';
 import { createAftersalesRoutes } from './modules/aftersales';
-import { createChannelRoutes, storeNamesById } from './modules/channel';
+import { createChannelRoutes, listStoreChoices, storeNamesById } from './modules/channel';
 import {
   AccessDeniedError,
   FieldValidationError,
@@ -20,6 +20,7 @@ import {
   createDingtalkLoginRoutes,
   createNotificationRoutes,
   createOrgRoutes,
+  createTeamRoutes,
   devDingtalkScanAvailable,
   devLoginAvailable,
 } from './modules/org';
@@ -94,6 +95,11 @@ export function createApp(deps: ServerDeps) {
   });
 
   app.route('/', createOrgRoutes({ runtime, appEnv: config.appEnv }));
+  // P20 团队与权限在 org；授权可选的全部店铺由这里注入 channel 的查询（org 不依赖 channel）
+  app.route(
+    '/',
+    createTeamRoutes({ runtime, appEnv: config.appEnv, storeChoices: listStoreChoices }),
+  );
   // 钉钉扫码登录（G11、G12）：换出与开发登录同一种会话
   app.route('/', createDingtalkLoginRoutes({ runtime, appEnv: config.appEnv, clients, logger }));
   // 站内通知（G10）的铃铛面板：只看自己的通知，在 org（会话与店铺范围）；写入与查询在 core

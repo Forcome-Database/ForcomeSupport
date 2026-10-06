@@ -22,7 +22,8 @@
       "dept": "FSH / 客服部",
       "email": "liting@forcome.com",
       "stores": "全部店铺",
-      "factory": null
+      "factory": null,
+      "lastLogin": "2026-09-11T08:02:00+08:00"
     },
     {
       "id": "cbe596af-af0a-502a-b154-7c54ad628cca",
@@ -33,7 +34,8 @@
       "dept": "FSH / 客服部",
       "email": "chenchen@forcome.com",
       "stores": "全部店铺",
-      "factory": null
+      "factory": null,
+      "lastLogin": "2026-09-11T09:15:00+08:00"
     },
     {
       "id": "39550bdf-7cae-59d1-bece-97afd552daa0",
@@ -44,7 +46,8 @@
       "dept": "FSH / 客服部",
       "email": "zhoumin@forcome.com",
       "stores": "全部店铺",
-      "factory": null
+      "factory": null,
+      "lastLogin": "2026-09-11T10:18:00+08:00"
     },
     {
       "id": "04f74422-a1fa-535b-85c7-81d2124516de",
@@ -55,7 +58,8 @@
       "dept": "FSH / 售后部",
       "email": "wanglei@forcome.com",
       "stores": "全部店铺",
-      "factory": null
+      "factory": null,
+      "lastLogin": "2026-09-11T10:20:00+08:00"
     },
     {
       "id": "53dade37-2733-5a9b-b000-e2ba4e418b57",
@@ -66,7 +70,8 @@
       "dept": "FSH / 客服部",
       "email": "zhaoqian@forcome.com",
       "stores": "全部店铺",
-      "factory": null
+      "factory": null,
+      "lastLogin": "2026-09-10T18:30:00+08:00"
     },
     {
       "id": "d1148825-9f45-5ee8-a2a3-c12571d60637",
@@ -77,7 +82,8 @@
       "dept": "FSH / 信息部",
       "email": "liuyang@forcome.com",
       "stores": "全部店铺",
-      "factory": null
+      "factory": null,
+      "lastLogin": "2026-09-11T10:20:00+08:00"
     },
     {
       "id": "3e6ef31c-9076-5b23-8f50-5156401efaf3",
@@ -88,7 +94,8 @@
       "dept": "FQD / 品质部",
       "email": null,
       "stores": null,
-      "factory": "FQD"
+      "factory": "FQD",
+      "lastLogin": "2026-09-11T09:40:00+08:00"
     },
     {
       "id": "63ad4ea2-d284-58ca-8ca6-54318ef911c5",
@@ -99,7 +106,8 @@
       "dept": "FZJ / 品质部",
       "email": null,
       "stores": null,
-      "factory": "FZJ"
+      "factory": "FZJ",
+      "lastLogin": "2026-09-10T16:05:00+08:00"
     }
   ],
   "stores": [

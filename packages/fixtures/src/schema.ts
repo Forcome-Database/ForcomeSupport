@@ -39,6 +39,8 @@ export const fixtureMemberSchema = z.object({
   email: z.string().nullable(),
   stores: z.string().nullable(),
   factory: z.string().nullable(),
+  /** 最近登录（P20 成员表，待办 06） */
+  lastLogin: instant,
 });
 
 export const fixtureStoreSchema = z.object({
