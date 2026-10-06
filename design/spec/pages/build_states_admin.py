@@ -633,11 +633,29 @@ def k20():
         ('钉钉从没同步成功过 · 连续 3 次失败', BS.dingtalk_card(err='never'))]), 3, 12)
     tests = row(toast('success', '连接正常', 'Gmail：4 个邮箱均可访问') + toast('success', '连接正常', '钉钉：通讯录可访问') +
                 toast('error', '测试连接失败：support@forcome.mx 无法访问', '请检查全域委派范围与邮箱状态') +
-                toast('error', '测试连接失败：钉钉通讯录无法访问', '请检查应用凭据与通讯录权限'), 12, 'flex-start', wrap=True)
+                toast('error', '测试连接失败：钉钉通讯录无法访问', '请检查应用凭据与通讯录权限') +
+                toast('success', '连接正常', 'Shopify：2 个店铺均可访问') +
+                toast('error', '测试连接失败：forcome.mx 无法访问', '请检查 Admin API 应用凭据与授权范围'), 12, 'flex-start', wrap=True)
+    # 补充小样（待办 11 · 协调者 10-06 决定，套用 Gmail 已确认的写法）：Shopify 卡同步延迟与连接异常（按店铺）；Gmail 与 Shopify 同时异常时
+    # 全站横幅各一条、Gmail 在上（G4 写法，「查看渠道状态」只对管理员）；Shopify 连接异常与恢复的站内通知、P27 的对象与「补拉」
+    shop_cards = grid(''.join(col(c + nowrap(t, 11, T['ink3'], 600), 6) for t, c in [
+        ('Shopify 同步延迟 · 超过 10 分钟没同步成功', BS.shopify_card_p1('同步延迟')),
+        ('Shopify 连接异常 · 连续 3 次失败（全站横幅同 G4）', BS.shopify_card_p1('连接异常'))]), 3, 12)
+    banners = col(banner('danger', *G4_BANNER, action=btn('查看渠道状态', 'secondary', 'sm')) +
+                  banner('danger', *G4_BANNER_SHOPIFY, action=btn('查看渠道状态', 'secondary', 'sm')), 8, 'width: 1100px;')
+    notices = row(''.join(col(nowrap(title, 13, T['ink'], 600) + nowrap(body, 12, T['ink3']) + nowrap('P18 · Shopify', 11, T['ink4']), 2,
+                              'padding: 8px 12px; border: 1px solid %s; border-radius: 8px; background: #ffffff;' % T['line'])
+                          for title, body in SHOPIFY_NOTICES) +
+                  col(nowrap(SHOPIFY_AUDIT['object'] + ' · 恢复连接', 13, T['ink'], 600) + nowrap(SHOPIFY_AUDIT['summary'], 12, T['ink3']) +
+                      nowrap('补拉：' + SHOPIFY_AUDIT['backfilled'], 12, T['ink3']), 2,
+                      'padding: 8px 12px; border: 1px solid %s; border-radius: 8px; background: #ffffff;' % T['line']), 12, 'flex-start')
     return frame(BS.p18(phase1=True) + cap('卡头小样 · 卡片状态的五种写法') + strip + cap('店铺表状态列') + st_col +
                  cap('钉钉卡 · 第一阶段已连接') + ding +
                  cap('补充小样 · 第一阶段 Gmail 卡同步延迟与连接异常、钉钉卡连接异常（下一行为边界：几个邮箱同时异常、钉钉从没同步成功过）') + cards +
-                 cap('补充小样 · 「测试连接」的结果（G5 浮层；测试中按钮置灰转圈；测试连接不改状态，Gmail 测完立即同步一次）') + tests, w=1472, gap=12)
+                 cap('补充小样 · 「测试连接」的结果（G5 浮层；测试中按钮置灰转圈；测试连接不改状态，Gmail、Shopify 测完立即同步一次）') + tests +
+                 cap('补充小样 · 第一阶段 Shopify 卡同步延迟与连接异常（按店铺；回补窗口行随待办 13）') + shop_cards +
+                 cap('补充小样 · Gmail 与 Shopify 同时连接异常：全站横幅各一条，Gmail 在上（G4 写法）') + banners +
+                 cap('补充小样 · Shopify 连接异常与恢复的站内通知（G10 写法）、P27 的对象与「补拉」') + notices, w=1472, gap=12)
 
 
 # ---------------------------------------------------------------- K22–K24 客服主管的设置页「SLA」「标签库」「模板」（局部 1:1）

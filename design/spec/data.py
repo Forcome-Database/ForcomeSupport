@@ -332,6 +332,26 @@ ORDERS = {
                             'status': '已签收', 'fulfil': 'MFN（自发货）', 'promise': '08-27', 'ship_to': 'Toronto, ON, CA',
                             'carrier': 'Canada Post', 'tracking': '7316204855219087', 'delivered': '08-26'},
 }
+# 第一阶段 Shopify 订单镜像的示例（待办 11）：第一阶段工单与台账引用的 Shopify 订单，Fake Shopify 回放它们（经夹具）。
+# 下单与最近更新（平台 updated_at）、商品行（名称, 数量）、金额（美元）、付款与履约状态、收件地址（街道, 门牌, 城市, 州, 邮编, 国家）、
+# 履约单号（承运商, 单号）；客户邮箱由夹具按客户名推出（同 Fake 来信）。#1063 的商品、金额、下单日同 ORDERS
+SHOPIFY_ORDERS_P1 = {
+    '#0991': {'store': 'forcome.com', 'customer': 'Emily Chen', 'placed': '08-14 16:05', 'updated': '08-18 11:20',
+              'items': [('V2 车载吸尘器 白色', 1)], 'total': 48.99, 'paid': 'PAID', 'fulfilled': 'FULFILLED',
+              'ship_to': ('418 SE Morrison St', None, 'Portland', 'OR', '97214', 'US'), 'tracking': ('UPS', '1Z9X4E770312345678')},
+    '#1049': {'store': 'forcome.com', 'customer': 'Priya Raman', 'placed': '08-22 20:15', 'updated': '09-02 10:11',
+              'items': [('V2 车载吸尘器 黑色', 1)], 'total': 54.99, 'paid': 'PARTIALLY_REFUNDED', 'fulfilled': 'FULFILLED',
+              'ship_to': ('2210 Mission St', 'Apt 3', 'San Francisco', 'CA', '94110', 'US'), 'tracking': ('UPS', '1Z9X4E770398765432')},
+    '#1052': {'store': 'forcome.com', 'customer': 'David Park', 'placed': '08-26 09:40', 'updated': '08-30 15:02',
+              'items': [('V2 车载吸尘器 黑色', 1)], 'total': 54.99, 'paid': 'PAID', 'fulfilled': 'FULFILLED',
+              'ship_to': ('1100 Congress Ave', None, 'Austin', 'TX', '78701', 'US'), 'tracking': ('UPS', '1Z9X4E770355501234')},
+    '#1057': {'store': 'forcome.com', 'customer': 'Priya Raman', 'placed': '09-09 18:20', 'updated': '09-09 18:21',
+              'items': [('V2 车载吸尘器 黑色', 1)], 'total': 54.99, 'paid': 'PAID', 'fulfilled': 'UNFULFILLED',
+              'ship_to': ('2210 Mission St', 'Apt 3', 'San Francisco', 'CA', '94110', 'US'), 'tracking': None},
+    '#1063': {'store': 'forcome.com', 'customer': 'Olivia Turner', 'placed': '08-05 13:30', 'updated': '08-09 16:45',
+              'items': [('V2 车载吸尘器', 1)], 'total': 54.99, 'paid': 'PAID', 'fulfilled': 'FULFILLED',
+              'ship_to': ('1550 Larimer St', None, 'Denver', 'CO', '80202', 'US'), 'tracking': ('UPS', '1Z9X4E770377712345')},
+}
 # 生产厂报价（StatesFactory F3、F7、F9 用的「提交后」画面；S-20260911-0019 在演示时刻 NOW 仍为待报价）
 QUOTES = {
     'S-20260911-0019': {'product': 5.20, 'freight': 12.80, 'carrier': '云途专线', 'ship_date': '2026-09-14', 'at': '10:22',
@@ -646,6 +666,15 @@ GMAIL_ISSUES_MIXED = [('amz-auto@forcome.com', '10:12', 3), ('support@forcome.mx
 GMAIL_DELAYED_MIXED = ('support@forcome.com', '10:06')
 # G4 集成中断横幅（全站，所有角色；「查看渠道状态」只对管理员显示）。K7 统一用这一写法（待办 09 Q1，10-06 用户确认）
 G4_BANNER = ('Gmail 连接中断，来信暂存队列', '09-11 %s 起未收取。恢复后自动补收，按到达顺序处理，SLA 从原到达时间计算。管理员、客服主管已收到通知。' % GMAIL_ISSUE['since'])
+# Shopify 订单同步（待办 11 · 协调者 10-06 决定，套用 Gmail 已确认的写法）：某个店铺的连接异常与同步延迟示例（店铺、连续失败从几点起与次数、
+# 最近同步成功），全站横幅（Gmail 与 Shopify 同时异常时各一条、Gmail 在上），连接异常与恢复的站内通知、P27 的对象与「补拉」写法
+SHOPIFY_ISSUE = {'store': 'forcome.mx', 'since': '10:05', 'failures': 3, 'last': '10:04'}
+SHOPIFY_DELAYED = {'store': 'forcome.mx', 'last': '10:05'}
+G4_BANNER_SHOPIFY = ('Shopify 订单同步中断', '09-11 %s 起未同步。来信照常收取，恢复后自动补拉订单。管理员、客服主管已收到通知。' % SHOPIFY_ISSUE['since'])
+SHOPIFY_NOTICES = [('Shopify 连接异常', '%s 连续 3 次失败，订单暂停同步' % SHOPIFY_ISSUE['store']),
+                   ('Shopify 已恢复', '%s 已重新连接，补拉 2 笔订单' % SHOPIFY_ISSUE['store'])]
+SHOPIFY_AUDIT = {'object': 'Shopify · %s' % SHOPIFY_ISSUE['store'], 'summary': '状态：连接异常 → 已连接（补拉 2 笔订单）',
+                 'backfilled': '2 笔订单（10:05–10:13 更新）'}
 SQS_STATE = ('正常', 0)       # 亚马逊订单通知队列（SQS）：状态, 积压条数（P18、K20）
 AMZ_BACKFILL_DAYS = 90        # 第一阶段亚马逊订单回补天数（K20）
 SLA_HOURS = {'亚马逊': 24, '内部目标': 24}  # K22：亚马逊首次回复时限（平台考核）与 Shopify 与邮件内部目标的全局值

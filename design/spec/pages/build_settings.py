@@ -176,6 +176,30 @@ def gmail_card_p1(st='已连接'):
     return ch_card('message', 'Gmail', state('已连接'), GMAIL_LINES_P1, '', 'ok', sync=CHANNEL_SYNC['Gmail'])
 
 
+SHOPIFY_LINES_P1 = ['2 个店铺 · 订单经 Admin API 准实时同步']  # 第一阶段 Shopify 卡的店铺行（回补窗口行另画，随待办 13）
+
+
+def shopify_backfill_line():
+    return row(nowrap('订单回补 %d 天' % SHOPIFY_BACKFILL_DAYS, 12, T['ink3']) + chip('未开通 read_all_orders', 'warning', 11), 6)
+
+
+def shopify_card_p1(st='已连接'):
+    """第一阶段 Shopify 卡（K20；待办 11 · 协调者 10-06 决定，套用 Gmail 卡已确认的写法，异常与延迟按店铺）。同步延迟（超过 10 分钟）：
+    每个延迟的店铺一行「<店铺> hh:mm 后未同步成功，超过 10 分钟」，其余说明行照常。连接异常（连续 3 次失败）：每个异常的店铺一行原因与恢复指引，
+    再写一次订单暂停同步，底部「重新检测」（立即重测并补拉）；第一阶段没有「重新授权」与错误日志页。"""
+    if st == '同步延迟':
+        d = SHOPIFY_DELAYED
+        return ch_card('store', 'Shopify Admin API', state('同步延迟'), ['%s %s 后未同步成功，超过 10 分钟' % (d['store'], d['last'])] + SHOPIFY_LINES_P1 + [shopify_backfill_line()],
+                       '', 'warn', 'warning', sync=d['last'])
+    if st == '连接异常':
+        e = SHOPIFY_ISSUE
+        return ch_card('store', 'Shopify Admin API', state('连接异常'),
+                       ['%s 访问失败（%s 起连续 %d 次）：请检查 Admin API 应用凭据与授权范围' % (e['store'], e['since'], e['failures']),
+                        '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取'],
+                       row(btn('重新检测', 'primary', 'sm', 'refresh'), 6), 'bad', 'danger', sync=e['last'])
+    return ch_card('store', 'Shopify Admin API', state('已连接'), SHOPIFY_LINES_P1 + [shopify_backfill_line()], '', 'ok', sync=CHANNEL_SYNC['Shopify'])
+
+
 def grid3(cells):
     return '<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: stretch;">%s</div>' % ''.join(cells)
 
@@ -198,9 +222,7 @@ def p18_channels_p1():
     amz = ch_card('store', '亚马逊 SP-API', state('已连接'),
                   ['2 个店铺 · 订单经 SP-API 准实时同步', sqs_line(), row(nowrap('订单回补 %d 天' % AMZ_BACKFILL_DAYS, 12, T['ink3']) + chip('已完成', 'success', 11, 'check'), 6)],
                   '', 'ok', sync=CHANNEL_SYNC['SP-API'])
-    shp = ch_card('store', 'Shopify Admin API', state('已连接'),
-                  ['2 个店铺 · 订单经 Admin API 准实时同步', row(nowrap('订单回补 %d 天' % SHOPIFY_BACKFILL_DAYS, 12, T['ink3']) + chip('未开通 read_all_orders', 'warning', 11), 6)],
-                  '', 'ok', sync=CHANNEL_SYNC['Shopify'])
+    shp = shopify_card_p1()
     gm = gmail_card_p1()
     return grid3([amz, shp, gm, dingtalk_card(late=True),
                   phase2_card('link', '积加 ERP', '亚马逊订单收件人、库存、售后出库单、单号与运费。'),
