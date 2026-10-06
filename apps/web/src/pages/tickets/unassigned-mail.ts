@@ -146,6 +146,8 @@ async function commit(
         ? {}
         : {
             retry: async () => {
+              // 期间别的标签页换了人：不拿他的会话重试，浮层随之消失
+              if (!(await sameMember(queryClient, memberId))) return;
               try {
                 await submit(queryClient, mail, store);
               } catch (retryError) {
