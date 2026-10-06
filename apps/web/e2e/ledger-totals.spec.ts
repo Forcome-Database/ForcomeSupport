@@ -374,6 +374,60 @@ test('筛选行：费用发生日默认本月，区间日历选好起止即生�
   ).toHaveCount(0);
 });
 
+test('筛选浮层的焦点（共用浮层 keepFocusIfMoved）：键盘打开、Esc 关闭后焦点回到芯片；选完一个紧接着点开另一个，后者保持打开', async ({
+  page,
+}) => {
+  await loginAs(page, '王磊');
+  await page.goto('/aftersales/ledger');
+  await expect(chip(page, '状态')).toHaveText('状态');
+
+  // ① 键盘：焦点在芯片上回车打开，Esc 关闭后焦点回到芯片（焦点原在浮层里，卸载后照常还给触发处）
+  await chip(page, '状态').focus();
+  await page.keyboard.press('Enter');
+  const status = page.getByRole('dialog', { name: '状态' });
+  await expect(status).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(status).toHaveCount(0);
+  await expect(chip(page, '状态')).toBeFocused();
+
+  // ② 选完「状态」紧接着点开「费用发生日」：在「状态」下拉退场卸载的那一刻点（最容易被抢回焦点的时刻，
+  // 部署冒烟偶发失败的就是这个时序，待办 05 Comments），日历保持打开、焦点留在日历里
+  await chip(page, '状态').click();
+  await expect(status).toBeVisible();
+  const after = await page.evaluate(
+    () =>
+      new Promise<{ calendarOpen: boolean; focusInCalendar: boolean }>((resolve) => {
+        const statusPopover = document.querySelector('[role="dialog"][aria-label="状态"]');
+        const option = [...(statusPopover?.querySelectorAll('[role="option"]') ?? [])].find(
+          (item) => item.textContent?.trim() === '进行中',
+        );
+        const dateChip = [
+          ...document.querySelectorAll('[data-testid="ledger-filters"] button'),
+        ].find((button) => button.textContent?.startsWith('费用发生日'));
+        if (!(option instanceof HTMLElement) || !(dateChip instanceof HTMLElement)) {
+          throw new Error('没找到「进行中」或「费用发生日」');
+        }
+        new MutationObserver((_, observer) => {
+          if (statusPopover?.isConnected) return;
+          observer.disconnect();
+          dateChip.click();
+          // 抢焦点发生在卸载之后的下一个任务里：过一会儿再看日历是否还开着
+          setTimeout(() => {
+            const calendar = document.querySelector('[role="dialog"][aria-label="费用发生日"]');
+            resolve({
+              calendarOpen: calendar?.getAttribute('data-state') === 'open',
+              focusInCalendar: calendar?.contains(document.activeElement) ?? false,
+            });
+          }, 300);
+        }).observe(document.body, { childList: true, subtree: true });
+        option.click();
+      }),
+  );
+  expect(after).toEqual({ calendarOpen: true, focusInCalendar: true });
+  await expect(page).toHaveURL(/\?status=in_progress$/);
+  await expect(page.getByRole('dialog', { name: '费用发生日' })).toBeVisible();
+});
+
 test('列表为空：说明写当前筛选与「清除筛选查看全部 N 张」，按钮「清除筛选」；条件就是默认时没有按钮', async ({
   page,
 }) => {

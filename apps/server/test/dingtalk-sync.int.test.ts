@@ -1,5 +1,6 @@
 import {
   channelSettingsSchema,
+  currentMemberSchema,
   devMembersResponseSchema,
   loginDeniedSchema,
   notificationListSchema,
@@ -7,6 +8,7 @@ import {
   type DevMember,
 } from '@forcome/contracts';
 import { getDemoFixture } from '@forcome/fixtures';
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { sendWorkNotificationsJob } from '../src/modules/core';
 import { dingtalkClient, factoryHeadUserId } from '../src/modules/integration';
@@ -41,6 +43,16 @@ async function memberNamed(name: string): Promise<DevMember | undefined> {
 }
 
 /** 通讯录里某个部门的钉钉 ID（按「FSH / 客服部」这样的路径找） */
+/** 成员表里记着的店铺范围（停用的成员也看得到） */
+async function storeScopeOf(name: string) {
+  const [row] = (
+    await t.runtime.db.execute<{ all_stores: boolean; store_ids: string[] }>(
+      sql`SELECT all_stores, store_ids FROM org.member WHERE name = ${name}`,
+    )
+  ).rows;
+  return row && { all: row.all_stores, storeIds: row.store_ids };
+}
+
 async function departmentId(path: string): Promise<string> {
   const { departments } = await dingtalk().client().readDirectory();
   const byId = new Map(departments.map((d) => [d.id, d]));
@@ -289,15 +301,42 @@ describe('Stream 通讯录事件：新增、变更、离职分别反映到成员
   });
 
   it('钉钉离职停用的又回到通讯录：恢复在职，但角色与店铺范围清空，扫码登录「未分配角色」；审计「钉钉恢复在职」', async () => {
+    const customerService = await departmentId('FSH / 客服部');
+    // 离职前两种店铺范围都要清空：陈晨是全部店铺（示例数据，上面的离职用例里停用）；另一位坐席只授权一个店铺，也在钉钉离职
+    // 成员表只记店铺 id，这里不需要真有这个店铺
+    const store = { id: '01920000-0000-7000-8000-000000000001' };
+    await t.addMember({
+      dingtalkUserId: 'one-store',
+      name: '单店坐席',
+      dept: 'FSH / 客服部',
+      roles: ['agent'],
+      allStores: false,
+      storeIds: [store.id],
+    });
+    const oneStore = {
+      userId: 'one-store',
+      name: '单店坐席',
+      departmentIds: [customerService],
+      email: null,
+    };
+    dingtalk().addUser(oneStore, { silent: true });
+    dingtalk().removeUser('one-store');
+    await t.runJobs();
+    expect(await memberNamed('单店坐席')).toBeUndefined();
+    expect(await storeScopeOf('陈晨')).toEqual({ all: true, storeIds: [] });
+    expect(await storeScopeOf('单店坐席')).toEqual({ all: false, storeIds: [store.id] });
+
     dingtalk().addUser({
       userId: 'chenchen',
       name: '陈晨',
-      departmentIds: [await departmentId('FSH / 客服部')],
+      departmentIds: [customerService],
       email: 'chenchen@forcome.com',
     });
+    dingtalk().addUser(oneStore);
     await t.runJobs();
 
     expect(await memberNamed('陈晨')).toMatchObject({ roles: [] });
+    expect(await memberNamed('单店坐席')).toMatchObject({ roles: [] });
     const { response } = await t.scanLogin('chenchen');
     expect(response.status).toBe(403);
     expect(loginDeniedSchema.parse(await response.json())).toMatchObject({ reason: 'no_role' });
@@ -312,6 +351,18 @@ describe('Stream 通讯录事件：新增、变更、离职分别反映到成员
         after: expect.objectContaining({ status: 'active', roles: [] }) as unknown,
       }),
     ]);
+
+    // 店铺范围一并清空：全部店铺的（陈晨）与只授权一个店铺的都变成没有店铺
+    expect(await storeScopeOf('陈晨')).toEqual({ all: false, storeIds: [] });
+    expect(await storeScopeOf('单店坐席')).toEqual({ all: false, storeIds: [] });
+    // 管理员只重新分配角色（P20 随待办 06，这里直接写库）后扫码登录：店铺范围仍是空的，没有沿用离职前的
+    await t.runtime.db.execute(
+      sql`UPDATE org.member SET roles = ARRAY['agent'] WHERE name = '单店坐席'`,
+    );
+    const { client, response: signedIn } = await t.scanLogin('one-store');
+    expect(signedIn.status).toBe(200);
+    const me = currentMemberSchema.parse(await (await client.get('/api/me')).json());
+    expect(me).toMatchObject({ roles: ['agent'], stores: { all: false, storeIds: [] } });
   });
 
   it('管理员停用的成员（不是钉钉离职）不随通讯录恢复', async () => {
@@ -461,6 +512,7 @@ describe('开发测试环境：重灌示例数据恢复示例成员（联调真�
     await t.loadFixtures();
     expect(await memberNamed('王磊')).toMatchObject({ roles: ['aftersales_owner'] });
     expect(await memberNamed('陈晨')).toMatchObject({ roles: ['agent'] });
+    expect(await storeScopeOf('陈晨')).toEqual({ all: true, storeIds: [] });
     // 不是示例成员的不动
     expect(await memberNamed('孙悦')).toMatchObject({ roles: [] });
   });
