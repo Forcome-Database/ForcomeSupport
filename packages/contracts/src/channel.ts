@@ -280,10 +280,10 @@ export type ChannelCard = z.infer<typeof channelCardSchema>;
 
 /**
  * 全站横幅（G4，GET /api/channel/alerts）：连接异常的渠道（钉钉除外，6.9），所有登录成员都看得到，恢复后自动消失。
- * 第一期只有 Gmail；订单（SP-API、Shopify）随 11、12
+ * 第一期只有 Gmail；订单（SP-API、Shopify）随 11、12 加进 kind
  */
 export const channelAlertSchema = z.object({
-  kind: z.enum(['amazon', 'shopify', 'gmail']),
+  kind: z.enum(['gmail']),
   /** 连接异常的邮箱（或店铺），按地址排序 */
   targets: z.array(z.string()).min(1),
   /** 最早的一串连续失败从何时起（G4「09-11 10:05 起未收取」） */

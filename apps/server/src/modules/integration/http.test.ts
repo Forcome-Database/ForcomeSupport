@@ -29,14 +29,16 @@ afterEach(async () => {
 });
 
 describe('出站 HTTP 客户端工厂', () => {
-  it('每次调用一条调用记录：成功、失败都记，地址不带查询串（可能有凭证），凭证类的响应体不留', async () => {
+  it('每次调用一条调用记录：成功、失败都记，查询参数里像凭证的值换成 ***，凭证类的响应体不留', async () => {
     const origin = agent.get('https://api.example.com');
-    origin.intercept({ path: '/a?access_token=secret-1' }).reply(200, { ok: true });
+    origin.intercept({ path: '/a?access_token=secret-1&page=2' }).reply(200, { ok: true });
     origin.intercept({ path: '/b' }).reply(503, 'busy');
     origin.intercept({ path: '/token', method: 'POST' }).reply(200, { access_token: 'secret-2' });
     const http = createHttpClient('example', { dispatcher: agent, recorder, storeId: 's-1' });
 
-    await http.getJson('https://api.example.com/a?access_token=secret-1', { operation: 'a' });
+    await http.getJson('https://api.example.com/a?access_token=secret-1&page=2', {
+      operation: 'a',
+    });
     await expect(http.getText('https://api.example.com/b', { operation: 'b' })).rejects.toThrow(
       ExternalCallFailedError,
     );
@@ -49,7 +51,7 @@ describe('出站 HTTP 客户端工厂', () => {
     expect(
       records.map((r) => [r.system, r.operation, r.storeId, r.outcome, r.status, r.request]),
     ).toEqual([
-      ['example', 'a', 's-1', 'ok', 200, 'GET https://api.example.com/a'],
+      ['example', 'a', 's-1', 'ok', 200, 'GET https://api.example.com/a?access_token=***&page=2'],
       ['example', 'b', 's-1', 'failed', 503, 'GET https://api.example.com/b'],
       ['example', 'token', 's-1', 'ok', 200, 'POST https://api.example.com/token'],
     ]);

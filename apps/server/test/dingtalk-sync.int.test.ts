@@ -1,4 +1,5 @@
 import {
+  channelAlertsSchema,
   channelSettingsSchema,
   currentMemberSchema,
   devMembersResponseSchema,
@@ -462,6 +463,10 @@ describe('同步失败（E-32、AC-P1-22）：保留上次的成员与部门，�
       expect(
         (await notificationsOf(client)).filter((n) => n.type === 'channel_disconnected'),
       ).toEqual([]);
+      const alerts = channelAlertsSchema.parse(
+        await (await client.get('/api/channel/alerts')).json(),
+      );
+      expect(alerts.alerts).toEqual([]);
     }
     t.clock.advance({ minutes: 6 });
     await t.enqueue(sendWorkNotificationsJob, {});

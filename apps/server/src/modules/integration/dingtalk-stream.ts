@@ -146,7 +146,8 @@ export function createDingtalkStream(
         ua: 'forcome-support',
         localIp: '',
       },
-      { operation: 'gateway/connections/open' },
+      // 返回的 ticket 是连接凭证：调用记录里不留响应体（待办 09）
+      { operation: 'gateway/connections/open', secretResponse: true },
     );
     const parsed = endpointSchema.safeParse(body);
     if (!parsed.success) {

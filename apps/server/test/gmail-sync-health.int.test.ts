@@ -40,7 +40,7 @@ let agent: ApiClient;
 
 let letterNo = 0;
 /** 一封客户来信，到达时间为此刻（各封主题不同，便于按主题核对） */
-function letter(to: string, overrides: Partial<FakeMailInput> = {}): FakeMailInput {
+function letter(to: FakeMailInput['to'], overrides: Partial<FakeMailInput> = {}): FakeMailInput {
   letterNo += 1;
   return {
     to,
@@ -511,5 +511,76 @@ describe('Gmail 同步健壮性与连接状态', () => {
 
     // 渠道与店铺只归管理员（10.1）
     expect((await supervisor.post('/api/channel/connection-tests/gmail', {})).status).toBe(403);
+  });
+
+  it('「重新检测」：开始监听失败、正在退避的邮箱，测试连接当场 watch 并同步，不用等退避', async () => {
+    gmail.faults.reset();
+    gmail.faults.failNext({ kind: 'error', status: 503 }, { operation: 'users.watch' });
+    const res = await admin.post('/api/channel/stores', {
+      name: '测试重新检测店铺',
+      platform: 'shopify',
+      sites: ['US'],
+      defaultSite: 'US',
+      mailboxes: ['recheck-test@forcome.test'],
+      platformId: 'recheck-test.myshopify.com',
+    });
+    expect(res.status).toBe(201);
+    await t.runJobs();
+    expect(gmail.isWatched('recheck-test@forcome.test')).toBe(false);
+
+    // 退避 1 分钟还没到，管理员点「重新检测」
+    expect((await admin.post('/api/channel/connection-tests/gmail', {})).status).toBe(200);
+    expect(gmail.isWatched('recheck-test@forcome.test')).toBe(true);
+    await t.runJobs();
+    expect(await storeGmailStatus('测试重新检测店铺')).toBe('connected');
+  });
+
+  it('同一封信发到两个邮箱、两个邮箱同时恢复：副本不算补拉的来信，另一个照写「补拉 0 封来信」（E1）', async () => {
+    gmail.faults.reset();
+    t.clock.advance({ minutes: 1 });
+    await pollAll();
+    const seen = new Set((await noticeItems(admin)).map((n) => n.id));
+    const COM = stores.find((s) => s.name === 'forcome.com')!;
+    gmail.faults.failNext({ kind: 'timeout' }, { operation: 'users.history.list', times: 6 });
+    gmail.deliver(letter([MX.mailbox, COM.mailbox]));
+    for (let round = 0; round < 3; round += 1) {
+      t.clock.advance({ minutes: 1 });
+      await runAllowingFailures();
+    }
+    expect((await alerts(agent))[0]?.targets).toEqual([COM.mailbox, MX.mailbox].sort());
+
+    await pollAll();
+    const recovered = (await noticeItems(admin))
+      .filter((n) => n.type === 'channel_recovered' && !seen.has(n.id))
+      .map((n) => n.body)
+      .sort();
+    // 先入库的一封为准（补拉 1 封），另一个邮箱收到的是它的副本（补拉 0 封）
+    expect(recovered).toHaveLength(2);
+    expect(recovered.filter((body) => body.endsWith('已重新连接，补拉 1 封来信'))).toHaveLength(1);
+    expect(recovered.filter((body) => body.endsWith('已重新连接，补拉 0 封来信'))).toHaveLength(1);
+    expect(await alerts(agent)).toEqual([]);
+  });
+
+  it('真实接口但没有配置 Google 凭据：不算连接失败，店铺的 Gmail 为未连接（6.9），不出横幅、不发通知', async () => {
+    const before = await channelNotices(admin);
+    const res = await admin.post('/api/channel/stores', {
+      name: '测试未配置凭据店铺',
+      platform: 'shopify',
+      sites: ['US'],
+      defaultSite: 'US',
+      mailboxes: ['no-credentials@forcome.test'],
+      platformId: 'no-credentials.myshopify.com',
+      adapterMode: 'real',
+    });
+    expect(res.status).toBe(201);
+    for (const minutes of [0, 1, 2, 4]) {
+      t.clock.advance({ minutes });
+      await t.runJobs();
+    }
+    expect(await storeGmailStatus('测试未配置凭据店铺')).toBe('not_connected');
+    expect(await alerts(agent)).toEqual([]);
+    expect(await channelNotices(admin)).toEqual(before);
+    // Gmail 卡为最差的「未连接」，但没有异常的邮箱可列
+    expect(await gmailCard()).toMatchObject({ status: 'not_connected', issues: [] });
   });
 });

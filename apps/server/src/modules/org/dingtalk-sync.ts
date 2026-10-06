@@ -16,6 +16,7 @@ import {
   type DbExecutor,
   type Feed,
   type JobContext,
+  type Logger,
   type Runtime,
   type Tx,
 } from '../core';
@@ -94,7 +95,7 @@ export async function dingtalkSyncHealth(db: DbExecutor): Promise<SyncHealth> {
  */
 export async function checkDingtalkDirectory(
   client: DingtalkClient,
-  logger: Pick<JobContext, 'logger'>['logger'],
+  logger: Logger,
 ): Promise<boolean> {
   try {
     return (await client.getDepartment(DINGTALK_ROOT_DEPARTMENT_ID)) !== null;

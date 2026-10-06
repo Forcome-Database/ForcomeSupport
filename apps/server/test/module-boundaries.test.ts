@@ -9,9 +9,16 @@ import { beforeAll, describe, expect, it } from 'vitest';
 const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 let eslint: ESLint;
 
-beforeAll(() => {
+/**
+ * 第一次检查要建起带类型的 ESLint 程序（整个后端的 TypeScript 项目），全量测试并行跑时要几十秒；
+ * 在这里先热身一次（单独的时限），免得算进第一个用例的 30 秒里而偶发超时（待办 09 定位）
+ */
+beforeAll(async () => {
   eslint = new ESLint({ cwd: repoRoot });
-});
+  await eslint.lintText('export {};\n', {
+    filePath: `${repoRoot}/apps/server/src/modules/core/index.ts`,
+  });
+}, 180_000);
 
 /** 以 modules/<module>/<file>（默认 index.ts）的身份检查代码，返回边界规则的报错 */
 async function boundaryErrors(module: string, code: string, file = 'index.ts'): Promise<string[]> {

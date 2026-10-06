@@ -4,7 +4,7 @@ import { MockAgent } from 'undici';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { GoogleCredentials } from '../core';
 import type { CallRecordEntry, CallRecorder } from './call-records';
-import { CursorExpiredError, ExternalCallFailedError } from './faults';
+import { ClientNotConfiguredError, CursorExpiredError, ExternalCallFailedError } from './faults';
 import { createRealGmail, createRealGmailClient, createRealGmailPushClient } from './gmail-real';
 import { createGoogleTokens } from './google-auth';
 import { createHttpClient } from './http';
@@ -226,7 +226,7 @@ describe('Gmail 接口', () => {
     expect(new TextDecoder().decode(message.raw)).toBe(raw);
   });
 
-  it('每次调用写一条调用记录：系统、动作、店铺、状态码、请求（不带查询串）与响应摘要；失败也记', async () => {
+  it('每次调用写一条调用记录：系统、动作、店铺、状态码、请求（含查询参数）与响应摘要；失败也记', async () => {
     tokenExchange();
     googleapis()
       .intercept({ path: /\/history\?/ })
@@ -242,7 +242,7 @@ describe('Gmail 接口', () => {
     expect(token?.response).not.toContain('token-1');
     expect(history).toMatchObject({
       storeId: 'store-mx',
-      request: `GET https://gmail.googleapis.com${USER}/history`,
+      request: `GET https://gmail.googleapis.com${USER}/history?startHistoryId=1&historyTypes=messageAdded&maxResults=500`,
     });
     expect(history?.response).toContain('Requested entity was not found.');
     expect(history?.durationMs).toBeGreaterThanOrEqual(0);
@@ -257,7 +257,8 @@ describe('Gmail 接口', () => {
       mailRecipientGuard: new MailRecipientGuard({ allowlistOnly: true, allowlist: [] }),
     });
     const failure = await client.watch(MAILBOX).catch((error: unknown) => error);
-    expect(failure).toBeInstanceOf(ExternalCallFailedError);
+    // 不是连接故障而是还没接通：收信不把它算进连续失败（P18 为「未连接」）
+    expect(failure).toBeInstanceOf(ClientNotConfiguredError);
     expect(failure).toMatchObject({ retryable: false });
     expect((failure as Error).message).toContain('GOOGLE_SERVICE_ACCOUNT_KEY_FILE');
   });

@@ -21,6 +21,7 @@ import {
   type Tx,
 } from '../core';
 import {
+  ClientNotConfiguredError,
   CursorExpiredError,
   ExternalCallFailedError,
   ExternalServiceError,
@@ -54,7 +55,8 @@ import { loadSenderRules } from './sender-rules';
 export const gmailSyncJob = defineJob('channel.gmail_sync', z.object({ mailbox: z.string() }), {
   policy: 'stately',
   retryLimit: 5,
-  retryDelay: 30,
+  // 每次重试都算一次失败：60 秒起翻倍，持续约 3 分钟的故障才满 3 次（转连接异常）
+  retryDelay: 60,
   retryBackoff: true,
 });
 
@@ -101,30 +103,53 @@ const mailboxTargetColumns = {
   defaultSite: store.defaultSite,
 };
 
-async function mailboxTarget(db: DbExecutor, address: string): Promise<MailboxTarget | null> {
-  const [row] = await db
+/** 进线邮箱与所属店铺（按地址排序）：可只取某个地址，或只取已 watch（有游标）/ 还没 watch 的 */
+async function mailboxTargets(
+  db: DbExecutor,
+  filter: { readonly address?: string; readonly watched?: boolean } = {},
+): Promise<MailboxTarget[]> {
+  const watched =
+    filter.watched === undefined
+      ? undefined
+      : filter.watched
+        ? isNotNull(mailboxSync.historyId)
+        : isNull(mailboxSync.historyId);
+  return db
     .select(mailboxTargetColumns)
     .from(storeMailbox)
     .innerJoin(store, eq(store.id, storeMailbox.storeId))
-    .where(eq(storeMailbox.address, address))
-    .limit(1);
-  return row ?? null;
+    .leftJoin(mailboxSync, eq(mailboxSync.address, storeMailbox.address))
+    .where(and(filter.address ? eq(storeMailbox.address, filter.address) : undefined, watched))
+    .orderBy(storeMailbox.address);
+}
+
+async function mailboxTarget(db: DbExecutor, address: string): Promise<MailboxTarget | null> {
+  return (await mailboxTargets(db, { address }))[0] ?? null;
 }
 
 function gmailFor(clients: IntegrationClients, target: MailboxTarget): GmailClient {
   return clients.forStore(gmailClient, { id: target.storeId, adapterMode: target.adapterMode });
 }
 
-/** 外部调用的失败记进同步记录（连续 3 次为连接异常）；我们自己的错误不算 */
+/**
+ * 外部调用的失败记进同步记录（连续 3 次为连接异常）。我们自己的错误不算；没配置凭据也不算（还没接通，6.9 的「未连接」）。
+ * 记录本身出错只记日志，不盖掉原来的错误（调用方照常抛原错误）
+ */
 async function noteFailure(
   runtime: Runtime,
   address: string,
   error: unknown,
   logger: Logger,
 ): Promise<void> {
-  if (!(error instanceof ExternalServiceError)) return;
-  const failures = await recordMailboxFailure(runtime, address, error);
-  logger.warn({ err: error, mailbox: address, failures }, 'Gmail 调用失败，已记入同步记录');
+  if (!(error instanceof ExternalServiceError) || error instanceof ClientNotConfiguredError) {
+    return;
+  }
+  try {
+    const failures = await recordMailboxFailure(runtime, address, error);
+    logger.warn({ err: error, mailbox: address, failures }, 'Gmail 调用失败，已记入同步记录');
+  } catch (recordError) {
+    logger.error({ err: recordError, mailbox: address }, '记同步失败时出错');
+  }
 }
 
 /** 开始监听失败后多久再试：1 分钟起翻倍，最多 30 分钟（每次失败都记进同步记录，连续 3 次为连接异常） */
@@ -145,18 +170,12 @@ async function ensureWatches(
   logger: Logger,
   retries: WatchRetries,
 ): Promise<void> {
-  const unwatched: MailboxTarget[] = await runtime.db
-    .select(mailboxTargetColumns)
-    .from(storeMailbox)
-    .innerJoin(store, eq(store.id, storeMailbox.storeId))
-    .leftJoin(mailboxSync, eq(mailboxSync.address, storeMailbox.address))
-    .where(isNull(mailboxSync.historyId));
-  for (const target of unwatched) {
+  for (const target of await mailboxTargets(runtime.db, { watched: false })) {
     const retry = retries.get(target.address);
     if (retry && retry.retryAt > runtime.clock.now().getTime()) continue;
-    let watch: Awaited<ReturnType<GmailClient['watch']>>;
     try {
-      watch = await gmailFor(clients, target).watch(target.address);
+      await startWatching(runtime, gmailFor(clients, target), target, logger);
+      retries.delete(target.address);
     } catch (error) {
       const failures = (retry?.failures ?? 0) + 1;
       const delay = Math.min(WATCH_RETRY_MS * 2 ** (failures - 1), WATCH_RETRY_MAX_MS);
@@ -166,32 +185,40 @@ async function ensureWatches(
         '邮箱开始监听失败，稍后重试',
       );
       await noteFailure(runtime, target.address, error, logger);
-      continue;
     }
-    await transaction(runtime, async (tx) => {
-      await tx.db
-        .insert(mailboxSync)
-        .values({
-          address: target.address,
-          historyId: watch.historyId,
-          watchExpiresAt: watch.expiration,
-          createdAt: tx.now,
-          updatedAt: tx.now,
-        })
-        .onConflictDoUpdate({
-          target: mailboxSync.address,
-          // 已有游标就不动它（续订不能跳过还没同步的消息）
-          set: {
-            historyId: sql`coalesce(${mailboxSync.historyId}, excluded.history_id)`,
-            watchExpiresAt: sql`excluded.watch_expires_at`,
-            updatedAt: sql`excluded.updated_at`,
-          },
-        });
-      await tx.enqueue(gmailSyncJob, { mailbox: target.address }, { singletonKey: target.address });
-    });
-    retries.delete(target.address);
-    logger.info({ mailbox: target.address, historyId: watch.historyId }, '邮箱已开始监听');
   }
+}
+
+/** 给一个邮箱 watch：写下游标与推送到期时间，并立即排一次同步。watch 失败照常抛出 */
+async function startWatching(
+  runtime: Runtime,
+  gmail: GmailClient,
+  target: MailboxTarget,
+  logger: Logger,
+): Promise<void> {
+  const watch = await gmail.watch(target.address);
+  await transaction(runtime, async (tx) => {
+    await tx.db
+      .insert(mailboxSync)
+      .values({
+        address: target.address,
+        historyId: watch.historyId,
+        watchExpiresAt: watch.expiration,
+        createdAt: tx.now,
+        updatedAt: tx.now,
+      })
+      .onConflictDoUpdate({
+        target: mailboxSync.address,
+        // 已有游标就不动它（续订不能跳过还没同步的消息）
+        set: {
+          historyId: sql`coalesce(${mailboxSync.historyId}, excluded.history_id)`,
+          watchExpiresAt: sql`excluded.watch_expires_at`,
+          updatedAt: sql`excluded.updated_at`,
+        },
+      });
+    await tx.enqueue(gmailSyncJob, { mailbox: target.address }, { singletonKey: target.address });
+  });
+  logger.info({ mailbox: target.address, historyId: watch.historyId }, '邮箱已开始监听');
 }
 
 /**
@@ -223,20 +250,9 @@ export function createGmailPushFeed(clients: IntegrationClients): Feed {
   );
 }
 
-/** 已 watch 的邮箱（有游标的） */
-async function watchedMailboxes(db: DbExecutor): Promise<MailboxTarget[]> {
-  return db
-    .select(mailboxTargetColumns)
-    .from(storeMailbox)
-    .innerJoin(store, eq(store.id, storeMailbox.storeId))
-    .innerJoin(mailboxSync, eq(mailboxSync.address, storeMailbox.address))
-    .where(isNotNull(mailboxSync.historyId))
-    .orderBy(storeMailbox.address);
-}
-
 /** 每 5 分钟：给每个已 watch 的邮箱排一次同步 */
 export async function pollMailboxes(runtime: Runtime, logger: Logger): Promise<void> {
-  const targets = await watchedMailboxes(runtime.db);
+  const targets = await mailboxTargets(runtime.db, { watched: true });
   await transaction(runtime, async (tx) => {
     for (const target of targets) {
       await tx.enqueue(gmailSyncJob, { mailbox: target.address }, { singletonKey: target.address });
@@ -251,7 +267,7 @@ export async function renewWatches(
   { runtime, logger }: JobContext,
 ): Promise<void> {
   const failed: unknown[] = [];
-  for (const target of await watchedMailboxes(runtime.db)) {
+  for (const target of await mailboxTargets(runtime.db, { watched: true })) {
     try {
       const watch = await gmailFor(clients, target).watch(target.address);
       await runtime.db
@@ -309,6 +325,9 @@ function messageIdOf(value: string | undefined): string | null {
  *   其余在同一事务里发出「来信已接收」；
  * - 我方发出（「已发送」）：店铺就是发件邮箱的店铺，不识别来源；归到工单与回复识别随 16（届时在这里发「我方发信已同步」）。
  */
+/** 一封邮件入库的结果：新的一封、别的邮箱已收过的同一封（只记「同时发送到」）、同一邮箱里重复投递的（丢弃） */
+type IngestResult = 'created' | 'copy' | 'duplicate';
+
 async function ingestMessage(
   runtime: Runtime,
   target: MailboxTarget,
@@ -317,7 +336,7 @@ async function ingestMessage(
   parsed: Email,
   direction: MessageDirection,
   logger: Logger,
-): Promise<boolean> {
+): Promise<IngestResult> {
   const rfcMessageId = messageIdOf(parsed.messageId);
   const from = firstMailbox(parsed.from);
   const headers = parsed.headers.map((h) => ({ key: h.key, value: h.value }));
@@ -379,7 +398,7 @@ async function ingestMessage(
       .returning({ id: message.id });
     if (!row) {
       logger.info({ mailbox: target.address, gmailMessageId: raw.id }, '重复消息，已丢弃（E-15）');
-      return false;
+      return 'duplicate';
     }
     if (canonical) {
       const seen = [canonical.mailbox, ...canonical.alsoSentTo];
@@ -393,21 +412,21 @@ async function ingestMessage(
         { mailbox: target.address, rfcMessageId, canonicalId: canonical.id },
         '同一封邮件已在别的邮箱收到，只记「同时发送到」（R-TK-07）',
       );
-      return true;
+      return 'copy';
     }
     if (direction === 'outbound') {
       logger.info({ mailbox: target.address, messageId: row.id }, '「已发送」的我方回信已入库');
-      return true;
+      return 'created';
     }
     if (recognized && isArchivedSource(recognized.source)) {
       logger.info(
         { mailbox: target.address, messageId: row.id, source: recognized.source },
         '平台通知或营销邮件，已归档，不建工单',
       );
-      return true;
+      return 'created';
     }
     await tx.enqueue(inboundReceivedJob, { messageId: row.id });
-    return true;
+    return 'created';
   });
 }
 
@@ -454,8 +473,9 @@ async function ingestAll(
       continue;
     }
     const parsed = await PostalMime.parse(raw.raw);
-    const inserted = await ingestMessage(runtime, target, rules, raw, parsed, direction, logger);
-    if (inserted && direction === 'inbound') {
+    const result = await ingestMessage(runtime, target, rules, raw, parsed, direction, logger);
+    // 补拉了几封来信：新入库的来信（含归档的平台通知），别的邮箱已收过的副本不算
+    if (result === 'created' && direction === 'inbound') {
       count += 1;
       if (!from || raw.internalDate < from) from = raw.internalDate;
       if (!to || raw.internalDate > to) to = raw.internalDate;
@@ -602,23 +622,24 @@ export async function syncMailbox(
 
 /**
  * 「测试连接」（K20，2026-10-06 用户确认）：逐个进线邮箱取 users.getProfile，看能不能以该邮箱身份访问；不改连接状态
- * （状态只看同步记录），测完给每个已 watch 的邮箱立即排一次同步——能访问了就马上补拉、恢复
+ * （状态只看同步记录）。能访问但还没 watch 成功的邮箱当场 watch（「重新检测」立即重测并补拉，不用等 worker 的退避；
+ * watch 失败算访问不了），测完给每个已 watch 的邮箱排一次同步——能访问了就马上补拉、恢复
  */
 export async function testGmailConnection(
   runtime: Runtime,
   clients: IntegrationClients,
   logger: Logger,
 ): Promise<{ reachable: string[]; unreachable: string[] }> {
-  const targets: MailboxTarget[] = await runtime.db
-    .select(mailboxTargetColumns)
-    .from(storeMailbox)
-    .innerJoin(store, eq(store.id, storeMailbox.storeId))
-    .orderBy(storeMailbox.address);
+  const unwatched = new Set(
+    (await mailboxTargets(runtime.db, { watched: false })).map((target) => target.address),
+  );
   const reachable: string[] = [];
   const unreachable: string[] = [];
-  for (const target of targets) {
+  for (const target of await mailboxTargets(runtime.db)) {
+    const gmail = gmailFor(clients, target);
     try {
-      await gmailFor(clients, target).profile(target.address);
+      await gmail.profile(target.address);
+      if (unwatched.has(target.address)) await startWatching(runtime, gmail, target, logger);
       reachable.push(target.address);
     } catch (error) {
       logger.warn({ err: error, mailbox: target.address }, '测试连接：邮箱无法访问');

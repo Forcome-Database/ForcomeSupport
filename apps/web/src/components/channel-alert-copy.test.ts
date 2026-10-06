@@ -21,8 +21,8 @@ describe('G4 集成中断横幅（K7 同一写法）', () => {
   it('Gmail：标题与说明', () => {
     const gmail = CHANNEL_ALERT_COPY.gmail;
     for (const html of [GLOBAL_STATES, STATES_ADMIN]) {
-      expectText(html, gmail?.title);
-      expectText(html, gmail?.description('09-11 10:05'));
+      expectText(html, gmail.title);
+      expectText(html, gmail.description('09-11 10:05'));
     }
   });
 

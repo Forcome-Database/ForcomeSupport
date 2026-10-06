@@ -217,8 +217,10 @@ export function createRealDingtalkClient(
       appkey: credentials.clientId,
       appsecret: credentials.clientSecret,
     });
+    // 返回的是访问凭证：调用记录里不留响应体（待办 09）
     const body = await http.getJson(`${OAPI}/gettoken?${query.toString()}`, {
       operation: 'gettoken',
+      secretResponse: true,
     });
     const envelope = checked(parse(oapiEnvelope, body, 'gettoken'), 'gettoken');
     const parsed = parse(tokenSchema, envelope, 'gettoken');
@@ -337,7 +339,7 @@ export function createRealDingtalkClient(
             code: authCode,
             grantType: 'authorization_code',
           },
-          { operation: 'oauth2/userAccessToken' },
+          { operation: 'oauth2/userAccessToken', secretResponse: true },
         );
         userToken = parse(
           z.looseObject({ accessToken: z.string().min(1) }),

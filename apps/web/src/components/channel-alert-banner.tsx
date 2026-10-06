@@ -14,10 +14,10 @@ import { CHANNEL_ALERT_COPY, VIEW_CHANNEL_STATUS } from './channel-alert-copy';
  */
 export function ChannelAlertBanner({ member }: { member: CurrentMember }) {
   const alerts = useQuery(channelAlertsQuery);
-  const shown = (alerts.data ?? []).flatMap((alert) => {
-    const copy = CHANNEL_ALERT_COPY[alert.kind];
-    return copy ? [{ alert, copy }] : [];
-  });
+  const shown = (alerts.data ?? []).map((alert) => ({
+    alert,
+    copy: CHANNEL_ALERT_COPY[alert.kind],
+  }));
   if (shown.length === 0) return null;
   const admin = canOpenPage(member, pages.settingsChannels);
   return (

@@ -15,7 +15,7 @@ export interface CallRecordEntry {
   readonly durationMs: number;
   readonly outcome: 'ok' | 'failed' | 'timeout' | 'network';
   readonly status: number | null;
-  /** 方法与地址（不带查询串：查询串里可能有访问凭证） */
+  /** 方法与地址；查询参数里像凭证的值换成 *** */
   readonly request: string;
   /** 响应体的前一段或错误说明 */
   readonly response: string | null;

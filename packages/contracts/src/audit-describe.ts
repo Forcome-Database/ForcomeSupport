@@ -413,9 +413,9 @@ function channelSummary(before: unknown, after: unknown, ctx: FormatContext): st
   return head;
 }
 
-/** 另有写法的摘要（按快照）：登录、退出、导出、越权访问；其余写第一个变化的字段 */
+/** 另有写法的摘要（按快照）：登录、退出、导出、越权访问、渠道连接；其余写第一个变化的字段 */
 const snapshotSummaries: Partial<
-  Record<AuditSnapshotKind, (after: unknown, ctx: FormatContext) => string>
+  Record<AuditSnapshotKind, (after: unknown, ctx: FormatContext, before: unknown) => string>
 > = {
   login: () => '会话有效期 7 天（无操作）',
   empty: () => EMPTY,
@@ -425,6 +425,7 @@ const snapshotSummaries: Partial<
     isPlainObject(after) && Array.isArray(after.storeIds)
       ? `店铺 ${valueWords(fieldAt('accessDenied', 'storeIds'), after.storeIds, ctx)} 不在授权范围内（R-ST-06）`
       : EMPTY,
+  channel: (after, ctx, before) => channelSummary(before, after, ctx),
 };
 
 /** 来源 IP 的写法：IPv4 映射的 IPv6 地址（::ffff:10.20.1.12，经本机代理直连时会这样记）写成 IPv4 */
@@ -523,9 +524,7 @@ export function describeAuditRecord(
     }
   }
   const special = snapshotSummaries[kind];
-  if (special) return { ...base, summary: special(after, ctx), more: 0, fields };
-  if (kind === 'channel')
-    return { ...base, summary: channelSummary(before, after, ctx), more: 0, fields };
+  if (special) return { ...base, summary: special(after, ctx, before), more: 0, fields };
   const summary = !first
     ? EMPTY
     : first.hidden

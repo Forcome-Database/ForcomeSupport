@@ -111,8 +111,7 @@ export async function storeNamesById(
   return new Map(rows.map((row) => [row.id, row.name]));
 }
 
-/** 接口输出（contracts 的 Store） */
-/** 店铺的接口输出；「状态」列按这一刻的同步记录算（connections.ts） */
+/** 店铺的接口输出（contracts 的 Store）；「状态」列按这一刻的同步记录算（connections.ts） */
 export function toStore(record: StoreRecord, connections: ConnectionSnapshot): Store {
   return {
     id: record.id,

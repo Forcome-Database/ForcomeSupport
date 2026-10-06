@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import type { GoogleCredentials } from '../core';
 import type { RealClientContext } from './definition';
-import { CursorExpiredError, ExternalCallFailedError, ExternalTimeoutError } from './faults';
+import {
+  ClientNotConfiguredError,
+  CursorExpiredError,
+  ExternalCallFailedError,
+  ExternalTimeoutError,
+} from './faults';
 import type { GmailClient, GmailNotification, GmailPushClient, GmailRawMessage } from './gmail';
 import { createGoogleTokens, type GoogleTokens } from './google-auth';
 import { createHttpClient, type HttpClient, type RateLimit } from './http';
@@ -75,12 +80,12 @@ function parse<T extends z.ZodType>(
   return parsed.data;
 }
 
-function notConfigured(system: string, operation: string): ExternalCallFailedError {
-  return new ExternalCallFailedError(system, operation, {
-    message:
-      '没有配置 Google 服务账号与 Pub/Sub（GOOGLE_SERVICE_ACCOUNT_KEY_FILE 等，docs/部署说明.md 第 12 节）',
-    retryable: false,
-  });
+function notConfigured(system: string, operation: string): ClientNotConfiguredError {
+  return new ClientNotConfiguredError(
+    system,
+    operation,
+    '没有配置 Google 服务账号与 Pub/Sub（GOOGLE_SERVICE_ACCOUNT_KEY_FILE 等，docs/部署说明.md 第 12 节）',
+  );
 }
 
 const isStatus = (error: unknown, status: number) =>
@@ -282,7 +287,7 @@ function withCredentials<C>(
   operations: readonly (keyof C)[],
 ): C {
   if (credentials) return create(credentials);
-  // 没配置：每个操作都以「未配置」失败（不可重试），P18 据此显示连接异常
+  // 没配置：每个操作都以「未配置」失败（不可重试）；收信不把它算进连续失败，P18 为「未连接」
   return Object.fromEntries(
     operations.map((operation) => [
       operation,

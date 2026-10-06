@@ -56,6 +56,7 @@ export {
 export { type FakeMailInput } from './gmail-mime';
 export { MailRecipientGuard, MailRecipientNotAllowedError } from './mail-recipient-guard';
 export {
+  ClientNotConfiguredError,
   ConnectionLostError,
   CursorExpiredError,
   ExternalCallFailedError,

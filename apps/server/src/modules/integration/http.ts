@@ -12,7 +12,8 @@ import { ExternalCallFailedError, ExternalTimeoutError } from './faults';
  *   ExternalCallFailedError——业务代码只处理 faults.ts 的这一套错误（同 Fake）；
  * - 限流（待办 09）：按「系统 × 接口」，各系统在建客户端时给出每个接口（或 '*' 为每个接口各自）每秒最多几次，
  *   超出的调用排队等（p-throttle）；限流器整个进程共用，同一系统的几个客户端实例（如按店铺新建的 Gmail）一起算；
- * - 调用记录（待办 09）：每次调用（含失败、超时）交给 CallRecorder 一条：系统、动作、店铺、耗时、状态码、请求与响应摘要。
+ * - 调用记录（待办 09）：每次调用（含失败、超时）交给 CallRecorder 一条：系统、动作、店铺、耗时、状态码、请求与响应摘要
+ *   （请求写方法与地址，查询参数里像凭证的值换成 ***；换令牌这类 secretResponse 的响应体不记）。
  */
 
 let sharedDispatcher: Dispatcher | undefined;
@@ -93,10 +94,16 @@ type Body =
   | { readonly kind: 'json'; readonly value: unknown }
   | { readonly kind: 'form'; readonly value: Readonly<Record<string, string>> };
 
-/** 调用记录里的地址：去掉查询串（里面可能有 access_token） */
+/** 查询参数里像凭证的（access_token、appsecret、appkey、授权码、分页令牌等）：调用记录里写成 *** */
+const SECRET_PARAM = /token|secret|key|password|assertion|code|ticket/i;
+
+/** 调用记录里的请求：方法与地址，查询参数照写（排错要看 startHistoryId 这类参数），像凭证的值换成 *** */
 function requestSummary(method: string, url: string): string {
   const parsed = new URL(url);
-  return `${method} ${parsed.origin}${parsed.pathname}`;
+  for (const name of new Set(parsed.searchParams.keys())) {
+    if (SECRET_PARAM.test(name)) parsed.searchParams.set(name, '***');
+  }
+  return `${method} ${parsed.origin}${parsed.pathname}${decodeURIComponent(parsed.search)}`;
 }
 
 /**

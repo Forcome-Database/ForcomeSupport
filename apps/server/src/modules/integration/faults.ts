@@ -76,6 +76,18 @@ export class CursorExpiredError extends ExternalServiceError {
   }
 }
 
+/**
+ * 真实现要的凭据没有配置（例如 Gmail 的 Google 服务账号）：不是连接出了故障，而是还没接通——调用方不把它算进连续失败
+ * （连接状态为「未连接」，PRD 6.9），不可重试
+ */
+export class ClientNotConfiguredError extends ExternalServiceError {
+  override name = 'ClientNotConfiguredError';
+
+  constructor(system: string, operation: string, message: string) {
+    super(system, operation, message, false);
+  }
+}
+
 /** 连接断开（长连接掉线、网络不通），恢复后再继续 */
 export class ConnectionLostError extends ExternalServiceError {
   override name = 'ConnectionLostError';
