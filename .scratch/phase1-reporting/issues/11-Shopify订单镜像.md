@@ -1,6 +1,6 @@
 # 11: Shopify 订单镜像
 
-Status: ready-for-agent
+Status: claimed
 Blocked by: 07, 09, 31
 
 规格：[第一期：报表与台账](../spec.md)
