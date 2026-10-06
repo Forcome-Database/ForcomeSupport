@@ -123,3 +123,7 @@ status: accepted
 ## 修订（2026-10-06，待办 12 落地）
 
 - **迁移 0024**：`order.platform_order` 加亚马逊的列（`fulfillment_channel` MFN / AFN、`promised_ship_by`、`promised_delivery_by`），金额与币种改为可空（亚马逊待付款的订单还没有金额；CHECK `platform_order_total_pair` 要求两列同时有或同时没有）；`order.order_sync.source` 加 `amazon_orders`（取值由应用层枚举约束）；新表 `order.order_queue`（订单通知队列的拉取与检查记录，整个环境一个队列一行，UUIDv7 主键 + `name` 唯一）。
+
+## 修订（2026-10-07，待办 16 落地）
+
+- **迁移 0027**：`ticket.ticket_message` 加来信的 `source`、`channel`、`first_reply_at`、应回复来信的 `sla_due_at` 与 `sla_result`（取值由应用层枚举约束；CHECK `ticket_message_sla_pair` 要求两列同时有或同时没有——生产厂、其他供应商的来信与我方回复都没有），我方回复的 `auto_reply`（默认 false）；部分索引 `ticket_message_sla_pending_idx (sla_due_at) WHERE sla_result = 'pending'` 与 `ticket_open_last_inbound_idx (status, last_inbound_at) WHERE status <> 'closed'` 给每分钟扫描用；`ticket.status_change` 加 `channel_message_id`（触发的消息，跨模块不设外键）；新表 `ticket.pending_reply`（等来信的我方回复：`channel_message_id` 唯一、它回复的 Message-ID 数组 `reply_to`、`(mailbox, gmail_thread_id)` 索引；只存不满 24 小时的，表很小，按 `= ANY(reply_to)` 查不另建 GIN）。**迁移 0028**（自定义迁移）回填已部署的工单消息与状态变更记录。

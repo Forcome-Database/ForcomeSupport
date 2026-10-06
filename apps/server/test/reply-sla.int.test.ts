@@ -17,7 +17,7 @@ import {
   type FakeGmail,
   type FakeMailInput,
 } from '../src/modules/integration';
-import { ticketTimeLimitsJob } from '../src/modules/ticket';
+import { attributeReplyJob, ticketTimeLimitsJob } from '../src/modules/ticket';
 import type { ApiClient } from './api-client';
 import { startTestHarness, type TestHarness } from './harness';
 
@@ -313,6 +313,10 @@ describe('回复识别与 SLA（R-SL-08）', () => {
     await t.runJobs();
     gmail.redeliver(AUTO.mailbox, gmailId);
     await t.runJobs();
+    // 回复识别的任务再跑一次（重试或重复排队）
+    const [sent] = outbound(await onlyTicketOf(agent, 'Lou Fenn'));
+    await t.enqueue(attributeReplyJob, { messageId: sent!.id });
+    await t.runJobs();
 
     const detail = await onlyTicketOf(agent, 'Lou Fenn');
     expect(outbound(detail)).toHaveLength(1);
@@ -380,6 +384,33 @@ describe('乱序：回复先于它所回复的来信入库（R-SL-08）', () => 
       { firstReplyAt: iso('2026-09-10T10:30:00+08:00'), result: 'met' },
       { firstReplyAt: iso('2026-09-10T10:30:00+08:00'), result: 'met' },
     ]);
+  });
+
+  it('来信与回信同一批同步、两边的任务同时跑：回信照样归属（「找不到 → 等着」与「归并 → 找等着的」按咨询锁互斥）', async () => {
+    t.clock.set('2026-09-10T12:30:00+08:00');
+    for (const [buyer, n] of [
+      ['Eve Dunn', 1],
+      ['Fox Hale', 2],
+      ['Gwen Ito', 3],
+    ] as const) {
+      gmail.deliver(
+        amazonLetter(buyer, `<same-batch-${n}@buyer.example>`, '2026-09-10T12:00:00+08:00'),
+      );
+      gmail.send(
+        reply(buyer, '2026-09-10T12:20:00+08:00', {
+          'In-Reply-To': `<same-batch-${n}@buyer.example>`,
+        }),
+      );
+    }
+    await t.runJobs({ concurrently: true });
+    for (const buyer of ['Eve Dunn', 'Fox Hale', 'Gwen Ito']) {
+      const detail = await onlyTicketOf(agent, buyer);
+      expect([buyer, detail.ticket.status, outbound(detail).length]).toEqual([
+        buyer,
+        'awaiting_customer',
+        1,
+      ]);
+    }
   });
 
   it('回信最多等 24 小时：过了 24 小时对应的来信才到，不再归属（工单是待回复）', async () => {
