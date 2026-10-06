@@ -70,11 +70,11 @@ Blocked by: 07, 09, 31
 
 - 开发测试环境的 Shopify 卡头比原型多一枚「模拟数据」标签，卡头一行放不下时右侧标签（模拟数据 · 状态 · 测试连接）折到第二行，卡名完整；真实环境没有这枚标签，与原型一样一行。卡名不收缩：比 1440 更窄的窗口里卡头可能挤（系统按 1440 设计，桌面使用）。
 - Shopify 卡没有「订单回补 60 天 · 未开通 read_all_orders」一行（Q7，随 13），与第一期参照图不同。
-- 卡上「最近同步」是实际同步时刻（截图里 10:20，原型示例 10:15）。
+- 卡上「最近同步」是实际同步时刻（截图里 10:19，原型示例 10:15）。
 
 **截图与逐项核对**（1440 × 900，`.scratch/phase1-reporting/shots/`；本机开发服务 api 4516 + worker + 前端 4517，示例数据夹具，演示时刻 2026-09-11 10:20；异常状态用接口桩换成原型 K20 补充小样的示例值）
 
-- `11-p18-settings.png` 对照 `design/spec/shots/phase1/P18_Settings.png`：Shopify 卡头「Shopify Admin API · 最近同步 10:20 · 已连接 · 测试连接」、店铺行「2 个店铺 · 订单经 Admin API 准实时同步」，店铺表两个 Shopify 店铺「已连接 / Gmail · Admin API」——一致；差异见上一节（模拟数据标签、回补窗口行随 13）。
+- `11-p18-settings.png` 对照 `design/spec/shots/phase1/P18_Settings.png`：Shopify 卡头「Shopify Admin API · 最近同步 10:19 · 已连接 · 测试连接」、店铺行「2 个店铺 · 订单经 Admin API 准实时同步」，店铺表两个 Shopify 店铺「已连接 / Gmail · Admin API」——一致；差异见上一节（模拟数据标签、回补窗口行随 13）。
 - `11-p18-shopify-delayed.png` 对照 K20 补充小样「Shopify 同步延迟」：浅黄卡「同步延迟」「最近同步 10:05」，延迟行在前、店铺行照常，没有「重新检测」；店铺表 forcome.mx「Admin API 同步延迟」——一致。
 - `11-p18-shopify-error.png` 对照 K20 补充小样「Shopify 连接异常」与 G4：顶部红色横幅「Shopify 订单同步中断」与说明逐字一致、管理员有「查看渠道状态」；卡浅红「连接异常」「最近同步 10:04」，原因行、暂停同步行、卡底主色「重新检测」带刷新图标；店铺表「Admin API 连接异常」——一致。
 - `11-p18-shopify-test-ok.png`、`11-p18-shopify-test-failed.png` 对照 K20 补充小样的浮层：成功绿勾「连接正常 · Shopify：2 个店铺均可访问」；失败红叉「测试连接失败：forcome.mx 无法访问 · 请检查 Admin API 应用凭据与授权范围」——一致。
