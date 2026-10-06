@@ -268,6 +268,7 @@ export function TeamPage() {
     setErrors(NO_ERRORS);
     setConflicts(null);
     setWaitingOnline(false);
+    dismissToast(SAVE_TOAST);
     dismissToast(OFFLINE_TOAST);
   }
 

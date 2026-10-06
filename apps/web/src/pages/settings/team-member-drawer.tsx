@@ -1,6 +1,7 @@
 import {
   roleLabels,
   roleNames,
+  teamMessages,
   teamRoles,
   type Role,
   type StoreScopeValue,
@@ -10,7 +11,7 @@ import {
 } from '@forcome/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronDown } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { FormField, useFocusField } from '@/components/form-field';
 import { LoadError } from '@/components/load-error';
@@ -178,6 +179,8 @@ function TeamMemberDrawerContent({
   const { isDirty } = formState;
   // 断网时立即给失败浮层（G5「保存失败：网络不可用」），不暂停到恢复联网（TanStack Query 的默认）
   const add = useMutation({ mutationFn: api.addTeamMember, networkMode: 'always' });
+  // 关闭抽屉（含放弃）后撤掉它的失败浮层：不能再从浮层重试已放弃的添加
+  useEffect(() => () => dismissToast(SAVE_TOAST), []);
   const focusField = useFocusField();
 
   async function added(member: TeamMember) {
@@ -200,6 +203,8 @@ function TeamMemberDrawerContent({
     if (endSessionIfUnauthenticated(queryClient, error)) return true;
     if (!(error instanceof ApiRequestError && error.status === 400 && error.fields)) return false;
     const fields = error.fields;
+    // 选的人刚被停用或已不在成员表里（报「请选择成员」）：清掉选择，触发框回到「请选择」；刚被别人添加的仍写他（K17 补充小样 ⑧）
+    if (fields.memberId === teamMessages.memberRequired) form.setValue('memberId', null);
     for (const name of FIELD_ORDER) {
       const message = fields[name];
       if (message) setError(name, { type: 'server', message });

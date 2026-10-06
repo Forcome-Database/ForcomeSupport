@@ -186,8 +186,11 @@ export function editsAfterReload(edits: TeamEdits, latest: readonly TeamMember[]
 }
 
 /**
- * 保存成功之后还剩的修改：这次提交出去的（sent 里的同一份）都已保存；提交期间又改了的格子留着，依据换成刚保存好的最新一行
- * （latest），不让「保存」把提交之后的改动一并清掉
+ * 保存成功之后还剩的修改（不让「保存」把提交之后的改动一并清掉）：
+ * - 提交出去的那一份（sent 里的同一份）已保存，清掉；
+ * - 提交出去之后同一个人又改了：留着，依据换成刚保存好的那一行（那一版是这次保存写的）；
+ * - 提交之后才改的人（不在 sent 里）：原样留着，依据仍是开始改时的那一版——期间被别人改过的，下次保存照样报 409（G7），
+ *   不会悄悄覆盖
  */
 export function editsAfterSave(
   current: TeamEdits,
@@ -197,9 +200,13 @@ export function editsAfterSave(
   const byId = new Map(latest.map((m) => [m.id, m]));
   let next: TeamEdits = new Map();
   for (const [id, edit] of current) {
-    const now = byId.get(id);
-    if (sent.get(id) === edit || !now || now.status !== 'active') continue;
-    next = applyEdit(next, now, { roles: edit.roles, stores: edit.stores });
+    if (sent.get(id) === edit) continue;
+    if (!sent.has(id)) {
+      next = new Map(next).set(id, edit);
+      continue;
+    }
+    const saved = byId.get(id);
+    if (saved) next = applyEdit(next, saved, { roles: edit.roles, stores: edit.stores });
   }
   return next;
 }

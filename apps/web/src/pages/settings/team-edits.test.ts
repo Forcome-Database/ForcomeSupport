@@ -153,7 +153,7 @@ describe('并发（G7）', () => {
 });
 
 describe('保存成功之后', () => {
-  it('提交出去的修改清掉；提交期间又改的留着，依据换成刚保存好的那一版', () => {
+  it('提交出去的修改清掉；提交之后才改的人原样留着，依据仍是开始改时的那一版', () => {
     const sent = applyEdit(none, zhaoqian, { stores: { all: true } });
     // 提交之后、成功之前又改了李婷
     const current = applyEdit(sent, liting, { roles: ['agent', 'supervisor'] });
@@ -163,7 +163,20 @@ describe('保存成功之后', () => {
     ];
     const next = editsAfterSave(current, sent, latest);
     expect([...next.keys()]).toEqual(['lt']);
-    expect(next.get('lt')).toMatchObject({ roles: ['agent', 'supervisor'], base: { version: 1 } });
+    expect(next.get('lt')).toBe(current.get('lt'));
+  });
+
+  it('提交之后才改的人在这期间被别人改过：依据不换成最新的，下次保存带旧版本号（服务端报 409，不悄悄覆盖）', () => {
+    const sent = applyEdit(none, zhaoqian, { stores: { all: true } });
+    const current = applyEdit(sent, liting, { roles: ['agent', 'supervisor'] });
+    const latest = [
+      { ...zhaoqian, version: 2, stores: { all: true } as const },
+      { ...liting, version: 7, roles: ['agent', 'admin'] as TeamMember['roles'] },
+    ];
+    const next = editsAfterSave(current, sent, latest);
+    expect(teamChangesOf(next)).toEqual([
+      { id: 'lt', version: 1, roles: ['agent', 'supervisor'], stores: { all: true } },
+    ]);
   });
 
   it('提交出去之后同一个人又改了：留着，依据是保存好的那一版（不再按旧版本号提交）', () => {

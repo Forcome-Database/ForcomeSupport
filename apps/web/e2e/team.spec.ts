@@ -247,6 +247,42 @@ test('「从钉钉添加」：有输入时关闭弹 G8；保存失败浮层的�
   await expect(drawer(page).getByLabel(/^成员/)).toHaveText(NEWCOMER);
 });
 
+test('「从钉钉添加」：选的人刚被停用时清掉选择、触发框回到「请选择」；放弃并关闭抽屉后失败浮层一并撤掉（接口桩按 contracts 严格解析）', async ({
+  page,
+}) => {
+  await loginAs(page, '刘洋');
+  await resetNewcomer(page);
+  await openTeam(page);
+  await page.getByRole('button', { name: '从钉钉添加' }).click();
+  await pickNewcomer(page);
+  await drawer(page).getByRole('checkbox', { name: '坐席' }).click();
+  await drawer(page).getByRole('radio', { name: '全部店铺（含以后新增的）' }).click();
+  await page.route('**/api/org/team/members', (route) =>
+    route.fulfill({
+      status: 400,
+      json: apiErrorSchema.parse({
+        error: 'invalid_request',
+        message: '请按提示修改后再保存',
+        fields: { memberId: '请选择成员' },
+      }),
+    }),
+  );
+  await drawer(page).getByRole('button', { name: '保存' }).click();
+  await expect(drawer(page).getByText('请选择成员', { exact: true })).toBeVisible();
+  await expect(drawer(page).getByLabel(/^成员/)).toHaveText('请选择');
+  await page.unroute('**/api/org/team/members');
+
+  await pickNewcomer(page);
+  await page.route('**/api/org/team/members', (route) => route.abort());
+  await drawer(page).getByRole('button', { name: '保存' }).click();
+  await expect(page.getByText('保存失败：网络不可用')).toBeVisible();
+  await drawer(page).getByRole('button', { name: '取消' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '放弃修改' }).click();
+  await expect(drawer(page)).toHaveCount(0);
+  await expect(page.getByText('保存失败：网络不可用')).toHaveCount(0);
+  await page.unroute('**/api/org/team/members');
+});
+
 test('格内修改（K6）：改角色与数据范围 → 已修改与保存栏摘要 → 保存成功浮层；只剩一个角色时不能取消；改回原值不算修改', async ({
   page,
 }) => {
@@ -477,6 +513,39 @@ test('并发（G7）几个人同时冲突：标题写「等 N 人」、不写是
   await alert.getByRole('button', { name: '查看最新' }).click();
   await expect(alert).toHaveCount(0);
   await expect(saveBar(page)).toContainText('没有未保存的修改');
+  await page.unroute('**/api/org/team');
+
+  // 一个人但对不出是谁改的（他已不在成员表里，例如刚回到通讯录、角色被清空）：同样写「他人」，不写时刻（协调者 10-06 决定）；
+  // 覆盖保存时这个人放弃修改，一个都不剩就不提交
+  await editScope(page, 'Forcome Direct');
+  let saves = 0;
+  await page.route('**/api/org/team', async (route) => {
+    if (route.request().method() === 'PUT') {
+      saves += 1;
+      return route.fulfill({
+        status: 409,
+        json: apiErrorSchema.parse({ error: 'optimistic_lock', message: '数据已被他人修改' }),
+      });
+    }
+    const team = teamSchema.parse(await (await route.fetch()).json());
+    return route.fulfill({
+      json: teamSchema.parse({
+        ...team,
+        members: team.members.filter((m) => m.name !== NEWCOMER),
+      }),
+    });
+  });
+  await saveBar(page).getByRole('button', { name: '保存' }).click();
+  await expect(alert).toContainText(`${NEWCOMER}刚被他人修改`);
+  await expect(alert).not.toContainText('（');
+  await alert.getByRole('button', { name: '覆盖保存' }).click();
+  const confirm = page.getByRole('alertdialog');
+  await expect(confirm.getByRole('heading', { name: '覆盖他人的修改？' })).toBeVisible();
+  await expect(confirm).toContainText('他人 保存的内容会被你的内容替换，覆盖后记入审计日志。');
+  await confirm.getByRole('button', { name: '覆盖保存' }).click();
+  await expect(alert).toHaveCount(0);
+  await expect(saveBar(page)).toContainText('没有未保存的修改');
+  expect(saves).toBe(1);
   await page.unroute('**/api/org/team');
 });
 
