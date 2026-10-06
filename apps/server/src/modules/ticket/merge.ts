@@ -294,18 +294,18 @@ export async function mergeInbound(
       );
     } else {
       // 追加（待回复保持待回复，等客户、已解决回到待回复）或重开（已关闭 → 待回复）：状态按迁移表变化；
-      // 已被回复的晚到来信追加时状态不变（迁移表看的是未回复来信）。最近来信取较晚的一封（来信可能乱序到达）
+      // 已被回复的晚到来信不是未回复来信（1.4），状态不变——追加不迁移，已关闭的也不重开、只归进这张工单。
+      // 最近来信取较晚的一封（来信可能乱序到达）
       firstReplyAt = await firstReplyAfter(tx, target.ticket.id, mail.receivedAt);
-      const current =
-        target.kind === 'append' && firstReplyAt
-          ? target.ticket
-          : await applyTransition(
-              tx,
-              target.ticket,
-              target.kind === 'reopen' ? 'inbound_reopen' : 'inbound',
-              systemActor,
-              cause,
-            );
+      const current = firstReplyAt
+        ? target.ticket
+        : await applyTransition(
+            tx,
+            target.ticket,
+            target.kind === 'reopen' ? 'inbound_reopen' : 'inbound',
+            systemActor,
+            cause,
+          );
       const latest =
         mail.receivedAt > current.lastInboundAt ? mail.receivedAt : current.lastInboundAt;
       merged = await updateWithVersion(tx, ticket, current, {
@@ -323,7 +323,6 @@ export async function mergeInbound(
       channel,
       ...inboundSlaColumns({
         source,
-        channel,
         receivedAt: mail.receivedAt,
         firstReplyAt,
         now: tx.now,
@@ -332,8 +331,14 @@ export async function mergeInbound(
     });
     await retryWaitingReplies(tx, mail);
     logger.info(
-      { messageId, ticket: merged.number, orderNumber, merged: target.kind },
-      MERGED_LOG[target.kind],
+      {
+        messageId,
+        ticket: merged.number,
+        orderNumber,
+        merged: target.kind,
+        answered: !!firstReplyAt,
+      },
+      firstReplyAt ? '已被回复的晚到来信归进工单，状态不变' : MERGED_LOG[target.kind],
     );
   });
 }

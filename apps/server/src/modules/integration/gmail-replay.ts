@@ -83,6 +83,28 @@ export function fixtureMails(fixture: DemoFixture): ReplayMail[] {
     const threadId = `demo-${ticket.no}`;
     const letters: string[] = [];
     const mails: ReplayMail[] = [];
+    /** 店铺邮箱「已发送」里的一封：回复到此为止的最后一封来信，References 列出之前的来信，同一线程 */
+    const reply = (
+      mailbox: string,
+      part: string,
+      at: string | Date,
+      text: string,
+      headers: Readonly<Record<string, string>> = {},
+    ): ReplayMail => ({
+      mailbox,
+      sent: true,
+      mail: {
+        to: from.address,
+        from: { address: mailbox },
+        subject: `Re: ${ticket.subject}`,
+        text,
+        at,
+        messageId: messageIdOf(ticket.no, part),
+        headers: { ...headers, 'In-Reply-To': letters.at(-1)!, References: letters.join(' ') },
+        gmailId: `demo-${ticket.no}-${part}`,
+        threadId,
+      },
+    });
     for (const entry of entries) {
       if (entry.direction === 'inbound') {
         const index = letters.length + 1;
@@ -109,45 +131,13 @@ export function fixtureMails(fixture: DemoFixture): ReplayMail[] {
         letters.push(messageId);
       } else {
         const index = mails.filter((m) => m.sent).length + 1;
-        mails.push({
-          mailbox: store.mailbox,
-          sent: true,
-          mail: {
-            to: from.address,
-            from: { address: store.mailbox },
-            subject: `Re: ${ticket.subject}`,
-            text: entry.body,
-            at: entry.at,
-            messageId: messageIdOf(ticket.no, `r${index}`),
-            headers: { 'In-Reply-To': letters.at(-1)!, References: letters.join(' ') },
-            gmailId: `demo-${ticket.no}-r${index}`,
-            threadId,
-          },
-        });
+        mails.push(reply(store.mailbox, `r${index}`, entry.at, entry.body));
       }
     }
     // I18 的自动回复：我方邮箱对这张工单的来信自动回复，带 Auto-Submitted
     const auto = fixture.autoReply;
     if (auto.ticket === ticket.no) {
-      mails.push({
-        mailbox: auto.from,
-        sent: true,
-        mail: {
-          to: from.address,
-          from: { address: auto.from },
-          subject: `Re: ${ticket.subject}`,
-          text: auto.body,
-          at: auto.at,
-          messageId: messageIdOf(ticket.no, 'auto'),
-          headers: {
-            ...auto.headers,
-            'In-Reply-To': letters.at(-1)!,
-            References: letters.join(' '),
-          },
-          gmailId: `demo-${ticket.no}-auto`,
-          threadId,
-        },
-      });
+      mails.push(reply(auto.from, 'auto', auto.at, auto.body, auto.headers));
     }
     return mails;
   });

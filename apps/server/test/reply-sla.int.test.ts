@@ -258,18 +258,39 @@ describe('回复识别与 SLA（R-SL-08）', () => {
     ]);
   });
 
-  it('In-Reply-To 对不上时按 References（从最近的一封往前）归属', async () => {
+  it('没有 In-Reply-To 时按 References（从最近的一封往前）归属', async () => {
     t.clock.set('2026-09-10T14:00:00+08:00');
     gmail.deliver(amazonLetter('Gus Lowe', '<refs-1@buyer.example>', '2026-09-10T13:00:00+08:00'));
     await t.runJobs();
     gmail.send(
       reply('Gus Lowe', '2026-09-10T13:30:00+08:00', {
-        'In-Reply-To': '<unknown@elsewhere.example>',
         References: '<older@elsewhere.example> <refs-1@buyer.example>',
       }),
     );
     await t.runJobs();
     expect((await onlyTicketOf(agent, 'Gus Lowe')).ticket.status).toBe('awaiting_customer');
+  });
+
+  it('In-Reply-To 指向归档的平台通知（不会归并成工单）时不等它，接着按 References 归属', async () => {
+    t.clock.set('2026-09-10T14:10:00+08:00');
+    gmail.deliver(amazonLetter('Ned Ross', '<refs-2@buyer.example>', '2026-09-10T13:00:00+08:00'));
+    gmail.deliver({
+      to: AUTO.mailbox,
+      from: { name: 'Amazon', address: 'no-reply@amazon.com' },
+      subject: 'Your listing was updated',
+      text: 'Notification',
+      at: '2026-09-10T13:05:00+08:00',
+      messageId: '<notice@amazon.example>',
+    });
+    await t.runJobs();
+    gmail.send(
+      reply('Ned Ross', '2026-09-10T13:30:00+08:00', {
+        'In-Reply-To': '<notice@amazon.example>',
+        References: '<refs-2@buyer.example> <notice@amazon.example>',
+      }),
+    );
+    await t.runJobs();
+    expect((await onlyTicketOf(agent, 'Ned Ross')).ticket.status).toBe('awaiting_customer');
   });
 
   it('没有回复头（海帆另起的信）时按 Gmail 线程归属', async () => {
@@ -429,6 +450,59 @@ describe('乱序：回复先于它所回复的来信入库（R-SL-08）', () => 
     const detail = await onlyTicketOf(agent, 'Cal Hart');
     expect(detail.ticket.status).toBe('awaiting_reply');
     expect(outbound(detail)).toEqual([]);
+  });
+
+  it('In-Reply-To 指向还没入库的来信时等它，不按线程归到同一线程里别的工单；它归并后归属', async () => {
+    t.clock.set('2026-09-15T10:00:00+08:00');
+    const [gmailId] = gmail.deliver(
+      amazonLetter('Ira Bell', '<thread-a@buyer.example>', '2026-09-15T09:00:00+08:00'),
+    );
+    await t.runJobs();
+    // 回信回的是另一位客户的信（还没同步进来），但落在同一个 Gmail 线程里
+    gmail.send(
+      reply(
+        'Jo Pike',
+        '2026-09-15T09:40:00+08:00',
+        { 'In-Reply-To': '<thread-b@buyer.example>' },
+        { threadId: gmailId! },
+      ),
+    );
+    await t.runJobs();
+    expect((await onlyTicketOf(agent, 'Ira Bell')).ticket.status).toBe('awaiting_reply');
+
+    gmail.deliver(amazonLetter('Jo Pike', '<thread-b@buyer.example>', '2026-09-15T09:30:00+08:00'));
+    await t.runJobs();
+    expect((await onlyTicketOf(agent, 'Jo Pike')).ticket.status).toBe('awaiting_customer');
+    expect(outbound(await onlyTicketOf(agent, 'Ira Bell'))).toEqual([]);
+  });
+
+  it('等满 24 小时它回复的来信仍没来：最后识别一次，按 References、线程归属', async () => {
+    t.clock.set('2026-09-16T10:00:00+08:00');
+    const [gmailId] = gmail.deliver(
+      amazonLetter('Kim Rowe', '<final-a@buyer.example>', '2026-09-16T09:00:00+08:00'),
+    );
+    await t.runJobs();
+    gmail.send(
+      reply(
+        'Kim Rowe',
+        '2026-09-16T09:30:00+08:00',
+        { 'In-Reply-To': '<never@buyer.example>' },
+        { threadId: gmailId! },
+      ),
+    );
+    await t.runJobs();
+    expect((await onlyTicketOf(agent, 'Kim Rowe')).ticket.status).toBe('awaiting_reply');
+
+    t.clock.set('2026-09-17T10:00:00+08:00');
+    agent = await t.loginAs('坐席');
+    await t.enqueue(ticketTimeLimitsJob, {});
+    await t.runJobs();
+    const detail = await onlyTicketOf(agent, 'Kim Rowe');
+    expect(detail.ticket.status).toBe('awaiting_customer');
+    expect(slaOf(inbound(detail)[0]!)).toEqual({
+      firstReplyAt: iso('2026-09-16T09:30:00+08:00'),
+      result: 'met',
+    });
   });
 
   it('24 小时内的等待照常归属（扫描只放弃满 24 小时的）', async () => {
@@ -698,7 +772,7 @@ describe('生产厂来信（AC-P1-04 的 SLA 部分）与时限扫描（AC-TK-07
     ]);
   });
 
-  it('关闭后的回信只进全程记录，不再改状态与 SLA 结果（R-SL-07：关闭时未回复的计未达标）', async () => {
+  it('关闭后才同步进来的回信：进全程记录、记首次回复（首响照样统计），不改状态；超时后才回的仍是未达标（R-SL-07）', async () => {
     await travel('2026-10-05T10:00:00+08:00');
     gmail.send(
       reply('Lea Voss', '2026-10-05T09:00:00+08:00', { 'In-Reply-To': '<idle14-2@buyer.example>' }),
@@ -708,8 +782,58 @@ describe('生产厂来信（AC-P1-04 的 SLA 部分）与时限扫描（AC-TK-07
     expect(detail.ticket.status).toBe('closed');
     expect(outbound(detail)).toHaveLength(1);
     expect(inbound(detail).map(slaOf)).toEqual([
-      { firstReplyAt: null, result: 'missed' },
-      { firstReplyAt: null, result: 'missed' },
+      { firstReplyAt: iso('2026-10-05T09:00:00+08:00'), result: 'missed' },
+      { firstReplyAt: iso('2026-10-05T09:00:00+08:00'), result: 'missed' },
+    ]);
+  });
+
+  it('晚到的来信早于已关闭工单里已归属的回复：已被回复，不重开，只归进这张工单（不记工单量事件）', async () => {
+    await travel('2026-10-10T10:01:00+08:00');
+    amazon.put(AUTO.id, {
+      orderId: '113-2000003-0000003',
+      updatedAt: new Date('2026-10-01T10:00:00+08:00'),
+      createdAt: new Date('2026-10-01T10:00:00+08:00'),
+    });
+    gmail.deliver(
+      amazonLetter(
+        'Max Lind',
+        '<late-reopen-2@buyer.example>',
+        '2026-10-10T10:00:00+08:00',
+        'Order 113-2000003-0000003',
+      ),
+    );
+    await t.runJobs();
+    gmail.send(
+      reply('Max Lind', '2026-10-10T11:00:00+08:00', {
+        'In-Reply-To': '<late-reopen-2@buyer.example>',
+      }),
+    );
+    await t.runJobs();
+    await scanAt('2026-10-17T10:00:00+08:00');
+    expect((await onlyTicketOf(agent, 'Max Lind')).ticket.status).toBe('closed');
+
+    // 回信之前的一封（10-10 09:00）这时才同步进来
+    gmail.deliver(
+      amazonLetter(
+        'Max Lind',
+        '<late-reopen-1@buyer.example>',
+        '2026-10-10T09:00:00+08:00',
+        'Order 113-2000003-0000003',
+      ),
+    );
+    await t.runJobs();
+    const detail = await onlyTicketOf(agent, 'Max Lind');
+    expect(detail.ticket).toEqual(
+      expect.objectContaining({ status: 'closed', closeReason: 'customer_no_reply' }),
+    );
+    expect(slaOf(inbound(detail)[0]!)).toEqual({
+      firstReplyAt: iso('2026-10-10T11:00:00+08:00'),
+      result: 'met',
+    });
+    expect((await statusChanges(t, detail.ticket.number)).map(([event]) => event)).toEqual([
+      'inbound',
+      'reply_detected',
+      'idle_7_days',
     ]);
   });
 

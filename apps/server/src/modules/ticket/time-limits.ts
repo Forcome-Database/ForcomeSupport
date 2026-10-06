@@ -1,7 +1,17 @@
 import type { TicketEvent, TicketStatus } from '@forcome/contracts';
-import { and, eq, inArray, lte, or } from 'drizzle-orm';
+import { and, eq, lte, or } from 'drizzle-orm';
 import { z } from 'zod';
-import { defineJob, systemActor, transaction, type Logger, type Runtime, type Tx } from '../core';
+import {
+  defineJob,
+  storeScopeCondition,
+  SYSTEM_STORE_SCOPE,
+  systemActor,
+  toMilliseconds,
+  transaction,
+  type Logger,
+  type Runtime,
+  type Tx,
+} from '../core';
 import { expireWaitingReplies } from './replies';
 import { ticket } from './schema';
 import { markOverdue, missUnrepliedOnClose } from './sla';
@@ -25,30 +35,41 @@ export const ticketTimeLimitsJob = defineJob(
   { cron: '* * * * *', tz: 'Asia/Shanghai', runAtStartup: true },
 );
 
-const DAY = 86_400_000;
-/** 6.1：待回复 14 天无新来信关闭 */
-export const AWAITING_REPLY_IDLE_DAYS = 14;
-/** 6.1：等客户、已解决 7 天无来信关闭 */
-export const WAITING_IDLE_DAYS = 7;
+type IdleEvent = Extract<TicketEvent, 'idle_7_days' | 'idle_14_days'>;
+
+/**
+ * 6.1 的按时关闭：哪个状态多少天无来信、按哪个事件关闭（关闭原因由迁移表给出）。扫描的候选条件与锁住后的重判都按这张表
+ */
+export const IDLE_LIMITS: Readonly<
+  Partial<Record<TicketStatus, { readonly days: number; readonly event: IdleEvent }>>
+> = {
+  // 待回复 14 天无新来信 → 已关闭（未识别到回复）
+  awaiting_reply: { days: 14, event: 'idle_14_days' },
+  // 等客户 7 天无来信 → 已关闭（客户未回复）；已解决 7 天无来信 → 已关闭（已解决后无来信）
+  awaiting_customer: { days: 7, event: 'idle_7_days' },
+  resolved: { days: 7, event: 'idle_7_days' },
+};
 
 /** 到了时限要发生的迁移事件；还没到（或已关闭）为 null */
 export function idleEventOf(
   status: TicketStatus,
   lastInboundAt: Date,
   now: Date,
-): Extract<TicketEvent, 'idle_7_days' | 'idle_14_days'> | null {
-  const idle = now.getTime() - lastInboundAt.getTime();
-  if (status === 'awaiting_reply')
-    return idle >= AWAITING_REPLY_IDLE_DAYS * DAY ? 'idle_14_days' : null;
-  if (status === 'awaiting_customer' || status === 'resolved') {
-    return idle >= WAITING_IDLE_DAYS * DAY ? 'idle_7_days' : null;
-  }
-  return null;
+): IdleEvent | null {
+  const limit = IDLE_LIMITS[status];
+  if (!limit) return null;
+  return now.getTime() - lastInboundAt.getTime() >= toMilliseconds({ days: limit.days })
+    ? limit.event
+    : null;
 }
 
 /** 锁住一张工单，到了时限就按迁移表关闭（同时把仍未回复的应回复来信计未达标）；返回是否关闭了 */
 async function closeIfIdle(tx: Tx, ticketId: string, now: Date): Promise<boolean> {
-  const [current] = await tx.db.select().from(ticket).where(eq(ticket.id, ticketId)).for('update');
+  const [current] = await tx.db
+    .select()
+    .from(ticket)
+    .where(and(eq(ticket.id, ticketId), storeScopeCondition(SYSTEM_STORE_SCOPE, ticket.storeId)))
+    .for('update');
   if (!current) return false;
   const event = idleEventOf(current.status, current.lastInboundAt, now);
   if (!event) return false;
@@ -76,18 +97,23 @@ export async function scanTimeLimits(
   const at: Runtime = { ...runtime, clock: { now: () => now } };
   const overdue = await transaction(at, (tx) => markOverdue(tx, now));
 
+  // 系统操作，扫全部店铺
   const due = await runtime.db
     .select({ id: ticket.id })
     .from(ticket)
     .where(
-      or(
-        and(
-          eq(ticket.status, 'awaiting_reply'),
-          lte(ticket.lastInboundAt, new Date(now.getTime() - AWAITING_REPLY_IDLE_DAYS * DAY)),
-        ),
-        and(
-          inArray(ticket.status, ['awaiting_customer', 'resolved']),
-          lte(ticket.lastInboundAt, new Date(now.getTime() - WAITING_IDLE_DAYS * DAY)),
+      and(
+        storeScopeCondition(SYSTEM_STORE_SCOPE, ticket.storeId),
+        or(
+          ...Object.entries(IDLE_LIMITS).map(([status, limit]) =>
+            and(
+              eq(ticket.status, status as TicketStatus),
+              lte(
+                ticket.lastInboundAt,
+                new Date(now.getTime() - toMilliseconds({ days: limit.days })),
+              ),
+            ),
+          ),
         ),
       ),
     );

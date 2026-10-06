@@ -1,10 +1,4 @@
-import {
-  slaDueAt,
-  slaResultOf,
-  type SlaResult,
-  type TicketChannel,
-  type TicketSource,
-} from '@forcome/contracts';
+import { slaDueAt, slaResultOf, type SlaResult, type TicketSource } from '@forcome/contracts';
 import { and, eq, gt, isNull, lt, min, sql } from 'drizzle-orm';
 import type { Tx } from '../core';
 import { ticketMessage } from './schema';
@@ -21,7 +15,6 @@ import { ticketMessage } from './schema';
 /** 新归并的一封来信的首次回复与 SLA 列（firstReplyAt：工单里已有、晚于它的第一封我方回复，乱序时才有） */
 export function inboundSlaColumns(input: {
   readonly source: TicketSource;
-  readonly channel: TicketChannel;
   readonly receivedAt: Date;
   readonly firstReplyAt: Date | null;
   readonly now: Date;

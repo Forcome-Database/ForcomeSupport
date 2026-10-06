@@ -1,5 +1,5 @@
 import type { DemoFixture } from '@forcome/fixtures';
-import type { Clock } from '../core';
+import { toMilliseconds, type Clock } from '../core';
 import { defineClient, type FakeClient } from './definition';
 import { ExternalCallFailedError, FaultInjector } from './faults';
 import { buildFakeMail, type FakeMailInput } from './gmail-mime';
@@ -93,7 +93,7 @@ const HISTORY_START = 1000;
 /** Gmail 推送的有效期 */
 const WATCH_DAYS = 7;
 
-const DAY_MS = 86_400_000;
+const DAY_MS = toMilliseconds({ days: 1 });
 
 /**
  * 示例邮件平移几天（待办 16）：夹具的时间在 9 月的演示时刻附近，开发测试环境与 Playwright 用真实时钟，原样回放的话

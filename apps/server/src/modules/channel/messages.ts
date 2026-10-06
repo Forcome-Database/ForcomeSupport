@@ -159,6 +159,9 @@ export async function findOutboundMessage(
 /** 一封我方回复可能回复的邮件：按 Message-ID 或同一 Gmail 线程找到的已入库邮件（不论方向） */
 export interface ReplyTarget {
   readonly id: string;
+  readonly direction: MessageDirection;
+  /** 来信会归并成工单（不是归档的平台通知与营销）：还没归到工单时，回复识别要等它 */
+  readonly mergeable: boolean;
   readonly rfcMessageId: string | null;
   readonly mailbox: string;
   readonly gmailThreadId: string;
@@ -176,9 +179,11 @@ export async function listReplyTargets(
   reply: Pick<OutboundMessage, 'id' | 'mailbox' | 'gmailThreadId' | 'inReplyTo' | 'references'>,
 ): Promise<ReplyTarget[]> {
   const ids = [...new Set([reply.inReplyTo, ...reply.references].filter((x) => x !== null))];
-  return db
+  const rows = await db
     .select({
       id: message.id,
+      direction: message.direction,
+      source: message.source,
       rfcMessageId: message.rfcMessageId,
       mailbox: message.mailbox,
       gmailThreadId: message.gmailThreadId,
@@ -197,6 +202,11 @@ export async function listReplyTargets(
       ),
     )
     .orderBy(asc(message.receivedAt), asc(message.id));
+  return rows.map(({ source, ...row }) => ({
+    ...row,
+    // 未归属店铺的来信（15）还没识别来源，指定店铺后照样归并
+    mergeable: row.direction === 'inbound' && (source === null || !isArchivedSource(source)),
+  }));
 }
 
 /** 工单详情里一封消息的摘要（正文随 17） */
