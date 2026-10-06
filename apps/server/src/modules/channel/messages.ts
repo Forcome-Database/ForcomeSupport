@@ -132,6 +132,8 @@ export async function listMessageSummaries(
 export interface ReceivedMail {
   readonly id: string;
   readonly mailbox: string;
+  /** 来信 inbound；「已发送」里我方发出的 outbound */
+  readonly direction: MessageDirection;
   /** From 头（Shopify 联系表单通知是 mailer@shopify.com，客户渠道身份在识别结果里） */
   readonly from: MailAddress;
   readonly subject: string;
@@ -156,6 +158,7 @@ export async function listReceivedMail(
     .select({
       id: message.id,
       mailbox: message.mailbox,
+      direction: message.direction,
       fromAddress: message.fromAddress,
       fromName: message.fromName,
       subject: message.subject,
@@ -177,6 +180,7 @@ export async function listReceivedMail(
     return {
       id: row.id,
       mailbox: row.mailbox,
+      direction: row.direction,
       from: { address: row.fromAddress, name: row.fromName },
       subject: row.subject,
       receivedAt: row.receivedAt,

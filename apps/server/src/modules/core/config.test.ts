@@ -1,3 +1,6 @@
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ConfigError, loadConfig } from './index';
 
@@ -9,6 +12,24 @@ const DINGTALK = {
   DINGTALK_CLIENT_SECRET: 'example-client-secret-value',
   DINGTALK_AGENT_ID: '3100000001',
 };
+
+/** Google 服务账号密钥文件（示例内容，只校验形状）：Gmail 推送用真实接口时（生产环境默认）必填 */
+const KEY_FILE = join(tmpdir(), `forcome-config-test-${process.pid}.json`);
+const SERVICE_ACCOUNT = {
+  type: 'service_account',
+  client_email: 'forcome-support@forcome-mail.iam.gserviceaccount.com',
+  private_key: '-----BEGIN PRIVATE KEY-----\nexample-key\n-----END PRIVATE KEY-----\n',
+  token_uri: 'https://oauth2.googleapis.com/token',
+};
+writeFileSync(KEY_FILE, JSON.stringify(SERVICE_ACCOUNT));
+const GOOGLE = {
+  GOOGLE_SERVICE_ACCOUNT_KEY_FILE: KEY_FILE,
+  GMAIL_PUBSUB_TOPIC: 'projects/forcome-mail/topics/gmail',
+  GMAIL_PUBSUB_SUBSCRIPTION: 'projects/forcome-mail/subscriptions/gmail-production',
+};
+
+/** 生产环境默认全部用真实接口：钉钉与 Gmail 的凭据都要填 */
+const REAL = { ...DINGTALK, ...GOOGLE };
 
 describe('配置读取', () => {
   it('只给数据库地址时其余取默认值', () => {
@@ -22,13 +43,14 @@ describe('配置读取', () => {
       mailSend: { allowlistOnly: true, allowlist: [] },
       clockStart: null,
       dingtalk: null,
+      google: null,
     });
   });
 
   it('读取环境、端口与日志级别', () => {
     const config = loadConfig({
       DATABASE_URL,
-      ...DINGTALK,
+      ...REAL,
       APP_ENV: 'production',
       PORT: '8080',
       LOG_LEVEL: 'warn',
@@ -112,7 +134,7 @@ describe('发信白名单开关（ADR 0013：开发测试环境默认禁止向�
         allowlist: [],
       });
     }
-    expect(loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'production' }).mailSend).toEqual({
+    expect(loadConfig({ DATABASE_URL, ...REAL, APP_ENV: 'production' }).mailSend).toEqual({
       allowlistOnly: false,
       allowlist: [],
     });
@@ -136,7 +158,7 @@ describe('发信白名单开关（ADR 0013：开发测试环境默认禁止向�
     expect(
       loadConfig({
         DATABASE_URL,
-        ...DINGTALK,
+        ...REAL,
         APP_ENV: 'production',
         MAIL_SEND_ALLOWLIST_ONLY: 'true',
       }).mailSend.allowlistOnly,
@@ -201,7 +223,7 @@ describe('全局外部客户端的真实 / Fake 选择（CLIENT_MODE_<系统>）
     expect(
       loadConfig({
         DATABASE_URL,
-        ...DINGTALK,
+        ...REAL,
         CLIENT_MODE_DINGTALK: 'real',
         CLIENT_MODE_EXCHANGE_RATE: 'fake',
       }).clientModes,
@@ -221,7 +243,7 @@ describe('全局外部客户端的真实 / Fake 选择（CLIENT_MODE_<系统>）
     expect(
       loadConfig({
         DATABASE_URL,
-        ...DINGTALK,
+        ...REAL,
         APP_ENV: 'production',
         CLIENT_MODE_DINGTALK: 'real',
       }).clientModes,
@@ -254,18 +276,77 @@ describe('钉钉企业内部应用的凭据（用户上线时填进环境文件�
   });
 
   it('填齐时读出凭据；AgentId 只能是数字', () => {
-    expect(loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'production' }).dingtalk).toEqual({
+    expect(loadConfig({ DATABASE_URL, ...REAL, APP_ENV: 'production' }).dingtalk).toEqual({
       clientId: 'dingexampleclientid',
       clientSecret: 'example-client-secret-value',
       agentId: '3100000001',
     });
     expect(() =>
-      loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'production', DINGTALK_AGENT_ID: 'abc' }),
+      loadConfig({ DATABASE_URL, ...REAL, APP_ENV: 'production', DINGTALK_AGENT_ID: 'abc' }),
     ).toThrow(/DINGTALK_AGENT_ID：只能是数字/);
   });
 
   it('用 Fake 时（非生产环境默认）不要求凭据，填了也不用', () => {
     expect(loadConfig({ DATABASE_URL, APP_ENV: 'staging' }).dingtalk).toBeNull();
-    expect(loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'staging' }).dingtalk).toBeNull();
+    expect(loadConfig({ DATABASE_URL, ...REAL, APP_ENV: 'staging' }).dingtalk).toBeNull();
+  });
+});
+
+describe('Gmail 的 Google 凭据（待办 09）', () => {
+  it('生产环境（Gmail 推送默认真实接口）三项必填，只列变量名', () => {
+    let error: unknown;
+    try {
+      loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'production' });
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ConfigError);
+    const message = (error as Error).message;
+    expect(message).toContain('GOOGLE_SERVICE_ACCOUNT_KEY_FILE：Gmail 推送用真实接口时必填');
+    expect(message).toContain('GMAIL_PUBSUB_TOPIC：Gmail 推送用真实接口时必填');
+    expect(message).toContain('GMAIL_PUBSUB_SUBSCRIPTION：Gmail 推送用真实接口时必填');
+  });
+
+  it('填齐时读出密钥文件里的服务账号与 Pub/Sub 主题、订阅', () => {
+    expect(loadConfig({ DATABASE_URL, ...REAL, APP_ENV: 'production' }).google).toEqual({
+      clientEmail: SERVICE_ACCOUNT.client_email,
+      privateKey: SERVICE_ACCOUNT.private_key,
+      tokenUri: SERVICE_ACCOUNT.token_uri,
+      pubsubTopic: GOOGLE.GMAIL_PUBSUB_TOPIC,
+      pubsubSubscription: GOOGLE.GMAIL_PUBSUB_SUBSCRIPTION,
+    });
+  });
+
+  it('非生产环境可以不填；填了一部分要求填齐；读不到的文件、不是服务账号的密钥、写错的主题都拒绝且不回显密钥', () => {
+    expect(loadConfig({ DATABASE_URL, APP_ENV: 'staging' }).google).toBeNull();
+    expect(() =>
+      loadConfig({
+        DATABASE_URL,
+        APP_ENV: 'staging',
+        GMAIL_PUBSUB_TOPIC: GOOGLE.GMAIL_PUBSUB_TOPIC,
+      }),
+    ).toThrow(/GOOGLE_SERVICE_ACCOUNT_KEY_FILE：与其他两项 Google 配置一起填/);
+    expect(() =>
+      loadConfig({ DATABASE_URL, APP_ENV: 'staging', ...GOOGLE }, () => {
+        throw new Error('ENOENT');
+      }),
+    ).toThrow(/GOOGLE_SERVICE_ACCOUNT_KEY_FILE：读不到这个文件或不是 JSON/);
+    let error: unknown;
+    try {
+      loadConfig({ DATABASE_URL, APP_ENV: 'staging', ...GOOGLE }, () =>
+        JSON.stringify({ ...SERVICE_ACCOUNT, type: 'authorized_user' }),
+      );
+    } catch (e) {
+      error = e;
+    }
+    expect((error as Error).message).toContain('不是服务账号的 JSON 密钥文件');
+    expect((error as Error).message).not.toContain('example-key');
+    expect(() =>
+      loadConfig({ DATABASE_URL, APP_ENV: 'staging', ...GOOGLE, GMAIL_PUBSUB_TOPIC: 'gmail' }),
+    ).toThrow(/GMAIL_PUBSUB_TOPIC：写成 projects\/<项目>\/topics\/<主题>/);
+    // 开发测试环境把推送切到真实接口时同样要填
+    expect(() =>
+      loadConfig({ DATABASE_URL, APP_ENV: 'staging', CLIENT_MODE_GMAIL_PUSH: 'real' }),
+    ).toThrow(/GMAIL_PUBSUB_SUBSCRIPTION：Gmail 推送用真实接口时必填/);
   });
 });

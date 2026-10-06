@@ -1,6 +1,6 @@
 # 09: Gmail 同步健壮性与连接状态
 
-Status: ready-for-agent
+Status: claimed
 Blocked by: 05, 08, 31
 
 规格：[第一期：报表与台账](../spec.md)

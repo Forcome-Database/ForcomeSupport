@@ -159,7 +159,7 @@ export const storeSaveMessages = {
 
 /**
  * 渠道连接状态（PRD 6.9）：已连接 / 同步延迟（Gmail、订单 10 分钟，钉钉 2 小时）/ 连接异常（连续 3 次失败）/ 未连接。
- * 待办 07 只用到已连接与未连接（店铺的数据来源决定），同步延迟与连接异常随 05、09、11、12 接上同步记录。
+ * 钉钉（05）与 Gmail（09，按邮箱）按同步记录算（syncConnectionStatus）；订单在 11、12 接上同步记录之前只由数据来源决定。
  */
 export const connectionStatuses = ['connected', 'delayed', 'error', 'not_connected'] as const;
 export const connectionStatusSchema = z.enum(connectionStatuses);
@@ -245,16 +245,74 @@ export const channelKinds = ['amazon', 'shopify', 'gmail', 'dingtalk'] as const;
 export const channelKindSchema = z.enum(channelKinds);
 export type ChannelKind = z.infer<typeof channelKindSchema>;
 
+/**
+ * 渠道卡上列出的一个异常连接（6.9「列出异常的邮箱或店铺」，K7）：Gmail 为邮箱。只列同步延迟与连接异常——
+ * 刚登记、还没同步过的（未连接）不算异常
+ */
+export const channelIssueSchema = z.object({
+  /** 邮箱地址（Gmail）；订单随 11、12 为店铺名 */
+  target: z.string(),
+  status: z.enum(['delayed', 'error']),
+  /** 最近一次同步成功的时间；从没成功过为 null */
+  lastSuccessAt: z.iso.datetime({ offset: true }).nullable(),
+  /** 这一串连续失败的第 1 次（K7「10:05 起连续 3 次」）；没有在失败为 null */
+  failingSince: z.iso.datetime({ offset: true }).nullable(),
+  /** 连续失败的次数 */
+  failures: z.int().nonnegative(),
+});
+export type ChannelIssue = z.infer<typeof channelIssueSchema>;
+
 export const channelCardSchema = z.object({
   kind: channelKindSchema,
   /** 该渠道下最差的状态（6.9） */
   status: connectionStatusSchema,
   /** 接的是模拟数据（Fake，只在非生产环境），卡头另标「模拟数据」 */
   simulated: z.boolean(),
-  /** 最近一次同步成功的时间；还没有同步记录时为 null（同步随 05、09、11、12） */
+  /**
+   * 最近一次同步成功的时间：Gmail 取各邮箱中最旧的一次（同报表「更新于」的取法）；还没有同步记录时为 null
+   * （订单随 11、12）
+   */
   lastSyncAt: z.iso.datetime({ offset: true }).nullable(),
+  /** 异常的邮箱（按地址排序）；钉钉卡与没有异常时为空 */
+  issues: z.array(channelIssueSchema),
 });
 export type ChannelCard = z.infer<typeof channelCardSchema>;
+
+/**
+ * 全站横幅（G4，GET /api/channel/alerts）：连接异常的渠道（钉钉除外，6.9），所有登录成员都看得到，恢复后自动消失。
+ * 第一期只有 Gmail；订单（SP-API、Shopify）随 11、12
+ */
+export const channelAlertSchema = z.object({
+  kind: z.enum(['amazon', 'shopify', 'gmail']),
+  /** 连接异常的邮箱（或店铺），按地址排序 */
+  targets: z.array(z.string()).min(1),
+  /** 最早的一串连续失败从何时起（G4「09-11 10:05 起未收取」） */
+  since: z.iso.datetime({ offset: true }),
+});
+export type ChannelAlert = z.infer<typeof channelAlertSchema>;
+export const channelAlertsSchema = z.object({ alerts: z.array(channelAlertSchema) });
+export type ChannelAlerts = z.infer<typeof channelAlertsSchema>;
+
+/**
+ * 「测试连接」（K20，POST /api/channel/connection-tests/{kind}）：第一期 Gmail 与钉钉两张卡有；亚马逊、Shopify 随 11、12。
+ * 测试连接不改连接状态（状态只看同步记录），Gmail 测完立即排一次各邮箱的同步（2026-10-06 用户确认）。
+ * 全部可访问时 200 返回测过的对象；有访问不了的返回 502，message 写哪些访问不了（connectionTestMessages）
+ */
+export const connectionTestKinds = ['gmail', 'dingtalk'] as const;
+export const connectionTestKindSchema = z.enum(connectionTestKinds);
+export type ConnectionTestKind = z.infer<typeof connectionTestKindSchema>;
+export const connectionTestResultSchema = z.object({
+  kind: connectionTestKindSchema,
+  /** 测过且可访问的：Gmail 为全部进线邮箱，钉钉为通讯录 */
+  targets: z.array(z.string()),
+});
+export type ConnectionTestResult = z.infer<typeof connectionTestResultSchema>;
+
+/** 测试连接失败时 502 的 message（失败浮层标题「测试连接失败：<它>」，2026-10-06 用户确认） */
+export const connectionTestMessages = {
+  unreachable: (targets: readonly string[]) => `${targets.join('、')} 无法访问`,
+  dingtalkUnreachable: '钉钉通讯录无法访问',
+} as const;
 
 /** P18 渠道与店铺（GET /api/channel/settings） */
 export const channelSettingsSchema = z.object({

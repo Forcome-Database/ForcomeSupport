@@ -74,10 +74,11 @@ export const storeMailbox = channelSchema.table(
 );
 
 /**
- * 邮箱的同步状态（规格 channel「Gmail 客户端」）：每个进线邮箱一行，watch 建立后有增量游标 historyId，
+ * 邮箱的同步状态（规格 channel「Gmail 客户端」、PRD 6.9）：每个进线邮箱一行，watch 建立后有增量游标 historyId，
  * 每次同步把这之后新到的消息入库，全部入库成功后才推进游标（水位只在持久化成功后推进）。
  * 按地址关联进线邮箱、不设外键：编辑店铺时进线邮箱整行替换，游标要留着。
- * 续订 watch、游标过期补拉、最近同步成功时间与连接状态随 09 号待办。
+ * 同步记录（待办 09）：最近一次同步成功的时间与连续失败的次数，连接状态按它算（contracts 的 syncConnectionStatus）；
+ * 游标过期时记下补拉的区间起点与补拉开始时的新游标，补拉完成前最近同步成功的时间不前移。
  */
 export const mailboxSync = channelSchema.table(
   'mailbox_sync',
@@ -89,6 +90,18 @@ export const mailboxSync = channelSchema.table(
     historyId: text('history_id'),
     /** 推送（watch）的到期时间 */
     watchExpiresAt: timestamptz('watch_expires_at'),
+    /** 最近一次同步成功（取完游标之后的全部消息并入库）的时间；从没成功过为空 */
+    lastSuccessAt: timestamptz('last_success_at'),
+    /** 连续失败的次数（watch 与同步的外部调用失败都算）；成功一次清零，满 3 次为连接异常 */
+    consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+    /** 这一串连续失败的第 1 次的时间（K7「10:05 起连续 3 次」、G4「10:05 起未收取」）；没在失败为空 */
+    failingSince: timestamptz('failing_since'),
+    /** 最近一次失败的原因（排错用） */
+    lastError: text('last_error'),
+    /** 游标过期（history.list 404）后按 internalDate 区间补拉：区间起点；没在补拉为空 */
+    backfillFrom: timestamptz('backfill_from'),
+    /** 补拉开始时取的新游标（users.getProfile 的 historyId），补拉完成后换上 */
+    backfillHistoryId: text('backfill_history_id'),
     createdAt: timestamptz('created_at').notNull(),
     updatedAt: timestamptz('updated_at').notNull(),
   },
@@ -101,7 +114,8 @@ export const mailboxSync = channelSchema.table(
  * - 去重（R-TK-07、E-15）：「邮箱 + Gmail 消息 ID」唯一，重复投递只入库一次；
  * - 同一封邮件（Message-ID 相同）发到几个店铺邮箱：最早入库的一封为准（duplicate_of 为空，Message-ID 在这些行里唯一），
  *   其余记 duplicate_of 指向它、不再识别与归并，它们的邮箱记在准的那封的 also_sent_to（「同时发送到」）。
- * 待办 08 只收来信（方向 inbound）；「已发送」随 09。附件随用到它的待办。
+ * 方向：来信 inbound；「已发送」里我方发出的 outbound（待办 09 入库，归到工单与回复识别随 16）。
+ * Message-ID 判重按方向分开：店铺邮箱之间互相发信时，发出的一份与收到的一份各自为准。附件随用到它的待办。
  */
 export const message = channelSchema.table(
   'message',
@@ -111,7 +125,7 @@ export const message = channelSchema.table(
     mailbox: text('mailbox').notNull(),
     gmailMessageId: text('gmail_message_id').notNull(),
     gmailThreadId: text('gmail_thread_id').notNull(),
-    /** 方向：来信 inbound / 我方发出 outbound（09） */
+    /** 方向：来信 inbound / 我方发出 outbound（Gmail 标签含 SENT） */
     direction: text('direction', { enum: messageDirections }).notNull(),
     /** RFC Message-ID（带尖括号）；邮件没写时为空 */
     rfcMessageId: text('rfc_message_id'),
@@ -160,7 +174,7 @@ export const message = channelSchema.table(
   (t) => [
     unique('message_mailbox_gmail_id_key').on(t.mailbox, t.gmailMessageId),
     uniqueIndex('message_rfc_message_id_key')
-      .on(t.rfcMessageId)
+      .on(t.direction, t.rfcMessageId)
       .where(sql`${t.duplicateOfId} IS NULL AND ${t.rfcMessageId} IS NOT NULL`),
     index('message_store_received_idx').on(t.storeId, t.receivedAt),
   ],

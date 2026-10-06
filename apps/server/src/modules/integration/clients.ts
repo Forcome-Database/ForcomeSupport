@@ -7,8 +7,10 @@ import {
   type AppConfig,
   type AppEnv,
   type DingtalkCredentials,
+  type GoogleCredentials,
   type MailSendPolicy,
 } from '../core';
+import { noCallRecords, type CallRecorder } from './call-records';
 import type {
   AnyClientDefinition,
   ClientDefinition,
@@ -51,6 +53,10 @@ export interface IntegrationClientsOptions {
   readonly mailSend?: MailSendPolicy;
   /** 钉钉企业内部应用的凭据（AppConfig.dingtalk），交给钉钉的真实现；不传为 null */
   readonly dingtalk?: DingtalkCredentials | null;
+  /** Google 服务账号与 Pub/Sub（AppConfig.google），交给 Gmail 的真实现；不传为 null */
+  readonly google?: GoogleCredentials | null;
+  /** 真实现的调用记录写到哪里；不传不记（api、worker 传 databaseCallRecorder） */
+  readonly callRecorder?: CallRecorder;
 }
 
 export class IntegrationClients {
@@ -62,6 +68,8 @@ export class IntegrationClients {
   /** 全局客户端的真实现：一个进程只建一次 */
   readonly #globals = new Map<AnyClientDefinition, unknown>();
   readonly #dingtalk: DingtalkCredentials | null;
+  readonly #google: GoogleCredentials | null;
+  readonly #callRecorder: CallRecorder;
   /** 发信白名单守卫，经 RealClientContext 交给真实现 */
   readonly mailRecipientGuard: MailRecipientGuard;
 
@@ -74,6 +82,8 @@ export class IntegrationClients {
     this.#definitions = new Set(options.definitions ?? clientDefinitions);
     this.#modes = options.clientModes ?? {};
     this.#dingtalk = options.dingtalk ?? null;
+    this.#google = options.google ?? null;
+    this.#callRecorder = options.callRecorder ?? noCallRecords;
     for (const [system, mode] of Object.entries(this.#modes)) {
       const definition = [...this.#definitions].find((d) => d.system === system);
       const variable = clientModeVariable(system);
@@ -112,6 +122,8 @@ export class IntegrationClients {
       ...(storeId === undefined ? {} : { storeId }),
       mailRecipientGuard: this.mailRecipientGuard,
       dingtalk: this.#dingtalk,
+      google: this.#google,
+      callRecorder: this.#callRecorder,
     };
   }
 
@@ -188,15 +200,21 @@ export class IntegrationClients {
  * 生产环境不回放，也不解析夹具。options 只给测试用：换登记清单与夹具。
  */
 export function createIntegrationClients(
-  config: Pick<AppConfig, 'appEnv' | 'clientModes' | 'mailSend' | 'dingtalk'>,
-  options: { definitions?: readonly AnyClientDefinition[]; fixture?: () => DemoFixture } = {},
+  config: Pick<AppConfig, 'appEnv' | 'clientModes' | 'mailSend' | 'dingtalk' | 'google'>,
+  options: {
+    definitions?: readonly AnyClientDefinition[];
+    fixture?: () => DemoFixture;
+    callRecorder?: CallRecorder;
+  } = {},
 ): IntegrationClients {
   const clients = new IntegrationClients({
     appEnv: config.appEnv,
     clientModes: config.clientModes,
     mailSend: config.mailSend,
     dingtalk: config.dingtalk,
+    google: config.google,
     definitions: options.definitions,
+    callRecorder: options.callRecorder,
   });
   if (config.appEnv !== 'production') {
     clients.replayFixtures((options.fixture ?? getDemoFixture)());

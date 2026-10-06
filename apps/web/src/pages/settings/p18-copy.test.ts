@@ -15,7 +15,10 @@ import {
   CARD_LINES,
   CHANNEL_CARDS,
   CHANNEL_SECTION,
+  CONNECTION_TEST,
+  DINGTALK_ISSUE_LINES,
   DRAWER,
+  GMAIL_ISSUE_LINES,
   EMPTY_STORES,
   LAST_SYNC,
   LEAVE,
@@ -202,5 +205,37 @@ describe('K20 第一阶段渠道卡与 G8', () => {
 
   it('编辑时的未保存离开照 G8 的写法（「有 N 项未保存的修改。放弃后恢复为上次保存的值。」）', () => {
     expectIn(GLOBAL_STATES, LEAVE.edit(3).replace('「编辑店铺」', '「规则与阈值」'));
+  });
+});
+
+describe('K20 补充小样：卡片的异常写法与「测试连接」（待办 09）', () => {
+  it('Gmail 卡同步延迟与连接异常：每个邮箱一行、来信暂存、「重新检测」（Q2、Q3 用户确认）', () => {
+    expectText(STATES_ADMIN, GMAIL_ISSUE_LINES.delayed('support@forcome.mx', '10:05'));
+    expectText(STATES_ADMIN, GMAIL_ISSUE_LINES.failed('support@forcome.mx', '10:05', 3));
+    expectText(STATES_ADMIN, GMAIL_ISSUE_LINES.held);
+    expectText(STATES_ADMIN, GMAIL_ISSUE_LINES.recheck);
+    // 几个邮箱同时异常、另有一个延迟（E2、E3 协调者决定）：次数为实际的连续失败次数
+    expectText(STATES_ADMIN, GMAIL_ISSUE_LINES.failed('amz-auto@forcome.com', '10:12', 3));
+    expectText(STATES_ADMIN, GMAIL_ISSUE_LINES.failed('support@forcome.mx', '10:05', 5));
+    expectText(STATES_ADMIN, GMAIL_ISSUE_LINES.delayed('support@forcome.com', '10:06'));
+  });
+
+  it('钉钉卡同步延迟与连接异常（Q6 用户确认；从没同步成功过为 E4 协调者决定）', () => {
+    expectText(STATES_ADMIN, DINGTALK_ISSUE_LINES.delayed('08:00'));
+    expectText(STATES_ADMIN, DINGTALK_ISSUE_LINES.failed('08:00'));
+    expectText(STATES_ADMIN, DINGTALK_ISSUE_LINES.failed(null));
+    expectText(STATES_ADMIN, DINGTALK_ISSUE_LINES.note);
+    expectText(STATES_ADMIN, DINGTALK_ISSUE_LINES.tail);
+  });
+
+  it('「测试连接」按钮与结果浮层（Q4 用户确认）', () => {
+    expectText(P18, CONNECTION_TEST.button);
+    expectText(STATES_ADMIN, CONNECTION_TEST.okTitle);
+    expectText(STATES_ADMIN, CONNECTION_TEST.ok.gmail(4));
+    expectText(STATES_ADMIN, CONNECTION_TEST.ok.dingtalk);
+    expectText(STATES_ADMIN, `${CONNECTION_TEST.failedAction}失败：support@forcome.mx 无法访问`);
+    expectText(STATES_ADMIN, `${CONNECTION_TEST.failedAction}失败：钉钉通讯录无法访问`);
+    expectText(STATES_ADMIN, CONNECTION_TEST.failedDescription.gmail);
+    expectText(STATES_ADMIN, CONNECTION_TEST.failedDescription.dingtalk);
   });
 });

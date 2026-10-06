@@ -329,6 +329,7 @@ describe('Fake 从示例数据夹具回放（ADR 0009 修订）', () => {
           clientModes: {},
           mailSend: { allowlistOnly: true, allowlist: [] },
           dingtalk: null,
+          google: null,
         },
         { definitions: withReplay, fixture: () => demo },
       );
@@ -344,6 +345,7 @@ describe('Fake 从示例数据夹具回放（ADR 0009 修订）', () => {
         clientModes: {},
         mailSend: { allowlistOnly: false, allowlist: [] },
         dingtalk: null,
+        google: null,
       },
       {
         definitions: withReplay,

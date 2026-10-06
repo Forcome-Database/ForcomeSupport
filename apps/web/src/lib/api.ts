@@ -5,7 +5,9 @@ import {
   auditLogOptionsSchema,
   auditLogSchema,
   BACKGROUND_REQUEST_HEADER,
+  channelAlertsSchema,
   channelSettingsSchema,
+  connectionTestResultSchema,
   currentMemberSchema,
   devMembersResponseSchema,
   dingtalkLoginStartSchema,
@@ -34,7 +36,10 @@ import {
   type AuditLogOptions,
   type AuditLogQuery,
   type CancelInput,
+  type ChannelAlert,
   type ChannelSettings,
+  type ConnectionTestKind,
+  type ConnectionTestResult,
   type CurrentMember,
   type DevMember,
   type DingtalkLoginRequest,
@@ -267,6 +272,17 @@ export const api = {
   /** P18 渠道与店铺：渠道卡、店铺表，以及是否显示「数据来源」 */
   channelSettings: (): Promise<ChannelSettings> =>
     call('/api/channel/settings', channelSettingsSchema),
+
+  /** 全站横幅（G4）：连接异常的渠道（钉钉除外）；所有登录成员都能取 */
+  channelAlerts: async (): Promise<ChannelAlert[]> =>
+    (await call('/api/channel/alerts', channelAlertsSchema)).alerts,
+
+  /**
+   * 「测试连接」（K20）：全部可访问时返回测过的对象；有访问不了的抛 502 connection_test_failed，
+   * message 写哪些访问不了（失败浮层「测试连接失败：<message>」）
+   */
+  testConnection: (kind: ConnectionTestKind): Promise<ConnectionTestResult> =>
+    call(`/api/channel/connection-tests/${kind}`, connectionTestResultSchema, jsonBody('POST', {})),
 
   /** 新增店铺；字段填错时抛 ApiRequestError（fields 为各字段的错误） */
   createStore: (input: StoreInput): Promise<Store> =>

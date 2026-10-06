@@ -61,6 +61,49 @@ export const CARD_LINES = {
   dingtalk: ['通讯录：成员与部门每小时同步', '工作通知推送；扫码登录'],
 } as const;
 
+/**
+ * Gmail 卡的异常说明行（K20 补充小样，待办 09 Q2、Q3 用户确认、E2、E3 协调者决定）：每个连接异常的邮箱一行原因与恢复指引
+ * （次数为实际的连续失败次数），再写一次来信暂存，底部「重新检测」；每个同步延迟的邮箱一行，排在异常行之后。
+ * 第一阶段不发信、没有错误日志页：不写「回复进入待发队列」、没有「查看错误日志」
+ */
+export const GMAIL_ISSUE_LINES = {
+  failed: (mailbox: string, since: string, failures: number) =>
+    `${mailbox} 访问失败（${since} 起连续 ${failures} 次）：请检查全域委派范围与邮箱状态`,
+  held: '该邮箱来信暂存，恢复后自动补拉',
+  delayed: (mailbox: string, last: string) => `${mailbox} ${last} 后未同步成功，超过 10 分钟`,
+  recheck: '重新检测',
+} as const;
+
+/**
+ * 钉钉卡同步延迟与连接异常时的说明行（K20；连接异常为待办 09 Q6 用户确认，从没同步成功过为 E4 协调者决定）：
+ * 第一行换成未同步成功的说明，其后两行固定
+ */
+export const DINGTALK_ISSUE_LINES = {
+  delayed: (last: string) => `通讯录 ${last} 后未同步成功，超过 2 小时`,
+  failed: (last: string | null) =>
+    last ? `通讯录 ${last} 后未同步成功，连续 3 次失败` : '通讯录尚未同步成功，连续 3 次失败',
+  note: '只提醒管理员，不出全站横幅；成员与部门保持上次结果，登录与权限不受影响',
+  tail: '工作通知推送；扫码登录',
+} as const;
+
+/**
+ * 「测试连接」（K20 卡头的文字按钮与结果浮层，待办 09 Q4 用户确认）：成功 3 秒消失；失败的标题由 notify 写成
+ * 「测试连接失败：<接口给的原因>」，说明写怎么查
+ */
+export const CONNECTION_TEST = {
+  button: '测试连接',
+  okTitle: '连接正常',
+  ok: {
+    gmail: (mailboxes: number) => `Gmail：${mailboxes} 个邮箱均可访问`,
+    dingtalk: '钉钉：通讯录可访问',
+  },
+  failedAction: '测试连接',
+  failedDescription: {
+    gmail: '请检查全域委派范围与邮箱状态',
+    dingtalk: '请检查应用凭据与通讯录权限',
+  },
+} as const;
+
 /** 页头右上（原型 btn('查看审计日志', 'secondary', 'md', 'history')）：进入 P27，管理员另一个入口（PRD P27） */
 export const VIEW_AUDIT_LOG = '查看审计日志';
 

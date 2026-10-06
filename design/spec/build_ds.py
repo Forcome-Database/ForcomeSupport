@@ -283,7 +283,7 @@ body = col(''.join([
 save('DesignSystem.dc.html', board('设计规范', '视觉 v3：顶栏分段导航 + 浅灰底浮动面板 + 靛蓝主色，AI 用靛蓝→青色渐变标识（参考 forcome-support-console.html）。本板定义色彩、字体、间距、组件、状态与研发映射；所有高保真页面只使用这里的组件，开发用 shadcn/ui + Tailwind CSS v4。', body, 1920, 2400))
 
 # ---------------------------------------------------------------- 全局状态
-from data import NOW_LABEL, TICKETS, G7_OCC
+from data import NOW_LABEL, TICKETS, G7_OCC, G4_BANNER
 _g7_t = next(t for t in TICKETS if t['no'] == 'T-20260902-0071')  # G7 并发示例：陈晨负责的工单
 page_skel = app('liting', '收件箱', ['收件箱', '待处理'], '<div style="flex: 1; display: flex; gap: 12px; padding: 10px 14px 12px 14px; min-height: 0px;"><div style="width: 308px; background: #ffffff; border: 1px solid %s; border-radius: 16px; overflow: hidden;">%s</div><div style="flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; background: #ffffff; border-radius: 16px;">%s%s%s%s</div><div style="width: 332px; background: #ffffff; border: 1px solid %s; border-radius: 16px; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">%s%s%s%s</div></div>' % (
     T['line'], skel_rows(8), skel('50%', 16), skel('100%', 90, 8), skel('100%', 200, 8), skel('40%', 32, 6), T['line'], skel('40%', 10), skel('80%', 10), skel('100%', 120, 8), skel('100%', 80, 8)), w=1440, h=900)
@@ -291,8 +291,7 @@ page_skel = app('liting', '收件箱', ['收件箱', '待处理'], '<div style="
 G2_DESC = '「渠道与店铺」只对管理员开放。你当前的角色是坐席，如需开通请联系管理员刘洋。'
 # G3 找不到：不写保留策略（D-21 个人信息长期保留）
 G3_DESC = '工单 T-20260801-9999 不存在，请检查编号或链接是否完整。'
-# G4 集成中断横幅：不可关闭、恢复后自动消失；本图为坐席李婷视角，「查看渠道状态」只对管理员显示，这里不出现
-G4_BANNER = ('Gmail 连接中断，来信暂存队列', '09-11 10:05 起未收取。恢复后自动补收，按到达顺序处理，SLA 从原到达时间计算。管理员、客服主管已收到通知。')
+# G4 集成中断横幅（data.G4_BANNER，K7 同一写法）：不可关闭、恢复后自动消失；本图为坐席李婷视角，「查看渠道状态」只对管理员显示，这里不出现
 page_403 = app('liting', '', ['设置', '渠道与店铺'], '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(no_permission('没有访问权限', G2_DESC, btn('返回首页', 'primary', 'md', 'chev_l')), pad='8px 24px'))
 page_404 = app('liting', '工单', ['工单', 'T-20260801-9999'], '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(empty('search', '找不到这张工单', G3_DESC, row(btn('返回工单列表', 'primary') + btn('按订单号搜索', 'secondary', 'md', 'search'), 8)), pad='8px 24px'))
 page_offline = app('liting', '收件箱', ['收件箱', '待处理'], '<div style="flex: 1; display: flex; align-items: center; justify-content: center;">%s</div>' % card(load_error('网络连接已断开', '你刚才编辑的回复已保存在本机。恢复连接后会自动同步，不需要重新输入。', row(btn('重新连接', 'primary', 'md', 'refresh'), 8)), pad='8px 24px'),

@@ -2,6 +2,7 @@ import type { DemoFixture } from '@forcome/fixtures';
 import { defineClient, type FakeClient } from './definition';
 import { ExternalCallFailedError, FaultInjector } from './faults';
 import { buildFakeMail, type FakeMailInput } from './gmail-mime';
+import { createRealGmail, createRealGmailPush } from './gmail-real';
 import { fixtureMails } from './gmail-replay';
 
 /*
@@ -11,8 +12,8 @@ import { fixtureMails } from './gmail-replay';
  * - 推送（全局，gmail_push）：Gmail 把「某邮箱有变化」发到 Pub/Sub 主题，worker 从本环境的订阅 pull 后确认。
  *   推送是环境级的（一个订阅服务全部邮箱），所以与按店铺选择的邮箱客户端分开，按 CLIENT_MODE_GMAIL_PUSH 选择；
  *   Fake 邮箱在被 watch 后把通知发进同一进程的 Fake 推送。
- * 真实现（服务账号 + 全域委派、Pub/Sub 订阅、代理与调用记录）随 09 号待办；在那之前调用一律以「未接入」失败，
- * 生产环境不会悄悄退回 Fake。
+ * 真实现（gmail-real.ts，待办 09）：服务账号 + 全域委派以各邮箱身份调 Gmail REST 接口、Pub/Sub 用 REST 的一元 pull，
+ * 都经出站 HTTP 客户端工厂（代理、限流、调用记录）。没配置 Google 凭据时调用以「未配置」失败，生产环境不会悄悄退回 Fake。
  */
 
 /** 一封邮件的原始内容（messages.get format=raw） */
@@ -31,15 +32,22 @@ export interface GmailRawMessage {
 export interface GmailClient {
   /** 建立（或续订）推送，返回此刻的增量游标与推送到期时间（users.watch，不按标签过滤） */
   watch(mailbox: string): Promise<{ historyId: string; expiration: Date }>;
+  /** 邮箱此刻的增量游标（users.getProfile 的 historyId）：游标过期补拉前取新游标，「测试连接」也用它探邮箱能不能访问 */
+  profile(mailbox: string): Promise<{ historyId: string }>;
   /**
    * 游标之后新到的消息（users.history.list，historyTypes=messageAdded，分页在实现里取完）；
-   * 返回新游标。游标过期（404）抛 CursorExpiredError，由 09 号待办按 internalDate 区间补拉
+   * 返回新游标。游标过期（404）抛 CursorExpiredError，调用方改按 internalDate 区间补拉（listMessages）
    */
   listHistory(
     mailbox: string,
     startHistoryId: string,
   ): Promise<{ messageIds: string[]; historyId: string }>;
-  /** 一封邮件的原文（users.messages.get，format=raw） */
+  /**
+   * 某个时刻之后到达的全部消息（users.messages.list，q=after:<秒>，不按标签过滤、不含垃圾邮件与已删除，分页在实现里取完）：
+   * 游标过期后的区间补拉用
+   */
+  listMessages(mailbox: string, range: { after: Date }): Promise<string[]>;
+  /** 一封邮件的原文（users.messages.get，format=raw）；邮件已不存在（404）抛带状态码 404 的 ExternalCallFailedError */
   getMessage(mailbox: string, messageId: string): Promise<GmailRawMessage>;
 }
 
@@ -57,27 +65,6 @@ export interface GmailPushClient {
   acknowledge(ackIds: readonly string[]): Promise<void>;
 }
 
-function notConnected(system: string, operation: string): Promise<never> {
-  return Promise.reject(
-    new ExternalCallFailedError(system, operation, {
-      message: '尚未接入真实接口（服务账号与 Pub/Sub 订阅随 09 号待办）',
-      retryable: false,
-    }),
-  );
-}
-
-/** 真实现的占位：09 号待办接入服务账号 + 全域委派（googleapis）与 Pub/Sub 订阅 */
-const realGmail = (): GmailClient => ({
-  watch: () => notConnected('gmail', 'users.watch'),
-  listHistory: () => notConnected('gmail', 'users.history.list'),
-  getMessage: () => notConnected('gmail', 'users.messages.get'),
-});
-
-const realGmailPush = (): GmailPushClient => ({
-  pull: () => notConnected('gmail_push', 'pull'),
-  acknowledge: () => notConnected('gmail_push', 'acknowledge'),
-});
-
 // ---------------------------------------------------------------- Fake
 
 interface StoredMessage extends GmailRawMessage {
@@ -92,6 +79,9 @@ interface FakeMailbox {
   /** 回放的示例来信：开始监听后才送达（演示环境里它们是系统上线后到达的来信） */
   pending: FakeMailInput[];
 }
+
+/** 不在收信范围里的标签（同 Gmail 的 messages.list 默认：不含垃圾邮件与已删除） */
+const EXCLUDED_FROM_LIST = new Set(['SPAM', 'TRASH']);
 
 function recipientsOf(mail: FakeMailInput): readonly string[] {
   return typeof mail.to === 'string' ? [mail.to] : mail.to;
@@ -204,6 +194,26 @@ export class FakeGmail implements FakeClient<GmailClient> {
     });
   }
 
+  /**
+   * 店铺邮箱发出一封信（Gmail 标签 SENT，落在发件邮箱的「已发送」里）：from 是店铺邮箱，to 是客户；返回 Gmail 消息 ID。
+   * 收件人里有别的店铺邮箱时，它们照常各收到一份来信（deliver）
+   */
+  send(mail: Omit<FakeMailInput, 'from' | 'to'> & { from: string; to: string }): string {
+    const built = buildFakeMail(
+      { ...mail, from: { address: mail.from }, to: mail.to },
+      `<fake-${this.#nextId}@forcome.example>`,
+    );
+    const id = mail.gmailId ?? this.#newId();
+    this.#append(mail.from, {
+      id,
+      threadId: id,
+      labelIds: ['SENT'],
+      internalDate: built.internalDate,
+      raw: built.raw,
+    });
+    return id;
+  }
+
   /** 同一封信在该邮箱的 history 里再出现一次（Gmail 与 Pub/Sub 都可能重复投递，E-15） */
   redeliver(address: string, messageId: string): void {
     const found = this.#mailbox(address).messages.find((m) => m.id === messageId);
@@ -230,6 +240,10 @@ export class FakeGmail implements FakeClient<GmailClient> {
         const last = box.messages.at(-1)?.internalDate.getTime() ?? 0;
         return { historyId, expiration: new Date(last + WATCH_DAYS * 86_400_000) };
       },
+      profile: async (mailbox) => {
+        await this.faults.check('users.getProfile');
+        return { historyId: String(this.#mailbox(mailbox).historyId) };
+      },
       listHistory: async (mailbox, startHistoryId) => {
         await this.faults.check('users.history.list');
         const box = this.#mailbox(mailbox);
@@ -238,6 +252,19 @@ export class FakeGmail implements FakeClient<GmailClient> {
           messageIds: box.messages.filter((m) => m.historyId > start).map((m) => m.id),
           historyId: String(Math.max(box.historyId, start)),
         };
+      },
+      listMessages: async (mailbox, { after }) => {
+        await this.faults.check('users.messages.list');
+        const seen = new Set<string>();
+        return this.#mailbox(mailbox)
+          .messages.filter(
+            (m) =>
+              m.internalDate.getTime() >= after.getTime() &&
+              !m.labelIds.some((label) => EXCLUDED_FROM_LIST.has(label)) &&
+              !seen.has(m.id) &&
+              seen.add(m.id),
+          )
+          .map((m) => m.id);
       },
       getMessage: async (mailbox, messageId) => {
         await this.faults.check('users.messages.get');
@@ -281,7 +308,7 @@ export class FakeGmail implements FakeClient<GmailClient> {
 export const gmailPushClient = defineClient({
   system: 'gmail_push',
   scope: 'global',
-  createReal: realGmailPush,
+  createReal: createRealGmailPush,
   createFake: () => new FakeGmailPush(),
 });
 
@@ -289,6 +316,6 @@ export const gmailPushClient = defineClient({
 export const gmailClient = defineClient({
   system: 'gmail',
   scope: 'store',
-  createReal: realGmail,
+  createReal: createRealGmail,
   createFake: ({ fake }) => new FakeGmail(() => fake(gmailPushClient)),
 });

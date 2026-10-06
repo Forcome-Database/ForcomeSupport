@@ -88,6 +88,25 @@ export async function dingtalkSyncHealth(db: DbExecutor): Promise<SyncHealth> {
   };
 }
 
+/**
+ * P18 钉钉卡的「测试连接」（K20，待办 09）：取一次根部门，看应用凭据与通讯录权限能不能用；不改同步记录（状态只看全量对账）。
+ * 能取到返回 true，调用失败或取不到返回 false
+ */
+export async function checkDingtalkDirectory(
+  client: DingtalkClient,
+  logger: Pick<JobContext, 'logger'>['logger'],
+): Promise<boolean> {
+  try {
+    return (await client.getDepartment(DINGTALK_ROOT_DEPARTMENT_ID)) !== null;
+  } catch (error) {
+    logger.warn({ err: error }, '测试连接：钉钉通讯录无法访问');
+    return false;
+  }
+}
+
+/** 钉钉通讯录的根部门 ID（钉钉固定为 1） */
+const DINGTALK_ROOT_DEPARTMENT_ID = '1';
+
 /** P18 钉钉卡的连接状态与最近同步时间（6.9：超过 2 小时没成功为同步延迟，连续 3 次失败为连接异常） */
 export async function dingtalkConnection(
   db: DbExecutor,

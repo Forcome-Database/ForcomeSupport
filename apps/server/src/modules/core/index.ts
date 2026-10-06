@@ -35,6 +35,7 @@ export {
   type AppConfig,
   type AppEnv,
   type DingtalkCredentials,
+  type GoogleCredentials,
   type MailSendPolicy,
 } from './config';
 export { type Database, type DbExecutor, type DbTransaction } from './db';

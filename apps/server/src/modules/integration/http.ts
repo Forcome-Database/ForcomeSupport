@@ -1,4 +1,6 @@
+import pThrottle from 'p-throttle';
 import { EnvHttpProxyAgent, fetch, type Dispatcher } from 'undici';
+import { noCallRecords, summarize, type CallRecorder } from './call-records';
 import { ExternalCallFailedError, ExternalTimeoutError } from './faults';
 
 /*
@@ -7,8 +9,10 @@ import { ExternalCallFailedError, ExternalTimeoutError } from './faults';
  *   NO_PROXY 里的境内域名直连；整个进程共用一个（钉钉 Stream 的 WebSocket 也经它，同样遵守 NO_PROXY）；
  * - 超时：每次调用有上限，到点以 ExternalTimeoutError 结束；
  * - 错误：非 2xx 抛 ExternalCallFailedError（带状态码；429 与 5xx 可重试），网络错误抛不带状态码、可重试的
- *   ExternalCallFailedError——业务代码只处理 faults.ts 的这一套错误（同 Fake）。
- * 按「系统 × 接口」的限流与调用记录随 09 号待办（Gmail，第一个高频的真实现）加在这里；汇率每天一次，用不上限流。
+ *   ExternalCallFailedError——业务代码只处理 faults.ts 的这一套错误（同 Fake）；
+ * - 限流（待办 09）：按「系统 × 接口」，各系统在建客户端时给出每个接口（或 '*' 为每个接口各自）每秒最多几次，
+ *   超出的调用排队等（p-throttle）；限流器整个进程共用，同一系统的几个客户端实例（如按店铺新建的 Gmail）一起算；
+ * - 调用记录（待办 09）：每次调用（含失败、超时）交给 CallRecorder 一条：系统、动作、店铺、耗时、状态码、请求与响应摘要。
  */
 
 let sharedDispatcher: Dispatcher | undefined;
@@ -19,14 +23,16 @@ export function outboundDispatcher(): Dispatcher {
   return sharedDispatcher;
 }
 
-/** 默认超时 30 秒；大文件（欧洲央行全量历史）调用方另给 */
+/** 默认超时 30 秒；大文件（欧洲央行全量历史）与长轮询调用方另给 */
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 export interface HttpRequestOptions {
-  /** 操作名（写进错误，如 eurofxref-daily.xml） */
+  /** 操作名（写进错误与调用记录，也是限流的接口，如 users.history.list） */
   readonly operation: string;
   readonly timeoutMs?: number;
   readonly headers?: Readonly<Record<string, string>>;
+  /** 成功的响应体是凭证（换令牌）：调用记录里不留 */
+  readonly secretResponse?: boolean;
 }
 
 export interface HttpClient {
@@ -36,43 +42,68 @@ export interface HttpClient {
   getJson(url: string, options: HttpRequestOptions): Promise<unknown>;
   /** POST JSON 并按 JSON 解析返回（解析结果由调用方用 zod 校验） */
   postJson(url: string, body: unknown, options: HttpRequestOptions): Promise<unknown>;
+  /** POST 表单（application/x-www-form-urlencoded，OAuth 换令牌）并按 JSON 解析返回 */
+  postForm(
+    url: string,
+    form: Readonly<Record<string, string>>,
+    options: HttpRequestOptions,
+  ): Promise<unknown>;
+}
+
+/** 一个接口每秒最多几次 */
+export interface RateLimit {
+  readonly perSecond: number;
+}
+
+export interface HttpClientOptions {
+  /** 只给测试用（undici 的 MockAgent）；生产与开发都走共用的代理分流连接 */
+  readonly dispatcher?: Dispatcher;
+  /** 调用记录写到哪里；不给不记 */
+  readonly recorder?: CallRecorder;
+  /** 店铺级客户端的店铺（写进调用记录） */
+  readonly storeId?: string;
+  /** 按接口限流：键为操作名，'*' 为没单独写的每个接口各自的上限；不给不限 */
+  readonly rateLimits?: Readonly<Record<string, RateLimit>>;
+}
+
+/** 进程共用的限流器：键为「系统 × 接口」 */
+const throttles = new Map<string, <T>(call: () => Promise<T>) => Promise<T>>();
+
+function throttled(
+  system: string,
+  operation: string,
+  limits: Readonly<Record<string, RateLimit>> | undefined,
+): (<T>(call: () => Promise<T>) => Promise<T>) | null {
+  const limit = limits?.[operation] ?? limits?.['*'];
+  if (!limit) return null;
+  const key = `${system} × ${operation}`;
+  let throttle = throttles.get(key);
+  if (!throttle) {
+    const run = pThrottle({ limit: limit.perSecond, interval: 1000 })(
+      (call: () => Promise<unknown>) => call(),
+    );
+    throttle = <T>(call: () => Promise<T>) => run(call) as Promise<T>;
+    throttles.set(key, throttle);
+  }
+  return throttle;
+}
+
+type Body =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'json'; readonly value: unknown }
+  | { readonly kind: 'form'; readonly value: Readonly<Record<string, string>> };
+
+/** 调用记录里的地址：去掉查询串（里面可能有 access_token） */
+function requestSummary(method: string, url: string): string {
+  const parsed = new URL(url);
+  return `${method} ${parsed.origin}${parsed.pathname}`;
 }
 
 /**
  * 某个外部系统的 HTTP 客户端。dispatcher 只给测试用（undici 的 MockAgent），生产与开发都走共用的代理分流连接
  */
-export function createHttpClient(
-  system: string,
-  options: { dispatcher?: Dispatcher } = {},
-): HttpClient {
-  async function send(url: string, request: HttpRequestOptions, body?: unknown) {
-    const signal = AbortSignal.timeout(request.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-    let response: Awaited<ReturnType<typeof fetch>>;
-    try {
-      response = await fetch(url, {
-        dispatcher: options.dispatcher ?? outboundDispatcher(),
-        signal,
-        ...(body === undefined
-          ? { headers: request.headers }
-          : {
-              method: 'POST',
-              headers: {
-                'content-type': 'application/json',
-                accept: 'application/json',
-                ...request.headers,
-              },
-              body: JSON.stringify(body),
-            }),
-      });
-    } catch (error) {
-      throw translate(error, request.operation, signal);
-    }
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new ExternalCallFailedError(system, request.operation, { status: response.status });
-    }
-    return { response, signal };
-  }
+export function createHttpClient(system: string, options: HttpClientOptions = {}): HttpClient {
+  const recorder = options.recorder ?? noCallRecords;
 
   function translate(error: unknown, operation: string, signal: AbortSignal): Error {
     if (signal.aborted) return new ExternalTimeoutError(system, operation);
@@ -83,24 +114,85 @@ export function createHttpClient(
     });
   }
 
-  async function read<T>(
-    request: HttpRequestOptions,
-    signal: AbortSignal,
-    body: () => Promise<T>,
-  ): Promise<T> {
+  /** 发一次请求并把响应体读成文本；非 2xx、超时、网络错误翻译成 faults.ts 的错误。每次都写一条调用记录 */
+  async function exchange(url: string, request: HttpRequestOptions, body: Body): Promise<string> {
+    const method = body.kind === 'none' ? 'GET' : 'POST';
+    const startedAt = new Date();
+    const began = performance.now();
+    const signal = AbortSignal.timeout(request.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    let status: number | null = null;
+    let outcome: 'ok' | 'failed' | 'timeout' | 'network' = 'ok';
+    let response: string | null = null;
     try {
-      return await body();
+      let res: Awaited<ReturnType<typeof fetch>>;
+      try {
+        res = await fetch(url, {
+          method,
+          dispatcher: options.dispatcher ?? outboundDispatcher(),
+          signal,
+          headers: {
+            ...(body.kind === 'json'
+              ? { 'content-type': 'application/json', accept: 'application/json' }
+              : body.kind === 'form'
+                ? {
+                    'content-type': 'application/x-www-form-urlencoded',
+                    accept: 'application/json',
+                  }
+                : {}),
+            ...request.headers,
+          },
+          body:
+            body.kind === 'json'
+              ? JSON.stringify(body.value)
+              : body.kind === 'form'
+                ? new URLSearchParams(body.value).toString()
+                : undefined,
+        });
+      } catch (error) {
+        throw translate(error, request.operation, signal);
+      }
+      status = res.status;
+      let text: string;
+      try {
+        text = await res.text();
+      } catch (error) {
+        throw translate(error, request.operation, signal);
+      }
+      response = text;
+      if (!res.ok) {
+        throw new ExternalCallFailedError(system, request.operation, {
+          status: res.status,
+          message: `调用失败（${res.status}）：${summarize(text) ?? ''}`,
+        });
+      }
+      if (request.secretResponse) response = '（凭证，不记录）';
+      return text;
     } catch (error) {
-      throw translate(error, request.operation, signal);
+      outcome =
+        error instanceof ExternalTimeoutError ? 'timeout' : status === null ? 'network' : 'failed';
+      response ??= error instanceof Error ? error.message : String(error);
+      throw error;
+    } finally {
+      await recorder.record({
+        system,
+        operation: request.operation,
+        storeId: options.storeId ?? null,
+        startedAt,
+        durationMs: performance.now() - began,
+        outcome,
+        status,
+        request: requestSummary(method, url),
+        response: summarize(response),
+      });
     }
   }
 
-  async function readJson(
-    response: Awaited<ReturnType<typeof fetch>>,
-    request: HttpRequestOptions,
-    signal: AbortSignal,
-  ): Promise<unknown> {
-    const text = await read(request, signal, () => response.text());
+  function send(url: string, request: HttpRequestOptions, body: Body): Promise<string> {
+    const throttle = throttled(system, request.operation, options.rateLimits);
+    return throttle ? throttle(() => exchange(url, request, body)) : exchange(url, request, body);
+  }
+
+  function parseJson(text: string, request: HttpRequestOptions): unknown {
     try {
       return JSON.parse(text) as unknown;
     } catch (error) {
@@ -113,17 +205,15 @@ export function createHttpClient(
   }
 
   return {
-    async getText(url, request) {
-      const { response, signal } = await send(url, request);
-      return read(request, signal, () => response.text());
-    },
+    getText: (url, request) => send(url, request, { kind: 'none' }),
     async getJson(url, request) {
-      const { response, signal } = await send(url, request);
-      return readJson(response, request, signal);
+      return parseJson(await send(url, request, { kind: 'none' }), request);
     },
     async postJson(url, body, request) {
-      const { response, signal } = await send(url, request, body);
-      return readJson(response, request, signal);
+      return parseJson(await send(url, request, { kind: 'json', value: body }), request);
+    },
+    async postForm(url, form, request) {
+      return parseJson(await send(url, request, { kind: 'form', value: form }), request);
     },
   };
 }

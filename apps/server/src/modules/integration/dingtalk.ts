@@ -5,6 +5,7 @@ import { defineClient, type FakeClient } from './definition';
 import { fixtureDirectory } from './dingtalk-replay';
 import { createDingtalkStream, type DingtalkStream } from './dingtalk-stream';
 import { ExternalCallFailedError, ExternalServiceError, FaultInjector } from './faults';
+import type { CallRecorder } from './call-records';
 import { createHttpClient, type HttpClient } from './http';
 
 /*
@@ -390,12 +391,15 @@ export function createRealDingtalkClient(
   };
 }
 
-function realDingtalk(credentials: DingtalkCredentials | null): DingtalkClient {
+function realDingtalk(
+  credentials: DingtalkCredentials | null,
+  callRecorder: CallRecorder,
+): DingtalkClient {
   if (!credentials) {
     // loadConfig 已在启动时要求凭据；直接构造（测试、脚本）时这里再挡一次
     throw new Error('钉钉用真实接口时要配置 DINGTALK_CLIENT_ID 等凭据（docs/部署说明.md「钉钉」）');
   }
-  const http = createHttpClient('dingtalk');
+  const http = createHttpClient('dingtalk', { recorder: callRecorder });
   return createRealDingtalkClient(http, credentials, createDingtalkStream(http, credentials));
 }
 
@@ -607,6 +611,6 @@ export class FakeDingtalk implements FakeClient<DingtalkClient> {
 export const dingtalkClient = defineClient({
   system: 'dingtalk',
   scope: 'global',
-  createReal: ({ dingtalk }) => realDingtalk(dingtalk),
+  createReal: ({ dingtalk, callRecorder }) => realDingtalk(dingtalk, callRecorder),
   createFake: () => new FakeDingtalk(),
 });

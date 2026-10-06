@@ -7,6 +7,8 @@ import type { ServerDeps } from './deps';
 import {
   createChannelFeeds,
   createChannelJobHandlers,
+  gmailPollJob,
+  gmailRenewWatchJob,
   gmailSyncJob,
   inboundReceivedJob,
   storeChangedJob,
@@ -35,6 +37,8 @@ export const jobDefinitions: readonly AnyJobDefinition[] = [
   dingtalkEventJob,
   storeChangedJob,
   gmailSyncJob,
+  gmailPollJob,
+  gmailRenewWatchJob,
   inboundReceivedJob,
 ];
 

@@ -18,6 +18,7 @@ export {
 export {
   createOrgFeeds,
   createOrgJobHandlers,
+  checkDingtalkDirectory,
   dingtalkConnection,
   dingtalkEventJob,
   dingtalkReconcileJob,

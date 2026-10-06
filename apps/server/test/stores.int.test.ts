@@ -124,21 +124,22 @@ describe('P18 店铺表（非生产环境）', () => {
         adapterMode: 'fake',
       },
     ]);
-    // 店铺表「状态」列：模拟数据的连接视为已连接（K20 卡头另标「模拟数据」）
+    // 店铺表「状态」列：订单的同步记录随 11、12，模拟数据视为已连接；Gmail 按邮箱的同步记录（待办 09），
+    // 这里还没开始监听、没同步过，为未连接（同步后的状态见 gmail-sync-health.int.test.ts）
     for (const store of data.stores) {
       expect(store.connections).toEqual([
-        { kind: 'gmail', status: 'connected' },
+        { kind: 'gmail', status: 'not_connected' },
         { kind: 'orders', status: 'connected' },
       ]);
       expect(store.updatedBy).toBeNull();
     }
-    // 渠道卡：亚马逊 SP-API、Shopify Admin API、Gmail、钉钉。订单与 Gmail 的同步记录随后续待办，暂无最近同步时间；
-    // 钉钉卡按通讯录的同步记录（待办 05），这里还没对账过，为未连接（对账后的状态见 dingtalk-sync.int.test.ts）
+    // 渠道卡：亚马逊 SP-API、Shopify Admin API、Gmail、钉钉。订单的同步记录随后续待办，暂无最近同步时间；
+    // Gmail 与钉钉卡按同步记录（待办 09、05），这里都还没同步过，为未连接
     expect(data.channels).toEqual([
-      { kind: 'amazon', status: 'connected', simulated: true, lastSyncAt: null },
-      { kind: 'shopify', status: 'connected', simulated: true, lastSyncAt: null },
-      { kind: 'gmail', status: 'connected', simulated: true, lastSyncAt: null },
-      { kind: 'dingtalk', status: 'not_connected', simulated: true, lastSyncAt: null },
+      { kind: 'amazon', status: 'connected', simulated: true, lastSyncAt: null, issues: [] },
+      { kind: 'shopify', status: 'connected', simulated: true, lastSyncAt: null, issues: [] },
+      { kind: 'gmail', status: 'not_connected', simulated: true, lastSyncAt: null, issues: [] },
+      { kind: 'dingtalk', status: 'not_connected', simulated: true, lastSyncAt: null, issues: [] },
     ]);
   });
 
@@ -452,6 +453,7 @@ describe('P18 店铺表（非生产环境）', () => {
       status: 'not_connected',
       simulated: true,
       lastSyncAt: null,
+      issues: [],
     });
     expect(data.channels.find((c) => c.kind === 'gmail')?.status).toBe('not_connected');
     expect(data.channels.find((c) => c.kind === 'amazon')?.status).toBe('connected');

@@ -117,6 +117,7 @@ describe('全量对账：钉钉通讯录里的人都同步成成员', () => {
       status: 'connected',
       simulated: true,
       lastSyncAt: new Date(DEMO_NOW).toISOString(),
+      issues: [],
     });
   });
 });

@@ -1,5 +1,6 @@
 import type { DemoFixture } from '@forcome/fixtures';
-import type { DingtalkCredentials } from '../core';
+import type { DingtalkCredentials, GoogleCredentials } from '../core';
+import type { CallRecorder } from './call-records';
 import type { MailRecipientGuard } from './mail-recipient-guard';
 
 /*
@@ -16,6 +17,10 @@ export interface RealClientContext {
   readonly mailRecipientGuard: MailRecipientGuard;
   /** 钉钉企业内部应用的凭据（core 的 loadConfig 读环境变量）；钉钉用 Fake 时为 null */
   readonly dingtalk: DingtalkCredentials | null;
+  /** Google 服务账号与 Pub/Sub（Gmail 的真实现，待办 09）；没配置为 null，真实现调用时以「未配置」失败 */
+  readonly google: GoogleCredentials | null;
+  /** 调用记录写到哪里（经出站 HTTP 客户端工厂，待办 09） */
+  readonly callRecorder: CallRecorder;
 }
 
 /** Fake 的最小约定：给出（某店铺视角的）客户端，能重置到初始状态 */

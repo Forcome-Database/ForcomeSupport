@@ -34,7 +34,7 @@ import {
   type AuditLogField,
 } from './audit-log';
 import { memberStatusLabels, storeScopeSchema } from './auth';
-import { platformLabels } from './channel';
+import { connectionStatusLabels, platformLabels } from './channel';
 import { formatRate, formatRateDate } from './exchange-rate';
 import { FINANCE_HIDDEN, maskFinanceFields } from './finance';
 import { adapterModeLabels } from './integration';
@@ -90,7 +90,10 @@ type ValueKind =
   | 'feeItems'
   | 'boolean'
   | 'ledgerFilters'
-  | 'auditFilters';
+  | 'auditFilters'
+  | 'backfill'
+  | 'trigger'
+  | 'sameDayTime';
 
 interface FieldDefinition {
   /** 快照里的路径（点分） */
@@ -175,6 +178,13 @@ const snapshotFields: Record<AuditSnapshotKind, readonly FieldDefinition[]> = {
     field('name', '姓名'),
     field('dept', '钉钉部门'),
   ],
+  // 渠道连接（待办 09，原型 AUDIT_P27_EXPAND）：状态、最近同步成功、补拉、触发
+  channel: [
+    field('status', '状态', 'text', connectionStatusLabels),
+    field('lastSuccessAt', '最近同步成功', 'sameDayTime'),
+    field('backfilled', '补拉', 'backfill'),
+    field('trigger', '触发', 'trigger'),
+  ],
   accessDenied: [
     field('reason', '原因', 'text', { store_scope: '店铺不在授权范围内' }),
     field('storeIds', '店铺', 'stores'),
@@ -236,6 +246,8 @@ interface FormatContext {
   readonly names: AuditNames;
   /** 这条记录的年份：同年的时刻省略年份 */
   readonly year: string;
+  /** 这条记录的日期（北京时间）：sameDayTime 的值在同一天时只写时:分 */
+  readonly day: string;
 }
 
 function dateTimeWords(value: unknown, ctx: FormatContext): string {
@@ -291,6 +303,24 @@ function auditFilterWords(value: unknown, ctx: FormatContext): string {
   return [time, ...auditConditionWords({ ...filter, actorName })].join(' · ');
 }
 
+/** 恢复连接时补拉的来信（原型「3 封来信（10:05–10:13 到达，SLA 按原到达时间）」） */
+function backfillWords(value: unknown, ctx: FormatContext): string {
+  const parsed = auditSnapshotSchemas.channel.shape.backfilled.safeParse(value);
+  if (!parsed.success || !parsed.data) return EMPTY;
+  const { count, from, to } = parsed.data;
+  const time = (at: string) => auditTimeWords(at, { withDate: false, year: ctx.year });
+  return `${count} 封来信（${time(from)}–${time(to)} 到达，SLA 按原到达时间）`;
+}
+
+/** 触发（原型「连续 3 次失败」「第 4 次重试成功」） */
+function triggerWords(value: unknown): string {
+  const parsed = auditSnapshotSchemas.channel.shape.trigger.safeParse(value);
+  if (!parsed.success || !parsed.data) return EMPTY;
+  return parsed.data.kind === 'failures'
+    ? `连续 ${parsed.data.count} 次失败`
+    : `第 ${parsed.data.attempt} 次重试成功`;
+}
+
 /** 一个值的写法（值已按权限过滤；HIDDEN 由调用方处理） */
 function valueWords(definition: FieldDefinition, value: unknown, ctx: FormatContext): string {
   if (isEmptyField(definition, value)) return EMPTY;
@@ -337,6 +367,15 @@ function valueWords(definition: FieldDefinition, value: unknown, ctx: FormatCont
       return ledgerFilterWords(value, ctx);
     case 'auditFilters':
       return auditFilterWords(value, ctx);
+    case 'backfill':
+      return backfillWords(value, ctx);
+    case 'sameDayTime': {
+      if (typeof value !== 'string' || Number.isNaN(new Date(value).getTime())) return text(value);
+      const sameDay = businessDateTime(new Date(value)).startsWith(ctx.day);
+      return auditTimeWords(value, { withDate: !sameDay, year: ctx.year });
+    }
+    case 'trigger':
+      return triggerWords(value);
     default:
       return labelOf(value);
   }
@@ -356,6 +395,22 @@ function exportSummary(kind: 'ledgerExport' | 'auditExport') {
     const rows = typeof after.rows === 'number' ? ` · ${after.rows} 行` : '';
     return `筛选：${valueWords(fieldAt(kind, 'filters'), after.filters, ctx)}${rows}`;
   };
+}
+
+/**
+ * 渠道连接的摘要（原型 AUDIT_LOG）：「状态：已连接 → 连接异常（连续 3 次失败）」「状态：连接异常 → 已连接（补拉 3 封来信）」；
+ * 恢复时一封也没补拉到照写「补拉 0 封来信」（展开里「补拉」两侧都空、不列）
+ */
+function channelSummary(before: unknown, after: unknown, ctx: FormatContext): string {
+  const status = fieldAt('channel', 'status');
+  const parsed = auditSnapshotSchemas.channel.safeParse(after);
+  const head = `${status.label}：${valueWords(status, valueAt(before, 'status'), ctx)} → ${valueWords(status, valueAt(after, 'status'), ctx)}`;
+  if (!parsed.success) return head;
+  const { trigger, backfilled } = parsed.data;
+  if (trigger?.kind === 'failures') return `${head}（${triggerWords(trigger)}）`;
+  if (trigger?.kind === 'retry_succeeded')
+    return `${head}（补拉 ${backfilled?.count ?? 0} 封来信）`;
+  return head;
 }
 
 /** 另有写法的摘要（按快照）：登录、退出、导出、越权访问；其余写第一个变化的字段 */
@@ -408,6 +463,7 @@ export function describeAuditRecord(
   const ctx: FormatContext = {
     names: options.names,
     year: businessDateTime(record.occurredAt).slice(0, 4),
+    day: businessDateTime(record.occurredAt).slice(0, 10),
   };
   const known = isAuditAction(record.action) ? auditActions[record.action] : null;
   // 没有编号的店铺对象（较早的越权记录）写店铺名
@@ -468,6 +524,8 @@ export function describeAuditRecord(
   }
   const special = snapshotSummaries[kind];
   if (special) return { ...base, summary: special(after, ctx), more: 0, fields };
+  if (kind === 'channel')
+    return { ...base, summary: channelSummary(before, after, ctx), more: 0, fields };
   const summary = !first
     ? EMPTY
     : first.hidden

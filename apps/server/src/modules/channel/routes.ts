@@ -1,21 +1,27 @@
 import {
   apiErrorSchema,
+  channelAlertsSchema,
   channelSettingsSchema,
+  connectionTestKindSchema,
+  connectionTestMessages,
+  connectionTestResultSchema,
   storeInputSchema,
   storeOptionsSchema,
   storeSchema,
   storeUpdateSchema,
 } from '@forcome/contracts';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import type { AppEnv, Runtime } from '../core';
-import type { IntegrationClients } from '../integration';
+import type { AppEnv, Logger, Runtime } from '../core';
+import { dingtalkClient, type IntegrationClients } from '../integration';
 import {
+  checkDingtalkDirectory,
   dingtalkConnection,
   requireCapability,
   requireSession,
   type AccessVariables,
 } from '../org';
-import { channelCards } from './connections';
+import { channelAlerts, channelCards, loadConnections } from './connections';
+import { testGmailConnection } from './gmail-sync';
 import { createStore, listAllStores, listStoreOptions, toStore, updateStore } from './stores';
 
 const json = <T extends z.ZodType>(schema: T, description: string) => ({
@@ -84,29 +90,67 @@ const storeOptionsRoute = createRoute({
   },
 });
 
-/** channel 的接口：P18 渠道与店铺（管理员）与店铺选项（所有登录成员） */
+const alertsRoute = createRoute({
+  method: 'get',
+  path: '/api/channel/alerts',
+  summary: '全站横幅（G4）：连接异常的渠道（钉钉除外，6.9）；所有登录成员都要看到，恢复后列表为空',
+  responses: {
+    200: json(channelAlertsSchema, '连接异常的渠道；没有时为空列表'),
+    401: unauthenticated,
+  },
+});
+
+const connectionTestRoute = createRoute({
+  method: 'post',
+  path: '/api/channel/connection-tests/{kind}',
+  summary:
+    '测试连接（K20）：Gmail 逐个进线邮箱试访问、测完立即排一次同步；钉钉取根部门。不改连接状态',
+  request: { params: z.object({ kind: connectionTestKindSchema }) },
+  responses: {
+    200: json(connectionTestResultSchema, '全部可访问'),
+    401: unauthenticated,
+    403: forbidden,
+    502: json(
+      apiErrorSchema,
+      '有访问不了的：message 写哪些（失败浮层「测试连接失败：<message>」）',
+    ),
+  },
+});
+
+/** channel 的接口：P18 渠道与店铺（管理员）与店铺选项、全站横幅（所有登录成员） */
 export function createChannelRoutes(deps: {
   runtime: Runtime;
   appEnv: AppEnv;
   clients: IntegrationClients;
+  logger: Logger;
 }) {
-  const { runtime, appEnv, clients } = deps;
+  const { runtime, appEnv, clients, logger } = deps;
   const routes = new OpenAPIHono<{ Variables: AccessVariables }>();
   const session = requireSession(runtime, appEnv);
   const admin = requireCapability('settings.channels_team');
   routes.use('/api/channel/*', session);
-  for (const path of ['/api/channel/settings', '/api/channel/stores', '/api/channel/stores/*']) {
+  for (const path of [
+    '/api/channel/settings',
+    '/api/channel/stores',
+    '/api/channel/stores/*',
+    '/api/channel/connection-tests/*',
+  ]) {
     routes.use(path, admin);
   }
 
   routes.openapi(settingsRoute, async (c) => {
+    const now = runtime.clock.now();
     const stores = await listAllStores(runtime.db);
+    const connections = await loadConnections(runtime.db, now);
     // 钉钉卡按通讯录的同步记录（org，待办 05）
-    const dingtalk = await dingtalkConnection(runtime.db, runtime.clock.now());
+    const dingtalk = await dingtalkConnection(runtime.db, now);
     return c.json(
       {
-        channels: channelCards(stores, { mode: clients.globalMode('dingtalk'), ...dingtalk }),
-        stores: stores.map(toStore),
+        channels: channelCards(stores, connections, {
+          mode: clients.globalMode('dingtalk'),
+          ...dingtalk,
+        }),
+        stores: stores.map((record) => toStore(record, connections)),
         dataSourceEditable: appEnv !== 'production',
       },
       200,
@@ -118,7 +162,7 @@ export function createChannelRoutes(deps: {
       { runtime, appEnv, actor: c.get('access').actor },
       c.req.valid('json'),
     );
-    return c.json(toStore(created), 201);
+    return c.json(toStore(created, await loadConnections(runtime.db, runtime.clock.now())), 201);
   });
 
   routes.openapi(updateStoreRoute, async (c) => {
@@ -128,12 +172,43 @@ export function createChannelRoutes(deps: {
       c.req.valid('json'),
     );
     if (!updated) return c.json({ error: 'not_found', message: '没有这个店铺' }, 404);
-    return c.json(toStore(updated), 200);
+    return c.json(toStore(updated, await loadConnections(runtime.db, runtime.clock.now())), 200);
   });
 
   routes.openapi(storeOptionsRoute, async (c) =>
     c.json({ stores: await listStoreOptions(runtime.db, c.get('access').stores) }, 200),
   );
+
+  routes.openapi(alertsRoute, async (c) => {
+    const connections = await loadConnections(runtime.db, runtime.clock.now());
+    return c.json({ alerts: channelAlerts(connections) }, 200);
+  });
+
+  routes.openapi(connectionTestRoute, async (c) => {
+    const { kind } = c.req.valid('param');
+    if (kind === 'dingtalk') {
+      const ok = await checkDingtalkDirectory(clients.global(dingtalkClient), logger);
+      return ok
+        ? c.json({ kind, targets: ['通讯录'] }, 200)
+        : c.json(
+            {
+              error: 'connection_test_failed',
+              message: connectionTestMessages.dingtalkUnreachable,
+            },
+            502,
+          );
+    }
+    const result = await testGmailConnection(runtime, clients, logger);
+    return result.unreachable.length === 0
+      ? c.json({ kind, targets: result.reachable }, 200)
+      : c.json(
+          {
+            error: 'connection_test_failed',
+            message: connectionTestMessages.unreachable(result.unreachable),
+          },
+          502,
+        );
+  });
 
   return routes;
 }

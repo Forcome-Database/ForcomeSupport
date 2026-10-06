@@ -1,7 +1,15 @@
 import { z } from 'zod';
 import { defineJob, handleJob, type AnyJobHandler, type Feed } from '../core';
 import type { IntegrationClients } from '../integration';
-import { createGmailPushFeed, gmailSyncJob, syncMailbox } from './gmail-sync';
+import {
+  createGmailPushFeed,
+  gmailPollJob,
+  gmailRenewWatchJob,
+  gmailSyncJob,
+  pollMailboxes,
+  renewWatches,
+  syncMailbox,
+} from './gmail-sync';
 
 /**
  * 领域事件「店铺已变更」（待办 07 发出）：新增或编辑店铺后，在同一事务里排入。
@@ -22,6 +30,8 @@ export function createChannelJobHandlers(deps: { clients: IntegrationClients }):
       return Promise.resolve();
     }),
     handleJob(gmailSyncJob, (payload, context) => syncMailbox(deps.clients, payload, context)),
+    handleJob(gmailPollJob, (_payload, { runtime, logger }) => pollMailboxes(runtime, logger)),
+    handleJob(gmailRenewWatchJob, (_payload, context) => renewWatches(deps.clients, context)),
   ];
 }
 

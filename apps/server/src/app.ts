@@ -104,7 +104,7 @@ export function createApp(deps: ServerDeps) {
   app.route('/', createDingtalkLoginRoutes({ runtime, appEnv: config.appEnv, clients, logger }));
   // 站内通知（G10）的铃铛面板：只看自己的通知，在 org（会话与店铺范围）；写入与查询在 core
   app.route('/', createNotificationRoutes({ runtime, appEnv: config.appEnv }));
-  app.route('/', createChannelRoutes({ runtime, appEnv: config.appEnv, clients }));
+  app.route('/', createChannelRoutes({ runtime, appEnv: config.appEnv, clients, logger }));
   app.route('/', createTicketRoutes({ runtime, appEnv: config.appEnv }));
   app.route('/', createAftersalesRoutes({ runtime, appEnv: config.appEnv }));
   // P27 审计日志在 org（查看范围看角色、店铺范围与财务权限）；店铺名由这里注入 channel 的查询（org 不依赖 channel）

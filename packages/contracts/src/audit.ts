@@ -12,7 +12,7 @@ import {
   shipperSchema,
 } from './aftersales';
 import { memberStatusSchema, storeScopeSchema } from './auth';
-import { platformSchema, siteSchema } from './channel';
+import { connectionStatusSchema, platformSchema, siteSchema } from './channel';
 import { financeField } from './finance';
 import { adapterModeSchema } from './integration';
 import { roleSchema } from './roles';
@@ -175,6 +175,23 @@ export const accessDeniedAuditSnapshotSchema = z.object({
   path: z.string(),
 });
 
+/**
+ * 渠道连接（待办 09；PRD P27「第一阶段」的「渠道」对象、原型 AUDIT_LOG 与 AUDIT_P27_EXPAND）：某个 Gmail 邮箱进入连接异常与恢复连接，
+ * 操作人「系统」。状态、最近同步成功的时间、恢复时补拉了几封来信（到达时间的起止）与触发（前值「连续 N 次失败」、
+ * 恢复的后值「第 N 次重试成功」）
+ */
+export const channelAuditSnapshotSchema = z.object({
+  status: connectionStatusSchema,
+  lastSuccessAt: z.string().nullable(),
+  backfilled: z.object({ count: z.int().positive(), from: z.string(), to: z.string() }).nullable(),
+  trigger: z
+    .discriminatedUnion('kind', [
+      z.object({ kind: z.literal('failures'), count: z.int().positive() }),
+      z.object({ kind: z.literal('retry_succeeded'), attempt: z.int().positive() }),
+    ])
+    .nullable(),
+});
+
 /** 没有前后值的动作（如退出登录） */
 export const emptyAuditSnapshotSchema = z.object({});
 
@@ -186,6 +203,7 @@ export const auditSnapshotSchemas = {
   login: loginAuditSnapshotSchema,
   member: memberAuditSnapshotSchema,
   accessDenied: accessDeniedAuditSnapshotSchema,
+  channel: channelAuditSnapshotSchema,
   empty: emptyAuditSnapshotSchema,
 } as const;
 export type AuditSnapshotKind = keyof typeof auditSnapshotSchemas;
@@ -253,6 +271,9 @@ export const auditActions = {
     snapshot: 'member',
   },
   'auth.logout': { label: '退出登录', objectType: 'login', snapshot: 'empty' },
+  // 渠道连接（待办 09）：某个 Gmail 邮箱连续 3 次失败进入连接异常、之后同步成功恢复连接，操作人「系统」（2026-10-06 用户确认）
+  'channel.disconnected': { label: '连接异常', objectType: 'channel', snapshot: 'channel' },
+  'channel.recovered': { label: '恢复连接', objectType: 'channel', snapshot: 'channel' },
 } as const satisfies Record<string, AuditActionDefinition>;
 
 export type AuditAction = keyof typeof auditActions;

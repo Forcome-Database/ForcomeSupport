@@ -2,7 +2,7 @@
 import { serve } from '@hono/node-server';
 import { createApp } from './app';
 import { createLogger, loadConfig, startingAt, startRuntime } from './modules/core';
-import { createIntegrationClients } from './modules/integration';
+import { createIntegrationClients, databaseCallRecorder } from './modules/integration';
 import { onShutdown } from './shutdown';
 
 const config = loadConfig();
@@ -14,7 +14,11 @@ const { runtime, stop } = await startRuntime(config.databaseUrl, {
   clock: config.clockStart ? startingAt(config.clockStart) : undefined,
 });
 
-const app = createApp({ runtime, logger, config, clients: createIntegrationClients(config) });
+// 真实现的每次外部调用写一条调用记录（待办 09）
+const clients = createIntegrationClients(config, {
+  callRecorder: databaseCallRecorder(runtime, logger),
+});
+const app = createApp({ runtime, logger, config, clients });
 const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   logger.info(
     {

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { adapterModeSchema, type AdapterMode } from '@forcome/contracts';
 import { z } from 'zod';
 
@@ -17,6 +18,10 @@ import { z } from 'zod';
  * - `DINGTALK_CLIENT_ID` / `DINGTALK_CLIENT_SECRET` / `DINGTALK_AGENT_ID`：钉钉企业内部应用的凭据（用户上线时自己填进环境文件，
  *   docs/部署说明.md 第 11 节；待办 05）。钉钉用真实接口时（生产环境默认，或 `CLIENT_MODE_DINGTALK=real`）三项必填，缺了拒绝启动；
  *   用 Fake 时不读。CorpId 第一期用不到（第二期钉钉内免登时再加）。
+ * - `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` / `GMAIL_PUBSUB_TOPIC` / `GMAIL_PUBSUB_SUBSCRIPTION`：Gmail 真实现用的 Google 服务账号密钥
+ *   文件（JSON，全域委派到 4 个店铺邮箱）、watch 推送的 Pub/Sub 主题与本环境的订阅（docs/部署说明.md 第 12 节；待办 09）。
+ *   三项要么都不填、要么都填；Gmail 推送用真实接口时（生产环境默认，或 `CLIENT_MODE_GMAIL_PUSH=real`）必填。
+ *   店铺级的 Gmail 邮箱按店铺选择真实或模拟，启动时不知道要不要，没配置时真实邮箱的调用以「未配置」失败（P18 显示连接异常）。
  * 空值视同未设置。
  */
 const envSchema = z.object({
@@ -41,6 +46,15 @@ const envSchema = z.object({
   DINGTALK_CLIENT_ID: z.string().optional(),
   DINGTALK_CLIENT_SECRET: z.string().optional(),
   DINGTALK_AGENT_ID: z.string().regex(/^\d+$/, '只能是数字').optional(),
+  GOOGLE_SERVICE_ACCOUNT_KEY_FILE: z.string().optional(),
+  GMAIL_PUBSUB_TOPIC: z
+    .string()
+    .regex(/^projects\/[^/]+\/topics\/[^/]+$/, '写成 projects/<项目>/topics/<主题>')
+    .optional(),
+  GMAIL_PUBSUB_SUBSCRIPTION: z
+    .string()
+    .regex(/^projects\/[^/]+\/subscriptions\/[^/]+$/, '写成 projects/<项目>/subscriptions/<订阅>')
+    .optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>['APP_ENV'];
@@ -93,6 +107,36 @@ const REQUIRED_DINGTALK_VARIABLES = [
   'DINGTALK_AGENT_ID',
 ] as const;
 
+/**
+ * Gmail 真实现的 Google 凭据（ADR 0009 修订，待办 09）：服务账号（全域委派，以各店铺邮箱的身份读信）与 Pub/Sub。
+ * 只在 Gmail（邮箱或推送）用真实接口时用到。
+ */
+export interface GoogleCredentials {
+  /** 服务账号邮箱（密钥文件的 client_email） */
+  readonly clientEmail: string;
+  /** PKCS#8 私钥（密钥文件的 private_key） */
+  readonly privateKey: string;
+  /** 换令牌的地址（密钥文件的 token_uri） */
+  readonly tokenUri: string;
+  /** watch 推送的主题：projects/<项目>/topics/<主题> */
+  readonly pubsubTopic: string;
+  /** 本环境的订阅：projects/<项目>/subscriptions/<订阅> */
+  readonly pubsubSubscription: string;
+}
+
+const GOOGLE_VARIABLES = [
+  'GOOGLE_SERVICE_ACCOUNT_KEY_FILE',
+  'GMAIL_PUBSUB_TOPIC',
+  'GMAIL_PUBSUB_SUBSCRIPTION',
+] as const;
+
+const serviceAccountKeySchema = z.object({
+  type: z.literal('service_account'),
+  client_email: z.string().min(1),
+  private_key: z.string().includes('PRIVATE KEY'),
+  token_uri: z.url().default('https://oauth2.googleapis.com/token'),
+});
+
 export interface AppConfig {
   appEnv: AppEnv;
   databaseUrl: string;
@@ -108,6 +152,8 @@ export interface AppConfig {
   clockStart: Date | null;
   /** 钉钉企业内部应用的凭据：钉钉用真实接口时必有；用 Fake 时为 null（不读） */
   dingtalk: DingtalkCredentials | null;
+  /** Gmail 的 Google 凭据：Gmail 推送用真实接口时必有；三项都没填为 null */
+  google: GoogleCredentials | null;
 }
 
 export interface MailSendPolicy {
@@ -125,7 +171,13 @@ export class ConfigError extends Error {
   override name = 'ConfigError';
 }
 
-export function loadConfig(rawEnv: Record<string, string | undefined> = process.env): AppConfig {
+/** 读服务账号密钥文件（测试换成内存里的内容） */
+export type ReadKeyFile = (path: string) => string;
+
+export function loadConfig(
+  rawEnv: Record<string, string | undefined> = process.env,
+  readKeyFile: ReadKeyFile = (path) => readFileSync(path, 'utf8'),
+): AppConfig {
   // 空值视同未设置：Compose 会把 .env 里留空的变量原样传成空字符串（待办 03）
   const env = Object.fromEntries(
     Object.entries(rawEnv).filter(([, value]) => value !== undefined && value !== ''),
@@ -199,6 +251,41 @@ export function loadConfig(rawEnv: Record<string, string | undefined> = process.
     }
   }
 
+  // Gmail 的 Google 凭据：三项要么都填要么都不填；推送用真实接口时（生产默认）必填。只列变量名与原因，不回显密钥
+  let google: GoogleCredentials | null = null;
+  if (result.success) {
+    const given = GOOGLE_VARIABLES.filter((name) => result.data[name]);
+    const pushReal = (clientModes.gmail_push ?? defaultClientMode(result.data.APP_ENV)) === 'real';
+    if (given.length > 0 || pushReal) {
+      const missing = GOOGLE_VARIABLES.filter((name) => !result.data[name]);
+      for (const name of missing) {
+        problems.push(
+          `${name}：${pushReal ? 'Gmail 推送用真实接口时必填' : '与其他两项 Google 配置一起填'}`,
+        );
+      }
+      if (missing.length === 0) {
+        const file = result.data.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ?? '';
+        let key: z.infer<typeof serviceAccountKeySchema> | null = null;
+        try {
+          const parsed = serviceAccountKeySchema.safeParse(JSON.parse(readKeyFile(file)));
+          if (parsed.success) key = parsed.data;
+          else problems.push('GOOGLE_SERVICE_ACCOUNT_KEY_FILE：不是服务账号的 JSON 密钥文件');
+        } catch {
+          problems.push('GOOGLE_SERVICE_ACCOUNT_KEY_FILE：读不到这个文件或不是 JSON');
+        }
+        if (key) {
+          google = {
+            clientEmail: key.client_email,
+            privateKey: key.private_key,
+            tokenUri: key.token_uri,
+            pubsubTopic: result.data.GMAIL_PUBSUB_TOPIC ?? '',
+            pubsubSubscription: result.data.GMAIL_PUBSUB_SUBSCRIPTION ?? '',
+          };
+        }
+      }
+    }
+  }
+
   if (!result.success || problems.length > 0) {
     throw new ConfigError(`环境变量配置有误：\n${problems.join('\n')}`);
   }
@@ -224,5 +311,6 @@ export function loadConfig(rawEnv: Record<string, string | undefined> = process.
     },
     clockStart: CLOCK_START ? new Date(CLOCK_START) : null,
     dingtalk,
+    google,
   };
 }

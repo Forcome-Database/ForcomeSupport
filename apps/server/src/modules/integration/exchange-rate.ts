@@ -237,6 +237,7 @@ export class FakeExchangeRates implements FakeClient<ExchangeRateClient> {
 export const exchangeRateClient = defineClient({
   system: 'exchange_rate',
   scope: 'global',
-  createReal: () => createRealExchangeRateClient(createHttpClient('exchange_rate')),
+  createReal: ({ callRecorder }) =>
+    createRealExchangeRateClient(createHttpClient('exchange_rate', { recorder: callRecorder })),
   createFake: () => new FakeExchangeRates(),
 });

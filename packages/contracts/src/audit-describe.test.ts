@@ -571,3 +571,106 @@ describe('要查名字的 ID', () => {
     expect([...ids.memberIds]).toEqual([WANGLEI]);
   });
 });
+
+describe('渠道连接的记录（待办 09，原型 AUDIT_LOG 与 AUDIT_P27_EXPAND）', () => {
+  const system = {
+    actorType: 'system',
+    actorId: null,
+    actorName: '系统',
+    actorRoles: [],
+    ip: null,
+  } as const;
+  const channelRecord = (overrides: Partial<AuditRecordInput>) =>
+    record({
+      ...system,
+      objectType: 'channel',
+      objectId: 'gmail:support@forcome.mx',
+      objectLabel: 'Gmail · support@forcome.mx',
+      storeId: null,
+      ...overrides,
+    });
+
+  it('连接异常：摘要「状态：已连接 → 连接异常（连续 3 次失败）」', () => {
+    const before: AuditSnapshot<'channel.disconnected'> = {
+      status: 'connected',
+      lastSuccessAt: '2026-09-11T02:04:00.000Z',
+      backfilled: null,
+      trigger: null,
+    };
+    const entry = describeAuditRecord(
+      channelRecord({
+        occurredAt: new Date('2026-09-11T02:05:00Z'),
+        action: 'channel.disconnected',
+        before,
+        after: { ...before, status: 'error', trigger: { kind: 'failures', count: 3 } },
+      }),
+      { financeVisible: false, names },
+    );
+    expect(entry).toMatchObject({
+      objectLabel: 'Gmail · support@forcome.mx',
+      actionLabel: '连接异常',
+      summary: '状态：已连接 → 连接异常（连续 3 次失败）',
+      more: 0,
+    });
+  });
+
+  it('恢复连接：摘要写补拉几封，展开照原型列状态、最近同步成功、补拉、触发', () => {
+    const entry = describeAuditRecord(
+      channelRecord({
+        occurredAt: new Date('2026-09-11T02:14:00Z'),
+        action: 'channel.recovered',
+        before: {
+          status: 'error',
+          lastSuccessAt: '2026-09-11T02:04:00.000Z',
+          backfilled: null,
+          trigger: { kind: 'failures', count: 3 },
+        },
+        after: {
+          status: 'connected',
+          lastSuccessAt: '2026-09-11T02:14:00.000Z',
+          backfilled: {
+            count: 3,
+            from: '2026-09-11T02:05:00.000Z',
+            to: '2026-09-11T02:13:00.000Z',
+          },
+          trigger: { kind: 'retry_succeeded', attempt: 4 },
+        },
+      }),
+      { financeVisible: false, names },
+    );
+    expect(entry.summary).toBe('状态：连接异常 → 已连接（补拉 3 封来信）');
+    expect(entry.fields.map((f) => [f.label, f.before, f.after])).toEqual([
+      ['状态', '连接异常', '已连接'],
+      ['最近同步成功', '10:04', '10:14'],
+      ['补拉', '—', '3 封来信（10:05–10:13 到达，SLA 按原到达时间）'],
+      ['触发', '连续 3 次失败', '第 4 次重试成功'],
+    ]);
+  });
+
+  it('最近同步成功不在当天时写月-日', () => {
+    const entry = describeAuditRecord(
+      channelRecord({
+        occurredAt: new Date('2026-09-11T02:05:00Z'),
+        action: 'channel.disconnected',
+        before: {
+          status: 'delayed',
+          lastSuccessAt: '2026-09-10T09:00:00.000Z',
+          backfilled: null,
+          trigger: null,
+        },
+        after: {
+          status: 'error',
+          lastSuccessAt: '2026-09-10T09:00:00.000Z',
+          backfilled: null,
+          trigger: { kind: 'failures', count: 3 },
+        },
+      }),
+      { financeVisible: false, names },
+    );
+    expect(field(entry, '最近同步成功')).toMatchObject({
+      before: '09-10 17:00',
+      after: '09-10 17:00',
+    });
+    expect(entry.summary).toBe('状态：同步延迟 → 连接异常（连续 3 次失败）');
+  });
+});

@@ -25,7 +25,7 @@ import {
   type StoreScope,
   type Tx,
 } from '../core';
-import { storeConnections } from './connections';
+import { storeConnections, type ConnectionSnapshot } from './connections';
 import { storeChangedJob } from './jobs';
 import { store, storeMailbox } from './schema';
 
@@ -112,7 +112,8 @@ export async function storeNamesById(
 }
 
 /** 接口输出（contracts 的 Store） */
-export function toStore(record: StoreRecord): Store {
+/** 店铺的接口输出；「状态」列按这一刻的同步记录算（connections.ts） */
+export function toStore(record: StoreRecord, connections: ConnectionSnapshot): Store {
   return {
     id: record.id,
     name: record.name,
@@ -122,7 +123,7 @@ export function toStore(record: StoreRecord): Store {
     mailboxes: [...record.mailboxes],
     platformId: record.platformId,
     adapterMode: record.adapterMode,
-    connections: storeConnections(record),
+    connections: storeConnections(record, connections),
     version: record.version,
     updatedAt: record.updatedAt.toISOString(),
     updatedBy: record.updatedByName,

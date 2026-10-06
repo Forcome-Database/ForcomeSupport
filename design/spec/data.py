@@ -638,6 +638,14 @@ def intent_counts(total_n, intents):
 CHANNEL_SYNC = {'SP-API': '10:12', 'SP-API 异常': '10:02', 'Shopify': '10:15', '积加': '10:16', 'Gmail': '10:18', 'Gmail 异常': '10:04',
                 '钉钉': '10:00', '易仓': '10:16', '钉钉 延迟': '08:00', '17TRACK': '10:10'}  # 「钉钉 延迟」为 K20 同步延迟示例的最近同步
 DINGTALK_LATE_SYNC = CHANNEL_SYNC['钉钉 延迟']
+# Gmail 某个邮箱的连接异常与同步延迟示例（K7、K20 补充小样，待办 09 · 10-06 用户确认）：邮箱、连续失败从几点起与次数、最近同步成功
+GMAIL_ISSUE = {'mailbox': 'support@forcome.mx', 'since': '10:05', 'failures': 3, 'last': CHANNEL_SYNC['Gmail 异常']}
+GMAIL_DELAYED = {'mailbox': 'support@forcome.mx', 'last': '10:05'}  # 演示时刻 10:20，超过 10 分钟没同步成功
+# 几个邮箱同时异常、另有一个延迟（E3，协调者 10-06 决定）：(邮箱, 连续失败从几点起, 次数)；延迟的 (邮箱, 最近同步成功)
+GMAIL_ISSUES_MIXED = [('amz-auto@forcome.com', '10:12', 3), ('support@forcome.mx', '10:05', 5)]
+GMAIL_DELAYED_MIXED = ('support@forcome.com', '10:06')
+# G4 集成中断横幅（全站，所有角色；「查看渠道状态」只对管理员显示）。K7 统一用这一写法（待办 09 Q1，10-06 用户确认）
+G4_BANNER = ('Gmail 连接中断，来信暂存队列', '09-11 %s 起未收取。恢复后自动补收，按到达顺序处理，SLA 从原到达时间计算。管理员、客服主管已收到通知。' % GMAIL_ISSUE['since'])
 SQS_STATE = ('正常', 0)       # 亚马逊订单通知队列（SQS）：状态, 积压条数（P18、K20）
 AMZ_BACKFILL_DAYS = 90        # 第一阶段亚马逊订单回补天数（K20）
 SLA_HOURS = {'亚马逊': 24, '内部目标': 24}  # K22：亚马逊首次回复时限（平台考核）与 Shopify 与邮件内部目标的全局值

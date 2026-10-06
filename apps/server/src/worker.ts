@@ -9,7 +9,7 @@ import {
   startRuntime,
   startWorker,
 } from './modules/core';
-import { createIntegrationClients } from './modules/integration';
+import { createIntegrationClients, databaseCallRecorder } from './modules/integration';
 import { onShutdown } from './shutdown';
 
 const config = loadConfig();
@@ -21,7 +21,11 @@ const { runtime, stop } = await startRuntime(config.databaseUrl, {
   clock: config.clockStart ? startingAt(config.clockStart) : undefined,
 });
 
-const deps: ServerDeps = { runtime, logger, config, clients: createIntegrationClients(config) };
+// 真实现的每次外部调用写一条调用记录（待办 09）
+const clients = createIntegrationClients(config, {
+  callRecorder: databaseCallRecorder(runtime, logger),
+});
+const deps: ServerDeps = { runtime, logger, config, clients };
 const handlers = createJobHandlers(deps);
 await startWorker(runtime, handlers, { logger });
 const feeds = createFeeds(deps);

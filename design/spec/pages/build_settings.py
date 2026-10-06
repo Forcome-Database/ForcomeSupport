@@ -130,17 +130,50 @@ def gmail_card(err=False):
 
 
 DINGTALK_LINES_P1 = ['通讯录：成员与部门每小时同步', '工作通知推送；扫码登录']  # 第一阶段已连接时的说明行（钉钉内免登随第二阶段）
+DINGTALK_NOTE = '只提醒管理员，不出全站横幅；成员与部门保持上次结果，登录与权限不受影响'
 
 
-def dingtalk_card(late=False, phase1=False):
-    """钉钉卡。late=True 为同步延迟（超过 2 小时）：只在本卡显示、只提醒管理员，不出全站横幅（6.9、E-32）。
-    phase1=True 且已连接时用第一阶段的说明行（没有钉钉内免登）。"""
+def dingtalk_card(late=False, phase1=False, err=False):
+    """钉钉卡。late=True 为同步延迟（超过 2 小时）、err=True 为连接异常（连续 3 次失败，待办 09 Q6 · 10-06 用户确认）：
+    都只在本卡显示、只提醒管理员，不出全站横幅（6.9、E-32）。phase1=True 且已连接时用第一阶段的说明行（没有钉钉内免登）。"""
+    if err:
+        # err='never'：从没同步成功过就连续 3 次失败（新部署凭据配错，E4，协调者 10-06 决定），没有最近同步时刻
+        never = err == 'never'
+        first = '通讯录尚未同步成功，连续 3 次失败' if never else '通讯录 %s 后未同步成功，连续 3 次失败' % DINGTALK_LATE_SYNC
+        return ch_card('users', '钉钉', state('连接异常'), [first, DINGTALK_NOTE, '工作通知推送；扫码登录'],
+                       '', 'bad', 'danger', sync=None if never else DINGTALK_LATE_SYNC)
     if late:
         return ch_card('users', '钉钉', state('同步延迟'),
-                       ['通讯录 %s 后未同步成功，超过 2 小时' % DINGTALK_LATE_SYNC, '只提醒管理员，不出全站横幅；成员与部门保持上次结果，登录与权限不受影响', '工作通知推送；扫码登录'],
+                       ['通讯录 %s 后未同步成功，超过 2 小时' % DINGTALK_LATE_SYNC, DINGTALK_NOTE, '工作通知推送；扫码登录'],
                        '', 'warn', 'warning', sync=DINGTALK_LATE_SYNC)
     lines = DINGTALK_LINES_P1 if phase1 else ['通讯录：成员与部门每小时同步', '工作通知推送；扫码登录与钉钉内免登']
     return ch_card('users', '钉钉', state('已连接'), lines, '', 'ok', sync=CHANNEL_SYNC['钉钉'])
+
+
+GMAIL_LINES_P1 = ['4 个邮箱：2 个亚马逊买家消息、2 个 Shopify 客服', '收件与「已发送」：识别到我方回复即转等客户']  # 第一阶段已连接时的说明行
+
+
+def gmail_card_p1(st='已连接'):
+    """第一阶段 Gmail 卡（K20，待办 09 Q2、Q3 · 10-06 用户确认）。同步延迟（超过 10 分钟）：每个延迟的邮箱一行「<邮箱> hh:mm 后未同步成功，
+    超过 10 分钟」，其余说明行照常。连接异常（连续 3 次失败，K7）：每个异常的邮箱一行原因与恢复指引，再写来信暂存，底部「重新检测」
+    （立即重测并补拉）；第一阶段不发信、没有错误日志页，所以不写「回复进入待发队列」、没有「查看错误日志」。"""
+    if st == '同步延迟':
+        d = GMAIL_DELAYED
+        return ch_card('message', 'Gmail', state('同步延迟'), ['%s %s 后未同步成功，超过 10 分钟' % (d['mailbox'], d['last'])] + GMAIL_LINES_P1,
+                       '', 'warn', 'warning', sync=d['last'])
+    if st == '异常与延迟':
+        # 几个邮箱同时异常、另有一个延迟（E3，协调者 10-06 决定）：每个异常的邮箱一行（次数为实际的连续失败次数），暂存说明只写一次，延迟行在后；
+        # 卡上的最近同步取各邮箱中最旧的一次
+        lines = ['%s 访问失败（%s 起连续 %d 次）：请检查全域委派范围与邮箱状态' % i for i in GMAIL_ISSUES_MIXED] + ['该邮箱来信暂存，恢复后自动补拉'] + \
+                ['%s %s 后未同步成功，超过 10 分钟' % GMAIL_DELAYED_MIXED]
+        return ch_card('message', 'Gmail', state('连接异常'), lines, row(btn('重新检测', 'primary', 'sm', 'refresh'), 6), 'bad', 'danger',
+                       sync=GMAIL_ISSUE['last'])
+    if st == '连接异常':
+        e = GMAIL_ISSUE
+        return ch_card('message', 'Gmail', state('连接异常'),
+                       ['%s 访问失败（%s 起连续 %d 次）：请检查全域委派范围与邮箱状态' % (e['mailbox'], e['since'], e['failures']), '该邮箱来信暂存，恢复后自动补拉'],
+                       row(btn('重新检测', 'primary', 'sm', 'refresh'), 6), 'bad', 'danger', sync=e['last'])
+    return ch_card('message', 'Gmail', state('已连接'), GMAIL_LINES_P1, '', 'ok', sync=CHANNEL_SYNC['Gmail'])
 
 
 def grid3(cells):
@@ -168,7 +201,7 @@ def p18_channels_p1():
     shp = ch_card('store', 'Shopify Admin API', state('已连接'),
                   ['2 个店铺 · 订单经 Admin API 准实时同步', row(nowrap('订单回补 %d 天' % SHOPIFY_BACKFILL_DAYS, 12, T['ink3']) + chip('未开通 read_all_orders', 'warning', 11), 6)],
                   '', 'ok', sync=CHANNEL_SYNC['Shopify'])
-    gm = ch_card('message', 'Gmail', state('已连接'), ['4 个邮箱：2 个亚马逊买家消息、2 个 Shopify 客服', '收件与「已发送」：识别到我方回复即转等客户'], '', 'ok', sync=CHANNEL_SYNC['Gmail'])
+    gm = gmail_card_p1()
     return grid3([amz, shp, gm, dingtalk_card(late=True),
                   phase2_card('link', '积加 ERP', '亚马逊订单收件人、库存、售后出库单、单号与运费。'),
                   phase2_card('box', '易仓海外仓', '库存与售后出库单经积加读写，本系统不直连易仓接口。')])
