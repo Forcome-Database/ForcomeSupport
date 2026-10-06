@@ -3,6 +3,7 @@ import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-q
 import { useNavigate } from '@tanstack/react-router';
 import { ChevronLeft } from 'lucide-react';
 import { AuthCard, AuthHeading, AuthNote } from '@/components/auth-card';
+import { BACK_TO_LOGIN } from '@/pages/login/login-copy';
 import { LoginDenied } from '@/components/login-denied';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -41,7 +42,7 @@ export function DevLoginPage() {
           action={
             <Button variant="outline" onClick={() => login.reset()}>
               <ChevronLeft />
-              返回登录页
+              {BACK_TO_LOGIN}
             </Button>
           }
         />

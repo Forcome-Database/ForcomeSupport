@@ -19,7 +19,13 @@ import {
   type Runtime,
   type Tx,
 } from '../core';
-import type { DingtalkClient, DingtalkDepartment } from '../integration';
+import {
+  dingtalkDepartmentEvents,
+  dingtalkUserEvents,
+  type DingtalkClient,
+  type DingtalkDepartment,
+  type DingtalkUser,
+} from '../integration';
 import {
   applyDepartmentChanges,
   applyDirectory,
@@ -43,11 +49,14 @@ import { dingtalkSync } from './schema';
  *   只给管理员发站内提醒（11.4），不出全站横幅（6.9）：连续失败的第 1 次与第 3 次（转为连接异常）各一条。
  */
 
-/** 每小时（整点）对账一次，worker 启动时也一次；失败后 10 分钟重试、最多 2 次（一轮失败约 20 分钟内到连接异常） */
+/**
+ * 每个整点对账一次，worker 启动时也一次。失败不重试：每次对账算一次同步，下一个整点再试——上次成功超过 2 小时先显示
+ * 「同步延迟」，连续 3 次失败（约 3 小时）才是「连接异常」（6.9、K20 的示例）；其间的变化有 Stream 事件
+ */
 export const dingtalkReconcileJob = defineJob(
   'org.dingtalk_reconcile',
   z.object({}),
-  { policy: 'stately', retryLimit: 2, retryDelay: 600 },
+  { policy: 'stately', retryLimit: 0 },
   { cron: '0 * * * *', tz: 'Asia/Shanghai', runAtStartup: true },
 );
 
@@ -63,15 +72,9 @@ export const dingtalkEventJob = defineJob(
   { retryLimit: 5, retryDelay: 30, retryBackoff: true },
 );
 
-/** 成员事件：取最新的成员（取不到即已离职） */
-const USER_EVENTS = new Set([
-  'user_add_org',
-  'user_modify_org',
-  'user_leave_org',
-  'user_active_org',
-]);
-/** 部门事件：取最新的部门（取不到即已删除） */
-const DEPARTMENT_EVENTS = new Set(['org_dept_create', 'org_dept_modify', 'org_dept_remove']);
+/** 成员事件：取最新的成员（取不到即已离职）；部门事件：取最新的部门（取不到即已删除） */
+const USER_EVENTS: ReadonlySet<string> = new Set(dingtalkUserEvents);
+const DEPARTMENT_EVENTS: ReadonlySet<string> = new Set(dingtalkDepartmentEvents);
 
 /** 同步失败给管理员的站内提醒（11.4「钉钉同步失败」；对象是 P18 钉钉卡） */
 export const DINGTALK_SYNC_FAILED = {
@@ -167,7 +170,7 @@ async function recordFailure(runtime: Runtime, error: unknown): Promise<number> 
 
 /**
  * 全量对账一次：先把通讯录全部取来（取的过程中出错就什么也不写），再在一个事务里写进成员与部门并记同步成功。
- * 通讯录一个人都没有时当作失败（多半是应用的通讯录权限范围没配好），不把所有人停用。失败时记一次失败并抛出（任务重试）。
+ * 通讯录一个人都没有时当作失败（多半是应用的通讯录权限范围没配好），不把所有人停用。失败时记一次失败并抛出（任务记为失败）。
  */
 export async function reconcileDirectory(
   runtime: Runtime,
@@ -217,19 +220,43 @@ async function departmentsToFetch(
   return fetched;
 }
 
-/**
- * 补建一位还没同步进来的成员（扫码登录时：新入职的人在事件处理到之前就来扫码）。在调用方的事务里做（已加锁）
- */
-export async function syncUserFromDingtalk(
-  tx: Tx,
+/** 向钉钉取来的一位成员：本人（取不到为已离职）、部门表里还缺的上级部门，与开始取的时刻 */
+export interface FetchedUser {
+  readonly userId: string;
+  readonly user: DingtalkUser | null;
+  readonly departments: readonly DingtalkDepartment[];
+  readonly fetchedAt: Date;
+}
+
+/** 向钉钉取一位成员的最新样子（在事务之外取，再交给 applyFetchedUser 在加锁的事务里写）；钉钉出错原样抛出 */
+export async function fetchUser(
+  runtime: Runtime,
   client: DingtalkClient,
   userId: string,
-): Promise<void> {
+): Promise<FetchedUser> {
+  const fetchedAt = runtime.clock.now();
   const user = await client.getUser(userId);
   const departments = user
-    ? await departmentsToFetch(client, await loadDepartmentTree(tx.db), user.departmentIds)
+    ? await departmentsToFetch(client, await loadDepartmentTree(runtime.db), user.departmentIds)
     : [];
-  await applyUserChange(tx, userId, user, departments);
+  return { userId, user, departments, fetchedAt };
+}
+
+/** 把取来的成员写进成员与部门（加锁；取来之后这一行已被更新过的不写，见 applyUserChange） */
+export function applyFetchedUser(
+  runtime: Runtime,
+  fetched: FetchedUser,
+): Promise<DirectoryChanges> {
+  return transaction(runtime, async (tx) => {
+    await lockDirectory(tx);
+    return applyUserChange(
+      tx,
+      fetched.userId,
+      fetched.user,
+      fetched.departments,
+      fetched.fetchedAt,
+    );
+  });
 }
 
 /** 处理一条通讯录事件：向钉钉取最新的样子再写（事件只说「谁变了」，重推、乱序都不影响结果） */
@@ -241,19 +268,13 @@ async function handleEvent(
 ): Promise<void> {
   if (USER_EVENTS.has(event.type)) {
     for (const userId of event.userIds) {
-      const user = await client.getUser(userId);
-      const departments = user
-        ? await departmentsToFetch(client, await loadDepartmentTree(runtime.db), user.departmentIds)
-        : [];
-      const changes = await transaction(runtime, async (tx) => {
-        await lockDirectory(tx);
-        return applyUserChange(tx, userId, user, departments);
-      });
+      const changes = await applyFetchedUser(runtime, await fetchUser(runtime, client, userId));
       context.logger.info({ type: event.type, userId, ...changes }, '钉钉通讯录事件已处理');
     }
     return;
   }
   if (DEPARTMENT_EVENTS.has(event.type)) {
+    const fetchedAt = runtime.clock.now();
     const upserts: DingtalkDepartment[] = [];
     const removed: string[] = [];
     for (const id of event.departmentIds) {
@@ -263,7 +284,7 @@ async function handleEvent(
     }
     const changed = await transaction(runtime, async (tx) => {
       await lockDirectory(tx);
-      return applyDepartmentChanges(tx, upserts, removed);
+      return applyDepartmentChanges(tx, upserts, removed, fetchedAt);
     });
     context.logger.info(
       { type: event.type, departments: event.departmentIds, membersChanged: changed },

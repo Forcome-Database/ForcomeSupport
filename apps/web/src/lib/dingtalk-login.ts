@@ -43,14 +43,14 @@ declare global {
 
 /**
  * 扫码登录框的授权参数：Client ID、钉钉带回的地址（钉钉开放平台「重定向 URL」要填同一个）、这次的 state；
- * scope 带 corpid，钉钉返回扫码人所在的组织，服务端再核对一次是本组织
+ * scope 只要 openid（服务端用 unionid 换本组织的用户 ID，认得出是不是本组织的人）
  */
 export function dingtalkFrameParams(start: DingtalkLoginStart): DingtalkFrameParams {
   if (!start.clientId) throw new Error('真实接口的扫码登录要有 Client ID');
   return {
     redirect_uri: encodeURIComponent(start.redirectUri),
     client_id: start.clientId,
-    scope: 'openid corpid',
+    scope: 'openid',
     response_type: 'code',
     state: start.state,
     prompt: 'consent',

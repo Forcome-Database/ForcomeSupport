@@ -1,4 +1,10 @@
-import { devDingtalkScanResponseSchema, loginDeniedSchema } from '@forcome/contracts';
+import {
+  apiErrorSchema,
+  devDingtalkScanResponseSchema,
+  dingtalkLoginStartSchema,
+  loginDeniedSchema,
+  loginFailedSchema,
+} from '@forcome/contracts';
 import { expect, test, type Page } from '@playwright/test';
 
 /*
@@ -35,6 +41,9 @@ async function scan(page: Page, userId: string): Promise<void> {
 }
 
 const card = (page: Page) => page.getByRole('main');
+
+/** 钉钉扫码登录框的脚本（真实接口时才加载；e2e 不连外网，用接口桩代替） */
+const DINGTALK_SCRIPT = 'https://g.alicdn.com/dingding/**';
 
 test('登录页（G11）：二维码与说明，2 分钟后过期加蒙层，「刷新」换一个新的二维码', async ({
   page,
@@ -147,4 +156,138 @@ test('会话 7 天未操作过期（G12）：「已退出登录」，「重新�
   await card(page).getByRole('button', { name: '重新扫码登录' }).click();
   await expect(card(page).getByRole('heading', { name: '用钉钉扫码登录' })).toBeVisible();
   await expect(page).toHaveURL((url) => url.pathname === '/login' && url.search === '');
+});
+
+test('取二维码失败：失败浮层「加载二维码失败：原因」+「立即重试」，重试后出二维码（G5）', async ({
+  page,
+}) => {
+  const failure = apiErrorSchema.parse({ error: 'internal', message: '服务器内部错误' });
+  await page.route('**/api/auth/dingtalk/start', (route) =>
+    route.fulfill({ status: 500, json: failure }),
+  );
+  await page.goto('/login');
+  await expect(page.getByText('加载二维码失败：服务器内部错误', { exact: true })).toBeVisible();
+  await expect(page.getByRole('img', { name: '钉钉登录二维码' })).toHaveCount(0);
+  await page.unroute('**/api/auth/dingtalk/start');
+  await page.getByRole('button', { name: '立即重试' }).click();
+  await expect(page.getByRole('img', { name: '钉钉登录二维码' })).toBeVisible();
+  await expect(page.getByText('加载二维码失败：服务器内部错误')).toHaveCount(0);
+});
+
+test('登录已过期（这次登录的 state 对不上）：失败浮层并回到二维码', async ({ page }) => {
+  await openLogin(page);
+  const body = await page.evaluate(async () => {
+    const res = await fetch('/api/dev/dingtalk/scan', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ userId: 'liting' }),
+    });
+    return (await res.json()) as unknown;
+  });
+  const { authCode } = devDingtalkScanResponseSchema.parse(body);
+  await page.goto(`/login/dingtalk?authCode=${encodeURIComponent(authCode)}&state=not-this-one`);
+  await expect(page).toHaveURL((url) => url.pathname === '/login');
+  await expect(page.getByText('登录失败：登录已过期', { exact: true })).toBeVisible();
+  await expect(page.getByText('请重新扫码。', { exact: true })).toBeVisible();
+});
+
+test('连不上钉钉：失败浮层写下一步，回到二维码', async ({ page }) => {
+  const unavailable = loginFailedSchema.parse({
+    error: 'login_failed',
+    reason: 'dingtalk_unavailable',
+    message: '暂时连不上钉钉',
+  });
+  await page.route('**/api/auth/dingtalk/login', (route) =>
+    route.fulfill({ status: 502, json: unavailable }),
+  );
+  await scan(page, 'liting');
+  await expect(page).toHaveURL((url) => url.pathname === '/login');
+  await expect(page.getByText('登录失败：暂时连不上钉钉', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('请稍后重新扫码；仍不行请联系管理员。', { exact: true }),
+  ).toBeVisible();
+});
+
+test('回调地址缺授权码或 state：直接回到二维码', async ({ page }) => {
+  await page.goto('/login/dingtalk');
+  await expect(page).toHaveURL((url) => url.pathname === '/login');
+  await expect(page.getByRole('img', { name: '钉钉登录二维码' })).toBeVisible();
+});
+
+test.describe('真实钉钉的扫码登录框（DTFrameLogin，接口桩）', () => {
+  /** 开登录的接口桩：钉钉用真实接口时的参数 */
+  async function realStart(page: Page, baseURL: string | undefined) {
+    const start = dingtalkLoginStartSchema.parse({
+      mode: 'real',
+      clientId: 'dingclientid',
+      redirectUri: new URL('/login/dingtalk', baseURL).toString(),
+      state: 'real-state',
+    });
+    await page.route('**/api/auth/dingtalk/start', (route) =>
+      route.fulfill({ status: 200, json: start }),
+    );
+    return start;
+  }
+
+  test('钉钉的登录框加载不出来：失败浮层「登录失败：暂时连不上钉钉」+「立即重试」', async ({
+    page,
+    baseURL,
+  }) => {
+    await realStart(page, baseURL);
+    await page.route(DINGTALK_SCRIPT, (route) => route.abort());
+    await page.goto('/login');
+    await expect(page.getByTestId('login-qr')).toHaveAttribute('data-mode', 'real');
+    await expect(page.getByText('登录失败：暂时连不上钉钉', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '立即重试' })).toBeVisible();
+  });
+
+  test('把授权参数交给钉钉的登录框；扫码确认后照它给的地址带到回调页换会话', async ({
+    page,
+    baseURL,
+  }) => {
+    const start = await realStart(page, baseURL);
+    // 钉钉登录框的替身：记下参数，测试里再模拟「扫码确认」
+    await page.route(DINGTALK_SCRIPT, (route) =>
+      route.fulfill({
+        contentType: 'application/javascript',
+        body: `window.DTFrameLogin = function (frame, params, onSuccess) {
+          var el = document.getElementById(frame.id);
+          el.setAttribute('data-params', JSON.stringify(params));
+          el.setAttribute('data-size', frame.width + 'x' + frame.height);
+          window.__confirmScan = onSuccess;
+        };`,
+      }),
+    );
+    await page.goto('/login');
+    const frame = page.getByTestId('login-qr').locator('[data-params]');
+    await expect(frame).toHaveAttribute('data-size', '168x168');
+    expect(JSON.parse((await frame.getAttribute('data-params')) ?? '{}')).toEqual({
+      redirect_uri: encodeURIComponent(start.redirectUri),
+      client_id: 'dingclientid',
+      scope: 'openid',
+      response_type: 'code',
+      state: 'real-state',
+      prompt: 'consent',
+    });
+    // 扫码确认：钉钉交回带授权码的地址，浏览器被带到回调页；这次的 state 是接口桩给的，服务端那边对不上
+    await page.evaluate(
+      (redirectUri) =>
+        (
+          window as unknown as {
+            __confirmScan: (result: {
+              redirectUrl: string;
+              authCode: string;
+              state: string;
+            }) => void;
+          }
+        ).__confirmScan({
+          redirectUrl: `${redirectUri}?authCode=real-code&state=real-state`,
+          authCode: 'real-code',
+          state: 'real-state',
+        }),
+      start.redirectUri,
+    );
+    await expect(page.getByText('登录失败：登录已过期', { exact: true })).toBeVisible();
+    await expect(page).toHaveURL((url) => url.pathname === '/login');
+  });
 });

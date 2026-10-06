@@ -15,8 +15,8 @@ import { z } from 'zod';
  * - `CLOCK_START`：起始时刻（带时区，如 2026-09-11T10:20:00+08:00），只在非生产环境可设：api 与 worker 的「当前时间」
  *   从它起走（core 的 startingAt），截图与演示时对上原型的演示时刻（待办 21，ADR 0008 修订）。
  * - `DINGTALK_CLIENT_ID` / `DINGTALK_CLIENT_SECRET` / `DINGTALK_AGENT_ID` / `DINGTALK_CORP_ID`：钉钉企业内部应用的凭据
- *   （用户上线时自己填进环境文件，docs/部署说明.md「钉钉」一节；待办 05）。钉钉用真实接口时（生产环境默认，或
- *   `CLIENT_MODE_DINGTALK=real`）四项必填，缺了拒绝启动；用 Fake 时不读。
+ *   （用户上线时自己填进环境文件，docs/部署说明.md 第 11 节；待办 05）。钉钉用真实接口时（生产环境默认，或
+ *   `CLIENT_MODE_DINGTALK=real`）前三项必填，缺了拒绝启动；CorpId 第一期不用（第二期钉钉内免登用），可以不填。用 Fake 时都不读。
  * 空值视同未设置。
  */
 const envSchema = z.object({
@@ -85,16 +85,16 @@ export interface DingtalkCredentials {
   readonly clientSecret: string;
   /** 应用的 AgentId：发工作通知 */
   readonly agentId: string;
-  /** 组织的 CorpId：扫码登录时核对扫码人属于本组织 */
-  readonly corpId: string;
+  /** 组织的 CorpId：第二期钉钉内免登（dd.requestAuthCode）要用；第一期扫码登录不需要，可以不填 */
+  readonly corpId: string | null;
 }
 
-const DINGTALK_VARIABLES = {
-  clientId: 'DINGTALK_CLIENT_ID',
-  clientSecret: 'DINGTALK_CLIENT_SECRET',
-  agentId: 'DINGTALK_AGENT_ID',
-  corpId: 'DINGTALK_CORP_ID',
-} as const satisfies Record<keyof DingtalkCredentials, string>;
+/** 用真实接口时必填的三项（CorpId 可选） */
+const REQUIRED_DINGTALK_VARIABLES = [
+  'DINGTALK_CLIENT_ID',
+  'DINGTALK_CLIENT_SECRET',
+  'DINGTALK_AGENT_ID',
+] as const;
 
 export interface AppConfig {
   appEnv: AppEnv;
@@ -185,20 +185,20 @@ export function loadConfig(rawEnv: Record<string, string | undefined> = process.
     problems.push('CLOCK_START：生产环境不能设定起始时刻');
   }
 
-  // 钉钉用真实接口时（生产默认）四项凭据必填；只列变量名，不回显取值
+  // 钉钉用真实接口时（生产默认）三项凭据必填（CorpId 可选）；只列变量名，不回显取值
   let dingtalk: DingtalkCredentials | null = null;
   if (
     result.success &&
     (clientModes.dingtalk ?? defaultClientMode(result.data.APP_ENV)) === 'real'
   ) {
-    const missing = Object.values(DINGTALK_VARIABLES).filter((name) => !result.data[name]);
+    const missing = REQUIRED_DINGTALK_VARIABLES.filter((name) => !result.data[name]);
     for (const name of missing) problems.push(`${name}：钉钉用真实接口时必填`);
     if (missing.length === 0) {
       dingtalk = {
         clientId: result.data.DINGTALK_CLIENT_ID ?? '',
         clientSecret: result.data.DINGTALK_CLIENT_SECRET ?? '',
         agentId: result.data.DINGTALK_AGENT_ID ?? '',
-        corpId: result.data.DINGTALK_CORP_ID ?? '',
+        corpId: result.data.DINGTALK_CORP_ID ?? null,
       };
     }
   }

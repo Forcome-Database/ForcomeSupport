@@ -4,14 +4,12 @@ import {
   devLoginRequestSchema,
   devMembersResponseSchema,
   loginDeniedSchema,
-  loginDenialMessage,
 } from '@forcome/contracts';
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
-import { recordAudit, transaction, type AppEnv, type Runtime } from '../core';
-import { currentMember, memberAccessOf, memberActor } from './access';
+import type { AppEnv, Runtime } from '../core';
 import { loginDenial } from './login';
-import { findMember, listActiveMembers, listAdmins } from './members';
-import { clientIp, openSession, setSessionCookie } from './session';
+import { findMember, listActiveMembers } from './members';
+import { loginDeniedBody, signIn } from './sign-in';
 
 /*
  * 开发登录（ADR 0010 修订）：本机、CI 与 Playwright 绕过钉钉扫码，选一位成员直接登录，
@@ -84,28 +82,8 @@ export function createDevLoginRoutes(deps: { runtime: Runtime; appEnv: AppEnv })
       return c.json({ error: 'not_found', message: '没有这位成员' }, 404);
     }
     const denied = loginDenial(found);
-    if (denied) {
-      const admins = await listAdmins(runtime.db);
-      const message = loginDenialMessage(
-        denied,
-        admins.map((a) => a.name),
-      );
-      return c.json({ error: 'login_denied' as const, reason: denied, message }, 403);
-    }
-    const access = memberAccessOf(found);
-    const { token } = await transaction(runtime, async (tx) => {
-      const opened = await openSession(tx, found.id);
-      await recordAudit(tx, memberActor(access.member, clientIp(c)), {
-        action: 'auth.login',
-        objectType: 'login',
-        objectId: opened.id,
-        objectLabel: '开发登录',
-        after: { method: 'dev' },
-      });
-      return opened;
-    });
-    setSessionCookie(c, token, appEnv);
-    return c.json(currentMember(access), 200);
+    if (denied) return c.json(await loginDeniedBody(runtime.db, denied), 403);
+    return c.json(await signIn(runtime, c, appEnv, found, 'dev'), 200);
   });
 
   return routes;

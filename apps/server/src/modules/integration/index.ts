@@ -19,13 +19,14 @@ export {
 export {
   dingtalkClient,
   DingtalkAuthCodeError,
-  DINGTALK_ROOT_DEPARTMENT,
+  dingtalkDepartmentEvents,
+  dingtalkUserEvents,
   FakeDingtalk,
-  WORK_NOTIFICATION_MAX_USERS,
   type DingtalkClient,
   type DingtalkDepartment,
   type DingtalkDirectory,
   type DingtalkEvent,
+  type DingtalkLoginIdentity,
   type DingtalkUser,
   type SentWorkNotification,
 } from './dingtalk';

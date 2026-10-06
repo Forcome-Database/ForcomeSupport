@@ -117,7 +117,15 @@ describe('通讯录全量读取（每小时对账）', () => {
         errcode: 0,
         result: {
           has_more: false,
-          list: [{ userid: 'liuyang', name: '刘洋', dept_id_list: [100, 101], email: 'ly@x.com' }],
+          list: [
+            {
+              userid: 'liuyang',
+              unionid: 'union-ly',
+              name: '刘洋',
+              dept_id_list: [100, 101],
+              email: 'ly@x.com',
+            },
+          ],
         },
       },
     );
@@ -154,8 +162,20 @@ describe('通讯录全量读取（每小时对账）', () => {
       { id: '101', name: '客服部', parentId: '100' },
     ]);
     expect(directory.users).toEqual([
-      { userId: 'liuyang', name: '刘洋', departmentIds: ['100', '101'], email: 'ly@x.com' },
-      { userId: 'liting', name: '李婷', departmentIds: ['101'], email: 'lt@forcome.com' },
+      {
+        userId: 'liuyang',
+        name: '刘洋',
+        departmentIds: ['100', '101'],
+        email: 'ly@x.com',
+        unionId: 'union-ly',
+      },
+      {
+        userId: 'liting',
+        name: '李婷',
+        departmentIds: ['101'],
+        email: 'lt@forcome.com',
+        unionId: null,
+      },
     ]);
   });
 
@@ -221,7 +241,7 @@ describe('通讯录全量读取（每小时对账）', () => {
   });
 });
 
-describe('扫码登录：授权码换出扫码人的钉钉用户 ID', () => {
+describe('扫码登录：授权码换出扫码人（unionid 与本组织的用户 ID）', () => {
   it('授权码 → 用户凭证 → 个人信息的 unionId → 本组织的用户 ID', async () => {
     agent
       .get(API)
@@ -252,21 +272,49 @@ describe('扫码登录：授权码换出扫码人的钉钉用户 ID', () => {
         result: { contact_type: 0, userid: 'liting' },
       },
     );
-    await expect(client().userIdByAuthCode('auth-code')).resolves.toBe('liting');
+    await expect(client().identifyByAuthCode('auth-code')).resolves.toEqual({
+      unionId: 'union-liting',
+      userId: 'liting',
+    });
   });
 
-  it('授权码无效或已用过（钉钉返回 4xx）、扫码人不是本组织的：都是 DingtalkAuthCodeError', async () => {
+  it('已离职（或不是本组织的人）：unionid 换不到用户 ID，只给出 unionid（登录按它认出是谁）', async () => {
+    agent
+      .get(API)
+      .intercept({ path: '/v1.0/oauth2/userAccessToken', method: 'POST' })
+      .reply(200, { accessToken: 'user-token' });
+    agent
+      .get(API)
+      .intercept({ path: '/v1.0/contact/users/me' })
+      .reply(200, { unionId: 'union-gone' });
+    token();
+    post(
+      '/topapi/user/getbyunionid',
+      { unionid: 'union-gone' },
+      { errcode: 60121, errmsg: '找不到该用户' },
+    );
+    await expect(client().identifyByAuthCode('code')).resolves.toEqual({
+      unionId: 'union-gone',
+      userId: null,
+    });
+  });
+
+  it('授权码无效、过期或已用过（钉钉返回 400）是 DingtalkAuthCodeError；401、403（多半是凭据配错）照常是调用失败', async () => {
     agent
       .get(API)
       .intercept({ path: '/v1.0/oauth2/userAccessToken', method: 'POST' })
       .reply(400, { code: 'InvalidAuthCode', message: '授权码无效' });
-    await expect(client().userIdByAuthCode('used')).rejects.toBeInstanceOf(DingtalkAuthCodeError);
+    await expect(client().identifyByAuthCode('used')).rejects.toBeInstanceOf(DingtalkAuthCodeError);
 
     agent
       .get(API)
       .intercept({ path: '/v1.0/oauth2/userAccessToken', method: 'POST' })
-      .reply(200, { accessToken: 'user-token', corpId: 'other-corp' });
-    await expect(client().userIdByAuthCode('other')).rejects.toBeInstanceOf(DingtalkAuthCodeError);
+      .reply(401, { code: 'InvalidClient', message: 'clientSecret 不对' });
+    const error = await client()
+      .identifyByAuthCode('code')
+      .catch((e: unknown) => e);
+    expect(error).not.toBeInstanceOf(DingtalkAuthCodeError);
+    expect(error).toBeInstanceOf(ExternalCallFailedError);
   });
 
   it('钉钉服务端出错（5xx）不是授权码的问题，照常是可重试的调用失败', async () => {
@@ -275,7 +323,7 @@ describe('扫码登录：授权码换出扫码人的钉钉用户 ID', () => {
       .intercept({ path: '/v1.0/oauth2/userAccessToken', method: 'POST' })
       .reply(503, 'busy');
     const error = await client()
-      .userIdByAuthCode('code')
+      .identifyByAuthCode('code')
       .catch((e: unknown) => e);
     expect(error).not.toBeInstanceOf(DingtalkAuthCodeError);
     expect((error as ExternalCallFailedError).retryable).toBe(true);
@@ -404,12 +452,21 @@ describe('Fake 钉钉', () => {
     await expect(dingtalk.getUser('u1')).resolves.toBeNull();
   });
 
-  it('授权码一次有效；发出的工作通知记下来供断言', async () => {
+  it('授权码一次有效；离职的人扫码只认得出 unionid；发出的工作通知记下来供断言', async () => {
     const fake = new FakeDingtalk();
     const dingtalk = fake.client();
+    fake.addUser({ userId: 'liting', name: '李婷', departmentIds: [], email: null });
     const code = fake.issueAuthCode('liting');
-    await expect(dingtalk.userIdByAuthCode(code)).resolves.toBe('liting');
-    await expect(dingtalk.userIdByAuthCode(code)).rejects.toBeInstanceOf(DingtalkAuthCodeError);
+    await expect(dingtalk.identifyByAuthCode(code)).resolves.toEqual({
+      unionId: 'union-liting',
+      userId: 'liting',
+    });
+    await expect(dingtalk.identifyByAuthCode(code)).rejects.toBeInstanceOf(DingtalkAuthCodeError);
+    fake.removeUser('liting');
+    await expect(dingtalk.identifyByAuthCode(fake.issueAuthCode('liting'))).resolves.toEqual({
+      unionId: 'union-liting',
+      userId: null,
+    });
     await dingtalk.sendWorkNotification({ userIds: ['liuyang'], text: '你好' });
     expect(fake.sent).toEqual([
       { userIds: ['liuyang'], text: '你好', taskId: expect.any(String) as string },

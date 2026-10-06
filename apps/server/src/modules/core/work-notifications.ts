@@ -158,17 +158,12 @@ export async function sendDueWorkNotifications(
       .where(and(pending, eq(workNotification.dingtalkUserId, dingtalkUserId)))
       .orderBy(asc(workNotification.createdAt), asc(workNotification.id));
     const ids = rows.map((row) => row.id);
+    let taskId: string;
     try {
-      const { taskId } = await sender.sendWorkNotification({
+      ({ taskId } = await sender.sendWorkNotification({
         userIds: [dingtalkUserId],
         text: workNotificationText(rows),
-      });
-      await runtime.db
-        .update(workNotification)
-        .set({ sentAt: now, taskId })
-        .where(inArray(workNotification.id, ids));
-      sent += 1;
-      items += rows.length;
+      }));
     } catch (error) {
       failed += 1;
       const attempts = Math.max(...rows.map((row) => row.attempts)) + 1;
@@ -184,7 +179,15 @@ export async function sendDueWorkNotifications(
         { err: error, dingtalkUserId, items: rows.length, attempts },
         gaveUp ? '钉钉工作通知多次发送失败，不再重试' : '钉钉工作通知发送失败，下一分钟再试',
       );
+      continue;
     }
+    // 发出去了才记已发；这一步写库失败时任务报错，下一分钟会重发一次（宁可重复，不漏）
+    await runtime.db
+      .update(workNotification)
+      .set({ sentAt: now, taskId })
+      .where(inArray(workNotification.id, ids));
+    sent += 1;
+    items += rows.length;
   }
   return { sent, items, failed };
 }

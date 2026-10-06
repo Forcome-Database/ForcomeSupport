@@ -6,7 +6,6 @@ import {
   dingtalkLoginRequestSchema,
   dingtalkLoginStartSchema,
   loginDeniedSchema,
-  loginDenialMessage,
   loginFailedSchema,
   loginFailureMessages,
   type LoginFailureReason,
@@ -14,28 +13,28 @@ import {
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
-import { recordAudit, transaction, type AppEnv, type Logger, type Runtime } from '../core';
+import type { AppEnv, Logger, Runtime } from '../core';
 import {
   dingtalkClient,
   DingtalkAuthCodeError,
   type FakeDingtalk,
   type IntegrationClients,
 } from '../integration';
-import { currentMember, memberAccessOf, memberActor } from './access';
-import { syncUserFromDingtalk } from './dingtalk-sync';
-import { lockDirectory } from './directory';
+import { applyFetchedUser, fetchUser } from './dingtalk-sync';
 import { loginDenial } from './login';
-import { findMemberByDingtalkUserId, listAdmins } from './members';
+import { findMemberByDingtalkUnionId, findMemberByDingtalkUserId } from './members';
 import { json } from './openapi';
-import { clientIp, openSession, setSessionCookie } from './session';
+import { secureCookies } from './session';
+import { loginDeniedBody, signIn } from './sign-in';
 
 /*
  * 钉钉扫码登录（G11、G12，规格 org「钉钉扫码登录换出服务端会话」，ADR 0010 修订，待办 05）：
  * 1. 登录页 POST /api/auth/dingtalk/start：开一次登录——随机 state 记在只给这组接口的 Cookie 里，返回画二维码的参数
  *    （真实接口时登录页嵌钉钉的二维码 DTFrameLogin，Fake 时画示意二维码）；
  * 2. 扫码确认后钉钉把浏览器带回 redirectUri（前端 /login/dingtalk?authCode=…&state=…），前端 POST /api/auth/dingtalk/login；
- * 3. 核对 state（防跨站伪造登录）→ 钉钉客户端用授权码换出扫码人的钉钉用户 ID → 找成员（还没同步进来的当场向钉钉取来补建）
- *    → 能不能进入与开发登录同一套判断（G12）→ 换出与开发登录同一种会话，审计「登录（钉钉扫码）」。
+ * 3. 核对 state（防跨站伪造登录）→ 钉钉客户端用授权码换出扫码人（unionid 与本组织的用户 ID；已离职的没有用户 ID，按 unionid
+ *    认出，G12「账号已停用」）→ 找成员（成员表还没跟上钉钉的当场向钉钉取来补同步）→ 能不能进入与开发登录同一套判断（G12）
+ *    → 换出与开发登录同一种会话，审计「登录（钉钉扫码）」。
  * 钉钉内免登随第二期。
  */
 
@@ -113,7 +112,6 @@ export function createDingtalkLoginRoutes(deps: {
   logger: Logger;
 }) {
   const { runtime, appEnv, clients, logger } = deps;
-  const secure = appEnv === 'production' || appEnv === 'staging';
   const routes = new OpenAPIHono();
 
   routes.openapi(startRoute, (c) => {
@@ -122,7 +120,7 @@ export function createDingtalkLoginRoutes(deps: {
       httpOnly: true,
       sameSite: 'Lax',
       path: STATE_COOKIE_PATH,
-      secure,
+      secure: secureCookies(appEnv),
       maxAge: STATE_MAX_AGE_SECONDS,
     });
     const mode = clients.globalMode(dingtalkClient.system);
@@ -141,7 +139,7 @@ export function createDingtalkLoginRoutes(deps: {
     const { authCode, state } = c.req.valid('json');
     const expected = getCookie(c, STATE_COOKIE);
     // state 只用一次
-    deleteCookie(c, STATE_COOKIE, { path: STATE_COOKIE_PATH, secure });
+    deleteCookie(c, STATE_COOKIE, { path: STATE_COOKIE_PATH, secure: secureCookies(appEnv) });
     const failed = (reason: LoginFailureReason, status: 400 | 502) =>
       c.json(
         { error: 'login_failed' as const, reason, message: loginFailureMessages[reason] },
@@ -149,63 +147,47 @@ export function createDingtalkLoginRoutes(deps: {
       );
     if (!sameState(expected, state)) return failed('state_mismatch', 400);
 
+    // 钉钉的调用出错按「授权码已失效 / 连不上钉钉」回答；查库出错照常是 500（统一的错误处理记日志）
     const dingtalk = clients.global(dingtalkClient);
-    let found;
-    try {
-      const userId = await dingtalk.userIdByAuthCode(authCode);
-      found = await findMemberByDingtalkUserId(runtime.db, userId);
-      // 还没同步进来（刚入职、事件还没处理到），或钉钉离职停用后又回到通讯录：当场向钉钉取来再判断
-      if (!found || (found.status === 'disabled' && found.disabledReason === 'dingtalk_left')) {
-        await transaction(runtime, async (tx) => {
-          await lockDirectory(tx);
-          await syncUserFromDingtalk(tx, dingtalk, userId);
-        });
-        found = await findMemberByDingtalkUserId(runtime.db, userId);
+    const callDingtalk = async <T>(call: () => Promise<T>): Promise<T | LoginFailureReason> => {
+      try {
+        return await call();
+      } catch (error) {
+        if (error instanceof DingtalkAuthCodeError) {
+          logger.info({ err: error }, '钉钉扫码登录：授权码无效、过期或已使用');
+          return 'code_invalid';
+        }
+        logger.error({ err: error }, '钉钉扫码登录：调用钉钉失败');
+        return 'dingtalk_unavailable';
       }
-    } catch (error) {
-      if (error instanceof DingtalkAuthCodeError) return failed('code_invalid', 400);
-      logger.warn({ err: error }, '钉钉扫码登录：连不上钉钉');
-      return failed('dingtalk_unavailable', 502);
+    };
+    const identity = await callDingtalk(() => dingtalk.identifyByAuthCode(authCode));
+    if (typeof identity === 'string') {
+      return failed(identity, identity === 'code_invalid' ? 400 : 502);
     }
 
-    const admins = async () => (await listAdmins(runtime.db)).map((a) => a.name);
-    if (!found) {
-      // 钉钉说是本组织的人，通讯录里却取不到（权限范围没覆盖他）：按未分配角色处理
-      return c.json(
-        {
-          error: 'login_denied' as const,
-          reason: 'no_role' as const,
-          message: loginDenialMessage('no_role', await admins()),
-        },
-        403,
-      );
+    // 在本组织：按用户 ID 找；已离职（换不到用户 ID）：按 unionid 认出是谁
+    let found = identity.userId
+      ? await findMemberByDingtalkUserId(runtime.db, identity.userId)
+      : await findMemberByDingtalkUnionId(runtime.db, identity.unionId);
+    // 成员表还没跟上钉钉时，当场向钉钉取这个人再判断：刚入职（还没同步进来）、钉钉离职停用后又回来、已离职但还没停用
+    const stale = identity.userId
+      ? !found || (found.status === 'disabled' && found.disabledReason === 'dingtalk_left')
+      : found?.status === 'active';
+    const userId = identity.userId ?? found?.dingtalkUserId;
+    if (stale && userId) {
+      const fetched = await callDingtalk(() => fetchUser(runtime, dingtalk, userId));
+      if (typeof fetched === 'string') return failed('dingtalk_unavailable', 502);
+      await applyFetchedUser(runtime, fetched);
+      found = await findMemberByDingtalkUnionId(runtime.db, identity.unionId);
+      found ??= await findMemberByDingtalkUserId(runtime.db, userId);
     }
+
+    // 钉钉认得、成员表里没有（通讯录权限范围没覆盖他，或不是本组织的人）：按未分配角色处理
+    if (!found) return c.json(await loginDeniedBody(runtime.db, 'no_role'), 403);
     const denied = loginDenial(found);
-    if (denied) {
-      return c.json(
-        {
-          error: 'login_denied' as const,
-          reason: denied,
-          message: loginDenialMessage(denied, await admins()),
-          member: { name: found.name, dept: found.dept, roles: [...found.roles] },
-        },
-        403,
-      );
-    }
-    const access = memberAccessOf(found);
-    const { token } = await transaction(runtime, async (tx) => {
-      const opened = await openSession(tx, found.id);
-      await recordAudit(tx, memberActor(access.member, clientIp(c)), {
-        action: 'auth.login',
-        objectType: 'login',
-        objectId: opened.id,
-        objectLabel: '钉钉扫码',
-        after: { method: 'dingtalk' },
-      });
-      return opened;
-    });
-    setSessionCookie(c, token, appEnv);
-    return c.json(currentMember(access), 200);
+    if (denied) return c.json(await loginDeniedBody(runtime.db, denied, found), 403);
+    return c.json(await signIn(runtime, c, appEnv, found, 'dingtalk'), 200);
   });
 
   return routes;

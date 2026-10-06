@@ -129,7 +129,7 @@ export function LoginQr({
         <DingtalkFrame start={start} onReload={onRefresh} />
       )}
       {expired && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-white/93">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-card/93">
           <span className="text-13 font-semibold whitespace-nowrap text-foreground">
             {QR_EXPIRED.title}
           </span>

@@ -78,10 +78,11 @@ function memberSnapshot(
   return { name: row.name, dept: row.dept, status: row.status, roles: [...row.roles] };
 }
 
+/** 写一个部门；已有的只在 onlyIfSyncedBy（取数据的时刻）之前同步过时才改 */
 async function upsertDepartment(
   tx: Tx,
   item: DingtalkDepartment,
-  onlyIfSyncedBy: Date | null,
+  onlyIfSyncedBy: Date,
 ): Promise<void> {
   await tx.db
     .insert(department)
@@ -94,8 +95,40 @@ async function upsertDepartment(
     .onConflictDoUpdate({
       target: department.dingtalkId,
       set: { name: item.name, parentDingtalkId: item.parentId, syncedAt: tx.now },
-      ...(onlyIfSyncedBy ? { setWhere: lte(department.syncedAt, onlyIfSyncedBy) } : {}),
+      setWhere: lte(department.syncedAt, onlyIfSyncedBy),
     });
+}
+
+/** 一位成员按通讯录写入的结果 */
+type MemberSyncResult = 'created' | 'updated' | 'rejoined' | 'unchanged';
+
+function count(changes: DirectoryChanges, result: MemberSyncResult): void {
+  if (result === 'created') changes.created += 1;
+  if (result === 'updated') changes.updated += 1;
+  if (result === 'rejoined') changes.rejoined += 1;
+}
+
+/**
+ * 通讯录里有、成员表里按用户 ID 找不到的人：新建。同一个人离职后重新入职，钉钉可能给了新的用户 ID，但 unionid 不变——
+ * 按 unionid 找到旧的成员就换上新的用户 ID，当作同一个人更新（钉钉离职停用的恢复在职）
+ */
+async function addFromDirectory(
+  tx: Tx,
+  user: DingtalkUser,
+  dept: string,
+): Promise<MemberSyncResult> {
+  if (user.unionId) {
+    const [same] = await tx.db
+      .select()
+      .from(member)
+      .where(eq(member.dingtalkUnionId, user.unionId))
+      .limit(1);
+    if (same) {
+      await tx.db.update(member).set({ dingtalkUserId: user.userId }).where(eq(member.id, same.id));
+      return refreshFromDirectory(tx, same, user, dept);
+    }
+  }
+  return (await createFromDirectory(tx, user, dept)) ? 'created' : 'unchanged';
 }
 
 async function createFromDirectory(tx: Tx, user: DingtalkUser, dept: string): Promise<boolean> {
@@ -103,6 +136,7 @@ async function createFromDirectory(tx: Tx, user: DingtalkUser, dept: string): Pr
     .insert(member)
     .values({
       dingtalkUserId: user.userId,
+      dingtalkUnionId: user.unionId,
       name: user.name,
       dept,
       dingtalkDepartmentIds: [...user.departmentIds],
@@ -126,12 +160,13 @@ async function refreshFromDirectory(
   row: MemberRow,
   user: DingtalkUser,
   dept: string,
-): Promise<'unchanged' | 'updated' | 'rejoined'> {
+): Promise<MemberSyncResult> {
   const rejoin = row.status === 'disabled' && row.disabledReason === 'dingtalk_left';
   const changed =
     row.name !== user.name ||
     row.dept !== dept ||
     row.email !== user.email ||
+    (user.unionId !== null && row.dingtalkUnionId !== user.unionId) ||
     row.dingtalkDepartmentIds.join(',') !== user.departmentIds.join(',');
   if (!rejoin && !changed) return 'unchanged';
   const profile = {
@@ -139,6 +174,8 @@ async function refreshFromDirectory(
     dept,
     dingtalkDepartmentIds: [...user.departmentIds],
     email: user.email,
+    // 钉钉没给 unionid 时保留已有的
+    ...(user.unionId === null ? {} : { dingtalkUnionId: user.unionId }),
     dingtalkSyncedAt: tx.now,
     updatedAt: tx.now,
   };
@@ -236,32 +273,43 @@ export async function applyDirectory(
     const dept = departmentPath(tree, user.departmentIds);
     const row = byUserId.get(user.userId);
     if (!row) {
-      // 不在 rows 里：新人，或快照之后被事件更新过的（建不进去，onConflictDoNothing）
-      if (await createFromDirectory(tx, user, dept)) changes.created += 1;
+      // 不在 rows 里：新人（或换了用户 ID 的老人），或快照之后被事件更新过的（建不进去，onConflictDoNothing）
+      const updatedSince = await tx.db
+        .select({ id: member.id })
+        .from(member)
+        .where(eq(member.dingtalkUserId, user.userId))
+        .limit(1);
+      if (updatedSince.length === 0) count(changes, await addFromDirectory(tx, user, dept));
       continue;
     }
-    const result = await refreshFromDirectory(tx, row, user, dept);
-    if (result === 'updated') changes.updated += 1;
-    if (result === 'rejoined') changes.rejoined += 1;
+    count(changes, await refreshFromDirectory(tx, row, user, dept));
   }
+  // 换了用户 ID 的同一个人（unionid 还在通讯录里）不算离职
+  const presentUnionIds = new Set(snapshot.users.flatMap((u) => (u.unionId ? [u.unionId] : [])));
   for (const row of rows) {
     if (row.status !== 'active' || !row.dingtalkUserId || present.has(row.dingtalkUserId)) continue;
+    if (row.dingtalkUnionId && presentUnionIds.has(row.dingtalkUnionId)) continue;
     await leaveFromDirectory(tx, row);
     changes.left += 1;
   }
   return changes;
 }
 
-/** 一位成员的事件（调用方已加锁）：通讯录里取到了就新建或更新，取不到（已离职）就停用 */
+/**
+ * 一位成员的事件（调用方已加锁）：通讯录里取到了就新建或更新，取不到（已离职）就停用。fetchedAt 是向钉钉取这个人之前的时刻：
+ * 这之后这一行已被别的事件或对账更新过（同一个人的几个事件并发处理时），这次取到的就是旧的，不写
+ */
 export async function applyUserChange(
   tx: Tx,
   userId: string,
   user: DingtalkUser | null,
   departments: readonly DingtalkDepartment[],
+  fetchedAt: Date,
 ): Promise<DirectoryChanges> {
   const changes = emptyChanges();
-  for (const item of departments) await upsertDepartment(tx, item, null);
+  for (const item of departments) await upsertDepartment(tx, item, fetchedAt);
   const [row] = await tx.db.select().from(member).where(eq(member.dingtalkUserId, userId)).limit(1);
+  if (row?.dingtalkSyncedAt && row.dingtalkSyncedAt > fetchedAt) return changes;
   if (!user) {
     if (row?.status === 'active') {
       await leaveFromDirectory(tx, row);
@@ -270,27 +318,29 @@ export async function applyUserChange(
     return changes;
   }
   const dept = departmentPath(await loadDepartmentTree(tx.db), user.departmentIds);
-  if (!row) {
-    if (await createFromDirectory(tx, user, dept)) changes.created += 1;
-    return changes;
-  }
-  const result = await refreshFromDirectory(tx, row, user, dept);
-  if (result === 'updated') changes.updated += 1;
-  if (result === 'rejoined') changes.rejoined += 1;
+  count(
+    changes,
+    row ? await refreshFromDirectory(tx, row, user, dept) : await addFromDirectory(tx, user, dept),
+  );
   return changes;
 }
 
 /**
  * 部门的事件（调用方已加锁）：新建或改名、调整上级的写进部门表，删掉的从部门表删；再按新的部门表重算成员的「钉钉部门」显示。
- * 返回显示变了的成员数
+ * fetchedAt 同 applyUserChange：取部门之后被更新过的部门不写。返回显示变了的成员数
  */
 export async function applyDepartmentChanges(
   tx: Tx,
   upserts: readonly DingtalkDepartment[],
   removedIds: readonly string[],
+  fetchedAt: Date,
 ): Promise<number> {
-  for (const item of upserts) await upsertDepartment(tx, item, null);
-  for (const id of removedIds) await tx.db.delete(department).where(eq(department.dingtalkId, id));
+  for (const item of upserts) await upsertDepartment(tx, item, fetchedAt);
+  for (const id of removedIds) {
+    await tx.db
+      .delete(department)
+      .where(and(eq(department.dingtalkId, id), lte(department.syncedAt, fetchedAt)));
+  }
   const tree = await loadDepartmentTree(tx.db);
   const rows = await tx.db
     .select({ id: member.id, dept: member.dept, departmentIds: member.dingtalkDepartmentIds })

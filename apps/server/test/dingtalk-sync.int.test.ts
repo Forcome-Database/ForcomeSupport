@@ -150,6 +150,7 @@ describe('Stream 通讯录事件：新增、变更、离职分别反映到成员
 
     expect((await chenchen.get('/api/me')).status).toBe(401);
     expect(await memberNamed('陈晨')).toBeUndefined();
+    // 离职的人在本组织里没有用户 ID 了：钉钉只认得出 unionid，按它认出是陈晨
     const { response } = await t.scanLogin('chenchen');
     expect(response.status).toBe(403);
     expect(loginDeniedSchema.parse(await response.json())).toMatchObject({
@@ -166,6 +167,43 @@ describe('Stream 通讯录事件：新增、变更、离职分别反映到成员
         after: expect.objectContaining({ status: 'disabled', roles: ['agent'] }) as unknown,
       }),
     ]);
+  });
+
+  it('激活与部门删除：激活事件同样取最新的样子；部门删掉后，改挂别的部门的成员显示跟着变', async () => {
+    // 物流部撤销：孙悦先在钉钉里改挂到 FSH（这次没推事件），再删部门、他激活钉钉
+    dingtalk().updateUser(
+      'sunyue',
+      { departmentIds: [await departmentId('FSH')] },
+      { silent: true },
+    );
+    dingtalk().removeDepartment('300');
+    dingtalk().activateUser('sunyue');
+    await t.runJobs();
+    expect(await memberNamed('孙悦')).toMatchObject({ dept: 'FSH', roles: [] });
+    expect(dingtalk().unacknowledged).toBe(0);
+  });
+
+  it('同一个人离职后重新入职、钉钉给了新的用户 ID：按 unionid 认作同一个人，恢复在职（角色清空），不另建一份', async () => {
+    dingtalk().removeUser('qianfeng');
+    await t.runJobs();
+    expect(await memberNamed('钱峰')).toBeUndefined();
+    dingtalk().addUser({
+      userId: 'qianfeng-2',
+      unionId: 'union-qianfeng',
+      name: '钱峰',
+      departmentIds: [await departmentId('FSH / 仓储部')],
+      email: null,
+    });
+    await t.runJobs();
+    expect((await activeMembers()).filter((m) => m.name === '钱峰')).toEqual([
+      expect.objectContaining({ dept: 'FSH / 仓储部', roles: [] }),
+    ]);
+    expect(await t.auditRecords({ action: 'member.dingtalk_rejoined' })).toContainEqual(
+      expect.objectContaining({ objectLabel: '钱峰' }),
+    );
+    // 之后对账：新的用户 ID 在通讯录里，不当成离职
+    await reconcile();
+    expect(await memberNamed('钱峰')).toBeDefined();
   });
 
   it('断线期间漏掉的离职事件，由每小时的全量对账补上', async () => {
@@ -190,10 +228,13 @@ describe('Stream 通讯录事件：新增、变更、离职分别反映到成员
     const { response } = await t.scanLogin('chenchen');
     expect(response.status).toBe(403);
     expect(loginDeniedSchema.parse(await response.json())).toMatchObject({ reason: 'no_role' });
-    expect(await t.auditRecords({ action: 'member.dingtalk_rejoined' })).toEqual([
+    expect(
+      (await t.auditRecords({ action: 'member.dingtalk_rejoined' })).filter(
+        (r) => r.objectLabel === '陈晨',
+      ),
+    ).toEqual([
       expect.objectContaining({
         actorType: 'system',
-        objectLabel: '陈晨',
         before: expect.objectContaining({ status: 'disabled', roles: ['agent'] }) as unknown,
         after: expect.objectContaining({ status: 'active', roles: [] }) as unknown,
       }),
@@ -234,7 +275,7 @@ describe('同步失败（E-32、AC-P1-22）：保留上次的成员与部门，�
     await reconcile();
   });
 
-  it('连续失败：第 1 次提醒管理员「钉钉同步失败」，第 3 次 P18 钉钉卡为连接异常并再提醒「钉钉连接异常」；成员不变，登录照常', async () => {
+  it('每个整点对账一次、失败不重试：第 1 次提醒「钉钉同步失败」，超过 2 小时为同步延迟（K20），连续 3 次为连接异常并再提醒「钉钉连接异常」；成员不变，登录照常', async () => {
     const admin = await t.loginAs('管理员');
     const supervisor = await t.loginAs('客服主管');
     const before = await activeMembers();
@@ -248,6 +289,8 @@ describe('同步失败（E-32、AC-P1-22）：保留上次的成员与部门，�
       { operation: 'directory', times: 3 },
     );
 
+    // 1 小时后的整点：第 1 次失败
+    t.clock.advance({ hours: 1 });
     await reconcile({ allowFailures: true });
     expect(await activeMembers()).toEqual(before);
     expect(await syncFailures(admin, seen)).toEqual([
@@ -261,10 +304,17 @@ describe('同步失败（E-32、AC-P1-22）：保留上次的成员与部门，�
     expect(await syncFailures(supervisor)).toEqual([]);
     expect(await dingtalkCard(admin)).toMatchObject({ status: 'connected', lastSyncAt: syncedAt });
 
+    // 再 1 小时：第 2 次失败，不再提醒；上次成功正好 2 小时前，还算已连接
+    t.clock.advance({ hours: 1 });
     await reconcile({ allowFailures: true });
     expect(await syncFailures(admin, seen)).toHaveLength(1);
     expect((await dingtalkCard(admin)).status).toBe('connected');
+    // 超过 2 小时没同步成功：同步延迟（K20「最近同步 08:00，超过 2 小时」）
+    t.clock.advance({ minutes: 12 });
+    expect(await dingtalkCard(admin)).toMatchObject({ status: 'delayed', lastSyncAt: syncedAt });
 
+    // 下一个整点：连续第 3 次失败，连接异常
+    t.clock.advance({ minutes: 48 });
     await reconcile({ allowFailures: true });
     expect(await dingtalkCard(admin)).toMatchObject({ status: 'error', lastSyncAt: syncedAt });
     expect((await syncFailures(admin, seen)).map((n) => [n.title, n.body])).toEqual([

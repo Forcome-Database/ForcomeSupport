@@ -36,6 +36,7 @@ CREATE TABLE "org"."dingtalk_sync" (
 );
 --> statement-breakpoint
 ALTER TABLE "org"."member" ADD COLUMN "dingtalk_user_id" text;--> statement-breakpoint
+ALTER TABLE "org"."member" ADD COLUMN "dingtalk_union_id" text;--> statement-breakpoint
 ALTER TABLE "org"."member" ADD COLUMN "dingtalk_department_ids" text[] DEFAULT '{}'::text[] NOT NULL;--> statement-breakpoint
 ALTER TABLE "org"."member" ADD COLUMN "email" text;--> statement-breakpoint
 ALTER TABLE "org"."member" ADD COLUMN "disabled_reason" text;--> statement-breakpoint
@@ -43,4 +44,5 @@ ALTER TABLE "org"."member" ADD COLUMN "disabled_at" timestamp with time zone;-->
 ALTER TABLE "org"."member" ADD COLUMN "dingtalk_synced_at" timestamp with time zone;--> statement-breakpoint
 CREATE INDEX "work_notification_pending_idx" ON "core"."work_notification" USING btree ("dingtalk_user_id","created_at") WHERE "core"."work_notification"."sent_at" IS NULL AND "core"."work_notification"."failed_at" IS NULL;--> statement-breakpoint
 ALTER TABLE "org"."member" ADD CONSTRAINT "member_dingtalk_user_id_unique" UNIQUE("dingtalk_user_id");--> statement-breakpoint
+ALTER TABLE "org"."member" ADD CONSTRAINT "member_dingtalk_union_id_unique" UNIQUE("dingtalk_union_id");--> statement-breakpoint
 ALTER TABLE "org"."member" ADD CONSTRAINT "member_disabled_reason_check" CHECK ("org"."member"."disabled_reason" IS NULL OR "org"."member"."status" = 'disabled');

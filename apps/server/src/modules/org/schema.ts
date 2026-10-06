@@ -18,6 +18,8 @@ export const member = orgSchema.table(
     id: primaryId(),
     /** 钉钉用户 ID（userid）；只有测试工具直接建的成员没有 */
     dingtalkUserId: text('dingtalk_user_id').unique(),
+    /** 钉钉的 unionid（同一个人不变）：离职后用 userid 找不到人，扫码登录按它认出是谁（G12「账号已停用」） */
+    dingtalkUnionId: text('dingtalk_union_id').unique(),
     name: text('name').notNull(),
     /** 钉钉部门的显示（主部门从组织下第一级起的路径，例「FSH / 客服部」）；同步时按部门表算好 */
     dept: text('dept').notNull(),

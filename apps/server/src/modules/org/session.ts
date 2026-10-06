@@ -106,6 +106,14 @@ export function sessionToken(c: Context): string | undefined {
 }
 
 /**
+ * Cookie 是否带 Secure：生产与开发测试环境走 HTTPS（待办 03）带；本机开发与自动化测试是 http，不带。
+ * 会话 Cookie 与扫码登录的 state Cookie 共用
+ */
+export function secureCookies(appEnv: AppEnv): boolean {
+  return appEnv === 'production' || appEnv === 'staging';
+}
+
+/**
  * 会话 Cookie：httpOnly、SameSite=Lax、整站有效，有效期与服务端一致（7 天，续期时随之顺延）——
  * 关掉浏览器不会退出登录，7 天无操作才需要重新登录。生产与开发测试环境走 HTTPS（待办 03），Cookie 带 Secure；
  * 本机开发与自动化测试是 http，不带 Secure。
@@ -115,7 +123,7 @@ export function setSessionCookie(c: Context, token: string, appEnv: AppEnv): voi
     httpOnly: true,
     sameSite: 'Lax',
     path: '/',
-    secure: appEnv === 'production' || appEnv === 'staging',
+    secure: secureCookies(appEnv),
     maxAge: SESSION_IDLE_TIMEOUT_MS / 1000,
   });
 }
@@ -123,7 +131,7 @@ export function setSessionCookie(c: Context, token: string, appEnv: AppEnv): voi
 export function clearSessionCookie(c: Context, appEnv: AppEnv): void {
   deleteCookie(c, SESSION_COOKIE, {
     path: '/',
-    secure: appEnv === 'production' || appEnv === 'staging',
+    secure: secureCookies(appEnv),
   });
 }
 

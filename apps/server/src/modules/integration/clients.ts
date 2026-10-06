@@ -54,6 +54,7 @@ export interface IntegrationClientsOptions {
 }
 
 export class IntegrationClients {
+  readonly #appEnv: AppEnv;
   readonly #production: boolean;
   readonly #definitions: ReadonlySet<AnyClientDefinition>;
   readonly #modes: Readonly<Record<string, AdapterMode>>;
@@ -65,6 +66,7 @@ export class IntegrationClients {
   readonly mailRecipientGuard: MailRecipientGuard;
 
   constructor(options: IntegrationClientsOptions) {
+    this.#appEnv = options.appEnv;
     this.#production = options.appEnv === 'production';
     this.mailRecipientGuard = new MailRecipientGuard(
       options.mailSend ?? defaultMailSendPolicy(options.appEnv),
@@ -130,7 +132,7 @@ export class IntegrationClients {
    * 只读配置、不建客户端，所以不要求已登记（钉钉客户端随 05 号待办登记）。
    */
   globalMode(system: string): AdapterMode {
-    return this.#modes[system] ?? defaultClientMode(this.#production ? 'production' : 'test');
+    return this.#modes[system] ?? defaultClientMode(this.#appEnv);
   }
 
   /** 本进程里该客户端的 Fake 实例（测试与开发环境往里放数据、注入故障）；生产环境拒绝 */

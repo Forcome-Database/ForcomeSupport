@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { demoQrFinders, demoQrModules, dingtalkFrameParams } from './dingtalk-login';
 
 describe('钉钉扫码登录框的授权参数（真实接口，G11）', () => {
-  it('Client ID、编码后的回调地址、这次的 state；scope 带 corpid（服务端核对是本组织）', () => {
+  it('Client ID、编码后的回调地址、这次的 state；scope 只要 openid', () => {
     expect(
       dingtalkFrameParams({
         mode: 'real',
@@ -13,7 +13,7 @@ describe('钉钉扫码登录框的授权参数（真实接口，G11）', () => {
     ).toEqual({
       redirect_uri: 'https%3A%2F%2Fsupport.forcome.example%2Flogin%2Fdingtalk',
       client_id: 'dingclientid',
-      scope: 'openid corpid',
+      scope: 'openid',
       response_type: 'code',
       state: 'abc',
       prompt: 'consent',

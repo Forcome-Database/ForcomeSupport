@@ -139,6 +139,45 @@ describe('登录被拒（G12）', () => {
     });
   });
 
+  it('离职事件漏了、成员表里还是在职时扫码：钉钉认不出他在本组织，当场停用并拒绝「账号已停用」', async () => {
+    await t.addMember({
+      dingtalkUserId: 'leaver',
+      name: '要离职的人',
+      dept: 'FSH / 客服部',
+      roles: ['agent'],
+      allStores: true,
+    });
+    dingtalk().addUser({
+      userId: 'leaver',
+      name: '要离职的人',
+      departmentIds: ['101'],
+      email: null,
+    });
+    await t.runJobs();
+    expect((await t.scanLogin('leaver')).response.status).toBe(200);
+
+    dingtalk().removeUser('leaver', { silent: true });
+    const { response } = await t.scanLogin('leaver');
+    expect(response.status).toBe(403);
+    expect(loginDeniedSchema.parse(await response.json())).toMatchObject({
+      reason: 'disabled',
+      message: '你的账号已停用（钉钉离职或管理员停用）。',
+    });
+    expect(await t.auditRecords({ action: 'member.dingtalk_left' })).toContainEqual(
+      expect.objectContaining({ objectLabel: '要离职的人' }),
+    );
+  });
+
+  it('钉钉认得出、成员表里没有的人（不是本组织的，或通讯录权限范围没覆盖）：按未分配角色拒绝', async () => {
+    const { response } = await t.scanLogin('stranger');
+    expect(response.status).toBe(403);
+    expect(loginDeniedSchema.parse(await response.json())).toEqual({
+      error: 'login_denied',
+      reason: 'no_role',
+      message: '你的钉钉账号还没有在本系统分配角色，请联系管理员刘洋。',
+    });
+  });
+
   it('只有生产厂对接人角色（第一期，AC-P1-21）：「工厂工作台第二阶段上线，目前无法进入」，带上是谁', async () => {
     const { response } = await t.scanLogin('chengong');
     expect(response.status).toBe(403);

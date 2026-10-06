@@ -13,7 +13,7 @@ import { createHttpClient, type HttpClient } from './http';
  * 一个接口覆盖四件事：
  * - 通讯录：全量读取（每小时对账）、按 ID 取一个成员或部门（处理变更事件时）；
  * - 通讯录变更事件：Stream 长连接推来，worker 的常驻拉取取走、转成后台任务后确认（同 Gmail 推送）；
- * - 扫码登录：用浏览器带回的授权码换出扫码人的钉钉用户 ID；
+ * - 扫码登录：用浏览器带回的授权码换出扫码人（unionid 与本组织的用户 ID，已离职的没有用户 ID）；
  * - 工作通知：发一条文本给几个人。
  * 真实现经出站 HTTP 客户端工厂（境内域名按 NO_PROXY 直连，ADR 0003）；接口细节见各函数的注释，真实环境验收见待办 29。
  */
@@ -36,6 +36,8 @@ export interface DingtalkUser {
   readonly departmentIds: readonly string[];
   /** 企业邮箱，没有取个人邮箱；都没有为 null */
   readonly email: string | null;
+  /** 钉钉的 unionid（同一个人在各组织里不变）：离职后用 userid 找不到人，扫码登录时按它认出是谁（G12「账号已停用」） */
+  readonly unionId: string | null;
 }
 
 /** 通讯录的全量快照（每小时对账用） */
@@ -44,11 +46,29 @@ export interface DingtalkDirectory {
   readonly users: readonly DingtalkUser[];
 }
 
-/** Stream 推来的一条通讯录事件 */
+/**
+ * 要处理的通讯录事件（钉钉开放平台「事件订阅」要勾选的就是这几个）：成员的增加、更改、离职、激活，部门的创建、修改、删除。
+ * 事件只说明「谁变了」，处理时向钉钉取最新的样子
+ */
+export const dingtalkUserEvents = [
+  'user_add_org',
+  'user_modify_org',
+  'user_leave_org',
+  'user_active_org',
+] as const;
+export const dingtalkDepartmentEvents = [
+  'org_dept_create',
+  'org_dept_modify',
+  'org_dept_remove',
+] as const;
+export type DingtalkUserEvent = (typeof dingtalkUserEvents)[number];
+export type DingtalkDepartmentEvent = (typeof dingtalkDepartmentEvents)[number];
+
+/** Stream 推来的一条事件 */
 export interface DingtalkEvent {
   /** Stream 消息 ID：处理完（转成后台任务）后用它确认；不确认的，钉钉稍后重推 */
   readonly messageId: string;
-  /** 事件类型，如 user_add_org、user_modify_org、user_leave_org、org_dept_create、org_dept_modify、org_dept_remove */
+  /** 事件类型：通讯录事件见 dingtalkUserEvents、dingtalkDepartmentEvents；订阅了别的事件也会推来（处理时忽略） */
   readonly type: string;
   /** 事件 ID（同一事件重推时不变），记日志排错用 */
   readonly eventId: string | null;
@@ -67,8 +87,11 @@ export interface DingtalkClient {
   getUser(userId: string): Promise<DingtalkUser | null>;
   /** 取一个部门；已删除为 null */
   getDepartment(departmentId: string): Promise<DingtalkDepartment | null>;
-  /** 扫码登录：授权码换出扫码人的钉钉用户 ID。授权码无效、已用过或不是本组织的人抛 DingtalkAuthCodeError */
-  userIdByAuthCode(authCode: string): Promise<string>;
+  /**
+   * 扫码登录：授权码换出扫码人是谁——unionid，与他在本组织的用户 ID（已离职、或不是本组织的人为 null）。
+   * 授权码无效、过期或已用过抛 DingtalkAuthCodeError
+   */
+  identifyByAuthCode(authCode: string): Promise<DingtalkLoginIdentity>;
   /** 发一条文本工作通知给几个人（每次最多 100 人），返回钉钉的任务 ID */
   sendWorkNotification(input: {
     readonly userIds: readonly string[];
@@ -82,12 +105,18 @@ export interface DingtalkClient {
   closeEvents(): Promise<void>;
 }
 
-/** 扫码登录的授权码无效、已用过或已过期，或扫码人不是本组织的成员（不可重试，界面提示重新扫码） */
+/** 扫码人：unionid 与本组织的用户 ID（不在本组织的通讯录里为 null） */
+export interface DingtalkLoginIdentity {
+  readonly unionId: string;
+  readonly userId: string | null;
+}
+
+/** 扫码登录的授权码无效、已用过或已过期（不可重试，界面提示重新扫码）；原始错误在 cause 里 */
 export class DingtalkAuthCodeError extends ExternalServiceError {
   override name = 'DingtalkAuthCodeError';
 
-  constructor(message = '授权码无效或已使用') {
-    super('dingtalk', 'login', message, false);
+  constructor(message = '授权码无效或已使用', cause?: unknown) {
+    super('dingtalk', 'login', message, false, cause);
   }
 }
 
@@ -96,11 +125,11 @@ export class DingtalkAuthCodeError extends ExternalServiceError {
 const OAPI = 'https://oapi.dingtalk.com';
 const API = 'https://api.dingtalk.com';
 /** 根部门 ID（组织本身） */
-export const DINGTALK_ROOT_DEPARTMENT = '1';
+const DINGTALK_ROOT_DEPARTMENT = '1';
 /** 成员列表每页条数（接口上限 100） */
 const PAGE_SIZE = 100;
 /** 工作通知每次最多发给的人数（接口上限 100） */
-export const WORK_NOTIFICATION_MAX_USERS = 100;
+const WORK_NOTIFICATION_MAX_USERS = 100;
 /** 访问凭证有效期 2 小时，提前 5 分钟换新 */
 const TOKEN_REFRESH_MARGIN_MS = 5 * 60_000;
 
@@ -122,6 +151,7 @@ const departmentSchema = z.object({
 
 const userSchema = z.object({
   userid: z.string(),
+  unionid: z.string().optional(),
   name: z.string(),
   dept_id_list: z.array(z.number()).default([]),
   org_email: z.string().optional(),
@@ -150,6 +180,7 @@ function toUser(row: z.infer<typeof userSchema>): DingtalkUser {
     name: row.name,
     departmentIds: row.dept_id_list.map(String),
     email: row.org_email || row.email || null,
+    unionId: row.unionid || null,
   };
 }
 
@@ -292,8 +323,9 @@ export function createRealDingtalkClient(
 
     getDepartment,
 
-    async userIdByAuthCode(authCode) {
-      // 1. 授权码换用户凭证（新版接口；授权码无效、过期或已用过时返回 4xx）
+    async identifyByAuthCode(authCode) {
+      // 1. 授权码换用户凭证（新版接口）。授权码无效、过期或已用过时钉钉返回 400；401、403 多半是 Client ID / Secret 配错，
+      //    照常是调用失败（登录接口记错误日志、界面写「暂时连不上钉钉」），不当成授权码的问题
       let userToken: string;
       try {
         const body = await http.postJson(
@@ -306,24 +338,14 @@ export function createRealDingtalkClient(
           },
           { operation: 'oauth2/userAccessToken' },
         );
-        const parsed = parse(
-          z.object({ accessToken: z.string().min(1), corpId: z.string().optional() }),
+        userToken = parse(
+          z.looseObject({ accessToken: z.string().min(1) }),
           body,
           'oauth2/userAccessToken',
-        );
-        // scope 含 corpid 时返回扫码人选的组织：企业内部应用只允许本组织成员登录，再核对一次
-        if (parsed.corpId && parsed.corpId !== credentials.corpId) {
-          throw new DingtalkAuthCodeError('扫码人不是本组织的成员');
-        }
-        userToken = parsed.accessToken;
+        ).accessToken;
       } catch (error) {
-        if (
-          error instanceof ExternalCallFailedError &&
-          error.status !== null &&
-          error.status >= 400 &&
-          error.status < 500
-        ) {
-          throw new DingtalkAuthCodeError();
+        if (error instanceof ExternalCallFailedError && error.status === 400) {
+          throw new DingtalkAuthCodeError('授权码无效、过期或已使用', error);
         }
         throw error;
       }
@@ -336,15 +358,17 @@ export function createRealDingtalkClient(
         }),
         'contact/users/me',
       );
-      // 3. unionId 换本组织的用户 ID；不是本组织的成员时没有
+      // 3. unionId 换本组织的用户 ID；已离职或不是本组织的人换不到
       const envelope = await oapi('/topapi/user/getbyunionid', { unionid: me.unionId }, [
         USER_NOT_FOUND,
       ]);
-      if (envelope.errcode === USER_NOT_FOUND) {
-        throw new DingtalkAuthCodeError('扫码人不是本组织的成员');
-      }
-      return parse(z.object({ userid: z.string().min(1) }), envelope.result, 'user/getbyunionid')
-        .userid;
+      if (envelope.errcode === USER_NOT_FOUND) return { unionId: me.unionId, userId: null };
+      const { userid } = parse(
+        z.object({ userid: z.string().min(1) }),
+        envelope.result,
+        'user/getbyunionid',
+      );
+      return { unionId: me.unionId, userId: userid };
     },
 
     async sendWorkNotification({ userIds, text }) {
@@ -390,7 +414,7 @@ interface QueuedEvent extends DingtalkEvent {
 
 /**
  * Fake 钉钉：内存里的通讯录、Stream 事件队列、扫码授权码与发出的工作通知。
- * - 测试与开发支撑改通讯录：addUser、updateUser、removeUser（离职）、addDepartment、updateDepartment、removeDepartment，
+ * - 测试与开发支撑改通讯录：addUser、updateUser、removeUser（离职）、activateUser、addDepartment、updateDepartment、removeDepartment，
  *   默认同时推一条对应的 Stream 事件；{ silent: true } 只改通讯录不推事件（模拟断线期间漏掉的事件，由全量对账补上）；
  * - issueAuthCode(用户 ID) 模拟「手机扫码并确认」，给出一个一次性的授权码；
  * - sent 是发出的工作通知；faults 的操作名：directory、getUser、getDepartment、login、send、events。
@@ -403,6 +427,8 @@ export class FakeDingtalk implements FakeClient<DingtalkClient> {
   #queue: QueuedEvent[] = [];
   readonly #outstanding = new Map<string, QueuedEvent>();
   readonly #authCodes = new Map<string, string>();
+  /** 用户 ID → unionid：离职后人从通讯录删掉，unionid 还认得（同真实钉钉） */
+  readonly #unionIds = new Map<string, string>();
   #sent: SentWorkNotification[] = [];
   #nextId = 1;
 
@@ -422,7 +448,7 @@ export class FakeDingtalk implements FakeClient<DingtalkClient> {
   }
 
   #push(
-    type: string,
+    type: DingtalkUserEvent | DingtalkDepartmentEvent,
     ids: { userIds?: readonly string[]; departmentIds?: readonly string[] },
     silent = false,
   ): void {
@@ -459,7 +485,13 @@ export class FakeDingtalk implements FakeClient<DingtalkClient> {
     this.#push('org_dept_remove', { departmentIds: [id] }, options.silent);
   }
 
-  addUser(user: DingtalkUser, options: { silent?: boolean } = {}): void {
+  /** 通讯录里放一个人（unionid 不给时取 union-<用户 ID>） */
+  addUser(
+    input: Omit<DingtalkUser, 'unionId'> & { readonly unionId?: string | null },
+    options: { silent?: boolean } = {},
+  ): void {
+    const user: DingtalkUser = { ...input, unionId: input.unionId ?? `union-${input.userId}` };
+    if (user.unionId) this.#unionIds.set(user.userId, user.unionId);
     this.#users.set(user.userId, user);
     this.#push('user_add_org', { userIds: [user.userId] }, options.silent);
   }
@@ -475,13 +507,21 @@ export class FakeDingtalk implements FakeClient<DingtalkClient> {
     this.#push('user_modify_org', { userIds: [userId] }, options.silent);
   }
 
+  /** 成员激活了钉钉（通讯录资料不变）：推 user_active_org */
+  activateUser(userId: string): void {
+    this.#push('user_active_org', { userIds: [userId] });
+  }
+
   /** 成员离职：从通讯录删除，推 user_leave_org */
   removeUser(userId: string, options: { silent?: boolean } = {}): void {
     this.#users.delete(userId);
     this.#push('user_leave_org', { userIds: [userId] }, options.silent);
   }
 
-  /** 模拟某人在手机上扫码并确认：给出一次性的授权码（浏览器会带着它回到登录页） */
+  /**
+   * 模拟某人在手机上扫码并确认：给出一次性的授权码（浏览器会带着它回到登录页）。已离职（不在通讯录里）的人也能扫，
+   * 换出的身份只有 unionid、没有本组织的用户 ID，同真实钉钉
+   */
   issueAuthCode(userId: string): string {
     const code = `fake-auth-${this.#nextId++}`;
     this.#authCodes.set(code, userId);
@@ -503,13 +543,16 @@ export class FakeDingtalk implements FakeClient<DingtalkClient> {
         await this.faults.check('getDepartment');
         return this.#departments.get(departmentId) ?? null;
       },
-      userIdByAuthCode: async (authCode) => {
+      identifyByAuthCode: async (authCode) => {
         await this.faults.check('login');
         const userId = this.#authCodes.get(authCode);
         // 授权码只能用一次
         this.#authCodes.delete(authCode);
         if (!userId) throw new DingtalkAuthCodeError();
-        return userId;
+        return {
+          unionId: this.#unionIds.get(userId) ?? `union-${userId}`,
+          userId: this.#users.has(userId) ? userId : null,
+        };
       },
       sendWorkNotification: async ({ userIds, text }) => {
         await this.faults.check('send');
@@ -541,6 +584,7 @@ export class FakeDingtalk implements FakeClient<DingtalkClient> {
     this.#queue = [];
     this.#outstanding.clear();
     this.#authCodes.clear();
+    this.#unionIds.clear();
     this.#sent = [];
     this.#nextId = 1;
     this.faults.reset();
@@ -552,7 +596,10 @@ export class FakeDingtalk implements FakeClient<DingtalkClient> {
     for (const department of directory.departments) {
       this.#departments.set(department.id, department);
     }
-    for (const user of directory.users) this.#users.set(user.userId, user);
+    for (const user of directory.users) {
+      this.#users.set(user.userId, user);
+      if (user.unionId) this.#unionIds.set(user.userId, user.unionId);
+    }
   }
 }
 

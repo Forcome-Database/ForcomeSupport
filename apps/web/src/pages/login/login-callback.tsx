@@ -23,7 +23,7 @@ const LOGIN_ERROR_TOAST = 'dingtalk-login';
 /** 地址里的授权码与 state：原样取字符串（钉钉的授权码可能全是数字，不经路由的查询串解析） */
 function callbackParams(): { authCode: string; state: string } | null {
   const params = new URLSearchParams(window.location.search);
-  const authCode = params.get('authCode') ?? params.get('code');
+  const authCode = params.get('authCode');
   const state = params.get('state');
   return authCode && state ? { authCode, state } : null;
 }

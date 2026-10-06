@@ -57,6 +57,15 @@ export async function findMember(db: DbExecutor, id: string): Promise<MemberRow 
   return row ?? null;
 }
 
+/** 按钉钉的 unionid 找成员（扫码登录：已离职的人在本组织里没有用户 ID 了） */
+export async function findMemberByDingtalkUnionId(
+  db: DbExecutor,
+  unionId: string,
+): Promise<MemberRow | null> {
+  const [row] = await db.select().from(member).where(eq(member.dingtalkUnionId, unionId)).limit(1);
+  return row ?? null;
+}
+
 /** 按钉钉用户 ID 找成员（扫码登录） */
 export async function findMemberByDingtalkUserId(
   db: DbExecutor,

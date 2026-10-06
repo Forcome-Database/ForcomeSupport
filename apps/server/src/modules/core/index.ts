@@ -93,10 +93,7 @@ export { createLogger, silentLogger, type Logger } from './logger';
 export {
   queueWorkNotifications,
   sendWorkNotificationsJob,
-  WORK_NOTIFICATION_MERGE_MS,
-  workNotificationText,
   type WorkNotificationDraft,
-  type WorkNotificationItem,
   type WorkNotificationRecipient,
   type WorkNotificationSender,
 } from './work-notifications';

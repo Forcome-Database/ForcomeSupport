@@ -44,6 +44,7 @@ export function fixtureDirectory(fixture: DemoFixture): DingtalkDirectory {
     name: member.name,
     departmentIds: [departmentOf(member.dept)],
     email: member.email,
+    unionId: `union-${member.key}`,
   }));
   for (const factory of fixture.factories) {
     users.push({
@@ -51,6 +52,7 @@ export function fixtureDirectory(fixture: DemoFixture): DingtalkDirectory {
       name: factory.head,
       departmentIds: [departmentOf(factory.code)],
       email: null,
+      unionId: `union-${factoryHeadUserId(factory.code)}`,
     });
   }
   return { departments: [...departments.values()], users };
