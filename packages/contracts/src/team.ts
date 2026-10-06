@@ -27,7 +27,10 @@ export function isTeamMember(memberRoles: readonly Role[]): boolean {
   return memberRoles.some((role) => (teamRoles as readonly Role[]).includes(role));
 }
 
-/** 校验与保存的报错（字段下方或成员表格子下方） */
+/**
+ * 校验与保存的报错（字段下方或成员表格子下方；文案照原型 K17 下方的 P20 补充小样，10-06 用户确认）。
+ * factoryRole、unknownStore、notActive 只有直接调接口或选的人刚好被停用时才会收到（界面不给这些选项），原型不画
+ */
 export const teamMessages = {
   memberRequired: '请选择成员',
   rolesRequired: '请至少选择一个角色',

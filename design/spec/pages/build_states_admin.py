@@ -357,7 +357,146 @@ def k16():
 def k17():
     full = frame(BS.team_tabs('角色权限') + BS.perm_matrix(), w=WW, gap=14)
     p1 = frame(cap('第一阶段 · 只显示阶段为「一起」「仅一」的能力行（prd_d 10.1）') + BS.perm_matrix(phase1=True), w=WW, gap=10)
-    return col(full + p1, 16)
+    return col(full + p1 + k17_more(), 16)
+
+
+# ---------------------------------------------------------------- K17 补充小样：P20 第一阶段的格内修改、吸底保存栏与「从钉钉添加」（待办 06）
+P20_COLS = [('成员', 'left'), ('钉钉部门', 'left'), ('角色', 'left'), ('数据范围', 'left'), ('状态', 'left'), ('最近登录', 'left'), ('', 'right')]
+P20_TPL = 'minmax(0, 1fr) 150px 190px 110px 90px 110px 28px'
+LAST_ROLE = '至少保留一个角色；不再需要的成员请停用'
+SCOPE_ALL = '全部店铺（含以后新增的）'
+STORE_NAMES = [s['name'] for s in STORES]
+
+
+def p20_cell(content, edited_=False, error=None):
+    """可改的格子：改过的在内容旁标「已修改」（放不下时换行），保存时的报错写在下方。"""
+    top = row(content + (BS.edited_tag() if edited_ else ''), 6, wrap=True, extra='row-gap: 4px;')
+    return col(top + (err_line(error) if error else ''), 4) if error else top
+
+
+def p20_row(key, roles=None, scope=None, status='已启用', role_edit=False, scope_edit=False, role_err=None, scope_err=None):
+    """成员表的一行（同 BS.member_table(lang=False)）；roles、scope 可换成修改后的样子，并标「已修改」或报错。"""
+    s = STAFF[key]
+    who_ = row(avatar(s['avatar'], AV_TONE.get(s['role'], 'green'), 28) + col(nowrap(s['name'] + ('（我）' if key == 'liuyang' else ''), 13, T['ink'], 700) + nowrap(s['email'], 12, T['ink4']), 1), 10)
+    roles_ = ''.join(cat(r) for r in (roles or [s['role']]))
+    scope_ = nowrap(scope or s['stores'], 13, T['ink2'])
+    return [who_, nowrap(s['dept'], 13, T['ink2']), p20_cell(roles_, role_edit, role_err), p20_cell(scope_, scope_edit, scope_err),
+            state(status), nowrap(s['last_login'], 13, T['ink2']), icon_btn('more', size=24)]
+
+
+def p20_rows(rows, row_tones=None):
+    return table(P20_COLS, rows, P20_TPL, py=11, row_tones=row_tones)
+
+
+def check_menu(items, width=176):
+    """勾选列表（DropdownMenu 的勾选项）：items: [(文字, 勾选, 禁用)]"""
+    out = ''
+    for t, on, off in items:
+        out += '<div style="padding: 7px 10px; border-radius: 6px;">%s</div>' % checkbox(t, on, off)
+    return '<div style="width: %dpx; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; box-shadow: %s; padding: 5px;">%s</div>' % (width, T['line'], SHADOW_MD, out)
+
+
+def scope_popover(some=True, chosen=('Forcome Direct',), width=240):
+    """「数据范围」的浮层：全部店铺 / 指定店铺；选指定店铺时下方勾选店铺（列全部店铺）。"""
+    stores = ''.join('<div>%s</div>' % checkbox(n, n in chosen) for n in STORE_NAMES) if some else ''
+    lst = '<div style="margin-left: 24px; padding-left: 12px; border-left: 1px solid %s; display: flex; flex-direction: column; gap: 7px;">%s</div>' % (T['line'], stores) if some else ''
+    return '<div style="width: %dpx; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; box-shadow: %s; padding: 12px; display: flex; flex-direction: column; gap: 8px;">%s%s%s</div>' % (
+        width, T['line'], SHADOW_MD, radio(SCOPE_ALL, not some), radio('指定店铺', some), lst)
+
+
+def err_line(t):
+    return row(icon('alert', 13, T['bad'], 2) + nowrap(t, 12, T['bad']), 4)
+
+
+def candidate_list(items, search='', empty_text=None, width=400):
+    """「从钉钉添加」的成员下拉：上方搜索框，列钉钉通讯录里在职、还没分配角色的人（姓名 · 钉钉部门 · 邮箱）。"""
+    box = '<div style="height: 36px; display: flex; align-items: center; gap: 8px; padding: 0px 12px; border-bottom: 1px solid %s;">%s%s</div>' % (
+        T['line'], icon('search', 15, T['ink4']), nowrap(search or '搜索姓名或邮箱', 13, T['ink'] if search else T['ink5']))
+    if empty_text:
+        lst = '<div style="padding: 7px 10px; font-size: 12px; color: %s;">%s</div>' % (T['ink3'], empty_text)
+    else:
+        lst = ''.join('<div style="padding: 7px 10px; border-radius: 6px; display: flex; flex-direction: column;%s">%s%s</div>' % (
+            ' background: %s;' % T['hover'] if i == 0 else '', nowrap(n, 13, T['ink2'], 600), nowrap(sub, 12, T['ink3'])) for i, (n, sub) in enumerate(items))
+    return '<div style="width: %dpx; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; box-shadow: %s;">%s<div style="padding: 5px;">%s</div></div>' % (
+        width, T['line'], SHADOW_MD, box, lst)
+
+
+def p20_candidates():
+    """钉钉通讯录里在职、还没分配角色的人：新入职的（data.DINGTALK_NEWCOMERS）与两家生产厂负责人，按姓名排序。"""
+    heads = [(STAFF[k]['name'], STAFF[k]['factory'], None) for k in ('liucz', 'zhoucz')]
+    news = [(n['name'], n['dept'], n['email']) for n in DINGTALK_NEWCOMERS]
+    order = {'刘厂长': 0, '吴桐': 1, '周厂长': 2}  # 姓名的拼音顺序（liu · wu · zhou）
+    people = sorted(heads + news, key=lambda p: order.get(p[0], 9))
+    return [(n, ' · '.join(x for x in (dept, mail) if x)) for n, dept, mail in people]
+
+
+def add_drawer(errors=False):
+    """「从钉钉添加成员」右侧抽屉（K8 同款，宽 440）：成员、角色、数据范围都必填；保存时一次报全并定位到第一个。"""
+    roles_ = grid(''.join(checkbox(r) for r in ('坐席', '客服主管', '售后负责人', '知识库负责人', '管理员')), 3, 12, extra='row-gap: 8px;')
+    body = (field('成员', select_box(st='error' if errors else 'default'), True, error='请选择成员' if errors else None) +
+            field('角色', roles_, True, hint='可多选，权限取并集', error='请至少选择一个角色' if errors else None) +
+            field('数据范围', col(radio(SCOPE_ALL) + radio('指定店铺'), 8), True, error='请选择数据范围' if errors else None))
+    return BS.drawer('从钉钉添加成员', body, btn('取消', 'secondary') + btn('保存', 'primary'), 440,
+                     '从钉钉通讯录选人并分配角色与店铺数据范围，分配后才能登录；保存记入审计日志。')
+
+
+def k17_more():
+    """K17 的补充小样（P20 第一阶段实现时确认，待办 06，10-06 用户确认）：格内修改角色与数据范围、改过的格与吸底保存栏（K6）、
+    保存结果与断网、保存时的报错、已停用的成员、并发（G7）、离开（G8）、「从钉钉添加」抽屉与成员下拉、添加结果。"""
+    zq = STAFF['zhaoqian']
+    # ① 修改角色：勾选列表，只剩一个角色时它不能取消
+    menu_ = check_menu([(r, r == zq['role'], r == zq['role']) for r in ('坐席', '客服主管', '售后负责人', '知识库负责人', '管理员')])
+    tip = '<div style="padding-top: 92px;">%s</div>' % tooltip(LAST_ROLE)
+    roles_pick = row('<div>%s</div>' % menu_ + tip, 8, 'flex-start')
+    # ② 修改数据范围：全部店铺 / 指定店铺 + 勾选店铺
+    scope_pick = row(scope_popover(False) + scope_popover(True), 16, 'flex-start')
+    # ③ 修改后：改过的格旁标「已修改」，行首警示色条；吸底保存栏写修改摘要
+    summary = '赵倩 角色：知识库负责人 → 坐席、知识库负责人；赵倩 店铺范围：全部店铺 → Forcome Direct'
+    changed = p20_rows([p20_row('wanglei'), p20_row('zhaoqian', ['坐席', '知识库负责人'], 'Forcome Direct', role_edit=True, scope_edit=True)], row_tones={1: 'warning'})
+    bar = save_bar(2, summary)
+    # ④ 保存结果（K6）
+    ok = toast('success', '设置已保存', '赵倩 店铺范围：Forcome Direct → 全部店铺，已记入审计日志（刘洋 10:24）。')
+    fail = toast('error', '保存失败：网络不可用', '修改已保留在页面上。', link('立即重试', 12))
+    off = toast('warning', '网络已断开，暂未保存', '修改已保留在页面上。恢复连接后自动重试保存，无需手动操作。', row(spinner(12, T['ink4']) + nowrap('等待网络恢复…', 12, T['ink3']), 6))
+    back = toast('neutral', '已自动重试并保存', '10:26 网络恢复后重试成功：赵倩 店铺范围：Forcome Direct → 全部店铺，已记入审计日志。')
+    # ⑤ 保存时的报错写在格子下方；已停用的成员不能改，悬停写原因
+    errs = p20_rows([p20_row('zhaoqian', scope='—', scope_edit=True, scope_err='请至少选择一个店铺'),
+                     p20_row('liuyang', ['坐席'], role_edit=True, role_err='至少要有一位在职的管理员')], row_tones={0: 'warning', 1: 'warning'})
+    gone = p20_rows([p20_row('chenchen', status='已停用')])
+    gone_tip = row(tooltip('已停用的成员不能修改角色与数据范围'), 0)
+    # ⑥ 并发（G7）
+    g7 = banner('warning', '赵倩刚被周敏修改（10:24）', '周敏改了：角色。你的修改还没保存，已保留在表格中；可先查看最新内容再改，或用你的内容覆盖。',
+                row(btn('查看最新', 'secondary', 'sm', 'refresh') + btn('覆盖保存', 'danger_outline', 'sm'), 8))
+    g7_many = banner('warning', '赵倩等 2 人刚被他人修改', '你的修改还没保存，已保留在表格中；可先查看最新内容再改，或用你的内容覆盖。',
+                     row(btn('查看最新', 'secondary', 'sm', 'refresh') + btn('覆盖保存', 'danger_outline', 'sm'), 8))
+    # ⑦ 离开（G8）
+    leave = dialog('离开前保存修改？', muted('「团队与权限」有 2 项未保存的修改。放弃后恢复为上次保存的值。', 13),
+                   btn('继续编辑', 'secondary', st='focus') + btn('放弃修改', 'danger_outline') + btn('保存并离开', 'primary'), 460, 'warning')
+    # ⑧ 「从钉钉添加」抽屉与成员下拉
+    drawer_ = '<div style="height: 500px; display: flex;">%s</div>' % add_drawer(True)
+    roles_ok = grid(''.join(checkbox(r, r == '坐席') for r in ('坐席', '客服主管', '售后负责人', '知识库负责人', '管理员')), 3, 12, extra='row-gap: 8px;')
+    filling = '<div style="width: 400px; background: #ffffff; border: 1px solid %s; border-radius: 12px; padding: 12px 14px;">%s</div>' % (
+        T['line'], field('角色', roles_ok, True, hint='可多选，权限取并集'))
+    picks = col(candidate_list(p20_candidates()) + candidate_list([], empty_text='钉钉通讯录里的人都已分配角色') +
+                candidate_list([], search='李', empty_text='没有匹配的人') + cap('填写时没有报错：角色下方写说明') + filling, 10)
+    added = toast('success', '已添加成员', '%s · 坐席，已记入审计日志（刘洋 10:24）。' % DINGTALK_NEWCOMERS[0]['name'])
+    add_fail = toast('error', '保存失败：网络不可用', '填写的内容已保留在抽屉里。', link('立即重试', 12))
+    taken = '<div style="width: 400px;">%s</div>' % field('成员', select_box(DINGTALK_NEWCOMERS[0]['name'], st='error'), True, error='%s已经分配过角色' % DINGTALK_NEWCOMERS[0]['name'])
+    add_leave = dialog('离开前保存修改？', muted('「从钉钉添加成员」填写的内容还没保存，放弃后不保留。', 13),
+                       btn('继续编辑', 'secondary', st='focus') + btn('放弃修改', 'danger_outline') + btn('保存并离开', 'primary'), 460, 'warning')
+    return frame(cap('P20 补充小样（第一阶段，待办 06）· ① 修改角色：点「角色」格展开勾选列表（P20 能分配的五个角色，没有生产厂对接人）；只剩一个角色时它不能取消，悬停写原因') + roles_pick +
+                 cap('② 修改数据范围：点「数据范围」格展开，「全部店铺（含以后新增的）」或「指定店铺」，选指定店铺时下方勾选店铺（列全部店铺）') + scope_pick +
+                 cap('③ 修改后：改过的格旁标「已修改」，该行行首警示色条；吸底保存栏写「有 N 项未保存修改」（N 为改过的格数）与修改摘要，几项用「；」接着写，放不下截断、悬停看全部；「放弃」直接撤销全部修改，「保存」不二次确认') + changed + bar +
+                 cap('④ 保存结果：成功浮层写修改摘要；断网时保留修改并在恢复后自动重试（K6），仍失败转红色失败浮层') + grid(ok + fail, 2, 12, extra='align-items: start;') + grid(off + back, 2, 12, extra='align-items: start;') +
+                 cap('⑤ 保存时的报错写在格子下方，整批都不保存：「指定店铺」没勾店铺；去掉了最后一位在职管理员的「管理员」角色') + errs +
+                 cap('已停用的成员：角色与数据范围的格子不能改，悬停写原因') + gone + gone_tip +
+                 cap('⑥ 有人已被别人改过（G7）：整批都不保存，表格上方给横幅；几个人时标题写「等 N 人」、不写是谁；「覆盖保存」需二次确认（同 P18）') + g7 + g7_many +
+                 cap('⑦ 有未保存的修改时离开本页（G8，切换设置菜单、顶栏导航、头像菜单）；切「角色权限」页签不算离开') + '<div style="display: flex; justify-content: center;">%s</div>' % leave +
+                 cap('⑧ 「从钉钉添加」右侧抽屉（宽 440）：成员、角色、数据范围都必填，数据范围默认不选；保存时一次报全并定位到第一个错误；在抽屉里直接保存，不进吸底保存栏') +
+                 row(drawer_ + picks, 24, 'flex-start') +
+                 cap('选的人刚被别人添加过（报在「成员」上）；添加结果；有输入时关闭抽屉（G8）') + taken + grid(added + add_fail, 2, 12, extra='align-items: start;') +
+                 '<div style="display: flex; justify-content: center;">%s</div>' % add_leave,
+                 w=WW, gap=10)
 
 
 def k21():
@@ -553,7 +692,7 @@ SPEC = {
     'K8': 'P18 点「新增店铺」或行尾「编辑」从右侧滑出抽屉（页面保持可见）：店铺名、平台、站点（多选）、默认站点、进线邮箱、平台标识、签名与覆盖项；开发测试环境另有「数据来源：真实接口 / 模拟数据」（新建时默认模拟数据），生产环境不显示也不接受。店铺名重复、平台标识为空、邮箱格式错误在字段下方报错，多个错误一次列全；保存按钮保持可点，点击后定位到第一个错误（AC-ST-01）。保存记入审计日志，未归属队列中收件地址匹配的来信自动归位。下方补充小样：进线邮箱没有错误时的提示、亚马逊店铺的平台标识、进线邮箱重复（每个地址一条错误）、其余必填项、编辑抽屉标题、保存结果浮层（成功 3 秒消失；失败保留输入、可立即重试）、店铺表为空、新增时的未保存离开（G8）。',
     'K10': '二次确认弹窗列出该成员的未关闭工单与进行中售后单，分别选接手人：工单选坐席或客服主管，售后单只列有该店铺范围的售后负责人；选齐后「改派并停用」，变更记审计（AC-ST-02）。成员在钉钉离职后自动停用，其未关闭工单与进行中售后单进入客服主管改派队列（AC-ST-05）。示例：停用李婷，未关闭工单按 data.TICKETS 计 → 接手人陈晨，进行中售后单 0 张；另一张小图：停用王磊，4 张进行中售后单但没有其他售后负责人，「改派并停用」置灰并写原因。',
     'K15': '页签「风险信号 · 7」，7 条风险信号命中即转人工（data.RISK_SIGNALS）。安全事故、平台风险与疑似提示注入（D-21）为硬规则：开关锁定并写「硬规则，不可关闭」。重复联系、高价值行内写明关闭影响「关闭需二次确认：近 30 天约少转人工 N 封」（data.RISK_OFF_IMPACT）；关闭任一可关的信号都是危险开关，二次确认并写明影响（关闭后命中的来信不再转人工，可能自动发送），确认后进入吸底保存栏。「发送方式与阈值」页签名旁圆点表示该页签有未保存修改。',
-    'K17': '权限矩阵一张表全部展开（不折叠），按 工单 / 审批 / 售后 / 知识 / 报表 / 设置 / 工厂 分组，能力行照 prd_d 10.1（含第一阶段的标记无需回复、新建与编辑登记、设为已完成，以及指定店铺、补登与汇率、改派售后单负责人、查看成本与结算金额、查看审计日志）；● 有权限、○ 只能看自己发起或负责的（「○ 自己登记的」写明范围）、「—」无权限、文字为部分能力。只读，按角色固定；第一阶段只显示已上线的能力行。',
+    'K17': '权限矩阵一张表全部展开（不折叠），按 工单 / 审批 / 售后 / 知识 / 报表 / 设置 / 工厂 分组，能力行照 prd_d 10.1（含第一阶段的标记无需回复、新建与编辑登记、设为已完成，以及指定店铺、补登与汇率、改派售后单负责人、查看成本与结算金额、查看审计日志）；● 有权限、○ 只能看自己发起或负责的（「○ 自己登记的」写明范围）、「—」无权限、文字为部分能力。只读，按角色固定；第一阶段只显示已上线的能力行。下方为 P20 第一阶段的补充小样（待办 06，10-06 用户确认）：格内修改角色与数据范围、改过的格与吸底保存栏（K6）、保存结果与断网、保存时的报错（含至少一位在职管理员）、已停用的成员、并发（G7）、离开（G8）、「从钉钉添加」抽屉与成员下拉、添加结果。',
     'K18': '两张小图：① 李婷（坐席）视角：页头提示「你只能看到自己的操作记录」，操作人筛选锁定为本人，列表只有李婷的记录；② 刘洋（管理员，没有财务权限）视角：展开 S-20260909-0016 的记录（data.AUDIT_EXPAND_DEMO），展开列出该单前后任一侧有值的全部字段、变化的标出，产品成本、运费、额外赔偿、其他、承担比例的前后值显示灰色「已隐藏」，其他字段照常显示；摘要「等 N 项」的 N 是变化的字段数；管理员打不开 P13，售后单编号不可点（10.2、D-24）。示例为完整版，第一阶段只有 P27「第一阶段」列出的对象类型。下方为补充小样（待办 30，10-05 用户确认）：第一阶段几种记录的写法、列表为空、导出、自定义时间。',
     'K19': '周敏视角，第一阶段外壳（导航 工单 · 售后 · 报表，无店铺范围与搜索）：筛选 近 7 天 · 本月 · 自定义 · 店铺 · 站点；标题下「数据来源：工单（Gmail）、平台订单、登记台账 · 更新于 %s」（取 Gmail、亚马逊订单、Shopify 订单中最旧的同步）与两条注；指标 3 个；图表 每日工单量 + 售后成本按责任类型（卡头总额即售后成本）。右为管理员视角局部：没有售后成本卡，每日工单量不可点、没有「查看明细」。导出同步生成后直接下载，记入审计（K5）。' % report_updated(),
     'K20': '刘洋视角，第一阶段外壳：亚马逊 SP-API（订单同步与 SQS 状态、订单回补 %d 天已完成）、Shopify Admin API（回补 %d 天 · 未开通 read_all_orders）、Gmail（4 个邮箱，收件与「已发送」）、钉钉（同步延迟 · 最近同步 %s，超过 2 小时，只提醒管理员、不出全站横幅；通讯录每个整点全量对账一次、失败不重试，每次失败算一次：上次成功超过 2 小时为同步延迟，连续 3 次失败为连接异常，待办 05 · 10-06）；积加、易仓为灰色虚线卡「第二阶段接入」，没有同步时间与测试连接；不显示 17TRACK。店铺表没有覆盖项列，没有吸底保存栏。下方为卡头小样（已连接 · 同步延迟 · 连接异常 · 未连接 · 模拟数据）、店铺表状态列写法与钉钉卡第一阶段已连接时的说明行（没有钉钉内免登）。' % (BS.AMZ_BACKFILL_DAYS, SHOPIFY_BACKFILL_DAYS, BS.DINGTALK_LATE_SYNC),

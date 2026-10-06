@@ -23,7 +23,7 @@ import { DEMO_NOW, startTestHarness, TEST_CLIENT_IP, type TestHarness } from './
  * P20 设置 · 团队与权限（待办 06；PRD P20 与「第一阶段」小节、K6、K17、G7，AC-ST-06、R-ST-06）：
  * 成员表、「从钉钉添加」（从通讯录同步进来、还没有角色的人里选人，必填角色与店铺范围）、吸底保存栏统一保存角色与店铺范围。
  * 角色与店铺范围每次请求从成员表读，改了下一次请求即生效（ADR 0010）；所有修改记审计。
- * Fake 钉钉回放示例通讯录并对账一次：两家生产厂负责人作为没有角色的成员进来，另放一位新同事孙悦作为待添加的人。
+ * Fake 钉钉回放示例通讯录并对账一次：两家生产厂负责人作为没有角色的成员进来，以及新入职待添加的吴桐（示例数据的 DINGTALK_NEWCOMERS）。
  * 同一个库上的用例按顺序进行，前面的修改留给后面。
  */
 
@@ -96,12 +96,7 @@ const candidateNamed = async (name: string) =>
 beforeAll(async () => {
   t = await startTestHarness();
   await t.loadFixtures();
-  const dingtalk = t.clients.fake(dingtalkClient);
-  dingtalk.replay(fixture);
-  dingtalk.addUser(
-    { userId: 'sunyue', name: '孙悦', departmentIds: ['101'], email: 'sunyue@forcome.com' },
-    { silent: true },
-  );
+  t.clients.fake(dingtalkClient).replay(fixture);
   await t.enqueue(dingtalkReconcileJob, {});
   await t.runJobs();
   admin = await t.loginAs('管理员');
@@ -151,10 +146,10 @@ describe('成员表（P20「成员」页签）', () => {
 
   it('「从钉钉添加」可选的人：通讯录里在职、还没分配角色的人（含两家生产厂负责人），按姓名排序', async () => {
     const list = await candidates();
-    expect(list.map((c) => c.name)).toEqual(['刘厂长', '孙悦', '周厂长']);
-    expect(list.find((c) => c.name === '孙悦')).toMatchObject({
+    expect(list.map((c) => c.name)).toEqual(['刘厂长', '吴桐', '周厂长']);
+    expect(list.find((c) => c.name === '吴桐')).toMatchObject({
       dept: expect.stringContaining('FSH') as string,
-      email: 'sunyue@forcome.com',
+      email: 'wutong@forcome.com',
     });
   });
 
@@ -190,50 +185,50 @@ describe('从钉钉添加成员（AC-ST-06）', () => {
   });
 
   it('选了人但不填角色或店铺范围：同样不能保存；「指定店铺」没勾店铺也不行', async () => {
-    const sunyue = await candidateNamed('孙悦');
+    const wutong = await candidateNamed('吴桐');
     expect(
-      await fieldErrors(await addMember({ memberId: sunyue, roles: [], stores: { all: true } })),
+      await fieldErrors(await addMember({ memberId: wutong, roles: [], stores: { all: true } })),
     ).toEqual({
       roles: teamMessages.rolesRequired,
     });
     expect(
-      await fieldErrors(await addMember({ memberId: sunyue, roles: ['agent'], stores: null })),
+      await fieldErrors(await addMember({ memberId: wutong, roles: ['agent'], stores: null })),
     ).toEqual({
       stores: teamMessages.scopeRequired,
     });
     expect(
       await fieldErrors(
         await addMember({
-          memberId: sunyue,
+          memberId: wutong,
           roles: ['agent'],
           stores: { all: false, storeIds: [] },
         }),
       ),
     ).toEqual({ stores: teamMessages.storesRequired });
-    expect(await candidateNamed('孙悦')).toBe(sunyue);
+    expect(await candidateNamed('吴桐')).toBe(wutong);
   });
 
   it('不能分配生产厂对接人（P20「第一阶段」）', async () => {
-    const sunyue = await candidateNamed('孙悦');
+    const wutong = await candidateNamed('吴桐');
     expect(
       await fieldErrors(
-        await addMember({ memberId: sunyue, roles: ['factory_contact'], stores: { all: true } }),
+        await addMember({ memberId: wutong, roles: ['factory_contact'], stores: { all: true } }),
       ),
     ).toEqual({ roles: teamMessages.factoryRole });
   });
 
   it('选人并分配角色与店铺范围：出现在成员表、不再是候选；记审计「添加成员」（前后值含角色与店铺范围）', async () => {
-    const sunyue = (await candidateNamed('孙悦'))!;
+    const wutong = (await candidateNamed('吴桐'))!;
     const res = await addMember({
-      memberId: sunyue,
+      memberId: wutong,
       roles: ['agent'],
       stores: { all: false, storeIds: [DIRECT] },
     });
     expect(res.status).toBe(201);
     const added = teamMemberSchema.parse(await res.json());
     expect(added).toMatchObject({
-      id: sunyue,
-      name: '孙悦',
+      id: wutong,
+      name: '吴桐',
       roles: ['agent'],
       stores: { all: false, storeIds: [DIRECT] },
       status: 'active',
@@ -244,25 +239,25 @@ describe('从钉钉添加成员（AC-ST-06）', () => {
     expect((await team()).members.map((m) => m.name)).toEqual([
       '李婷',
       '陈晨',
-      '孙悦',
+      '吴桐',
       '周敏',
       '王磊',
       '赵倩',
       '刘洋',
     ]);
-    expect(await candidateNamed('孙悦')).toBeNull();
+    expect(await candidateNamed('吴桐')).toBeNull();
 
-    const [audit] = await t.auditRecords({ action: 'member.add', objectId: sunyue });
+    const [audit] = await t.auditRecords({ action: 'member.add', objectId: wutong });
     expect(audit).toMatchObject({
       actorName: '刘洋',
       actorRoles: ['admin'],
       ip: TEST_CLIENT_IP,
       objectType: 'member',
-      objectLabel: '孙悦',
+      objectLabel: '吴桐',
       storeId: null,
-      before: { name: '孙悦', status: 'active', roles: [], stores: { all: false, storeIds: [] } },
+      before: { name: '吴桐', status: 'active', roles: [], stores: { all: false, storeIds: [] } },
       after: {
-        name: '孙悦',
+        name: '吴桐',
         status: 'active',
         roles: ['agent'],
         stores: { all: false, storeIds: [DIRECT] },
@@ -271,7 +266,7 @@ describe('从钉钉添加成员（AC-ST-06）', () => {
   });
 
   it('新成员登录后进入该角色的默认首页，只看到授权店铺（AC-ST-06）', async () => {
-    const { client, response } = await t.scanLogin('sunyue');
+    const { client, response } = await t.scanLogin('wutong');
     expect(response.status).toBe(200);
     expect(await me(client)).toMatchObject({
       roles: ['agent'],
@@ -286,12 +281,12 @@ describe('从钉钉添加成员（AC-ST-06）', () => {
   });
 
   it('已经添加过的人不能再添加（另一位管理员刚添加过）', async () => {
-    const sunyue = (await team()).members.find((m) => m.name === '孙悦')!.id;
+    const wutong = (await team()).members.find((m) => m.name === '吴桐')!.id;
     expect(
       await fieldErrors(
-        await addMember({ memberId: sunyue, roles: ['agent'], stores: { all: true } }),
+        await addMember({ memberId: wutong, roles: ['agent'], stores: { all: true } }),
       ),
-    ).toEqual({ memberId: teamMessages.alreadyAdded('孙悦') });
+    ).toEqual({ memberId: teamMessages.alreadyAdded('吴桐') });
   });
 });
 

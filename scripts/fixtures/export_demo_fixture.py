@@ -100,6 +100,16 @@ def members():
     return out
 
 
+def directory_newcomers():
+    """钉钉通讯录里新入职、还没分配角色的人（P20「从钉钉添加」的候选，待办 06）：Fake 钉钉回放时放进通讯录。"""
+    return [{
+        'key': n['key'],
+        'name': n['name'],
+        'dept': n['dept'],
+        'email': n['email'],
+    } for n in d.DINGTALK_NEWCOMERS]
+
+
 def stores():
     return [{
         'id': entity_id('store', s['id']),
@@ -300,6 +310,7 @@ def build():
         },
         'exchangeRates': {'base': 'USD', 'quotes': {'MXN': money(d.USD_MXN), 'CAD': money(d.USD_CAD)}},
         'members': members(),
+        'directoryNewcomers': directory_newcomers(),
         'stores': stores(),
         'factories': factories(),
         'parts': parts(),

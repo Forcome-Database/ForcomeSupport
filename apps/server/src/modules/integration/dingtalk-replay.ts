@@ -6,7 +6,9 @@ import type { DingtalkDepartment, DingtalkDirectory, DingtalkUser } from './ding
  * - 示例成员（原型 data.py 的 STAFF，8 位）：钉钉用户 ID 就是夹具里的 key（如 liting），与示例成员加载步骤
  *   （org.members）写进成员表的钉钉用户 ID 一致，全量对账时对得上、不会重复建或停用；部门按「FSH / 客服部」逐级建；
  * - 两家生产厂的负责人（刘厂长、周厂长）：是钉钉成员，但不分配系统角色（PRD 2.1），对账后作为没有角色的成员进来，
- *   扫码登录看到「未分配角色」（G12）。夹具里只有他们的姓名，用户 ID 取 factory-head-<厂代码>。
+ *   扫码登录看到「未分配角色」（G12）。夹具里只有他们的姓名，用户 ID 取 factory-head-<厂代码>；
+ * - 新入职、还没在 P20 分配角色的人（原型 data.py 的 DINGTALK_NEWCOMERS，如吴桐）：对账后作为没有角色的成员进来，
+ *   是 P20「从钉钉添加」的候选（待办 06），钉钉用户 ID 是夹具的 key。
  * 部门 ID 按出现先后从 100 起编，同一份夹具每次回放结果相同（api 与 worker 各回放一份，靠这个保持一致）。
  */
 
@@ -46,6 +48,15 @@ export function fixtureDirectory(fixture: DemoFixture): DingtalkDirectory {
     email: member.email,
     unionId: `union-${member.key}`,
   }));
+  for (const newcomer of fixture.directoryNewcomers) {
+    users.push({
+      userId: newcomer.key,
+      name: newcomer.name,
+      departmentIds: [departmentOf(newcomer.dept)],
+      email: newcomer.email,
+      unionId: `union-${newcomer.key}`,
+    });
+  }
   for (const factory of fixture.factories) {
     users.push({
       userId: factoryHeadUserId(factory.code),

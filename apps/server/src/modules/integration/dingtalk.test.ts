@@ -472,7 +472,7 @@ describe('Fake 钉钉', () => {
     ]);
   });
 
-  it('从示例数据回放通讯录：8 位示例成员（用户 ID 是夹具的 key）加两家生产厂的负责人，部门逐级建好', async () => {
+  it('从示例数据回放通讯录：8 位示例成员（用户 ID 是夹具的 key）、新入职待添加的人与两家生产厂的负责人，部门逐级建好', async () => {
     const fixture = getDemoFixture();
     const fake = new FakeDingtalk();
     fake.replay(fixture);
@@ -480,6 +480,7 @@ describe('Fake 钉钉', () => {
     expect(directory).toEqual(fixtureDirectory(fixture));
     expect(directory.users.map((u) => u.userId)).toEqual([
       ...fixture.members.map((m) => m.key),
+      ...fixture.directoryNewcomers.map((n) => n.key),
       factoryHeadUserId('FQD'),
       factoryHeadUserId('FZJ'),
     ]);
@@ -490,7 +491,7 @@ describe('Fake 钉钉', () => {
       if (!department || department.parentId === null) return [];
       return [...path(department.parentId), department.name];
     };
-    for (const member of fixture.members) {
+    for (const member of [...fixture.members, ...fixture.directoryNewcomers]) {
       const user = directory.users.find((u) => u.userId === member.key);
       expect(path(user?.departmentIds[0] ?? '').join(' / ')).toBe(member.dept);
     }

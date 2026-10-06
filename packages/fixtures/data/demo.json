@@ -110,6 +110,14 @@
       "lastLogin": "2026-09-10T16:05:00+08:00"
     }
   ],
+  "directoryNewcomers": [
+    {
+      "key": "wutong",
+      "name": "吴桐",
+      "dept": "FSH / 客服部",
+      "email": "wutong@forcome.com"
+    }
+  ],
   "stores": [
     {
       "id": "8adf47ec-435b-55d3-bd18-f3429dbee2df",

@@ -98,13 +98,13 @@ function MemberPicker({
             <Skeleton className="h-3.5 rounded-sm" />
             <Skeleton className="h-3.5 rounded-sm" />
           </div>
-        ) : candidates.length === 0 ? (
-          <div className="px-3 py-2.5 text-12 text-muted-foreground">{DRAWER.noCandidates}</div>
         ) : (
           <Command>
             <CommandInput placeholder={DRAWER.memberSearch} />
             <CommandList>
-              <CommandEmpty>{DRAWER.noMatch}</CommandEmpty>
+              <CommandEmpty>
+                {candidates.length === 0 ? DRAWER.noCandidates : DRAWER.noMatch}
+              </CommandEmpty>
               {candidates.map((candidate) => {
                 const current = candidate.id === value;
                 return (

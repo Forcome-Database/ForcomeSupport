@@ -43,6 +43,14 @@ export const fixtureMemberSchema = z.object({
   lastLogin: instant,
 });
 
+/** 钉钉通讯录里新入职、还没分配角色的人（P20「从钉钉添加」的候选，待办 06）：只进 Fake 钉钉的通讯录，不灌成员 */
+export const fixtureNewcomerSchema = z.object({
+  key: z.string(),
+  name: z.string(),
+  dept: z.string(),
+  email: z.string().nullable(),
+});
+
 export const fixtureStoreSchema = z.object({
   id: uuid,
   key: z.string(),
@@ -164,6 +172,7 @@ export const demoFixtureSchema = z.object({
     quotes: z.object({ MXN: amount, CAD: amount }),
   }),
   members: z.array(fixtureMemberSchema),
+  directoryNewcomers: z.array(fixtureNewcomerSchema),
   stores: z.array(fixtureStoreSchema),
   factories: z.array(
     z.object({
