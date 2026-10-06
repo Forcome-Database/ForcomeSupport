@@ -1,0 +1,221 @@
+import type { Currency } from '@forcome/contracts';
+import type { DemoFixture } from '@forcome/fixtures';
+import { defineClient, type FakeClient } from './definition';
+import { FaultInjector } from './faults';
+import { fixtureCustomerAddress } from './fixture-customers';
+import { createRealShopify } from './shopify-real';
+
+/*
+ * Shopify 订单（店铺级，规格 order「Shopify：Admin GraphQL」、ADR 0011，待办 11）：只读——按平台更新时间（updated_at）分页取订单
+ * （每 1–2 分钟增量，回补与对账随 13 也用它）、按订单名取一笔（镜像没有时补拉）、读店铺信息（「测试连接」）。
+ * 真实现（shopify-real.ts）用 Shopify 自建应用的客户端凭据按店铺换访问令牌（24 小时过期、每 20 小时提前换新，密文存库），
+ * 经出站 HTTP 客户端工厂调 Admin GraphQL；Fake 按店铺存订单，测试用 put 放入、faults（全部店铺）或 faultsOf(店铺)（只这个店铺）
+ * 注入故障（操作名 orders / order_by_name / shop），
+ * 开发测试环境从示例数据夹具回放第一阶段的 Shopify 订单。写动作（退款、改地址、取消）随第二期。
+ */
+
+/** 订单上的一个商品行 */
+export interface ShopifyLineItem {
+  readonly title: string;
+  readonly sku: string | null;
+  readonly quantity: number;
+}
+
+/** 收件地址（Admin API 的 MailingAddress，受保护客户数据） */
+export interface ShopifyAddress {
+  readonly name: string | null;
+  readonly address1: string | null;
+  readonly address2: string | null;
+  readonly city: string | null;
+  /** 州或省的代码，如 CA、ON */
+  readonly province: string | null;
+  readonly zip: string | null;
+  /** 国家代码（ISO 3166-1 alpha-2），如 US、CA、MX；Shopify 工单按它定站点（14） */
+  readonly country: string | null;
+  readonly phone: string | null;
+}
+
+/** 履约单号（Fulfillment.trackingInfo） */
+export interface ShopifyTracking {
+  readonly company: string | null;
+  readonly number: string | null;
+}
+
+/** 一笔 Shopify 订单（Admin GraphQL Order 里镜像要的字段） */
+export interface ShopifyOrder {
+  /** 平台订单号：Admin API 的全局 ID（gid://shopify/Order/<数字>） */
+  readonly id: string;
+  /** 订单名（如 #1063，店铺内唯一）：来信里写的是它 */
+  readonly name: string;
+  /** 客户邮箱（受保护客户数据）；没有为 null */
+  readonly email: string | null;
+  readonly createdAt: Date;
+  /** 平台更新时间（增量同步的水位） */
+  readonly updatedAt: Date;
+  readonly cancelledAt: Date | null;
+  /** 付款状态（displayFinancialStatus，如 PAID、REFUNDED） */
+  readonly financialStatus: string | null;
+  /** 履约状态（displayFulfillmentStatus，如 FULFILLED、UNFULFILLED） */
+  readonly fulfillmentStatus: string;
+  /** 订单总额（店铺币种） */
+  readonly total: { readonly amount: string; readonly currency: Currency };
+  readonly lineItems: readonly ShopifyLineItem[];
+  readonly shippingAddress: ShopifyAddress | null;
+  readonly tracking: readonly ShopifyTracking[];
+}
+
+/** 一页订单：按平台更新时间先后；还有下一页时给出游标 */
+export interface ShopifyOrderPage {
+  readonly orders: readonly ShopifyOrder[];
+  readonly nextCursor: string | null;
+}
+
+export interface ShopifyClient {
+  /**
+   * 平台更新时间不早于 updatedSince 的订单，按更新时间先后分页（orders 查询，query updated_at:>=…，sortKey UPDATED_AT）；
+   * after 为上一页的 nextCursor
+   */
+  listOrders(options: {
+    readonly updatedSince: Date;
+    readonly after?: string | null;
+    readonly first?: number;
+  }): Promise<ShopifyOrderPage>;
+  /** 按订单名取一笔（名字要完全一致，如 #1063）；没有为 null */
+  findOrderByName(name: string): Promise<ShopifyOrder | null>;
+  /** 店铺能不能访问（shop 查询）：「测试连接」用，返回店铺名 */
+  shop(): Promise<{ readonly name: string }>;
+}
+
+// ---------------------------------------------------------------- Fake
+
+/** 测试放进 Fake 的订单：没给的字段取默认值，id 不给时按订单名推出 */
+export type FakeShopifyOrderInput = Partial<ShopifyOrder> & {
+  readonly name: string;
+  readonly updatedAt: Date;
+};
+
+/** Fake 一页的默认条数（真实现每页 100） */
+const FAKE_PAGE_SIZE = 50;
+
+function fakeOrder(input: FakeShopifyOrderInput): ShopifyOrder {
+  return {
+    id: input.id ?? `gid://shopify/Order/${input.name.replace(/\D/g, '') || input.name}`,
+    email: null,
+    createdAt: input.updatedAt,
+    cancelledAt: null,
+    financialStatus: 'PAID',
+    fulfillmentStatus: 'UNFULFILLED',
+    total: { amount: '54.99', currency: 'USD' },
+    lineItems: [{ title: 'V2 车载吸尘器', sku: null, quantity: 1 }],
+    shippingAddress: null,
+    tracking: [],
+    ...input,
+  };
+}
+
+/** 按更新时间、再按 ID 排序（同一时刻更新的几笔顺序固定，分页不重不漏） */
+function byUpdatedAt(a: ShopifyOrder, b: ShopifyOrder): number {
+  return a.updatedAt.getTime() - b.updatedAt.getTime() || a.id.localeCompare(b.id);
+}
+
+/**
+ * Fake Shopify：按店铺存订单（键为平台订单号），put 放入或改写一笔（改写时更新时间由测试给出）。
+ * 分页游标是「已取过几笔」，与真实的不透明游标同样只在同一次遍历里有效
+ */
+export class FakeShopify implements FakeClient<ShopifyClient> {
+  /** 对全部店铺生效的故障 */
+  readonly faults = new FaultInjector('shopify');
+  readonly #storeFaults = new Map<string, FaultInjector>();
+  readonly #stores = new Map<string, Map<string, ShopifyOrder>>();
+
+  /** 只对这个店铺生效的故障（一个店铺连接异常、另一个照常） */
+  faultsOf(storeId: string): FaultInjector {
+    let faults = this.#storeFaults.get(storeId);
+    if (!faults) {
+      faults = new FaultInjector('shopify');
+      this.#storeFaults.set(storeId, faults);
+    }
+    return faults;
+  }
+
+  async #check(storeId: string, operation: string): Promise<void> {
+    await this.faults.check(operation);
+    await this.faultsOf(storeId).check(operation);
+  }
+
+  #orders(storeId: string): Map<string, ShopifyOrder> {
+    let orders = this.#stores.get(storeId);
+    if (!orders) {
+      orders = new Map();
+      this.#stores.set(storeId, orders);
+    }
+    return orders;
+  }
+
+  /** 放入或改写某店铺的一笔订单，返回放进去的样子 */
+  put(storeId: string, input: FakeShopifyOrderInput): ShopifyOrder {
+    const order = fakeOrder(input);
+    this.#orders(storeId).set(order.id, order);
+    return order;
+  }
+
+  /** 某店铺此刻的全部订单（按更新时间先后） */
+  orders(storeId: string): ShopifyOrder[] {
+    return [...this.#orders(storeId).values()].sort(byUpdatedAt);
+  }
+
+  client(storeId?: string): ShopifyClient {
+    if (!storeId) throw new Error('Shopify 是店铺级客户端，要给出店铺');
+    return {
+      listOrders: async ({ updatedSince, after, first }) => {
+        await this.#check(storeId, 'orders');
+        const all = this.orders(storeId).filter((o) => o.updatedAt >= updatedSince);
+        const start = after ? Number(after) : 0;
+        const end = start + (first ?? FAKE_PAGE_SIZE);
+        return { orders: all.slice(start, end), nextCursor: end < all.length ? String(end) : null };
+      },
+      findOrderByName: async (name) => {
+        await this.#check(storeId, 'order_by_name');
+        return this.orders(storeId).find((o) => o.name === name) ?? null;
+      },
+      shop: async () => {
+        await this.#check(storeId, 'shop');
+        return { name: storeId };
+      },
+    };
+  }
+
+  /** 示例数据夹具里第一阶段的 Shopify 订单（data.py 的 SHOPIFY_ORDERS_P1），客户邮箱同 Fake 来信 */
+  replay(fixture: DemoFixture): void {
+    const storeIds = new Map(fixture.stores.map((s) => [s.key, s.id]));
+    for (const order of fixture.shopifyOrders) {
+      const storeId = storeIds.get(order.storeKey);
+      if (!storeId) throw new Error(`示例订单 ${order.name} 的店铺 ${order.storeKey} 不在夹具里`);
+      this.put(storeId, {
+        name: order.name,
+        email: fixtureCustomerAddress(order.customer),
+        createdAt: new Date(order.placedAt),
+        updatedAt: new Date(order.updatedAt),
+        financialStatus: order.financialStatus,
+        fulfillmentStatus: order.fulfillmentStatus,
+        total: order.total,
+        lineItems: order.lineItems.map((item) => ({ ...item, sku: null })),
+        shippingAddress: { ...order.shipTo, name: order.customer, phone: null },
+        tracking: order.tracking ? [order.tracking] : [],
+      });
+    }
+  }
+
+  reset(): void {
+    this.#stores.clear();
+    this.faults.reset();
+    this.#storeFaults.clear();
+  }
+}
+
+export const shopifyClient = defineClient<ShopifyClient, FakeShopify>({
+  system: 'shopify',
+  scope: 'store',
+  createReal: createRealShopify,
+  createFake: () => new FakeShopify(),
+});

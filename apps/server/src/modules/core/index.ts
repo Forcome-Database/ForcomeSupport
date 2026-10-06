@@ -37,6 +37,7 @@ export {
   type DingtalkCredentials,
   type GoogleCredentials,
   type MailSendPolicy,
+  type ShopifyCredentials,
 } from './config';
 export { type Database, type DbExecutor, type DbTransaction } from './db';
 export {

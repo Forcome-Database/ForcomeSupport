@@ -15,4 +15,4 @@ export { type MailAddress, type Recognition, type SenderRule } from './recogniti
 export { clearInboundMail } from './reset';
 export { createChannelRoutes } from './routes';
 export { registerSenderRule } from './sender-rules';
-export { listStoreChoices, listStoreOptions, storeNamesById } from './stores';
+export { listOrderStores, listStoreChoices, listStoreOptions, storeNamesById } from './stores';

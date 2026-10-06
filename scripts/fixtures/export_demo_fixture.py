@@ -13,7 +13,9 @@
 成员与店铺的 id 用 UUIDv5 从 key 派生，重复运行结果不变，各模块的加载步骤与测试可以直接引用。
 - 站内通知取 NOTIFICATIONS（G10，周敏的面板）：只转第一期的类型（11.4 阶段「一起」，按原型的图标对上通知类型），
   第二期的「新审批单」不转换；只写时:分的落在演示当天。
-订单、未归属店铺来信等其余数据，由需要它们的待办在这里补充转换规则。
+- Shopify 订单取 SHOPIFY_ORDERS_P1（待办 11，Fake Shopify 回放）：时间按北京时间，金额两位小数的美元，
+  状态保留 Admin API 的枚举写法（PAID、FULFILLED 等），客户邮箱不在夹具里（由回放按客户名推出，同 Fake 来信）。
+亚马逊订单、未归属店铺来信等其余数据，由需要它们的待办在这里补充转换规则。
 
 用法（仓库根目录）：pnpm fixtures:generate；pnpm fixtures:verify 检查产物与 data.py 一致。
 可直接运行：python scripts/fixtures/export_demo_fixture.py [输出路径]
@@ -242,6 +244,28 @@ def ledger():
     return out
 
 
+# ---------------------------------------------------------------- Shopify 订单（待办 11）
+def shopify_orders():
+    out = []
+    for name, o in d.SHOPIFY_ORDERS_P1.items():
+        street, unit, city, province, zip_, country = o['ship_to']
+        out.append({
+            'name': name,
+            'storeKey': store_key(o['store']),
+            'customer': o['customer'],
+            'placedAt': at(o['placed']),
+            'updatedAt': at(o['updated']),
+            'lineItems': [{'title': t, 'quantity': q} for t, q in o['items']],
+            'total': {'amount': money(o['total']), 'currency': 'USD'},
+            'financialStatus': o['paid'],
+            'fulfillmentStatus': o['fulfilled'],
+            'shipTo': {'address1': street, 'address2': unit, 'city': city, 'province': province,
+                       'zip': zip_, 'country': country},
+            'tracking': {'company': o['tracking'][0], 'number': o['tracking'][1]} if o['tracking'] else None,
+        })
+    return out
+
+
 # ---------------------------------------------------------------- P05 时间线（I18）
 def ticket_timeline():
     o = d.P1_OLIVER
@@ -320,6 +344,7 @@ def build():
         # 原型用过的最大售后单序号（含第一期丢弃的待确认单 S-20260911-0022）：加载示例台账后新单号接在它之后，不与原型撞号
         'aftersalesLastSequence': max(int(a['no'][-4:]) for a in d.AFTERSALES),
         'ticketTimeline': ticket_timeline(),
+        'shopifyOrders': shopify_orders(),
         'notifications': notifications(),
     }
 

@@ -45,9 +45,9 @@ import {
  * P18 渠道卡（第一阶段，K20 与补充小样；原型 build_settings.p18_channels_p1()、gmail_card_p1()）：3 × 2 网格，间距 10。
  * 亚马逊 SP-API、Shopify Admin API、Gmail、钉钉四张卡头写连接状态（接模拟数据时前面另标「模拟数据」），
  * 有同步记录时副标题写「最近同步 hh:mm」，未连接写「尚未授权」；说明行按连接状态写（channel-card-lines.ts）；
- * Gmail 与钉钉卡头有「测试连接」，Gmail 卡有连接异常的邮箱时卡底另有「重新检测」（同一个测试，K7，待办 09）；
+ * Gmail、钉钉与 Shopify 卡头有「测试连接」，Gmail、Shopify 卡有连接异常的邮箱或店铺时卡底另有「重新检测」（同一个测试，K7，待办 09、11）；
  * 积加、易仓为灰色虚线卡「第二阶段接入」，没有同步时间与测试连接。
- * 亚马逊、Shopify 卡的「测试连接」、订单通知队列（SQS）与订单回补行、回补窗口行随 11、12、13 号待办加上。
+ * 亚马逊卡的「测试连接」与订单通知队列（SQS）行随 12，订单回补行与 Shopify 的回补窗口行随 13。
  */
 
 /** 连接状态 → 徽标色调（原型 STATE_TONE 的渠道连接一组） */
@@ -81,9 +81,21 @@ const CARD_ICONS: Record<ChannelKind, LucideIcon> = {
   dingtalk: Users,
 };
 
-/** 第一期有「测试连接」的卡（K20，待办 09）；亚马逊、Shopify 随 11、12 */
+/** 第一期有「测试连接」的卡（K20，待办 09、11）；亚马逊随 12 */
 const testKindOf = (kind: ChannelKind): ConnectionTestKind | null =>
-  kind === 'gmail' || kind === 'dingtalk' ? kind : null;
+  kind === 'gmail' || kind === 'dingtalk' || kind === 'shopify' ? kind : null;
+
+/** 测试成功浮层的说明（测过几个邮箱或店铺） */
+function connectionOkWords(kind: ConnectionTestKind, targets: number): string {
+  switch (kind) {
+    case 'gmail':
+      return CONNECTION_TEST.ok.gmail(targets);
+    case 'shopify':
+      return CONNECTION_TEST.ok.shopify(targets);
+    case 'dingtalk':
+      return CONNECTION_TEST.ok.dingtalk;
+  }
+}
 
 /**
  * 「测试连接」（K20，待办 09 Q4）：测试中按钮置灰转圈；全部可访问时成功浮层，访问不了时失败浮层写哪个访问不了与怎么查；
@@ -98,10 +110,7 @@ function useConnectionTest(kind: ConnectionTestKind) {
       dismissToast(toastId);
       showSuccess({
         title: CONNECTION_TEST.okTitle,
-        description:
-          kind === 'gmail'
-            ? CONNECTION_TEST.ok.gmail(result.targets.length)
-            : CONNECTION_TEST.ok.dingtalk,
+        description: connectionOkWords(kind, result.targets.length),
       });
     },
     onError: (error) => {
@@ -226,7 +235,7 @@ function ConnectedCard({
   );
 }
 
-/** 有「测试连接」的卡：Gmail、钉钉 */
+/** 有「测试连接」的卡：Gmail、钉钉、Shopify */
 function TestableCard({
   kind,
   card,

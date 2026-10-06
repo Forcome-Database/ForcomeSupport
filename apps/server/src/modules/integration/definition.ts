@@ -1,6 +1,7 @@
 import type { DemoFixture } from '@forcome/fixtures';
-import type { DingtalkCredentials, GoogleCredentials } from '../core';
+import type { Clock, DingtalkCredentials, GoogleCredentials, ShopifyCredentials } from '../core';
 import type { CallRecorder } from './call-records';
+import type { CredentialVault } from './credential-vault';
 import type { MailRecipientGuard } from './mail-recipient-guard';
 
 /*
@@ -13,6 +14,8 @@ export type ClientScope = 'store' | 'global';
 /** 真实现的构造参数；店铺级客户端带店铺 ID。凭据随各集成的待办加入 */
 export interface RealClientContext {
   readonly storeId?: string;
+  /** 店铺级客户端的平台标识（亚马逊卖家 ID / Shopify 店铺域名，channel 的店铺配置）；调用方没给为 undefined */
+  readonly storePlatformId?: string;
   /** 发信白名单（ADR 0013 修订）：会发信的真实现在发出前对全部收件人调用 assertAllowed */
   readonly mailRecipientGuard: MailRecipientGuard;
   /** 钉钉企业内部应用的凭据（core 的 loadConfig 读环境变量）；钉钉用 Fake 时为 null */
@@ -21,6 +24,12 @@ export interface RealClientContext {
   readonly google: GoogleCredentials | null;
   /** 调用记录写到哪里（经出站 HTTP 客户端工厂，待办 09） */
   readonly callRecorder: CallRecorder;
+  /** Shopify 自建应用的客户端凭据（待办 11）；没配置为 null，真实现调用时以「未配置」失败 */
+  readonly shopify: ShopifyCredentials | null;
+  /** 动态凭据保管（主密钥加密存库，待办 11）；没有主密钥为 null */
+  readonly credentialVault: CredentialVault | null;
+  /** 当前时间（凭据何时换新；测试里是手动时钟） */
+  readonly clock: Clock;
 }
 
 /** Fake 的最小约定：给出（某店铺视角的）客户端，能重置到初始状态 */

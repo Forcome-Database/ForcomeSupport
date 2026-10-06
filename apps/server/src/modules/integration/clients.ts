@@ -4,13 +4,17 @@ import {
   clientModeVariable,
   defaultClientMode,
   defaultMailSendPolicy,
+  systemClock,
   type AppConfig,
   type AppEnv,
+  type Clock,
   type DingtalkCredentials,
   type GoogleCredentials,
   type MailSendPolicy,
+  type ShopifyCredentials,
 } from '../core';
 import { noCallRecords, type CallRecorder } from './call-records';
+import type { CredentialVault } from './credential-vault';
 import type {
   AnyClientDefinition,
   ClientDefinition,
@@ -41,6 +45,8 @@ export class FakeNotAllowedError extends Error {
 export interface StoreClientSelection {
   readonly id: string;
   readonly adapterMode: AdapterMode;
+  /** 平台标识（亚马逊卖家 ID / Shopify 店铺域名）：订单的真实现按它连店铺；Gmail 用不到，可不给 */
+  readonly platformId?: string;
 }
 
 export interface IntegrationClientsOptions {
@@ -57,6 +63,12 @@ export interface IntegrationClientsOptions {
   readonly google?: GoogleCredentials | null;
   /** 真实现的调用记录写到哪里；不传不记（api、worker 传 databaseCallRecorder） */
   readonly callRecorder?: CallRecorder;
+  /** Shopify 的客户端凭据（AppConfig.shopify），交给 Shopify 的真实现；不传为 null */
+  readonly shopify?: ShopifyCredentials | null;
+  /** 动态凭据保管（api、worker 传 databaseCredentialVault）；不传为 null */
+  readonly credentialVault?: CredentialVault | null;
+  /** 真实现的当前时间（凭据何时换新）；不传为系统时钟 */
+  readonly clock?: Clock;
 }
 
 export class IntegrationClients {
@@ -70,6 +82,9 @@ export class IntegrationClients {
   readonly #dingtalk: DingtalkCredentials | null;
   readonly #google: GoogleCredentials | null;
   readonly #callRecorder: CallRecorder;
+  readonly #shopify: ShopifyCredentials | null;
+  readonly #credentialVault: CredentialVault | null;
+  readonly #clock: Clock;
   /** 发信白名单守卫，经 RealClientContext 交给真实现 */
   readonly mailRecipientGuard: MailRecipientGuard;
 
@@ -84,6 +99,9 @@ export class IntegrationClients {
     this.#dingtalk = options.dingtalk ?? null;
     this.#google = options.google ?? null;
     this.#callRecorder = options.callRecorder ?? noCallRecords;
+    this.#shopify = options.shopify ?? null;
+    this.#credentialVault = options.credentialVault ?? null;
+    this.#clock = options.clock ?? systemClock;
     for (const [system, mode] of Object.entries(this.#modes)) {
       const definition = [...this.#definitions].find((d) => d.system === system);
       const variable = clientModeVariable(system);
@@ -114,16 +132,20 @@ export class IntegrationClients {
       }
       return this.fake(definition).client(store.id);
     }
-    return definition.createReal(this.#realContext(store.id));
+    return definition.createReal(this.#realContext(store));
   }
 
-  #realContext(storeId?: string): RealClientContext {
+  #realContext(store?: StoreClientSelection): RealClientContext {
     return {
-      ...(storeId === undefined ? {} : { storeId }),
+      ...(store === undefined ? {} : { storeId: store.id }),
+      ...(store?.platformId === undefined ? {} : { storePlatformId: store.platformId }),
       mailRecipientGuard: this.mailRecipientGuard,
       dingtalk: this.#dingtalk,
       google: this.#google,
       callRecorder: this.#callRecorder,
+      shopify: this.#shopify,
+      credentialVault: this.#credentialVault,
+      clock: this.#clock,
     };
   }
 
@@ -200,11 +222,16 @@ export class IntegrationClients {
  * 生产环境不回放，也不解析夹具。options 只给测试用：换登记清单与夹具。
  */
 export function createIntegrationClients(
-  config: Pick<AppConfig, 'appEnv' | 'clientModes' | 'mailSend' | 'dingtalk' | 'google'>,
+  config: Pick<
+    AppConfig,
+    'appEnv' | 'clientModes' | 'mailSend' | 'dingtalk' | 'google' | 'shopify'
+  >,
   options: {
     definitions?: readonly AnyClientDefinition[];
     fixture?: () => DemoFixture;
     callRecorder?: CallRecorder;
+    credentialVault?: CredentialVault | null;
+    clock?: Clock;
   } = {},
 ): IntegrationClients {
   const clients = new IntegrationClients({
@@ -213,8 +240,11 @@ export function createIntegrationClients(
     mailSend: config.mailSend,
     dingtalk: config.dingtalk,
     google: config.google,
+    shopify: config.shopify,
     definitions: options.definitions,
     callRecorder: options.callRecorder,
+    credentialVault: options.credentialVault,
+    clock: options.clock,
   });
   if (config.appEnv !== 'production') {
     clients.replayFixtures((options.fixture ?? getDemoFixture)());

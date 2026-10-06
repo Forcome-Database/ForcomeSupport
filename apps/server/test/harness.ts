@@ -24,6 +24,7 @@ import {
   type HistorySheet,
 } from '../src/modules/aftersales';
 import {
+  listOrderStores,
   listReceivedMail,
   registerSenderRule,
   type ReceivedMail,
@@ -45,7 +46,17 @@ import {
   type JobDefinition,
   type Runtime,
 } from '../src/modules/core';
-import { IntegrationClients, type AnyClientDefinition } from '../src/modules/integration';
+import {
+  databaseCredentialVault,
+  IntegrationClients,
+  type AnyClientDefinition,
+} from '../src/modules/integration';
+import {
+  findOrder,
+  findOrdersByEmail,
+  type MirroredOrder,
+  type OrderRef,
+} from '../src/modules/order';
 import {
   createMember,
   orgMembersFixtureStep,
@@ -94,6 +105,9 @@ function sheetOfRows(
     rows: rows.map((row, index) => ({ row: index + 2, cells: header.map((h) => row[h] ?? null) })),
   };
 }
+
+/** 测试库里加密动态凭据的主密钥（32 字节；只在测试里，真实环境是 CREDENTIAL_MASTER_KEY） */
+export const TEST_CREDENTIAL_MASTER_KEY = Buffer.alloc(32, 0x5a);
 
 /** 测试请求的来源 IP（经 X-Forwarded-For 传给应用，审计里记它） */
 export const TEST_CLIENT_IP = '10.20.3.27';
@@ -180,6 +194,13 @@ export interface TestHarness {
   addSenderRule(rule: SenderRule & { readonly label: string }): Promise<void>;
   /** 收取的邮件（含归档的平台通知与营销，按到达时间先后；第一期没有查看页面，用它核对「归档不丢信」） */
   receivedMail(filter?: { readonly mailbox?: string }): Promise<ReceivedMail[]>;
+  /**
+   * 在某店铺内按订单名或平台订单号查订单（order 的 findOrder，系统操作的范围：归并等后台流程就这样调用，待办 11）：
+   * 镜像没有、给的是订单名时按订单名补拉并入库。第一期没有查订单的页面，订单镜像的效果经它核对
+   */
+  findOrder(storeId: string, ref: OrderRef): Promise<MirroredOrder | null>;
+  /** 在某店铺内按客户邮箱反查订单（order 的 findOrdersByEmail，只查镜像，R-ST-03） */
+  ordersByEmail(storeId: string, email: string): Promise<MirroredOrder[]>;
   /** 重放来信（运维命令 reset-inbound 的同一个函数，按本测试的运行环境：生产环境拒绝） */
   resetInbound(): Promise<InboundResetReport>;
   /**
@@ -227,7 +248,13 @@ export async function startTestHarness(
     }
   }
 
-  const clients = new IntegrationClients({ appEnv, definitions: options.clientDefinitions });
+  const clients = new IntegrationClients({
+    appEnv,
+    definitions: options.clientDefinitions,
+    // 真实现的「当前时间」也走手动时钟；动态凭据用测试主密钥加密存进本测试的库（Shopify 凭据没配置，真实接口为未连接）
+    clock,
+    credentialVault: databaseCredentialVault(runtime, TEST_CREDENTIAL_MASTER_KEY),
+  });
   const deps: ServerDeps = {
     runtime,
     logger: silentLogger,
@@ -345,6 +372,15 @@ export async function startTestHarness(
     addSenderRule: (rule) => transaction(runtime, (tx) => registerSenderRule(tx, rule)),
 
     receivedMail: (filter) => listReceivedMail(runtime.db, SYSTEM_STORE_SCOPE, filter),
+
+    async findOrder(storeId, ref) {
+      const store = (await listOrderStores(runtime.db)).find((s) => s.id === storeId);
+      if (!store) throw new Error(`没有店铺 ${storeId}`);
+      return findOrder(runtime, clients, SYSTEM_STORE_SCOPE, store, ref);
+    },
+
+    ordersByEmail: (storeId, email) =>
+      findOrdersByEmail(runtime.db, SYSTEM_STORE_SCOPE, { storeId, email }),
 
     resetInbound: () => resetInboundData(runtime, appEnv),
 

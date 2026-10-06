@@ -20,6 +20,7 @@ import {
   DRAWER,
   GMAIL_ISSUE_LINES,
   EMPTY_STORES,
+  SHOPIFY_ISSUE_LINES,
   LAST_SYNC,
   LEAVE,
   MENU_NOTE,
@@ -237,5 +238,20 @@ describe('K20 补充小样：卡片的异常写法与「测试连接」（待办
     expectText(STATES_ADMIN, `${CONNECTION_TEST.failedAction}失败：钉钉通讯录无法访问`);
     expectText(STATES_ADMIN, CONNECTION_TEST.failedDescription.gmail);
     expectText(STATES_ADMIN, CONNECTION_TEST.failedDescription.dingtalk);
+  });
+});
+
+describe('K20 补充小样：Shopify 卡（待办 11，协调者 2026-10-06 决定，套用 Gmail 的写法、按店铺）', () => {
+  it('同步延迟与连接异常：每个店铺一行、订单暂停同步、「重新检测」', () => {
+    expectText(STATES_ADMIN, SHOPIFY_ISSUE_LINES.delayed('forcome.mx', '10:05'));
+    expectText(STATES_ADMIN, SHOPIFY_ISSUE_LINES.failed('forcome.mx', '10:05', 3));
+    expectText(STATES_ADMIN, SHOPIFY_ISSUE_LINES.held);
+    expectText(STATES_ADMIN, CHANNEL_CARDS.shopify.stores(2));
+  });
+
+  it('「测试连接」的结果浮层', () => {
+    expectText(STATES_ADMIN, CONNECTION_TEST.ok.shopify(2));
+    expectText(STATES_ADMIN, `${CONNECTION_TEST.failedAction}失败：forcome.mx 无法访问`);
+    expectText(STATES_ADMIN, CONNECTION_TEST.failedDescription.shopify);
   });
 });

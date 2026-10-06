@@ -75,6 +75,18 @@ export const GMAIL_ISSUE_LINES = {
 } as const;
 
 /**
+ * Shopify 卡的异常说明行（K20 补充小样，待办 11，协调者 2026-10-06 决定，套用 Gmail 的写法、按店铺）：每个连接异常的店铺一行原因与
+ * 恢复指引（次数为实际的连续失败次数），再写一次订单暂停同步，底部「重新检测」（GMAIL_ISSUE_LINES.recheck）；每个同步延迟的店铺一行，
+ * 排在异常行之后。第一阶段没有「重新授权」与错误日志页
+ */
+export const SHOPIFY_ISSUE_LINES = {
+  failed: (store: string, since: string, failures: number) =>
+    `${store} 访问失败（${since} 起连续 ${failures} 次）：请检查 Admin API 应用凭据与授权范围`,
+  held: '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
+  delayed: (store: string, last: string) => `${store} ${last} 后未同步成功，超过 10 分钟`,
+} as const;
+
+/**
  * 钉钉卡同步延迟与连接异常时的说明行（K20；连接异常为待办 09 Q6 用户确认，从没同步成功过为 E4 协调者决定）：
  * 第一行换成未同步成功的说明，其后两行固定
  */
@@ -87,8 +99,8 @@ export const DINGTALK_ISSUE_LINES = {
 } as const;
 
 /**
- * 「测试连接」（K20 卡头的文字按钮与结果浮层，待办 09 Q4 用户确认）：成功 3 秒消失；失败的标题由 notify 写成
- * 「测试连接失败：<接口给的原因>」，说明写怎么查
+ * 「测试连接」（K20 卡头的文字按钮与结果浮层，待办 09 Q4 用户确认；Shopify 为待办 11 协调者 2026-10-06 套用）：成功 3 秒消失；
+ * 失败的标题由 notify 写成「测试连接失败：<接口给的原因>」，说明写怎么查
  */
 export const CONNECTION_TEST = {
   button: '测试连接',
@@ -96,11 +108,13 @@ export const CONNECTION_TEST = {
   ok: {
     gmail: (mailboxes: number) => `Gmail：${mailboxes} 个邮箱均可访问`,
     dingtalk: '钉钉：通讯录可访问',
+    shopify: (stores: number) => `Shopify：${stores} 个店铺均可访问`,
   },
   failedAction: '测试连接',
   failedDescription: {
     gmail: '请检查全域委派范围与邮箱状态',
     dingtalk: '请检查应用凭据与通讯录权限',
+    shopify: '请检查 Admin API 应用凭据与授权范围',
   },
 } as const;
 

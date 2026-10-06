@@ -248,7 +248,21 @@ interface FormatContext {
   readonly year: string;
   /** 这条记录的日期（北京时间）：sameDayTime 的值在同一天时只写时:分 */
   readonly day: string;
+  /** 渠道连接记录是哪个渠道（快照的 channel；没写的是 Gmail）：「补拉」写来信还是订单 */
+  readonly channel: 'gmail' | 'shopify';
 }
+
+/** 补拉的单位与时间的说法：Gmail 为来信（到达时间），Shopify 为订单（平台更新时间，协调者 2026-10-06 决定） */
+const BACKFILL_WORDS = {
+  gmail: {
+    count: (n: number) => `${n} 封来信`,
+    range: (from: string, to: string) => `${from}–${to} 到达，SLA 按原到达时间`,
+  },
+  shopify: {
+    count: (n: number) => `${n} 笔订单`,
+    range: (from: string, to: string) => `${from}–${to} 更新`,
+  },
+} as const;
 
 function dateTimeWords(value: unknown, ctx: FormatContext): string {
   if (typeof value !== 'string' || Number.isNaN(new Date(value).getTime())) return text(value);
@@ -303,13 +317,16 @@ function auditFilterWords(value: unknown, ctx: FormatContext): string {
   return [time, ...auditConditionWords({ ...filter, actorName })].join(' · ');
 }
 
-/** 恢复连接时补拉的来信（原型「3 封来信（10:05–10:13 到达，SLA 按原到达时间）」） */
+/**
+ * 恢复连接时补拉了多少：Gmail 原型「3 封来信（10:05–10:13 到达，SLA 按原到达时间）」，Shopify「2 笔订单（10:05–10:13 更新）」
+ */
 function backfillWords(value: unknown, ctx: FormatContext): string {
   const parsed = auditSnapshotSchemas.channel.shape.backfilled.safeParse(value);
   if (!parsed.success || !parsed.data) return EMPTY;
   const { count, from, to } = parsed.data;
   const time = (at: string) => auditTimeWords(at, { withDate: false, year: ctx.year });
-  return `${count} 封来信（${time(from)}–${time(to)} 到达，SLA 按原到达时间）`;
+  const words = BACKFILL_WORDS[ctx.channel];
+  return `${words.count(count)}（${words.range(time(from), time(to))}）`;
 }
 
 /** 触发（原型「连续 3 次失败」「第 4 次重试成功」） */
@@ -398,8 +415,8 @@ function exportSummary(kind: 'ledgerExport' | 'auditExport') {
 }
 
 /**
- * 渠道连接的摘要（原型 AUDIT_LOG）：「状态：已连接 → 连接异常（连续 3 次失败）」「状态：连接异常 → 已连接（补拉 3 封来信）」；
- * 恢复时一封也没补拉到照写「补拉 0 封来信」（展开里「补拉」两侧都空、不列）
+ * 渠道连接的摘要（原型 AUDIT_LOG）：「状态：已连接 → 连接异常（连续 3 次失败）」「状态：连接异常 → 已连接（补拉 3 封来信）」，
+ * Shopify 写「补拉 N 笔订单」；恢复时一封也没补拉到照写「补拉 0 封来信」（展开里「补拉」两侧都空、不列）
  */
 function channelSummary(before: unknown, after: unknown, ctx: FormatContext): string {
   const status = fieldAt('channel', 'status');
@@ -409,7 +426,7 @@ function channelSummary(before: unknown, after: unknown, ctx: FormatContext): st
   const { trigger, backfilled } = parsed.data;
   if (trigger?.kind === 'failures') return `${head}（${triggerWords(trigger)}）`;
   if (trigger?.kind === 'retry_succeeded')
-    return `${head}（补拉 ${backfilled?.count ?? 0} 封来信）`;
+    return `${head}（补拉 ${BACKFILL_WORDS[ctx.channel].count(backfilled?.count ?? 0)}）`;
   return head;
 }
 
@@ -465,6 +482,8 @@ export function describeAuditRecord(
     names: options.names,
     year: businessDateTime(record.occurredAt).slice(0, 4),
     day: businessDateTime(record.occurredAt).slice(0, 10),
+    channel:
+      isPlainObject(record.after) && record.after.channel === 'shopify' ? 'shopify' : 'gmail',
   };
   const known = isAuditAction(record.action) ? auditActions[record.action] : null;
   // 没有编号的店铺对象（较早的越权记录）写店铺名

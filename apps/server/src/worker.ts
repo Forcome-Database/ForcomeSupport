@@ -9,7 +9,11 @@ import {
   startRuntime,
   startWorker,
 } from './modules/core';
-import { createIntegrationClients, databaseCallRecorder } from './modules/integration';
+import {
+  createIntegrationClients,
+  databaseCallRecorder,
+  databaseCredentialVault,
+} from './modules/integration';
 import { onShutdown } from './shutdown';
 
 const config = loadConfig();
@@ -21,9 +25,11 @@ const { runtime, stop } = await startRuntime(config.databaseUrl, {
   clock: config.clockStart ? startingAt(config.clockStart) : undefined,
 });
 
-// 真实现的每次外部调用写一条调用记录（待办 09）
+// 真实现的每次外部调用写一条调用记录（待办 09）；动态凭据（Shopify 访问令牌）用主密钥加密存库（待办 11）
 const clients = createIntegrationClients(config, {
   callRecorder: databaseCallRecorder(runtime, logger),
+  credentialVault: databaseCredentialVault(runtime, config.credentialMasterKey),
+  clock: runtime.clock,
 });
 const deps: ServerDeps = { runtime, logger, config, clients };
 const handlers = createJobHandlers(deps);

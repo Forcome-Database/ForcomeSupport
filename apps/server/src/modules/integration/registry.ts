@@ -2,6 +2,7 @@ import type { AnyClientDefinition } from './definition';
 import { dingtalkClient } from './dingtalk';
 import { exchangeRateClient } from './exchange-rate';
 import { gmailClient, gmailPushClient } from './gmail';
+import { shopifyClient } from './shopify';
 
 /**
  * 登记的外部客户端（ADR 0009 修订）。各集成在自己的待办里用 defineClient 定义后加到这里：
@@ -13,4 +14,5 @@ export const clientDefinitions: readonly AnyClientDefinition[] = [
   gmailClient,
   exchangeRateClient,
   dingtalkClient,
+  shopifyClient,
 ];

@@ -44,6 +44,8 @@ describe('配置读取', () => {
       clockStart: null,
       dingtalk: null,
       google: null,
+      shopify: null,
+      credentialMasterKey: null,
     });
   });
 
@@ -360,5 +362,48 @@ describe('Gmail 的 Google 凭据（待办 09）', () => {
     expect(
       loadConfig({ DATABASE_URL, APP_ENV: 'staging', CLIENT_MODE_GMAIL_PUSH: 'real' }).google,
     ).toBeNull();
+  });
+});
+
+describe('Shopify 的客户端凭据与主密钥（待办 11）', () => {
+  const MASTER_KEY = Buffer.alloc(32, 7).toString('base64');
+  const SHOPIFY = {
+    SHOPIFY_CLIENT_ID: 'shopify-client-id',
+    SHOPIFY_CLIENT_SECRET: 'shopify-client-secret',
+    CREDENTIAL_MASTER_KEY: MASTER_KEY,
+  };
+
+  it('生产环境都没填时照常启动（用户 2026-10-04 口径：Shopify 资质还没有），shopify 与主密钥为 null', () => {
+    const config = loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'production' });
+    expect(config.shopify).toBeNull();
+    expect(config.credentialMasterKey).toBeNull();
+  });
+
+  it('填齐时读出客户端凭据与 32 字节的主密钥', () => {
+    const config = loadConfig({ DATABASE_URL, ...DINGTALK, ...SHOPIFY, APP_ENV: 'production' });
+    expect(config.shopify).toEqual({
+      clientId: 'shopify-client-id',
+      clientSecret: 'shopify-client-secret',
+    });
+    expect(config.credentialMasterKey).toEqual(Buffer.alloc(32, 7));
+  });
+
+  it('只填一项、填了凭据没填主密钥、主密钥不是 32 字节：拒绝启动，不回显取值', () => {
+    expect(() =>
+      loadConfig({ DATABASE_URL, SHOPIFY_CLIENT_ID: 'id', CREDENTIAL_MASTER_KEY: MASTER_KEY }),
+    ).toThrow(/SHOPIFY_CLIENT_SECRET：与另一项 Shopify 凭据一起填/);
+    let error: unknown;
+    try {
+      loadConfig({ DATABASE_URL, SHOPIFY_CLIENT_ID: 'id', SHOPIFY_CLIENT_SECRET: 'secret-value' });
+    } catch (e) {
+      error = e;
+    }
+    expect((error as Error).message).toContain('CREDENTIAL_MASTER_KEY：填了 Shopify 凭据时必填');
+    expect((error as Error).message).not.toContain('secret-value');
+    expect(() =>
+      loadConfig({ DATABASE_URL, CREDENTIAL_MASTER_KEY: Buffer.alloc(16).toString('base64') }),
+    ).toThrow(/CREDENTIAL_MASTER_KEY：必须是 32 字节密钥的 base64/);
+    // 先放好主密钥、还没有 Shopify 凭据：可以
+    expect(loadConfig({ DATABASE_URL, CREDENTIAL_MASTER_KEY: MASTER_KEY }).shopify).toBeNull();
   });
 });

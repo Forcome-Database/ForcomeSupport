@@ -124,20 +124,20 @@ describe('P18 店铺表（非生产环境）', () => {
         adapterMode: 'fake',
       },
     ]);
-    // 店铺表「状态」列：订单的同步记录随 11、12，模拟数据视为已连接；Gmail 按邮箱的同步记录（待办 09），
-    // 这里还没开始监听、没同步过，为未连接（同步后的状态见 gmail-sync-health.int.test.ts）
+    // 店铺表「状态」列：Gmail 按邮箱的同步记录（待办 09）、Shopify 订单按店铺的同步记录（待办 11），这里都还没同步过，为未连接
+    // （同步后的状态见 gmail-sync-health.int.test.ts、shopify-orders.int.test.ts）；亚马逊订单的同步记录随 12，模拟数据视为已连接
     for (const store of data.stores) {
       expect(store.connections).toEqual([
         { kind: 'gmail', status: 'not_connected' },
-        { kind: 'orders', status: 'connected' },
+        { kind: 'orders', status: store.platform === 'amazon' ? 'connected' : 'not_connected' },
       ]);
       expect(store.updatedBy).toBeNull();
     }
-    // 渠道卡：亚马逊 SP-API、Shopify Admin API、Gmail、钉钉。订单的同步记录随后续待办，暂无最近同步时间；
-    // Gmail 与钉钉卡按同步记录（待办 09、05），这里都还没同步过，为未连接
+    // 渠道卡：亚马逊 SP-API、Shopify Admin API、Gmail、钉钉。亚马逊订单的同步记录随 12，暂无最近同步时间；
+    // Shopify、Gmail 与钉钉卡按同步记录（待办 11、09、05），这里都还没同步过，为未连接
     expect(data.channels).toEqual([
       { kind: 'amazon', status: 'connected', simulated: true, lastSyncAt: null, issues: [] },
-      { kind: 'shopify', status: 'connected', simulated: true, lastSyncAt: null, issues: [] },
+      { kind: 'shopify', status: 'not_connected', simulated: true, lastSyncAt: null, issues: [] },
       { kind: 'gmail', status: 'not_connected', simulated: true, lastSyncAt: null, issues: [] },
       { kind: 'dingtalk', status: 'not_connected', simulated: true, lastSyncAt: null, issues: [] },
     ]);
@@ -316,7 +316,7 @@ describe('P18 店铺表（非生产环境）', () => {
         mailboxes: ['support@forcome.ca', 'help+ca@forcome.ca'],
         adapterMode: 'real',
         version: 2,
-        // 真实接口的连接要等 Gmail、Shopify 客户端接上（09、11），在那之前是未连接
+        // 改成真实接口：订单的同步记录按新的数据源从头算（之前模拟数据的同步不算数）；Google、Shopify 凭据都没配置，为未连接
         connections: [
           { kind: 'gmail', status: 'not_connected' },
           { kind: 'orders', status: 'not_connected' },
@@ -447,12 +447,11 @@ describe('P18 店铺表（非生产环境）', () => {
 
   it('非生产环境可以选择真实接口：该店铺各连接为未连接，渠道卡显示最差状态', async () => {
     const data = await settings(admin);
-    // forcome.ca 在上面改成了真实接口：Shopify 与 Gmail 卡都有一个未连接的店铺
-    expect(data.channels.find((c) => c.kind === 'shopify')).toEqual({
+    // forcome.ca 在上面改成了真实接口：Shopify 与 Gmail 卡都有一个未连接的店铺（Shopify 卡的最近同步取模拟数据的店铺同步过的时刻）
+    expect(data.channels.find((c) => c.kind === 'shopify')).toMatchObject({
       kind: 'shopify',
       status: 'not_connected',
       simulated: true,
-      lastSyncAt: null,
       issues: [],
     });
     expect(data.channels.find((c) => c.kind === 'gmail')?.status).toBe('not_connected');

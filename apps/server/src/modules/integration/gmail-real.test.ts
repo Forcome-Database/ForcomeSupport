@@ -2,7 +2,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import { decodeJwt } from 'jose';
 import { MockAgent } from 'undici';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { GoogleCredentials } from '../core';
+import { systemClock, type GoogleCredentials } from '../core';
 import type { CallRecordEntry, CallRecorder } from './call-records';
 import { ClientNotConfiguredError, CursorExpiredError, ExternalCallFailedError } from './faults';
 import { createRealGmail, createRealGmailClient, createRealGmailPushClient } from './gmail-real';
@@ -255,6 +255,9 @@ describe('Gmail 接口', () => {
       dingtalk: null,
       callRecorder: recorder,
       mailRecipientGuard: new MailRecipientGuard({ allowlistOnly: true, allowlist: [] }),
+      shopify: null,
+      credentialVault: null,
+      clock: systemClock,
     });
     const failure = await client.watch(MAILBOX).catch((error: unknown) => error);
     // 不是连接故障而是还没接通：收信不把它算进连续失败（P18 为「未连接」）

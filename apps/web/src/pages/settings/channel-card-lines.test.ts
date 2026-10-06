@@ -148,5 +148,58 @@ describe('订单卡', () => {
     expect(channelCardLines(card({ kind: 'shopify' }), STORES)).toEqual([
       '2 个店铺 · 订单经 Admin API 准实时同步',
     ]);
+    expect(needsRecheck(card({ kind: 'shopify' }))).toBe(false);
+  });
+});
+
+describe('Shopify 卡（待办 11，套用 Gmail 的写法、按店铺）', () => {
+  const shopify = (overrides: Partial<ChannelCard>) => card({ kind: 'shopify', ...overrides });
+
+  it('同步延迟：每个延迟的店铺一行在前，其余说明行照常', () => {
+    const delayed = shopify({
+      status: 'delayed',
+      issues: [
+        issue({
+          target: 'forcome.mx',
+          status: 'delayed',
+          lastSuccessAt: '2026-09-11T02:05:00.000Z',
+          failingSince: null,
+          failures: 0,
+        }),
+      ],
+    });
+    expect(channelCardLines(delayed, STORES)).toEqual([
+      'forcome.mx 10:05 后未同步成功，超过 10 分钟',
+      '2 个店铺 · 订单经 Admin API 准实时同步',
+    ]);
+    expect(needsRecheck(delayed)).toBe(false);
+  });
+
+  it('连接异常：每个异常的店铺一行（实际次数）、订单暂停同步写一次、延迟的店铺在后，卡底「重新检测」', () => {
+    const failed = shopify({
+      status: 'error',
+      issues: [
+        issue({ target: 'forcome.com', failures: 5 }),
+        issue({ target: 'forcome.mx', failingSince: '2026-09-11T02:12:00.000Z' }),
+      ],
+    });
+    expect(channelCardLines(failed, STORES)).toEqual([
+      'forcome.com 访问失败（10:05 起连续 5 次）：请检查 Admin API 应用凭据与授权范围',
+      'forcome.mx 访问失败（10:12 起连续 3 次）：请检查 Admin API 应用凭据与授权范围',
+      '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
+    ]);
+    expect(needsRecheck(failed)).toBe(true);
+    const mixed = shopify({
+      status: 'error',
+      issues: [
+        issue({ target: 'forcome.com', status: 'delayed', failingSince: null, failures: 0 }),
+        issue({ target: 'forcome.mx' }),
+      ],
+    });
+    expect(channelCardLines(mixed, STORES)).toEqual([
+      'forcome.mx 访问失败（10:05 起连续 3 次）：请检查 Admin API 应用凭据与授权范围',
+      '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
+      'forcome.com 10:04 后未同步成功，超过 10 分钟',
+    ]);
   });
 });

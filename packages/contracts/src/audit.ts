@@ -176,11 +176,13 @@ export const accessDeniedAuditSnapshotSchema = z.object({
 });
 
 /**
- * 渠道连接（待办 09；PRD P27「第一阶段」的「渠道」对象、原型 AUDIT_LOG 与 AUDIT_P27_EXPAND）：某个 Gmail 邮箱进入连接异常与恢复连接，
- * 操作人「系统」。状态、最近同步成功的时间、恢复时补拉了几封来信（到达时间的起止）与触发（前值「连续 N 次失败」、
- * 恢复的后值「第 N 次重试成功」）
+ * 渠道连接（待办 09；PRD P27「第一阶段」的「渠道」对象、原型 AUDIT_LOG 与 AUDIT_P27_EXPAND）：某个 Gmail 邮箱或 Shopify 店铺（待办 11）
+ * 进入连接异常与恢复连接，操作人「系统」。状态、最近同步成功的时间、恢复时补拉了多少（Gmail 为来信与到达时间的起止，
+ * Shopify 为订单与平台更新时间的起止）与触发（前值「连续 N 次失败」、恢复的后值「第 N 次重试成功」）。
+ * channel 写是哪个渠道（决定「补拉」的单位）；待办 09 写下的记录没有它，是 Gmail
  */
 export const channelAuditSnapshotSchema = z.object({
+  channel: z.enum(['gmail', 'shopify']).optional(),
   status: connectionStatusSchema,
   lastSuccessAt: z.string().nullable(),
   backfilled: z.object({ count: z.int().positive(), from: z.string(), to: z.string() }).nullable(),

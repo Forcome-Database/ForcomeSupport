@@ -22,6 +22,11 @@ import { z } from 'zod';
  *   文件（JSON，全域委派到 4 个店铺邮箱）、watch 推送的 Pub/Sub 主题与本环境的订阅（docs/部署说明.md 第 12 节；待办 09）。
  *   三项要么都不填、要么都填（只填一部分拒绝启动）。都不填时照常启动（生产环境也一样，用户 2026-10-04 口径：缺某个外部系统的配置时
  *   系统照常可用）：真实接口的推送与邮箱调用以「未配置」失败、不算连接失败，P18 的 Gmail 与各店铺为「未连接」，不出横幅、不发通知。
+ * - `SHOPIFY_CLIENT_ID` / `SHOPIFY_CLIENT_SECRET`：Shopify 自建应用（Dev Dashboard，与店铺同一组织）的客户端凭据，按店铺以
+ *   client credentials 换 24 小时的访问令牌读订单（docs/部署说明.md 第 13 节；待办 11）。两项要么都不填、要么都填；都不填时照常启动
+ *   （生产也一样，用户 2026-10-04 口径），真实接口的 Shopify 店铺为「未连接」，不出横幅、不发通知。
+ * - `CREDENTIAL_MASTER_KEY`：主密钥（32 字节的 base64），动态凭据（各店铺的 Shopify 访问令牌，SP-API 刷新令牌随 12）用它 AES-256-GCM
+ *   加密后存库（ADR 0013）。填了 Shopify 凭据就必填；单独填可以（先放好主密钥）。
  * 空值视同未设置。
  */
 const envSchema = z.object({
@@ -54,6 +59,15 @@ const envSchema = z.object({
   GMAIL_PUBSUB_SUBSCRIPTION: z
     .string()
     .regex(/^projects\/[^/]+\/subscriptions\/[^/]+$/, '写成 projects/<项目>/subscriptions/<订阅>')
+    .optional(),
+  SHOPIFY_CLIENT_ID: z.string().optional(),
+  SHOPIFY_CLIENT_SECRET: z.string().optional(),
+  CREDENTIAL_MASTER_KEY: z
+    .string()
+    .refine(
+      (value) => /^[A-Za-z0-9+/]+={0,2}$/.test(value) && Buffer.from(value, 'base64').length === 32,
+      '必须是 32 字节密钥的 base64（如 openssl rand -base64 32 的输出）',
+    )
     .optional(),
 });
 
@@ -130,6 +144,17 @@ const GOOGLE_VARIABLES = [
   'GMAIL_PUBSUB_SUBSCRIPTION',
 ] as const;
 
+/**
+ * Shopify 自建应用的客户端凭据（ADR 0011 修订，待办 11）：在 Shopify Dev Dashboard 的应用设置里取；应用与店铺属于同一个组织，
+ * 按店铺以 client credentials 换访问令牌（24 小时过期）。只在 Shopify 店铺用真实接口时用到
+ */
+export interface ShopifyCredentials {
+  readonly clientId: string;
+  readonly clientSecret: string;
+}
+
+const SHOPIFY_VARIABLES = ['SHOPIFY_CLIENT_ID', 'SHOPIFY_CLIENT_SECRET'] as const;
+
 const serviceAccountKeySchema = z.object({
   type: z.literal('service_account'),
   client_email: z.string().min(1),
@@ -154,6 +179,10 @@ export interface AppConfig {
   dingtalk: DingtalkCredentials | null;
   /** Gmail 的 Google 凭据；三项都没填为 null（照常启动，真实接口的 Gmail 为未连接） */
   google: GoogleCredentials | null;
+  /** Shopify 的客户端凭据；两项都没填为 null（照常启动，真实接口的 Shopify 店铺为未连接） */
+  shopify: ShopifyCredentials | null;
+  /** 动态凭据的主密钥（32 字节）；没填为 null */
+  credentialMasterKey: Buffer | null;
 }
 
 export interface MailSendPolicy {
@@ -282,6 +311,25 @@ export function loadConfig(
     }
   }
 
+  // Shopify 的客户端凭据：两项要么都填要么都不填（都不填照常启动，同 Google）；填了就要有主密钥加密存访问令牌
+  let shopify: ShopifyCredentials | null = null;
+  if (result.success) {
+    const given = SHOPIFY_VARIABLES.filter((name) => result.data[name]);
+    if (given.length > 0) {
+      const missing = SHOPIFY_VARIABLES.filter((name) => !result.data[name]);
+      for (const name of missing) problems.push(`${name}：与另一项 Shopify 凭据一起填`);
+      if (!result.data.CREDENTIAL_MASTER_KEY) {
+        problems.push('CREDENTIAL_MASTER_KEY：填了 Shopify 凭据时必填（加密存放各店铺的访问令牌）');
+      }
+      if (missing.length === 0) {
+        shopify = {
+          clientId: result.data.SHOPIFY_CLIENT_ID ?? '',
+          clientSecret: result.data.SHOPIFY_CLIENT_SECRET ?? '',
+        };
+      }
+    }
+  }
+
   if (!result.success || problems.length > 0) {
     throw new ConfigError(`环境变量配置有误：\n${problems.join('\n')}`);
   }
@@ -293,6 +341,7 @@ export function loadConfig(
     DEV_LOGIN_ENABLED,
     MAIL_SEND_ALLOWLIST_ONLY,
     CLOCK_START,
+    CREDENTIAL_MASTER_KEY,
   } = result.data;
   return {
     appEnv: APP_ENV,
@@ -308,5 +357,9 @@ export function loadConfig(
     clockStart: CLOCK_START ? new Date(CLOCK_START) : null,
     dingtalk,
     google,
+    shopify,
+    credentialMasterKey: CREDENTIAL_MASTER_KEY
+      ? Buffer.from(CREDENTIAL_MASTER_KEY, 'base64')
+      : null,
   };
 }

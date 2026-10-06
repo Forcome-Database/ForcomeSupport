@@ -1500,6 +1500,160 @@
     "closeReason": "已解决后无来信",
     "orderSyncedAt": "2026-09-10T09:02:00+08:00"
   },
+  "shopifyOrders": [
+    {
+      "name": "#0991",
+      "storeKey": "shop-com",
+      "customer": "Emily Chen",
+      "placedAt": "2026-08-14T16:05:00+08:00",
+      "updatedAt": "2026-08-18T11:20:00+08:00",
+      "lineItems": [
+        {
+          "title": "V2 车载吸尘器 白色",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "48.99",
+        "currency": "USD"
+      },
+      "financialStatus": "PAID",
+      "fulfillmentStatus": "FULFILLED",
+      "shipTo": {
+        "address1": "418 SE Morrison St",
+        "address2": null,
+        "city": "Portland",
+        "province": "OR",
+        "zip": "97214",
+        "country": "US"
+      },
+      "tracking": {
+        "company": "UPS",
+        "number": "1Z9X4E770312345678"
+      }
+    },
+    {
+      "name": "#1049",
+      "storeKey": "shop-com",
+      "customer": "Priya Raman",
+      "placedAt": "2026-08-22T20:15:00+08:00",
+      "updatedAt": "2026-09-02T10:11:00+08:00",
+      "lineItems": [
+        {
+          "title": "V2 车载吸尘器 黑色",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "54.99",
+        "currency": "USD"
+      },
+      "financialStatus": "PARTIALLY_REFUNDED",
+      "fulfillmentStatus": "FULFILLED",
+      "shipTo": {
+        "address1": "2210 Mission St",
+        "address2": "Apt 3",
+        "city": "San Francisco",
+        "province": "CA",
+        "zip": "94110",
+        "country": "US"
+      },
+      "tracking": {
+        "company": "UPS",
+        "number": "1Z9X4E770398765432"
+      }
+    },
+    {
+      "name": "#1052",
+      "storeKey": "shop-com",
+      "customer": "David Park",
+      "placedAt": "2026-08-26T09:40:00+08:00",
+      "updatedAt": "2026-08-30T15:02:00+08:00",
+      "lineItems": [
+        {
+          "title": "V2 车载吸尘器 黑色",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "54.99",
+        "currency": "USD"
+      },
+      "financialStatus": "PAID",
+      "fulfillmentStatus": "FULFILLED",
+      "shipTo": {
+        "address1": "1100 Congress Ave",
+        "address2": null,
+        "city": "Austin",
+        "province": "TX",
+        "zip": "78701",
+        "country": "US"
+      },
+      "tracking": {
+        "company": "UPS",
+        "number": "1Z9X4E770355501234"
+      }
+    },
+    {
+      "name": "#1057",
+      "storeKey": "shop-com",
+      "customer": "Priya Raman",
+      "placedAt": "2026-09-09T18:20:00+08:00",
+      "updatedAt": "2026-09-09T18:21:00+08:00",
+      "lineItems": [
+        {
+          "title": "V2 车载吸尘器 黑色",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "54.99",
+        "currency": "USD"
+      },
+      "financialStatus": "PAID",
+      "fulfillmentStatus": "UNFULFILLED",
+      "shipTo": {
+        "address1": "2210 Mission St",
+        "address2": "Apt 3",
+        "city": "San Francisco",
+        "province": "CA",
+        "zip": "94110",
+        "country": "US"
+      },
+      "tracking": null
+    },
+    {
+      "name": "#1063",
+      "storeKey": "shop-com",
+      "customer": "Olivia Turner",
+      "placedAt": "2026-08-05T13:30:00+08:00",
+      "updatedAt": "2026-08-09T16:45:00+08:00",
+      "lineItems": [
+        {
+          "title": "V2 车载吸尘器",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "54.99",
+        "currency": "USD"
+      },
+      "financialStatus": "PAID",
+      "fulfillmentStatus": "FULFILLED",
+      "shipTo": {
+        "address1": "1550 Larimer St",
+        "address2": null,
+        "city": "Denver",
+        "province": "CO",
+        "zip": "80202",
+        "country": "US"
+      },
+      "tracking": {
+        "company": "UPS",
+        "number": "1Z9X4E770377712345"
+      }
+    }
+  ],
   "notifications": [
     {
       "id": "80aac85d-6783-5994-8248-50ed9300ea36",

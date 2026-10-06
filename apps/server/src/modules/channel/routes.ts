@@ -13,6 +13,7 @@ import {
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { AppEnv, Logger, Runtime } from '../core';
 import { dingtalkClient, type IntegrationClients } from '../integration';
+import { testShopifyConnection } from '../order';
 import {
   checkDingtalkDirectory,
   dingtalkConnection,
@@ -22,7 +23,14 @@ import {
 } from '../org';
 import { channelAlerts, channelCards, loadConnections } from './connections';
 import { testGmailConnection } from './gmail-sync';
-import { createStore, listAllStores, listStoreOptions, toStore, updateStore } from './stores';
+import {
+  createStore,
+  listAllStores,
+  listOrderStores,
+  listStoreOptions,
+  toStore,
+  updateStore,
+} from './stores';
 
 const json = <T extends z.ZodType>(schema: T, description: string) => ({
   description,
@@ -104,7 +112,7 @@ const connectionTestRoute = createRoute({
   method: 'post',
   path: '/api/channel/connection-tests/{kind}',
   summary:
-    '测试连接（K20）：Gmail 逐个进线邮箱试访问、测完立即排一次同步；钉钉取根部门。不改连接状态',
+    '测试连接（K20）：Gmail 逐个进线邮箱试访问、Shopify 逐个店铺读店铺信息，测完立即排一次同步；钉钉取根部门。不改连接状态',
   request: { params: z.object({ kind: connectionTestKindSchema }) },
   responses: {
     200: json(connectionTestResultSchema, '全部可访问'),
@@ -180,8 +188,9 @@ export function createChannelRoutes(deps: {
   );
 
   routes.openapi(alertsRoute, async (c) => {
+    const stores = await listAllStores(runtime.db);
     const connections = await loadConnections(runtime.db, runtime.clock.now());
-    return c.json({ alerts: channelAlerts(connections) }, 200);
+    return c.json({ alerts: channelAlerts(stores, connections) }, 200);
   });
 
   routes.openapi(connectionTestRoute, async (c) => {
@@ -198,7 +207,10 @@ export function createChannelRoutes(deps: {
             502,
           );
     }
-    const result = await testGmailConnection(runtime, clients, logger);
+    const result =
+      kind === 'shopify'
+        ? await testShopifyConnection(runtime, clients, listOrderStores, logger)
+        : await testGmailConnection(runtime, clients, logger);
     return result.unreachable.length === 0
       ? c.json({ kind, targets: result.reachable }, 200)
       : c.json(

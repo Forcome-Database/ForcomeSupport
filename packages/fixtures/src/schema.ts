@@ -145,6 +145,31 @@ export const fixtureTicketTimelineSchema = z.object({
   orderSyncedAt: instant,
 });
 
+/**
+ * Shopify 订单（待办 11，data.py 的 SHOPIFY_ORDERS_P1）：Fake Shopify 回放它们。状态保留 Admin API 的枚举写法；
+ * 客户邮箱不在夹具里，回放按客户名推出（同 Fake 来信）
+ */
+export const fixtureShopifyOrderSchema = z.object({
+  name: z.string().regex(/^#\d+$/),
+  storeKey: z.string(),
+  customer: z.string(),
+  placedAt: instant,
+  updatedAt: instant,
+  lineItems: z.array(z.object({ title: z.string(), quantity: z.int().positive() })).min(1),
+  total: z.object({ amount, currency: fixtureCurrencySchema }),
+  financialStatus: z.string(),
+  fulfillmentStatus: z.string(),
+  shipTo: z.object({
+    address1: z.string(),
+    address2: z.string().nullable(),
+    city: z.string(),
+    province: z.string(),
+    zip: z.string(),
+    country: z.enum(['US', 'CA', 'MX']),
+  }),
+  tracking: z.object({ company: z.string(), number: z.string() }).nullable(),
+});
+
 /** 站内通知（G10 周敏的面板，第一期的类型）：类型取值同 contracts 的 notificationTypes，加载时再按枚举校验 */
 export const fixtureNotificationSchema = z.object({
   id: uuid,
@@ -194,6 +219,7 @@ export const demoFixtureSchema = z.object({
   aftersalesLastSequence: z.int().positive(),
   ticketTimeline: fixtureTicketTimelineSchema,
   notifications: z.array(fixtureNotificationSchema),
+  shopifyOrders: z.array(fixtureShopifyOrderSchema),
 });
 
 export type DemoFixture = z.infer<typeof demoFixtureSchema>;
@@ -203,3 +229,4 @@ export type FixtureTicket = z.infer<typeof fixtureTicketSchema>;
 export type FixtureLedgerRow = z.infer<typeof fixtureLedgerRowSchema>;
 export type FixtureFee = z.infer<typeof fixtureFeeSchema>;
 export type FixtureNotification = z.infer<typeof fixtureNotificationSchema>;
+export type FixtureShopifyOrder = z.infer<typeof fixtureShopifyOrderSchema>;

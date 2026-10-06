@@ -162,6 +162,13 @@
       "when": 1791272430977,
       "tag": "0022_gmail_sync_health",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791286095879,
+      "tag": "0023_shopify_order_mirror",
+      "breakpoints": true
     }
   ]
 }

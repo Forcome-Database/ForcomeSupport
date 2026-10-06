@@ -12,6 +12,7 @@ export {
   type FixtureLedgerRow,
   type FixtureMember,
   type FixtureNotification,
+  type FixtureShopifyOrder,
   type FixtureStore,
   type FixtureTicket,
 } from './schema';

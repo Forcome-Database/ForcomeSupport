@@ -56,6 +56,22 @@ export {
 export { type FakeMailInput } from './gmail-mime';
 export { MailRecipientGuard, MailRecipientNotAllowedError } from './mail-recipient-guard';
 export {
+  databaseCredentialVault,
+  type CredentialVault,
+  type StoredCredential,
+} from './credential-vault';
+export {
+  FakeShopify,
+  shopifyClient,
+  type FakeShopifyOrderInput,
+  type ShopifyAddress,
+  type ShopifyClient,
+  type ShopifyLineItem,
+  type ShopifyOrder,
+  type ShopifyOrderPage,
+  type ShopifyTracking,
+} from './shopify';
+export {
   ClientNotConfiguredError,
   ConnectionLostError,
   CursorExpiredError,

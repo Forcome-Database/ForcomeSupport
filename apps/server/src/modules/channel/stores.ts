@@ -25,6 +25,7 @@ import {
   type StoreScope,
   type Tx,
 } from '../core';
+import { queueShopifySync, resetOrderSync } from '../order';
 import { storeConnections, type ConnectionSnapshot } from './connections';
 import { storeChangedJob } from './jobs';
 import { store, storeMailbox } from './schema';
@@ -76,6 +77,23 @@ export async function listAllStores(db: DbExecutor): Promise<StoreRecord[]> {
 export async function listStoreChoices(db: DbExecutor): Promise<{ id: string; name: string }[]> {
   return db
     .select({ id: store.id, name: store.name })
+    .from(store)
+    .orderBy(asc(store.createdAt), asc(store.id));
+}
+
+/**
+ * 订单同步要知道的全部店铺（order 的 OrderStore：店铺名、平台、平台标识、数据来源），按建立先后。同步是系统操作，不按范围过滤；
+ * 由组装根注入 order（order 不依赖 channel）
+ */
+export async function listOrderStores(db: DbExecutor) {
+  return db
+    .select({
+      id: store.id,
+      name: store.name,
+      platform: store.platform,
+      platformId: store.platformId,
+      adapterMode: store.adapterMode,
+    })
     .from(store)
     .orderBy(asc(store.createdAt), asc(store.id));
 }
@@ -261,6 +279,8 @@ export async function createStore(ctx: StoreSaveContext, raw: StoreInput): Promi
       after: snapshot(created),
     });
     await tx.enqueue(storeChangedJob, { storeId: row.id, addedMailboxes: [...input.mailboxes] });
+    // Shopify 店铺立即同步一次订单（不等每分钟的定时，新店铺随即显示已连接或异常，待办 11）
+    if (row.platform === 'shopify') await queueShopifySync(tx, row.id);
     return created;
   });
 }
@@ -327,6 +347,15 @@ export async function updateStore(
       storeId: id,
       addedMailboxes: input.mailboxes.filter((m) => !current.mailboxes.includes(m)),
     });
+    // 平台、平台标识或数据来源改了：订单同步按新配置从头算（之前的同步记录不算数），Shopify 店铺立即同步一次（待办 11）
+    if (
+      current.platform !== updated.platform ||
+      current.platformId !== updated.platformId ||
+      current.adapterMode !== updated.adapterMode
+    ) {
+      await resetOrderSync(tx, id);
+    }
+    if (updated.platform === 'shopify') await queueShopifySync(tx, id);
     return updated;
   });
 }

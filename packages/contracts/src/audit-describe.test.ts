@@ -673,4 +673,45 @@ describe('渠道连接的记录（待办 09，原型 AUDIT_LOG 与 AUDIT_P27_EXP
     });
     expect(entry.summary).toBe('状态：同步延迟 → 连接异常（连续 3 次失败）');
   });
+
+  it('Shopify 店铺的恢复连接（待办 11，协调者 2026-10-06 决定）：补拉写「N 笔订单（…更新）」，一笔也没有照写「补拉 0 笔订单」', () => {
+    const shopifyRecord = (backfilled: AuditSnapshot<'channel.recovered'>['backfilled']) =>
+      describeAuditRecord(
+        channelRecord({
+          objectId: 'shopify:store-mx',
+          objectLabel: 'Shopify · forcome.mx',
+          occurredAt: new Date('2026-09-11T02:14:00Z'),
+          action: 'channel.recovered',
+          before: {
+            channel: 'shopify',
+            status: 'error',
+            lastSuccessAt: '2026-09-11T02:04:00.000Z',
+            backfilled: null,
+            trigger: { kind: 'failures', count: 3 },
+          },
+          after: {
+            channel: 'shopify',
+            status: 'connected',
+            lastSuccessAt: '2026-09-11T02:14:00.000Z',
+            backfilled,
+            trigger: { kind: 'retry_succeeded', attempt: 4 },
+          },
+        }),
+        { financeVisible: false, names },
+      );
+    const entry = shopifyRecord({
+      count: 2,
+      from: '2026-09-11T02:05:00.000Z',
+      to: '2026-09-11T02:13:00.000Z',
+    });
+    expect(entry.objectLabel).toBe('Shopify · forcome.mx');
+    expect(entry.summary).toBe('状态：连接异常 → 已连接（补拉 2 笔订单）');
+    expect(field(entry, '补拉')).toMatchObject({
+      before: '—',
+      after: '2 笔订单（10:05–10:13 更新）',
+    });
+    // 快照里的 channel 不是展开的字段
+    expect(entry.fields.map((f) => f.label)).toEqual(['状态', '最近同步成功', '补拉', '触发']);
+    expect(shopifyRecord(null).summary).toBe('状态：连接异常 → 已连接（补拉 0 笔订单）');
+  });
 });

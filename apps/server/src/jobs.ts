@@ -11,6 +11,7 @@ import {
   gmailRenewWatchJob,
   gmailSyncJob,
   inboundReceivedJob,
+  listOrderStores,
   storeChangedJob,
 } from './modules/channel';
 import {
@@ -28,6 +29,7 @@ import {
   dingtalkEventJob,
   dingtalkReconcileJob,
 } from './modules/org';
+import { createOrderJobHandlers, shopifyPollJob, shopifySyncJob } from './modules/order';
 import { createTicketJobHandlers } from './modules/ticket';
 
 export const jobDefinitions: readonly AnyJobDefinition[] = [
@@ -40,6 +42,8 @@ export const jobDefinitions: readonly AnyJobDefinition[] = [
   gmailPollJob,
   gmailRenewWatchJob,
   inboundReceivedJob,
+  shopifyPollJob,
+  shopifySyncJob,
 ];
 
 export function createJobHandlers(deps: ServerDeps): readonly AnyJobHandler[] {
@@ -51,6 +55,8 @@ export function createJobHandlers(deps: ServerDeps): readonly AnyJobHandler[] {
     }),
     ...createOrgJobHandlers({ dingtalk: () => deps.clients.global(dingtalkClient) }),
     ...createChannelJobHandlers(deps),
+    // 订单同步要的店铺来自 channel 的店铺配置（order 不依赖 channel）
+    ...createOrderJobHandlers({ clients: deps.clients, stores: listOrderStores }),
     ...createTicketJobHandlers(),
   ];
 }
