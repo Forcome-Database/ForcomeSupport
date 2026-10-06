@@ -37,6 +37,11 @@ x-app: &app
     GOOGLE_SERVICE_ACCOUNT_KEY_FILE: ${GOOGLE_SERVICE_ACCOUNT_KEY_FILE:-}
     GMAIL_PUBSUB_TOPIC: ${GMAIL_PUBSUB_TOPIC:-}
     GMAIL_PUBSUB_SUBSCRIPTION: ${GMAIL_PUBSUB_SUBSCRIPTION:-}
+    # Shopify 订单（待办 11，docs/部署说明.md 第 13 节）：店铺按 P18 的「数据来源」选择真实接口或 Fake；客户端凭据两项要么都填要么都不填
+    # （都不填照常启动，Shopify 为「未连接」）；填了就要有主密钥 CREDENTIAL_MASTER_KEY（各店铺的访问令牌用它加密存库）
+    SHOPIFY_CLIENT_ID: ${SHOPIFY_CLIENT_ID:-}
+    SHOPIFY_CLIENT_SECRET: ${SHOPIFY_CLIENT_SECRET:-}
+    CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY:-}
     TZ: UTC
   volumes:
     # 不用真实 Gmail 时挂仓库里的空目录 deploy/keys（密钥文件不进 git）

@@ -171,9 +171,11 @@ function CardHead({
       <div className="flex min-w-0 items-center gap-2.5">
         <IconTile icon={icon} tone={tone} />
         <div className="flex min-w-0 flex-col">
+          {/* 卡头右侧标签多时（开发测试环境另有「模拟数据」）卡名放不下：截断，悬停看全称 */}
           <div
+            title={name}
             className={cn(
-              'text-14 font-semibold whitespace-nowrap',
+              'truncate text-14 font-semibold',
               muted ? 'text-ink-2' : 'text-foreground',
             )}
           >

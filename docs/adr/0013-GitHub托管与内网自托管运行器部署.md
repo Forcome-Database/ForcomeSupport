@@ -76,3 +76,8 @@ status: accepted
 ## 修订（2026-10-06，待办 06 落地）
 
 - **冒烟容器的 Node 一侧同样信任本环境根证书**：e2e 用例可以用 `route.fetch()` 取真实响应再改写（P20 的接口桩按 contracts 严格解析），也可以用 `APIRequestContext`；这些请求由 Playwright 在 Node 里发出，不读 Chromium 的 NSS 证书库，原来在开发测试环境以 `unable to get local issuer certificate` 失败（本机 e2e 走 http，暴露不出来）。冒烟入口 `deploy/smoke/run-smoke.sh` 在加 NSS 证书之后另设 `NODE_EXTRA_CA_CERTS` 为同一张 caddy 根证书：只在这个一次性容器里生效，仍按正常规则校验证书链与域名，不忽略证书错误（`ignoreHTTPSErrors` 不用）。
+
+## 修订（2026-10-06，待办 11 落地）
+
+- **主密钥与动态凭据**：主密钥是环境变量 `CREDENTIAL_MASTER_KEY`（32 字节的 base64，`openssl rand -base64 32`），只读进 `integration`（`databaseCredentialVault`）。动态凭据按「外部系统 × 店铺」存进 `integration.credential`：AES-256-GCM（`node:crypto`），每次写入随机 12 字节 IV、16 字节认证标签，附加数据为「系统:店铺」（密文搬到别的行就解不开）；库里只有密文与签发、过期时间。主密钥换了或密文被改，解密失败当作没有凭据，真实现重新换一个，不让旧数据挡住同步。第一个使用者是 Shopify 的访问令牌（待办 11），SP-API 刷新令牌随 12。
+- **缺配置照常启动**（用户 2026-10-04 口径）：`SHOPIFY_CLIENT_ID` / `SHOPIFY_CLIENT_SECRET` 要么都填要么都不填，都不填时生产照常启动，Shopify 店铺为「未连接」（不出横幅、不发通知）；填了 Shopify 凭据就要有主密钥（只填一部分拒绝启动，只列变量名、不回显取值）。主密钥单独填可以。部署配置见 `docs/部署说明.md` 第 13 节。

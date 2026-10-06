@@ -115,3 +115,7 @@ status: accepted
 
 - **迁移 0020 / 0021：成员的最近登录与最近修改人**：`org.member` 加 `last_login_at`、`changed_at`、`changed_by_name`（ADR 0010 修订）。0021 是 `drizzle-kit generate --custom` 的一次性数据修补：从 `core.audit_log` 取每人最后一条「登录」补最近登录、取最后一条成员记录补最近修改人。迁移里的一次性修补可以跨 schema 读（迁移由库的属主执行），代码里 `org` 仍不读 `core` 的表；只补空值，重跑无害。
 - **整批保存的写法**：P20 的保存（`org/team.ts` 的 `saveTeam`）在一个事务里先取咨询锁、按 ID 一次取出这次改到的成员、比版本号，再逐人 `updateWithVersion`；字段错误用 `FieldValidationError` 的路径键「成员 ID.roles」，与表单的点分路径同一个约定，前端按键拆回每一格。
+
+## 修订（2026-10-06，待办 11 落地）
+
+- **订单镜像的表**（迁移 0023）：`order.platform_order`（UUIDv7 主键；「店铺 + 平台订单号」唯一，订单名在店铺内唯一用部分唯一索引 `WHERE name IS NOT NULL`，亚马逊没有订单名；商品行、收件地址、履约单号是 jsonb，类型在 `order/schema.ts`；总额 numeric(12,2) + 币种）、`order.order_sync`（店铺 × 数据源一行，唯一约束）。`integration.credential` 的密文、IV、认证标签是 `bytea`（drizzle 的 `customType`，在 JS 中是 Buffer）。`order` 是 SQL 保留字，手写 SQL 写成 `"order".platform_order`。
