@@ -103,4 +103,11 @@ Blocked by: 07, 09, 31
 
 **后续（给其他待办的衔接）**：12、13、14 的 Comments 已留言（同步记录与文案参数化、回补窗口行与回补复用写入、`findOrder` / `findOrdersByEmail` 的用法）。24（报表「更新于」）取 Shopify 订单的最近同步用 `order.orderSyncHealths`（取各店铺最旧的一次）。28（生产部署）：Shopify 凭据与主密钥不是启动条件，资质到位后按 `docs/部署说明.md` 第 13 节填入并重新部署；主密钥随备份单独离线保管。29（真实环境验收）：令牌、61–90 天历史订单、断线恢复、调用记录核对。
 
-**提交**：611d3d5 认领；904e1af 原型与 PRD v2.26 回写；80a8f79 主体；59ec586 部署配置、文档与截图；3c2079a 评审修复；f20a1e6 文档跟上订单名索引；868ec42 复核小修；以及本条记录与收尾（勾选验收项、Status 改 resolved）和补记部署结果的提交。
+**提交**：611d3d5 认领；904e1af 原型与 PRD v2.26 回写；80a8f79 主体；59ec586 部署配置、文档与截图；3c2079a 评审修复；f20a1e6 文档跟上订单名索引；868ec42 复核小修；fc4fc6c 本条记录与收尾（勾选验收项、Status 改 resolved）；cc6daf3、3ce2aa4 部署冒烟发现的两处修复（见下）；以及补记部署结果的提交。
+
+**部署到开发测试环境**（`pnpm deploy:staging`，前台等待，工作区干净）
+
+- 第 1 次（fc4fc6c）：前七步全过，冒烟 96 通过 / 1 失败——`ledger-totals.spec.ts`「导出中…导出失败」第二次点「导出 Excel」超时。根因：第一次导出的成功浮层（右上）盖住按钮，Playwright 的鼠标停在浮层上，Sonner 悬停时暂停计时，浮层一直不消失、一直挡着点击；浮层与鼠标落点是否重叠随环境而定，所以是偶发。修复（cc6daf3）：第二次点击前把鼠标移开、等成功浮层消失（只改用例；产品行为是正常的悬停暂停）。
+- 第 2 次（cc6daf3）：冒烟 96 通过 / 1 失败——`stores.spec.ts` 编辑测试店铺后 30 秒内状态列没变成「已连接」（「Admin API 未连接」）。根因：开发测试环境长期累积了 20 多个测试 Shopify 店铺（审计 e2e 每次部署建一个），worker 每个队列一次取一个任务、处理完等 2 秒再取，每分钟一轮的订单同步排成长队，编辑后新排的那次要二十多秒才轮到（查 `pgboss.job`：同一批任务每 2 秒开始一个）。修复（3ce2aa4）：`defineJob` 加每个 worker 的并发数（pg-boss `localConcurrency`），`order.shopify_sync` 设 5（同一店铺仍由 stately + singletonKey 保证同时只跑一个），`core/jobs.int.test.ts` 新增并发用例，ADR 0008 修订。
+- 第 3 次（3ce2aa4）：八步全过——准备、构建镜像、启动数据库、执行迁移（含 0023）、灌示例数据、启动 api / worker / caddy、内网 HTTPS 核对、Playwright 冒烟 97 通过 / 0 失败 / 0 不稳定 / 0 跳过（报告 `deploy/.state/staging/report.md`，版本 `3ce2aa4f723a`）。跑完后 4516–4519 端口空闲。
+- 修复后测试（3ce2aa4）：`pnpm typecheck` 0 错误，`pnpm lint` 通过，`pnpm test:unit` 70 个文件 632 项、`pnpm test:integration` 32 个文件 358 项全过；`ledger-totals.spec.ts` 本机单独 11 项全过，全量 e2e 由第 3 次部署的冒烟（97 项）覆盖。
