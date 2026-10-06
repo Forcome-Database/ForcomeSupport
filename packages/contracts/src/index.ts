@@ -215,6 +215,7 @@ export {
   densities,
   densityLabels,
   densitySchema,
+  devDingtalkRejoinResponseSchema,
   devDingtalkScanRequestSchema,
   devDingtalkScanResponseSchema,
   devLoginRequestSchema,

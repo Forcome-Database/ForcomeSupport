@@ -163,7 +163,8 @@ function TeamMemberDrawerContent({
   const form = useForm<AddForm>({ defaultValues: EMPTY_FORM, shouldFocusError: false });
   const { control, handleSubmit, formState, setError, clearErrors } = form;
   const { isDirty } = formState;
-  const add = useMutation({ mutationFn: api.addTeamMember });
+  // 断网时立即给失败浮层（G5「保存失败：网络不可用」），不暂停到恢复联网（TanStack Query 的默认）
+  const add = useMutation({ mutationFn: api.addTeamMember, networkMode: 'always' });
   const focusField = useFocusField();
 
   async function added(member: TeamMember) {

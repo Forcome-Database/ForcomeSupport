@@ -1,6 +1,8 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import {
+  apiErrorSchema,
   currentMemberSchema,
+  devDingtalkRejoinResponseSchema,
   devDingtalkScanRequestSchema,
   devDingtalkScanResponseSchema,
   dingtalkLoginRequestSchema,
@@ -87,6 +89,23 @@ const devScanRoute = createRoute({
     },
   },
   responses: { 200: json(devDingtalkScanResponseSchema, '授权码（一次有效）') },
+});
+
+const devRejoinRoute = createRoute({
+  method: 'post',
+  path: '/api/dev/dingtalk/rejoin',
+  summary:
+    '模拟某人钉钉离职后又回到通讯录：停用后恢复在职，角色与店铺范围清空（只在非生产环境开启开发登录、钉钉用 Fake 时存在）',
+  request: {
+    body: {
+      content: { 'application/json': { schema: devDingtalkScanRequestSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: json(devDingtalkRejoinResponseSchema, '这个人在成员表里的 ID'),
+    404: json(apiErrorSchema, 'Fake 钉钉的通讯录里没有这个人'),
+  },
 });
 
 /** 扫码确认后钉钉带浏览器回到的地址：本站的 /login/dingtalk（经 caddy 时按转发头取协议与域名） */
@@ -220,16 +239,39 @@ export function devDingtalkScanAvailable(
 }
 
 /**
- * 模拟扫码（开发工具，与开发登录同一个开关）：本机演示与 Playwright 用它拿到授权码，再像钉钉一样把浏览器带到
- * /login/dingtalk?authCode=…&state=…，走真实的回调页与换会话。授权码由本进程的 Fake 钉钉发出、一次有效。
+ * 钉钉的开发工具（与开发登录同一个开关，钉钉用 Fake 时才有）：
+ * - 模拟扫码：本机演示与 Playwright 用它拿到授权码，再像钉钉一样把浏览器带到 /login/dingtalk?authCode=…&state=…，
+ *   走真实的回调页与换会话。授权码由本进程的 Fake 钉钉发出、一次有效。
+ * - 模拟离职后又回到通讯录（待办 06）：走通讯录同步的同一条写入（applyFetchedUser）——先按离职停用、再按回到通讯录恢复在职，
+ *   角色与店铺范围清空，审计记「钉钉离职停用」「钉钉恢复在职」。这个人仍在 Fake 通讯录里（api 与 worker 的通讯录一致，
+ *   之后的对账不受影响）。长期运行的开发测试环境里 Playwright 用它让 P20「添加成员」可以重复执行。
  */
-export function createDevDingtalkRoutes(deps: { clients: IntegrationClients; appEnv: AppEnv }) {
+export function createDevDingtalkRoutes(deps: {
+  clients: IntegrationClients;
+  appEnv: AppEnv;
+  runtime: Runtime;
+}) {
   if (deps.appEnv === 'production') throw new Error('生产环境不能开启模拟扫码');
+  const { runtime } = deps;
   const routes = new OpenAPIHono();
   routes.openapi(devScanRoute, (c) => {
     const { userId } = c.req.valid('json');
     const fake: FakeDingtalk = deps.clients.fake(dingtalkClient);
     return c.json({ authCode: fake.issueAuthCode(userId) }, 200);
+  });
+  routes.openapi(devRejoinRoute, async (c) => {
+    const { userId } = c.req.valid('json');
+    const dingtalk = deps.clients.fake(dingtalkClient).client();
+    const tree = await loadDepartmentTree(runtime.db);
+    const fetched = await fetchUser(dingtalk, tree, userId, runtime.clock.now());
+    if (!fetched.user) {
+      return c.json({ error: 'not_found', message: '钉钉通讯录里没有这个人' }, 404);
+    }
+    await applyFetchedUser(runtime, { ...fetched, user: null });
+    await applyFetchedUser(runtime, { ...fetched, fetchedAt: runtime.clock.now() });
+    const member = await findMemberByDingtalkUserId(runtime.db, userId);
+    if (!member) throw new Error(`回到通讯录后成员表里没有 ${userId}`);
+    return c.json({ memberId: member.id }, 200);
   });
   return routes;
 }

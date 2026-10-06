@@ -1,6 +1,7 @@
 import {
   apiErrorSchema,
   currentMemberSchema,
+  devDingtalkRejoinResponseSchema,
   storeOptionsSchema,
   teamCandidatesSchema,
   teamMemberSchema,
@@ -278,6 +279,25 @@ describe('从钉钉添加成员（AC-ST-06）', () => {
     expect((await memberOf((await me(client)).id))?.lastLoginAt).toBe(
       new Date(DEMO_NOW).toISOString(),
     );
+  });
+
+  it('开发工具「模拟离职后又回到通讯录」：角色与店铺范围清空、又成为候选（P20 的 e2e 在开发测试环境重复执行靠它）', async () => {
+    const before = (await team()).members.find((m) => m.name === '吴桐')!;
+    expect(before.roles).toEqual(['agent']);
+    const res = await t.api.post('/api/dev/dingtalk/rejoin', { userId: 'wutong' });
+    expect(res.status).toBe(200);
+    expect(devDingtalkRejoinResponseSchema.parse(await res.json())).toEqual({
+      memberId: before.id,
+    });
+    expect((await team()).members.some((m) => m.name === '吴桐')).toBe(false);
+    expect(await candidateNamed('吴桐')).toBe(before.id);
+    const actions = (await t.auditRecords({ objectId: before.id })).map((r) => r.action);
+    expect(actions.slice(-2)).toEqual(['member.dingtalk_left', 'member.dingtalk_rejoined']);
+    expect((await t.api.post('/api/dev/dingtalk/rejoin', { userId: 'nobody' })).status).toBe(404);
+    // 恢复成上一条用例添加后的样子
+    expect(
+      (await addMember({ memberId: before.id, roles: ['agent'], stores: before.stores })).status,
+    ).toBe(201);
   });
 
   it('已经添加过的人不能再添加（另一位管理员刚添加过）', async () => {

@@ -81,7 +81,8 @@ export function TeamPage() {
   /** 断网时等网络恢复后自动重试（K6） */
   const [waitingOnline, setWaitingOnline] = useState(false);
   const focusField = useFocusField();
-  const save = useMutation({ mutationFn: api.saveTeam });
+  // 断网时要立即失败（交给 K6 的断网处理），不能像 TanStack Query 默认的那样暂停到恢复联网
+  const save = useMutation({ mutationFn: api.saveTeam, networkMode: 'always' });
   /** 断网时那次保存用的版本号（覆盖保存时是最新的），恢复后自动重试沿用 */
   const retryVersions = useRef<ReadonlyMap<string, number> | undefined>(undefined);
 

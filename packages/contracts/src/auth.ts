@@ -166,6 +166,12 @@ export type LoginFailed = z.infer<typeof loginFailedSchema>;
 export const devDingtalkScanRequestSchema = z.object({ userId: z.string().min(1) });
 export const devDingtalkScanResponseSchema = z.object({ authCode: z.string() });
 
+/**
+ * 开发工具：模拟某人钉钉离职后又回到通讯录（同模拟扫码的开关，请求体同上）——停用后恢复在职，角色与店铺范围清空，
+ * 成为 P20「从钉钉添加」的候选（v2.23 的恢复在职口径）。长期运行的开发测试环境里 Playwright 用它让「添加成员」可以重复执行（待办 06）
+ */
+export const devDingtalkRejoinResponseSchema = z.object({ memberId: z.uuid() });
+
 /** 管理员的联系人（无权限 G2、登录被拒 G12 写「请联系管理员刘洋」） */
 export const adminContactsSchema = z.object({
   admins: z.array(z.object({ id: z.uuid(), name: z.string() })),
