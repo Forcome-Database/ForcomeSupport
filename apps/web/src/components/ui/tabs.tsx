@@ -35,6 +35,17 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
   );
 }
 
+/** 页签的内容（P20「成员 · 角色权限」起用）：不加样式，布局由使用处给 */
+function TabsContent({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Content>) {
+  return (
+    <TabsPrimitive.Content
+      data-slot="tabs-content"
+      className={cn('outline-none', className)}
+      {...props}
+    />
+  );
+}
+
 /**
  * 页签上的计数（原型 tabs() 的计数块）：11 / 600、6 圆角、左右 5、行高 16、没有边线；选中浅主色底主色深字，未选中浅灰底灰字。
  * 设计规范的对照写「计数用 Badge」，这里有意单写：Badge 带 1px 边线、左右 7、行高 18，套用它要把这些全覆盖掉（ADR 0007 修订）
@@ -52,4 +63,4 @@ function TabsCount({ className, ...props }: React.ComponentProps<'span'>) {
   );
 }
 
-export { Tabs, TabsCount, TabsList, TabsTrigger };
+export { Tabs, TabsContent, TabsCount, TabsList, TabsTrigger };

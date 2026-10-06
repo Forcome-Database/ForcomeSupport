@@ -23,6 +23,9 @@ import {
   sourceTicketSchema,
   storeOptionsSchema,
   storeSchema,
+  teamCandidatesSchema,
+  teamMemberSchema,
+  teamSchema,
   ticketListSchema,
   type AdminContacts,
   type AftersalesDetail,
@@ -56,6 +59,11 @@ import {
   type StoreInput,
   type StoreOption,
   type StoreUpdate,
+  type Team,
+  type TeamCandidate,
+  type TeamChange,
+  type TeamMember,
+  type TeamMemberAdd,
   type TicketListItem,
 } from '@forcome/contracts';
 import type { z } from 'zod';
@@ -267,6 +275,24 @@ export const api = {
   /** 编辑店铺（带打开时的版本号）；别人先保存了抛 409 optimistic_lock（G7） */
   updateStore: (id: string, input: StoreUpdate): Promise<Store> =>
     call(`/api/channel/stores/${id}`, storeSchema, jsonBody('PUT', input)),
+
+  /** P20 成员表：已分配角色的成员、授权可选的全部店铺、钉钉通讯录最近一次对账成功的时刻 */
+  team: (): Promise<Team> => call('/api/org/team', teamSchema),
+
+  /** 「从钉钉添加」可选的人：钉钉通讯录里在职、还没分配角色的成员 */
+  teamCandidates: async (): Promise<TeamCandidate[]> =>
+    (await call('/api/org/team/candidates', teamCandidatesSchema)).candidates,
+
+  /** 从钉钉添加成员；字段填错时抛 ApiRequestError（fields 的键为 memberId、roles、stores） */
+  addTeamMember: (input: TeamMemberAdd): Promise<TeamMember> =>
+    call('/api/org/team/members', teamMemberSchema, jsonBody('POST', input)),
+
+  /**
+   * 吸底保存栏的保存：改过的成员一起保存，返回最新的成员表；字段填错抛 400（fields 的键为「成员 ID.roles / .stores」），
+   * 有人已被别人改过抛 409 optimistic_lock（G7），整批都没有保存
+   */
+  saveTeam: (changes: TeamChange[]): Promise<Team> =>
+    call('/api/org/team', teamSchema, jsonBody('PUT', { changes })),
 
   /** 当前成员店铺范围内的店铺（各页面的店铺筛选与选择） */
   storeOptions: async (): Promise<StoreOption[]> =>

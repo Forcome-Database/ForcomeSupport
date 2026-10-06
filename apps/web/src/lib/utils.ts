@@ -11,7 +11,7 @@ const twMerge = extendTailwindMerge({
     theme: {
       text: ['10', '11', '12', '13', '14', '16', '20', '24', 'body', 'minor', 'badge'],
       spacing: ['queue-row', 'queue', 'table-row', 'panel-x', 'panel-y'],
-      shadow: ['card', 'pop', 'press'],
+      shadow: ['card', 'pop', 'press', 'bar'],
     },
   },
 });

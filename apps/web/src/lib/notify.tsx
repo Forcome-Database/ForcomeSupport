@@ -1,4 +1,4 @@
-import { CircleCheck, CircleX, History, X } from 'lucide-react';
+import { CircleCheck, CircleX, History, Info, Loader2, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { failureReason } from './api';
  * 失败浮层不自动消失，必须给出重试或下一步；同一件事只留一条（id），成功后用 dismissToast(id) 撤掉。
  * 成功浮层 3 秒消失（showSuccess，P18 保存店铺起用）；可逆操作的撤销浮层（showUndo，P13 设为已完成起用，待办 21）
  * 固定在内容区右下的另一个容器（UNDO_TOASTER），带倒计时，倒计时结束前不消失（G5）。
+ * 警示浮层（showWarning，不自动消失）与中性浮层（showNeutral，3 秒消失）随 P20 的吸底保存栏起用（K6 断网后自动重试，待办 06）。
  */
 
 /** 撤销浮层的容器 id（components/ui/sonner.tsx 的 UndoToaster） */
@@ -53,6 +54,27 @@ export function showError(options: ErrorToastOptions): void {
 /** 成功浮层（G5、K6「设置已保存 · 已记入审计日志」）：绿色勾，3 秒后自动消失 */
 export function showSuccess(options: { readonly title: string; readonly description?: string }) {
   toast.custom((id) => <SuccessToast id={id} {...options} />);
+}
+
+/**
+ * 警示浮层（原型 toast('warning')，K6「网络已断开，暂未保存」）：黄色警示图标，不自动消失；
+ * pending 为说明下方带转圈的进行中写法（「等待网络恢复…」）。同一件事用同一个 id，之后用 dismissToast(id) 撤掉
+ */
+export function showWarning(options: {
+  readonly id: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly pending?: string;
+}): void {
+  toast.custom((toastId) => <WarningToast toastId={toastId} {...options} />, {
+    id: options.id,
+    duration: Infinity,
+  });
+}
+
+/** 中性浮层（原型 toast('neutral')，K6「已自动重试并保存」）：灰色信息图标，3 秒后自动消失 */
+export function showNeutral(options: { readonly title: string; readonly description?: string }) {
+  toast.custom((id) => <NeutralToast id={id} {...options} />);
 }
 
 type UndoToastOptions = {
@@ -147,6 +169,58 @@ function SuccessToast({
     <ToastCard
       id={id}
       icon={<CircleCheck className="size-4.5 shrink-0 text-success" strokeWidth={2} />}
+    >
+      <div className="text-13 font-semibold text-foreground">{title}</div>
+      {description && (
+        <div className="text-12 leading-normal text-muted-foreground">{description}</div>
+      )}
+    </ToastCard>
+  );
+}
+
+function WarningToast({
+  toastId,
+  title,
+  description,
+  pending,
+}: {
+  toastId: string | number;
+  title: string;
+  description?: string;
+  pending?: string;
+}) {
+  return (
+    <ToastCard
+      id={toastId}
+      icon={<TriangleAlert className="size-4.5 shrink-0 text-warning" strokeWidth={2} />}
+    >
+      <div className="text-13 font-semibold text-foreground">{title}</div>
+      {description && (
+        <div className="text-12 leading-normal text-muted-foreground">{description}</div>
+      )}
+      {pending && (
+        <div className="flex items-center gap-1.5 pt-0.5 text-12 text-muted-foreground">
+          <Loader2 className="size-3 animate-spin text-subtle-foreground" strokeWidth={2.2} />
+          {pending}
+        </div>
+      )}
+    </ToastCard>
+  );
+}
+
+function NeutralToast({
+  id,
+  title,
+  description,
+}: {
+  id: string | number;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <ToastCard
+      id={id}
+      icon={<Info className="size-4.5 shrink-0 text-muted-foreground" strokeWidth={2} />}
     >
       <div className="text-13 font-semibold text-foreground">{title}</div>
       {description && (

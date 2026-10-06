@@ -8,7 +8,8 @@ import { A11Y, MENU_NOTE, MENU_TITLE } from './p18-copy';
  * 设置页外壳（原型 build_settings.spage() 与 as_common.settings_menu()，第一阶段：PRD 4.1、P18）：
  * 左侧设置菜单（宽 208 的白色浮动面板），每项一个独立页面，点击即切换（导航语义，用链接，同顶栏分段导航，ADR 0007 修订）；
  * 第一阶段只有「渠道与店铺」「团队与权限」两项，菜单底部注「第一阶段只开放这两项设置」。两项都归管理员，第一期不出现带锁的项。
- * 右侧内容区：页头（标题、说明与右侧操作）+ 页面内容，内边距 16 / 24、区块间距 16，超出时滚动。
+ * 右侧内容区：页头（标题、说明与右侧操作）+ 页面内容，内边距 16 / 24、区块间距 16，超出时滚动；
+ * footer 是固定在内容区底部、不随内容滚动的吸底保存栏（原型 spage() 的 bar，P20 起用，K6）。
  */
 
 const MENU: readonly { page: PageDefinition & { path: string }; icon: LucideIcon }[] = [
@@ -16,7 +17,7 @@ const MENU: readonly { page: PageDefinition & { path: string }; icon: LucideIcon
   { page: pages.settingsTeam, icon: Users },
 ];
 
-export function SettingsLayout({ children }: { children: ReactNode }) {
+export function SettingsLayout({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
   return (
     <div className="flex min-h-0 flex-1">
       <nav
@@ -38,7 +39,12 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
           {MENU_NOTE}
         </div>
       </nav>
-      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">
+          {children}
+        </div>
+        {footer}
+      </div>
     </div>
   );
 }

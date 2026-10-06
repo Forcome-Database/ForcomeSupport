@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 export interface EditConflictInfo {
   /** 先保存的人（姓名；系统写入为「系统」） */
   readonly who: string;
-  /** 对方保存的时刻（hh:mm） */
+  /** 对方保存的时刻（hh:mm）；不知道时为空串（P20 几个人同时冲突时写「他人」） */
   readonly at: string;
   /** 对方改了哪些项（字段名）；内容相同时为空 */
   readonly fields: readonly string[];
@@ -27,10 +27,13 @@ export interface EditConflictInfo {
 
 export function EditConflictAlert({
   conflict,
+  copy,
   onReload,
   onOverwrite,
 }: {
   conflict: EditConflictInfo;
+  /** 标题与说明另写时给出（P20 成员表：「赵倩刚被周敏修改（10:24）」「……已保留在表格中……」） */
+  copy?: { readonly title: string; readonly description: string };
   onReload: () => void;
   onOverwrite: () => void;
 }) {
@@ -38,8 +41,11 @@ export function EditConflictAlert({
   return (
     <Alert
       tone="warning"
-      title={`这条记录刚被${who}修改（${at}）`}
-      description={`${fields.length > 0 ? `${who}改了：${fields.join('、')}。` : ''}你的修改还没保存，已保留在下方；可先查看最新内容再改，或用你的内容覆盖。`}
+      title={copy?.title ?? `这条记录刚被${who}修改（${at}）`}
+      description={
+        copy?.description ??
+        `${fields.length > 0 ? `${who}改了：${fields.join('、')}。` : ''}你的修改还没保存，已保留在下方；可先查看最新内容再改，或用你的内容覆盖。`
+      }
       action={
         <>
           <Button type="button" variant="outline" size="sm" onClick={onReload}>
@@ -59,7 +65,7 @@ function overwriteText({ who, at, fields }: EditConflictInfo): string {
   const [first] = fields;
   const what =
     fields.length > 1 ? `「${first}」等 ${fields.length} 项` : first ? `「${first}」` : '内容';
-  return `${who} ${at} 保存的${what}会被你的内容替换，覆盖后记入审计日志。`;
+  return `${who}${at ? ` ${at}` : ''} 保存的${what}会被你的内容替换，覆盖后记入审计日志。`;
 }
 
 /** 「覆盖保存」的二次确认 */

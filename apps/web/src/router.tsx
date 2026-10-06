@@ -31,7 +31,7 @@ import { DevLoginPage } from '@/pages/dev-login';
 import { LoginCallbackPage } from '@/pages/login/login-callback';
 import { LoginPage, loginSearchSchema } from '@/pages/login/login-page';
 import { ChannelsPage, channelsSearchSchema } from '@/pages/settings/channels-page';
-import { TeamPage } from '@/pages/settings/team-page';
+import { TeamPage, teamSearchSchema } from '@/pages/settings/team-page';
 import { TicketsPage } from '@/pages/tickets/tickets-page';
 
 /*
@@ -189,6 +189,18 @@ const channelsRoute = createRoute({
   ),
 });
 
+/** P20 团队与权限：地址栏可带要选中的成员（从 P27 点成员进来） */
+const teamRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: pages.settingsTeam.path,
+  validateSearch: teamSearchSchema,
+  component: () => (
+    <PageGate page={pages.settingsTeam}>
+      <TeamPage />
+    </PageGate>
+  ),
+});
+
 /** P27 审计日志：筛选条件在地址栏（PRD P27） */
 const auditRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -229,7 +241,7 @@ const routeTree = rootRoute.addChildren([
     pageRoute(pages.reports),
     settingsRoute,
     channelsRoute,
-    pageRoute(pages.settingsTeam, TeamPage),
+    teamRoute,
     auditRoute,
   ]),
 ]);
