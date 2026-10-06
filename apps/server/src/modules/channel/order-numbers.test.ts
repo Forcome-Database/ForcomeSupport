@@ -132,6 +132,15 @@ describe('HTML 正文里的 # 写成字符实体', () => {
     ).toEqual(['#1063']);
   });
 
+  it('没解码的字符实体（双重转义的 &amp;#8217;、不带分号的 &#8217）不当订单名', () => {
+    expect(
+      extractOrderNumbers('shopify', mail('', null, '<p>I&amp;#8217;m &#8217m about #1063</p>')),
+    ).toEqual(['#1063']);
+    expect(extractOrderNumbers('shopify', mail('', 'I&#8217m about #1063', null))).toEqual([
+      '#1063',
+    ]);
+  });
+
   it('&#35;、&#x23; 还原成 #', () => {
     expect(
       extractOrderNumbers('shopify', mail('', null, '<p>Order &#35;1063</p><p>and &#x23;1064</p>')),

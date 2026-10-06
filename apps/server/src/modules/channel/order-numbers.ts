@@ -20,8 +20,8 @@ const AMAZON_ORDER_NUMBER = new RegExp(
   'g',
 );
 
-/** #1063、# 1063 */
-const SHOPIFY_HASH_NAME = /#\s?(\d{4,})(?!\d)/g;
+/** #1063、# 1063；紧跟在 & 后面的不算（没解码的字符实体：双重转义的 &amp;#8217;、不带分号的 &#8217） */
+const SHOPIFY_HASH_NAME = /(?<!&)#\s?(\d{4,})(?!\d)/g;
 /**
  * 「订单」后面跟数字：order 1063、Order No. 1063、order number: 1063、Order #: 1066、Order ID 1067、pedido 1068、orden 1068、
  * número de pedido: 1069（「pedido / orden」前的「número de」可有可无，所以只要认出 pedido、orden）
@@ -36,13 +36,17 @@ function codePointText(code: number): string {
 
 /** HTML 去掉标签后的文字（只为抽订单号，不追求排版） */
 function htmlText(html: string): string {
-  return html
-    .replace(/<(head|style|script)\b[\s\S]*?<\/\1\s*>/gi, ' ')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => codePointText(Number.parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec: string) => codePointText(Number(dec)))
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&num;/gi, '#');
+  return (
+    html
+      .replace(/<(head|style|script)\b[\s\S]*?<\/\1\s*>/gi, ' ')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => codePointText(Number.parseInt(hex, 16)))
+      .replace(/&#(\d+);/g, (_, dec: string) => codePointText(Number(dec)))
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&num;/gi, '#')
+      // 最后才还原 &amp;：双重转义的 &amp;#8217; 只还原一层成 &#8217;，由订单名的写法排除（# 紧跟在 & 后面的不算）
+      .replace(/&amp;/gi, '&')
+  );
 }
 
 /** 主题与正文里按某个写法抽到的候选（先主题后正文、按出现先后）；Shopify 的写法取第 1 组数字、补成 #数字 */
