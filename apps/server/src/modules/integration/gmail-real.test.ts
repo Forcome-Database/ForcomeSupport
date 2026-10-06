@@ -256,6 +256,8 @@ describe('Gmail 接口', () => {
       callRecorder: recorder,
       mailRecipientGuard: new MailRecipientGuard({ allowlistOnly: true, allowlist: [] }),
       shopify: null,
+      spApi: null,
+      amazonSqs: null,
       credentialVault: null,
       clock: systemClock,
     });

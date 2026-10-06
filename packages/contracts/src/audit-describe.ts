@@ -249,20 +249,38 @@ interface FormatContext {
   /** 这条记录的日期（北京时间）：sameDayTime 的值在同一天时只写时:分 */
   readonly day: string;
   /** 渠道连接记录是哪个渠道（快照的 channel；没写的是 Gmail）：「补拉」写来信还是订单 */
-  readonly channel: 'gmail' | 'shopify';
+  readonly channel: AuditChannel;
 }
 
-/** 补拉的单位与时间的说法：Gmail 为来信（到达时间），Shopify 为订单（平台更新时间，协调者 2026-10-06 决定） */
-const BACKFILL_WORDS = {
+/** 渠道连接记录的渠道（快照的 channel） */
+type AuditChannel = 'gmail' | 'shopify' | 'amazon';
+
+/** 订单的补拉：N 笔订单，平台更新时间的起止 */
+const ORDER_BACKFILL = {
+  count: (n: number) => `${n} 笔订单`,
+  range: (from: string, to: string) => `${from}–${to} 更新`,
+};
+
+/**
+ * 补拉的单位与时间的说法：Gmail 为来信（到达时间），Shopify 与亚马逊为订单（平台更新时间；协调者 2026-10-06 决定，亚马逊为待办 12 Q5 套用）
+ */
+const BACKFILL_WORDS: Record<
+  AuditChannel,
+  { count: (n: number) => string; range: (from: string, to: string) => string }
+> = {
   gmail: {
     count: (n: number) => `${n} 封来信`,
     range: (from: string, to: string) => `${from}–${to} 到达，SLA 按原到达时间`,
   },
-  shopify: {
-    count: (n: number) => `${n} 笔订单`,
-    range: (from: string, to: string) => `${from}–${to} 更新`,
-  },
-} as const;
+  shopify: ORDER_BACKFILL,
+  amazon: ORDER_BACKFILL,
+};
+
+/** 快照里写的渠道；待办 09 写下的记录没有它，是 Gmail */
+function auditChannelOf(after: unknown): AuditChannel {
+  if (!isPlainObject(after)) return 'gmail';
+  return after.channel === 'shopify' || after.channel === 'amazon' ? after.channel : 'gmail';
+}
 
 function dateTimeWords(value: unknown, ctx: FormatContext): string {
   if (typeof value !== 'string' || Number.isNaN(new Date(value).getTime())) return text(value);
@@ -482,8 +500,7 @@ export function describeAuditRecord(
     names: options.names,
     year: businessDateTime(record.occurredAt).slice(0, 4),
     day: businessDateTime(record.occurredAt).slice(0, 10),
-    channel:
-      isPlainObject(record.after) && record.after.channel === 'shopify' ? 'shopify' : 'gmail',
+    channel: auditChannelOf(record.after),
   };
   const known = isAuditAction(record.action) ? auditActions[record.action] : null;
   // 没有编号的店铺对象（较早的越权记录）写店铺名

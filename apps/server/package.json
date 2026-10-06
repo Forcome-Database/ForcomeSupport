@@ -16,6 +16,7 @@
     "db:seed": "tsx --env-file=dev.env src/seed.ts",
     "db:reset-inbound": "tsx --env-file=dev.env src/reset-inbound.ts",
     "import:aftersales": "tsx --env-file=dev.env src/import-aftersales.ts",
+    "sp-api-token": "tsx --env-file=dev.env src/sp-api-token.ts",
     "history:sample": "tsx scripts/history-import-sample.ts"
   },
   "dependencies": {
@@ -24,6 +25,8 @@
     "@forcome/fixtures": "workspace:*",
     "@hono/node-server": "^2.1.3",
     "@hono/zod-openapi": "^1.6.3",
+    "@smithy/hash-node": "^4.5.2",
+    "@smithy/signature-v4": "^5.7.4",
     "big.js": "^7.0.1",
     "drizzle-orm": "^0.45.3",
     "exceljs": "^4.4.0",

@@ -1,3 +1,5 @@
+import { amazonOrdersClient } from './amazon-orders';
+import { amazonSqsClient } from './amazon-sqs';
 import type { AnyClientDefinition } from './definition';
 import { dingtalkClient } from './dingtalk';
 import { exchangeRateClient } from './exchange-rate';
@@ -15,4 +17,6 @@ export const clientDefinitions: readonly AnyClientDefinition[] = [
   exchangeRateClient,
   dingtalkClient,
   shopifyClient,
+  amazonOrdersClient,
+  amazonSqsClient,
 ];

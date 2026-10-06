@@ -119,3 +119,7 @@ status: accepted
 ## 修订（2026-10-06，待办 11 落地）
 
 - **订单镜像的表**（迁移 0023）：`order.platform_order`（UUIDv7 主键；「店铺 + 平台订单号」唯一，订单名是部分普通索引 `WHERE name IS NOT NULL`——平台保证店铺内唯一，但不在库里加唯一约束，万一撞名也不让整页写入失败、同步卡住，按订单名查时取平台更新时间最新的一笔；亚马逊没有订单名；商品行、收件地址、履约单号是 jsonb，类型在 `order/schema.ts`；总额 numeric(12,2) + 币种）、`order.order_sync`（店铺 × 数据源一行，唯一约束）。`integration.credential` 的密文、IV、认证标签是 `bytea`（drizzle 的 `customType`，在 JS 中是 Buffer）。`order` 是 SQL 保留字，手写 SQL 写成 `"order".platform_order`。
+
+## 修订（2026-10-06，待办 12 落地）
+
+- **迁移 0024**：`order.platform_order` 加亚马逊的列（`fulfillment_channel` MFN / AFN、`promised_ship_by`、`promised_delivery_by`），金额与币种改为可空（亚马逊待付款的订单还没有金额；CHECK `platform_order_total_pair` 要求两列同时有或同时没有）；`order.order_sync.source` 加 `amazon_orders`（取值由应用层枚举约束）；新表 `order.order_queue`（订单通知队列的拉取与检查记录，整个环境一个队列一行，UUIDv7 主键 + `name` 唯一）。

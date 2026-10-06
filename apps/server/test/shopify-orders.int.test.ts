@@ -139,8 +139,8 @@ describe('Shopify 订单镜像', () => {
     });
     expect(await storeOrdersStatus(COM.name)).toBe('connected');
     expect(await storeOrdersStatus(MX.name)).toBe('connected');
-    // 亚马逊店铺的订单随待办 12，不受影响
-    expect(await storeOrdersStatus(DIRECT.name)).toBe('connected');
+    // 亚马逊店铺的订单按自己的同步记录（待办 12），Shopify 的同步不影响它（这里还没同步过，为未连接）
+    expect(await storeOrdersStatus(DIRECT.name)).toBe('not_connected');
   });
 
   it('增量拉取写入镜像（含分页）；重复拉取不产生重复行；订单更新后镜像跟着更新、仍是一行', async () => {

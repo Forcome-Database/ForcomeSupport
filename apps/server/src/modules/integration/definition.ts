@@ -1,5 +1,12 @@
 import type { DemoFixture } from '@forcome/fixtures';
-import type { Clock, DingtalkCredentials, GoogleCredentials, ShopifyCredentials } from '../core';
+import type {
+  AmazonSqsConfig,
+  Clock,
+  DingtalkCredentials,
+  GoogleCredentials,
+  ShopifyCredentials,
+  SpApiCredentials,
+} from '../core';
 import type { CallRecorder } from './call-records';
 import type { CredentialVault } from './credential-vault';
 import type { MailRecipientGuard } from './mail-recipient-guard';
@@ -26,6 +33,10 @@ export interface RealClientContext {
   readonly callRecorder: CallRecorder;
   /** Shopify 自建应用的客户端凭据（待办 11）；没配置为 null，真实现调用时以「未配置」失败 */
   readonly shopify: ShopifyCredentials | null;
+  /** SP-API 私有应用的 LWA 凭据（待办 12）；没配置为 null，真实现调用时以「未配置」失败 */
+  readonly spApi: SpApiCredentials | null;
+  /** 订单通知队列（SQS，待办 12）；没配置为 null，真实现调用时以「未配置」失败 */
+  readonly amazonSqs: AmazonSqsConfig | null;
   /** 动态凭据保管（主密钥加密存库，待办 11）；没有主密钥为 null */
   readonly credentialVault: CredentialVault | null;
   /** 当前时间（凭据何时换新；测试里是手动时钟） */

@@ -1654,6 +1654,374 @@
       }
     }
   ],
+  "amazonOrders": [
+    {
+      "orderId": "113-4567890-1234567",
+      "storeKey": "amz-direct",
+      "site": "US",
+      "placedAt": "2026-09-03T08:12:00+08:00",
+      "updatedAt": "2026-09-05T19:40:00+08:00",
+      "lineItems": [
+        {
+          "title": "V2 车载吸尘器 黑色",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "49.99",
+        "currency": "USD"
+      },
+      "status": "SHIPPED",
+      "fulfillmentChannel": "MFN",
+      "shipBy": "2026-09-04T23:59:00+08:00",
+      "deliverBy": "2026-09-09T23:59:00+08:00",
+      "shipTo": {
+        "city": "Seattle",
+        "stateOrRegion": "WA",
+        "postalCode": null,
+        "countryCode": "US"
+      },
+      "tracking": {
+        "carrier": "UPS",
+        "number": "1Z4R28830358229017"
+      }
+    },
+    {
+      "orderId": "302-8811234-9901122",
+      "storeKey": "amz-direct",
+      "site": "MX",
+      "placedAt": "2026-08-20T21:05:00+08:00",
+      "updatedAt": "2026-08-27T15:30:00+08:00",
+      "lineItems": [
+        {
+          "title": "车载吸尘器 V2",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "889.00",
+        "currency": "MXN"
+      },
+      "status": "SHIPPED",
+      "fulfillmentChannel": "MFN",
+      "shipBy": "2026-08-21T23:59:00+08:00",
+      "deliverBy": "2026-08-28T23:59:00+08:00",
+      "shipTo": {
+        "city": "Monterrey",
+        "stateOrRegion": "NL",
+        "postalCode": "64000",
+        "countryCode": "MX"
+      },
+      "tracking": {
+        "carrier": "Estafeta",
+        "number": "8055123450001"
+      }
+    },
+    {
+      "orderId": "114-7788990-2233441",
+      "storeKey": "amz-direct",
+      "site": "US",
+      "placedAt": "2026-08-19T10:22:00+08:00",
+      "updatedAt": "2026-08-23T09:10:00+08:00",
+      "lineItems": [
+        {
+          "title": "V2 车载吸尘器",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "49.99",
+        "currency": "USD"
+      },
+      "status": "SHIPPED",
+      "fulfillmentChannel": "AFN",
+      "shipBy": "2026-08-20T23:59:00+08:00",
+      "deliverBy": "2026-08-23T23:59:00+08:00",
+      "shipTo": {
+        "city": "Columbus",
+        "stateOrRegion": "OH",
+        "postalCode": null,
+        "countryCode": "US"
+      },
+      "tracking": null
+    },
+    {
+      "orderId": "204-5566778-9900112",
+      "storeKey": "amz-direct",
+      "site": "CA",
+      "placedAt": "2026-08-20T09:30:00+08:00",
+      "updatedAt": "2026-08-26T16:20:00+08:00",
+      "lineItems": [
+        {
+          "title": "车载吸尘器 V2 黑色",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "67.99",
+        "currency": "CAD"
+      },
+      "status": "SHIPPED",
+      "fulfillmentChannel": "MFN",
+      "shipBy": "2026-08-21T23:59:00+08:00",
+      "deliverBy": "2026-08-27T23:59:00+08:00",
+      "shipTo": {
+        "city": "Toronto",
+        "stateOrRegion": "ON",
+        "postalCode": "M5V 2T6",
+        "countryCode": "CA"
+      },
+      "tracking": {
+        "carrier": "Canada Post",
+        "number": "7316204855219087"
+      }
+    },
+    {
+      "orderId": "113-2244668-8800997",
+      "storeKey": "amz-direct",
+      "site": "US",
+      "placedAt": "2026-08-28T17:45:00+08:00",
+      "updatedAt": "2026-09-01T10:20:00+08:00",
+      "lineItems": [
+        {
+          "title": "V2 车载吸尘器 黑色",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "49.99",
+        "currency": "USD"
+      },
+      "status": "SHIPPED",
+      "fulfillmentChannel": "MFN",
+      "shipBy": "2026-08-29T23:59:00+08:00",
+      "deliverBy": "2026-09-03T23:59:00+08:00",
+      "shipTo": {
+        "city": "Chicago",
+        "stateOrRegion": "IL",
+        "postalCode": null,
+        "countryCode": "US"
+      },
+      "tracking": {
+        "carrier": "UPS",
+        "number": "1Z4R28830355508812"
+      }
+    },
+    {
+      "orderId": "305-1122334-4455667",
+      "storeKey": "amz-direct",
+      "site": "MX",
+      "placedAt": "2026-09-02T12:10:00+08:00",
+      "updatedAt": "2026-09-06T18:35:00+08:00",
+      "lineItems": [
+        {
+          "title": "车载吸尘器 V2",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "889.00",
+        "currency": "MXN"
+      },
+      "status": "SHIPPED",
+      "fulfillmentChannel": "MFN",
+      "shipBy": "2026-09-03T23:59:00+08:00",
+      "deliverBy": "2026-09-10T23:59:00+08:00",
+      "shipTo": {
+        "city": "Ciudad de México",
+        "stateOrRegion": "CDMX",
+        "postalCode": "06600",
+        "countryCode": "MX"
+      },
+      "tracking": {
+        "carrier": "Estafeta",
+        "number": "8055123450417"
+      }
+    },
+    {
+      "orderId": "302-4455667-1122334",
+      "storeKey": "amz-direct",
+      "site": "MX",
+      "placedAt": "2026-08-30T19:20:00+08:00",
+      "updatedAt": "2026-09-05T12:00:00+08:00",
+      "lineItems": [
+        {
+          "title": "车载吸尘器 V2",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "889.00",
+        "currency": "MXN"
+      },
+      "status": "SHIPPED",
+      "fulfillmentChannel": "MFN",
+      "shipBy": "2026-08-31T23:59:00+08:00",
+      "deliverBy": "2026-09-07T23:59:00+08:00",
+      "shipTo": {
+        "city": "Guadalajara",
+        "stateOrRegion": "JAL",
+        "postalCode": "44100",
+        "countryCode": "MX"
+      },
+      "tracking": {
+        "carrier": "Estafeta",
+        "number": "8055123450288"
+      }
+    },
+    {
+      "orderId": "113-3344556-6677889",
+      "storeKey": "amz-direct",
+      "site": "US",
+      "placedAt": "2026-08-24T11:00:00+08:00",
+      "updatedAt": "2026-08-29T15:15:00+08:00",
+      "lineItems": [
+        {
+          "title": "V2 车载吸尘器",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "49.99",
+        "currency": "USD"
+      },
+      "status": "SHIPPED",
+      "fulfillmentChannel": "AFN",
+      "shipBy": "2026-08-25T23:59:00+08:00",
+      "deliverBy": "2026-08-28T23:59:00+08:00",
+      "shipTo": {
+        "city": "Denver",
+        "stateOrRegion": "CO",
+        "postalCode": null,
+        "countryCode": "US"
+      },
+      "tracking": null
+    },
+    {
+      "orderId": "113-6677001-2233445",
+      "storeKey": "amz-direct",
+      "site": "US",
+      "placedAt": "2026-09-02T08:40:00+08:00",
+      "updatedAt": "2026-09-05T10:30:00+08:00",
+      "lineItems": [
+        {
+          "title": "V2 车载吸尘器 白色",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "49.99",
+        "currency": "USD"
+      },
+      "status": "SHIPPED",
+      "fulfillmentChannel": "MFN",
+      "shipBy": "2026-09-03T23:59:00+08:00",
+      "deliverBy": "2026-09-08T23:59:00+08:00",
+      "shipTo": {
+        "city": "Boston",
+        "stateOrRegion": "MA",
+        "postalCode": null,
+        "countryCode": "US"
+      },
+      "tracking": {
+        "carrier": "UPS",
+        "number": "1Z4R28830370012345"
+      }
+    },
+    {
+      "orderId": "111-2233445-5566778",
+      "storeKey": "amz-auto",
+      "site": "US",
+      "placedAt": "2026-09-01T14:30:00+08:00",
+      "updatedAt": "2026-09-04T11:05:00+08:00",
+      "lineItems": [
+        {
+          "title": "V2 车载吸尘器 灰色",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "59.99",
+        "currency": "USD"
+      },
+      "status": "SHIPPED",
+      "fulfillmentChannel": "MFN",
+      "shipBy": "2026-09-02T23:59:00+08:00",
+      "deliverBy": "2026-09-07T23:59:00+08:00",
+      "shipTo": {
+        "city": "Atlanta",
+        "stateOrRegion": "GA",
+        "postalCode": null,
+        "countryCode": "US"
+      },
+      "tracking": {
+        "carrier": "UPS",
+        "number": "1Z4R28830361110245"
+      }
+    },
+    {
+      "orderId": "113-5566112-7788990",
+      "storeKey": "amz-auto",
+      "site": "US",
+      "placedAt": "2026-09-06T20:15:00+08:00",
+      "updatedAt": "2026-09-08T13:40:00+08:00",
+      "lineItems": [
+        {
+          "title": "V2 车载吸尘器 灰色",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "59.99",
+        "currency": "USD"
+      },
+      "status": "SHIPPED",
+      "fulfillmentChannel": "MFN",
+      "shipBy": "2026-09-07T23:59:00+08:00",
+      "deliverBy": "2026-09-12T23:59:00+08:00",
+      "shipTo": {
+        "city": "Phoenix",
+        "stateOrRegion": "AZ",
+        "postalCode": null,
+        "countryCode": "US"
+      },
+      "tracking": {
+        "carrier": "UPS",
+        "number": "1Z4R28830366677120"
+      }
+    },
+    {
+      "orderId": "113-9988776-5544332",
+      "storeKey": "amz-auto",
+      "site": "US",
+      "placedAt": "2026-09-04T09:55:00+08:00",
+      "updatedAt": "2026-09-07T16:10:00+08:00",
+      "lineItems": [
+        {
+          "title": "V2 车载吸尘器 灰色",
+          "quantity": 1
+        }
+      ],
+      "total": {
+        "amount": "59.99",
+        "currency": "USD"
+      },
+      "status": "SHIPPED",
+      "fulfillmentChannel": "MFN",
+      "shipBy": "2026-09-05T23:59:00+08:00",
+      "deliverBy": "2026-09-10T23:59:00+08:00",
+      "shipTo": {
+        "city": "Chicago",
+        "stateOrRegion": "IL",
+        "postalCode": null,
+        "countryCode": "US"
+      },
+      "tracking": {
+        "carrier": "UPS",
+        "number": "1Z4R28830369981234"
+      }
+    }
+  ],
   "notifications": [
     {
       "id": "80aac85d-6783-5994-8248-50ed9300ea36",

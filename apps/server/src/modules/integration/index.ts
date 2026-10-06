@@ -72,6 +72,27 @@ export {
   type ShopifyTracking,
 } from './shopify';
 export {
+  AMAZON_MARKETPLACES,
+  amazonOrdersClient,
+  FakeAmazonOrders,
+  type AmazonOrder,
+  type AmazonOrderItem,
+  type AmazonOrderPage,
+  type AmazonOrdersClient,
+  type AmazonPackage,
+  type AmazonShipTo,
+  type FakeAmazonOrderInput,
+} from './amazon-orders';
+export { storeSpApiRefreshToken } from './amazon-orders-real';
+export {
+  amazonSqsClient,
+  FakeAmazonSqs,
+  type AmazonNotificationsClient,
+  type OrderChangeNotification,
+  type QueueMessage,
+} from './amazon-sqs';
+export { type SpApiPriority } from './sp-api-quota';
+export {
   ClientNotConfiguredError,
   ConnectionLostError,
   CursorExpiredError,

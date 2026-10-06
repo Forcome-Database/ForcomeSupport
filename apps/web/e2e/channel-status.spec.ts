@@ -7,14 +7,22 @@ import {
 import { expect, test, type Page } from '@playwright/test';
 
 /*
- * 渠道连接状态（待办 09、11；PRD 6.9、P18「第一阶段」、K7、K20 补充小样、G4）：
- * - 真实的接口（开发测试环境全部是 Fake，邮箱与 Shopify 订单都在同步）：Gmail、钉钉与 Shopify 卡的「测试连接」与成功浮层；
+ * 渠道连接状态（待办 09、11、12；PRD 6.9、P18「第一阶段」、K7、K20 补充小样、G4）：
+ * - 真实的接口（开发测试环境全部是 Fake，邮箱与 Shopify、亚马逊订单都在同步）：四张卡的「测试连接」与成功浮层；
  * - 卡片的各种异常写法与全站横幅用接口桩（按 contracts 的模式解析真实响应后只改连接状态），不去弄坏长期运行的环境：
  *   Gmail 同步延迟、连接异常（卡底「重新检测」与失败浮层）、几个邮箱同时异常又有延迟、钉钉同步延迟与连接异常（含从没同步成功过）；
  *   Shopify 同步延迟、连接异常（按店铺，卡底「重新检测」与失败浮层，店铺表「Admin API 连接异常」）（待办 11）；
- *   横幅对所有角色显示、「查看渠道状态」只对管理员，恢复后自动消失；Gmail 与 Shopify 同时异常时各一条、Gmail 在上。
+ *   亚马逊同步延迟、连接异常（按店铺，同 Shopify）与「订单通知队列（SQS）」一行的四种写法（只影响这一行），测试连接失败按访问不了的
+ *   第一个写怎么查（待办 12）；
+ *   横幅对所有角色显示、「查看渠道状态」只对管理员，恢复后自动消失；几个渠道同时异常时各一条，从上到下 Gmail、亚马逊、Shopify。
  * 时刻按北京时间写（playwright.config 的 timezoneId）。
  */
+
+// 接口桩里取真实响应（route.fetch）时，页面可能正好在后台重取（窗口聚焦、每分钟的定时重取）：用例结束时撤掉桩并忽略还在途中的，
+// 否则这次重取被中断会报「route.fetch: Test ended」（与被测行为无关）
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
 
 async function loginAs(page: Page, name: string): Promise<void> {
   await page.goto('/dev-login');
@@ -33,19 +41,15 @@ const issue = (overrides: Partial<ChannelIssue>): ChannelIssue => ({
   ...overrides,
 });
 
-/** P18 的接口桩：取真实响应，只把 Gmail、钉钉、Shopify 卡换成给定的状态；可另把某店铺的订单连接换成给定的状态 */
+/** P18 的接口桩：取真实响应，只把给定的渠道卡换成给定的状态；可另把某店铺的订单连接换成给定的状态 */
 async function stubCards(
   page: Page,
-  cards: Partial<Record<'gmail' | 'dingtalk' | 'shopify', Partial<ChannelCard>>>,
+  cards: Partial<Record<ChannelCard['kind'], Partial<ChannelCard>>>,
   storeOrders: Readonly<Record<string, ChannelCard['status']>> = {},
 ): Promise<void> {
   await page.route('**/api/channel/settings', async (route) => {
     const real = channelSettingsSchema.parse(await (await route.fetch()).json());
-    const channels = real.channels.map((c) =>
-      c.kind === 'gmail' || c.kind === 'dingtalk' || c.kind === 'shopify'
-        ? { ...c, ...cards[c.kind] }
-        : c,
-    );
+    const channels = real.channels.map((c) => ({ ...c, ...cards[c.kind] }));
     const stores = real.stores.map((s) => {
       const status = storeOrders[s.name];
       return status
@@ -65,12 +69,11 @@ async function stubAlerts(page: Page, alerts: () => ChannelAlerts['alerts']): Pr
   );
 }
 
-test('测试连接（K20）：Gmail、钉钉与 Shopify 卡有（亚马逊随 12）；全部可访问时成功浮层写测过的邮箱数、通讯录可访问、店铺数', async ({
+test('测试连接（K20）：四张卡都有；全部可访问时成功浮层写测过的邮箱数、通讯录可访问、店铺数', async ({
   page,
 }) => {
   await loginAs(page, '刘洋');
   await page.goto('/settings/channels');
-  await expect(card(page, 'amazon').getByRole('button', { name: '测试连接' })).toHaveCount(0);
   // 开发测试环境的邮箱都在同步：已连接，副标题写最近同步时刻（刚部署时 worker 开始监听并同步完每个邮箱要几秒，之前为未连接）
   await expect(async () => {
     await page.reload();
@@ -93,6 +96,146 @@ test('测试连接（K20）：Gmail、钉钉与 Shopify 卡有（亚马逊随 12
   await expect(card(page, 'shopify')).toContainText(/最近同步 \d\d:\d\d/);
   await card(page, 'shopify').getByRole('button', { name: '测试连接' }).click();
   await expect(page.getByText(/^Shopify：\d+ 个店铺均可访问$/)).toBeVisible();
+
+  // 亚马逊订单每 4 分钟增量同步一次（worker 启动时也一次），订单通知队列（Fake SQS）在拉：已连接，SQS 正常
+  await expect(async () => {
+    await page.reload();
+    await expect(card(page, 'amazon')).toContainText('已连接', { timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+  await expect(card(page, 'amazon')).toContainText(/最近同步 \d\d:\d\d/);
+  await expect(card(page, 'amazon').getByTestId('order-queue-line')).toHaveText(
+    /^订单通知队列（SQS）正常 · 积压 \d+$/,
+  );
+  await card(page, 'amazon').getByRole('button', { name: '测试连接' }).click();
+  await expect(page.getByText(/^亚马逊 SP-API：\d+ 个店铺均可访问$/)).toBeVisible();
+});
+
+test('亚马逊卡同步延迟：每个延迟的店铺一行，其余说明行与 SQS 行照常；店铺表「SP-API 同步延迟」（待办 12 Q1）', async ({
+  page,
+}) => {
+  await stubCards(
+    page,
+    {
+      amazon: {
+        status: 'delayed',
+        lastSyncAt: '2026-09-11T02:05:00.000Z',
+        issues: [
+          issue({
+            target: 'Forcome Auto',
+            status: 'delayed',
+            failingSince: null,
+            failures: 0,
+            lastSuccessAt: '2026-09-11T02:05:00.000Z',
+          }),
+        ],
+        queue: { status: 'normal', backlog: 0 },
+      },
+    },
+    { 'Forcome Auto': 'delayed' },
+  );
+  await loginAs(page, '刘洋');
+  await page.goto('/settings/channels');
+  const amazon = card(page, 'amazon');
+  await expect(amazon).toContainText('同步延迟');
+  await expect(amazon).toContainText('最近同步 10:05');
+  await expect(amazon.getByTestId('channel-card-lines').locator('> div')).toHaveText([
+    'Forcome Auto 10:05 后未同步成功，超过 10 分钟',
+    /^\d+ 个店铺 · 订单经 SP-API 准实时同步$/,
+    '订单通知队列（SQS）正常 · 积压 0',
+  ]);
+  await expect(amazon.getByRole('button', { name: '重新检测' })).toHaveCount(0);
+  await expect(page.getByRole('row').filter({ hasText: 'A3KA8V1T6RW2NB' })).toContainText(
+    'SP-API 同步延迟',
+  );
+});
+
+test('亚马逊卡连接异常：每个异常的店铺一行原因与恢复指引、订单暂停同步、SQS 行照写、「重新检测」；测试失败浮层按访问不了的第一个写怎么查（待办 12 Q2、Q6）', async ({
+  page,
+}) => {
+  await stubCards(
+    page,
+    {
+      amazon: {
+        status: 'error',
+        lastSyncAt: '2026-09-11T02:02:00.000Z',
+        issues: [
+          issue({ target: 'Forcome Auto' }),
+          issue({ target: 'Forcome Direct', status: 'delayed', failingSince: null, failures: 0 }),
+        ],
+        queue: { status: 'normal', backlog: 0 },
+      },
+    },
+    { 'Forcome Auto': 'error' },
+  );
+  let failure = 'Forcome Auto 无法访问';
+  await page.route('**/api/channel/connection-tests/amazon', (route) =>
+    route.fulfill({ status: 502, json: { error: 'connection_test_failed', message: failure } }),
+  );
+  await loginAs(page, '刘洋');
+  await page.goto('/settings/channels');
+  const amazon = card(page, 'amazon');
+  await expect(amazon).toContainText('连接异常');
+  await expect(amazon.getByTestId('channel-card-lines').locator('> div')).toHaveText([
+    'Forcome Auto 访问失败（10:05 起连续 3 次）：请检查 SP-API 应用凭据与卖家授权',
+    '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
+    'Forcome Direct 10:04 后未同步成功，超过 10 分钟',
+    '订单通知队列（SQS）正常 · 积压 0',
+  ]);
+  // 第一阶段没有「重新授权」与错误日志页
+  await expect(amazon.getByRole('button', { name: '重新授权' })).toHaveCount(0);
+  await expect(amazon.getByRole('button', { name: '查看错误日志' })).toHaveCount(0);
+  await expect(page.getByRole('row').filter({ hasText: 'A3KA8V1T6RW2NB' })).toContainText(
+    'SP-API 连接异常',
+  );
+
+  await amazon.getByRole('button', { name: '重新检测' }).click();
+  await expect(page.getByText('测试连接失败：Forcome Auto 无法访问')).toBeVisible();
+  await expect(page.getByText('请检查 SP-API 应用凭据与卖家授权', { exact: true })).toBeVisible();
+
+  // 只有订单通知队列访问不了：写 AWS 的（上一次测完要重取渠道卡，按钮在这期间转圈、不响应点击）
+  failure = '订单通知队列（SQS） 无法访问';
+  const testButton = amazon.getByRole('button', { name: '测试连接' });
+  await expect(testButton).not.toHaveAttribute('aria-busy');
+  await testButton.click();
+  await expect(page.getByText('测试连接失败：订单通知队列（SQS） 无法访问')).toBeVisible();
+  await expect(page.getByText('请检查 AWS 访问密钥与队列地址', { exact: true })).toBeVisible();
+});
+
+test('订单通知队列（SQS）一行的四种写法：正常 · 积压 N、积压 N 条、拉取失败、未连接；只影响这一行，卡片仍是已连接、没有「重新检测」（待办 12 Q7）', async ({
+  page,
+}) => {
+  let queue: ChannelCard['queue'] = { status: 'normal', backlog: 3 };
+  await page.route('**/api/channel/settings', async (route) => {
+    const real = channelSettingsSchema.parse(await (await route.fetch()).json());
+    const channels = real.channels.map((c) =>
+      c.kind === 'amazon'
+        ? {
+            ...c,
+            status: 'connected' as const,
+            issues: [],
+            lastSyncAt: '2026-09-11T02:16:00.000Z',
+            queue,
+          }
+        : c,
+    );
+    await route.fulfill({ json: { ...real, channels } });
+  });
+  await loginAs(page, '刘洋');
+  await page.goto('/settings/channels');
+  const amazon = card(page, 'amazon');
+  const line = amazon.getByTestId('order-queue-line');
+  await expect(line).toHaveText('订单通知队列（SQS）正常 · 积压 3');
+  for (const [next, text] of [
+    [{ status: 'backlog', backlog: 12 }, '订单通知队列（SQS）积压 12 条'],
+    [{ status: 'failed', backlog: 3 }, '订单通知队列（SQS）拉取失败'],
+    [{ status: 'not_connected', backlog: null }, '订单通知队列（SQS）未连接'],
+  ] as const) {
+    queue = next;
+    await page.reload();
+    await expect(line).toHaveText(text);
+    await expect(amazon).toContainText('已连接');
+    await expect(amazon.getByRole('button', { name: '重新检测' })).toHaveCount(0);
+  }
 });
 
 test('Shopify 卡同步延迟：每个延迟的店铺一行，其余说明行照常；店铺表「Admin API 同步延迟」（待办 11）', async ({
@@ -349,6 +492,35 @@ test('全站横幅（G4）：Gmail 连接异常时所有角色都看到，「查
   await expect(adminBanner).toBeVisible();
 });
 
+test('全站横幅（G4）：Gmail、亚马逊、Shopify 同时连接异常时各一条，从上到下 Gmail、亚马逊、Shopify；亚马逊的写法（待办 12 Q3）', async ({
+  page,
+}) => {
+  await stubAlerts(page, () => [
+    { kind: 'gmail', targets: ['support@forcome.mx'], since: '2026-09-11T02:05:00.000Z' },
+    { kind: 'amazon', targets: ['Forcome Auto'], since: '2026-09-11T02:05:00.000Z' },
+    { kind: 'shopify', targets: ['forcome.mx'], since: '2026-09-11T02:05:00.000Z' },
+  ]);
+  await loginAs(page, '李婷');
+  const banners = page.getByRole('alert').filter({ hasText: /连接中断|同步中断/ });
+  await expect(banners).toHaveCount(3);
+  await expect(banners.nth(0)).toContainText('Gmail 连接中断，来信暂存队列');
+  await expect(banners.nth(1)).toContainText('亚马逊订单同步中断');
+  await expect(banners.nth(2)).toContainText('Shopify 订单同步中断');
+  await expect(
+    banners
+      .nth(1)
+      .getByText(
+        '09-11 10:05 起未同步。来信照常收取，恢复后自动补拉订单。管理员、客服主管已收到通知。',
+      ),
+  ).toBeVisible();
+  await expect(banners.nth(1).getByRole('link', { name: '查看渠道状态' })).toHaveCount(0);
+
+  await loginAs(page, '刘洋');
+  const adminAmazon = page.getByRole('alert').filter({ hasText: '亚马逊订单同步中断' });
+  await adminAmazon.getByRole('link', { name: '查看渠道状态' }).click();
+  await expect(page).toHaveURL(/\/settings\/channels$/);
+});
+
 test('全站横幅（G4）：Gmail 与 Shopify 同时连接异常时各一条，Gmail 在上；Shopify 的写法（待办 11）', async ({
   page,
 }) => {
@@ -401,5 +573,35 @@ test('Shopify 卡未连接（生产环境还没配置 Shopify 凭据，或从没
   await expect(shopify.getByRole('button', { name: '重新检测' })).toHaveCount(0);
   await expect(page.getByRole('row').filter({ hasText: 'forcome-mx.myshopify.com' })).toContainText(
     'Admin API 未连接',
+  );
+});
+
+test('亚马逊卡未连接（生产环境还没配置 SP-API 与 SQS）：「尚未授权」、没有最近同步与异常行、SQS 行未连接（待办 12）', async ({
+  page,
+}) => {
+  await stubCards(
+    page,
+    {
+      amazon: {
+        status: 'not_connected',
+        lastSyncAt: null,
+        issues: [],
+        queue: { status: 'not_connected', backlog: null },
+      },
+    },
+    { 'Forcome Direct': 'not_connected', 'Forcome Auto': 'not_connected' },
+  );
+  await loginAs(page, '刘洋');
+  await page.goto('/settings/channels');
+  const amazon = card(page, 'amazon');
+  await expect(amazon).toContainText('未连接');
+  await expect(amazon).toContainText('尚未授权');
+  await expect(amazon).not.toContainText('最近同步');
+  await expect(amazon.getByTestId('channel-card-lines').locator('> div')).toHaveText([
+    /^\d+ 个店铺 · 订单经 SP-API 准实时同步$/,
+    '订单通知队列（SQS）未连接',
+  ]);
+  await expect(page.getByRole('row').filter({ hasText: 'A1FD7Q2M9XK3LC' })).toContainText(
+    'SP-API 未连接',
   );
 });

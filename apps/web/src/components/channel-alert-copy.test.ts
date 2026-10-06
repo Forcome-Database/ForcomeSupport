@@ -32,6 +32,12 @@ describe('G4 集成中断横幅（K7 同一写法）', () => {
     expectText(STATES_ADMIN, shopify.description('09-11 10:05'));
   });
 
+  it('亚马逊：标题与说明（K20 补充小样，待办 12 Q3 协调者 2026-10-06 决定）', () => {
+    const amazon = CHANNEL_ALERT_COPY.amazon;
+    expectText(STATES_ADMIN, amazon.title);
+    expectText(STATES_ADMIN, amazon.description('09-11 10:05'));
+  });
+
   it('管理员看到的「查看渠道状态」', () => {
     expectText(STATES_ADMIN, VIEW_CHANNEL_STATUS);
   });

@@ -13,6 +13,7 @@ export {
   type FixtureMember,
   type FixtureNotification,
   type FixtureShopifyOrder,
+  type FixtureAmazonOrder,
   type FixtureStore,
   type FixtureTicket,
 } from './schema';

@@ -169,6 +169,13 @@
       "when": 1791288389142,
       "tag": "0023_shopify_order_mirror",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791297390356,
+      "tag": "0024_amazon_order_mirror",
+      "breakpoints": true
     }
   ]
 }

@@ -124,22 +124,23 @@ describe('P18 店铺表（非生产环境）', () => {
         adapterMode: 'fake',
       },
     ]);
-    // 店铺表「状态」列：Gmail 按邮箱的同步记录（待办 09）、Shopify 订单按店铺的同步记录（待办 11），这里都还没同步过，为未连接
-    // （同步后的状态见 gmail-sync-health.int.test.ts、shopify-orders.int.test.ts）；亚马逊订单的同步记录随 12，模拟数据视为已连接
+    // 店铺表「状态」列：Gmail 按邮箱的同步记录（待办 09）、Shopify 与亚马逊订单按店铺的同步记录（待办 11、12），这里都还没同步过，
+    // 为未连接（同步后的状态见 gmail-sync-health.int.test.ts、shopify-orders.int.test.ts、amazon-orders.int.test.ts）
     for (const store of data.stores) {
       expect(store.connections).toEqual([
         { kind: 'gmail', status: 'not_connected' },
-        { kind: 'orders', status: store.platform === 'amazon' ? 'connected' : 'not_connected' },
+        { kind: 'orders', status: 'not_connected' },
       ]);
       expect(store.updatedBy).toBeNull();
     }
-    // 渠道卡：亚马逊 SP-API、Shopify Admin API、Gmail、钉钉。亚马逊订单的同步记录随 12，暂无最近同步时间；
-    // Shopify、Gmail 与钉钉卡按同步记录（待办 11、09、05），这里都还没同步过，为未连接
+    // 渠道卡：亚马逊 SP-API、Shopify Admin API、Gmail、钉钉，都按同步记录（待办 12、11、09、05），这里都还没同步过，为未连接；
+    // 亚马逊卡另有订单通知队列（SQS）一行，还没拉过也是未连接
+    const empty = { status: 'not_connected', simulated: true, lastSyncAt: null, issues: [] };
     expect(data.channels).toEqual([
-      { kind: 'amazon', status: 'connected', simulated: true, lastSyncAt: null, issues: [] },
-      { kind: 'shopify', status: 'not_connected', simulated: true, lastSyncAt: null, issues: [] },
-      { kind: 'gmail', status: 'not_connected', simulated: true, lastSyncAt: null, issues: [] },
-      { kind: 'dingtalk', status: 'not_connected', simulated: true, lastSyncAt: null, issues: [] },
+      { kind: 'amazon', ...empty, queue: { status: 'not_connected', backlog: null } },
+      { kind: 'shopify', ...empty, queue: null },
+      { kind: 'gmail', ...empty, queue: null },
+      { kind: 'dingtalk', ...empty, queue: null },
     ]);
   });
 
@@ -455,7 +456,8 @@ describe('P18 店铺表（非生产环境）', () => {
       issues: [],
     });
     expect(data.channels.find((c) => c.kind === 'gmail')?.status).toBe('not_connected');
-    expect(data.channels.find((c) => c.kind === 'amazon')?.status).toBe('connected');
+    // 亚马逊店铺还没同步过（同步与状态见 amazon-orders.int.test.ts）
+    expect(data.channels.find((c) => c.kind === 'amazon')?.status).toBe('not_connected');
   });
 });
 

@@ -170,6 +170,31 @@ export const fixtureShopifyOrderSchema = z.object({
   tracking: z.object({ company: z.string(), number: z.string() }).nullable(),
 });
 
+/**
+ * 亚马逊订单（待办 12，data.py 的 AMAZON_ORDERS_P1）：Fake SP-API 回放它们。状态保留 SP-API 的枚举写法（SHIPPED 等），履约方 MFN / AFN；
+ * 收件地址只有非受限角色读得到的部分（美国站没有邮编），没有买家姓名
+ */
+export const fixtureAmazonOrderSchema = z.object({
+  orderId: z.string().regex(/^\d{3}-\d{7}-\d{7}$/),
+  storeKey: z.string(),
+  site: z.enum(['US', 'CA', 'MX']),
+  placedAt: instant,
+  updatedAt: instant,
+  lineItems: z.array(z.object({ title: z.string(), quantity: z.int().positive() })).min(1),
+  total: z.object({ amount, currency: fixtureCurrencySchema }),
+  status: z.string(),
+  fulfillmentChannel: z.enum(['MFN', 'AFN']),
+  shipBy: instant,
+  deliverBy: instant,
+  shipTo: z.object({
+    city: z.string(),
+    stateOrRegion: z.string(),
+    postalCode: z.string().nullable(),
+    countryCode: z.enum(['US', 'CA', 'MX']),
+  }),
+  tracking: z.object({ carrier: z.string(), number: z.string() }).nullable(),
+});
+
 /** 站内通知（G10 周敏的面板，第一期的类型）：类型取值同 contracts 的 notificationTypes，加载时再按枚举校验 */
 export const fixtureNotificationSchema = z.object({
   id: uuid,
@@ -220,6 +245,7 @@ export const demoFixtureSchema = z.object({
   ticketTimeline: fixtureTicketTimelineSchema,
   notifications: z.array(fixtureNotificationSchema),
   shopifyOrders: z.array(fixtureShopifyOrderSchema),
+  amazonOrders: z.array(fixtureAmazonOrderSchema),
 });
 
 export type DemoFixture = z.infer<typeof demoFixtureSchema>;
@@ -230,3 +256,4 @@ export type FixtureLedgerRow = z.infer<typeof fixtureLedgerRowSchema>;
 export type FixtureFee = z.infer<typeof fixtureFeeSchema>;
 export type FixtureNotification = z.infer<typeof fixtureNotificationSchema>;
 export type FixtureShopifyOrder = z.infer<typeof fixtureShopifyOrderSchema>;
+export type FixtureAmazonOrder = z.infer<typeof fixtureAmazonOrderSchema>;

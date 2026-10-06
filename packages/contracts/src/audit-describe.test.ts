@@ -714,4 +714,40 @@ describe('渠道连接的记录（待办 09，原型 AUDIT_LOG 与 AUDIT_P27_EXP
     expect(entry.fields.map((f) => f.label)).toEqual(['状态', '最近同步成功', '补拉', '触发']);
     expect(shopifyRecord(null).summary).toBe('状态：连接异常 → 已连接（补拉 0 笔订单）');
   });
+
+  it('亚马逊店铺的恢复连接（待办 12 Q5，协调者 2026-10-06 决定）：同 Shopify，补拉写「N 笔订单（…更新）」', () => {
+    const entry = describeAuditRecord(
+      channelRecord({
+        objectId: 'amazon:store-auto',
+        objectLabel: '亚马逊 SP-API · Forcome Auto',
+        occurredAt: new Date('2026-09-11T02:14:00Z'),
+        action: 'channel.recovered',
+        before: {
+          channel: 'amazon',
+          status: 'error',
+          lastSuccessAt: '2026-09-11T02:04:00.000Z',
+          backfilled: null,
+          trigger: { kind: 'failures', count: 3 },
+        },
+        after: {
+          channel: 'amazon',
+          status: 'connected',
+          lastSuccessAt: '2026-09-11T02:14:00.000Z',
+          backfilled: {
+            count: 2,
+            from: '2026-09-11T02:05:00.000Z',
+            to: '2026-09-11T02:13:00.000Z',
+          },
+          trigger: { kind: 'retry_succeeded', attempt: 4 },
+        },
+      }),
+      { financeVisible: false, names },
+    );
+    expect(entry.objectLabel).toBe('亚马逊 SP-API · Forcome Auto');
+    expect(entry.summary).toBe('状态：连接异常 → 已连接（补拉 2 笔订单）');
+    expect(field(entry, '补拉')).toMatchObject({
+      before: '—',
+      after: '2 笔订单（10:05–10:13 更新）',
+    });
+  });
 });

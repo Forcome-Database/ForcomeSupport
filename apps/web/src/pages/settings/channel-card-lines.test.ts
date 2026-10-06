@@ -34,6 +34,7 @@ const card = (overrides: Partial<ChannelCard>): ChannelCard => ({
   simulated: false,
   lastSyncAt: '2026-09-11T02:18:00.000Z',
   issues: [],
+  queue: null,
   ...overrides,
 });
 
@@ -201,5 +202,47 @@ describe('Shopify 卡（待办 11，套用 Gmail 的写法、按店铺）', () =
       '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
       'forcome.com 10:04 后未同步成功，超过 10 分钟',
     ]);
+  });
+});
+
+describe('亚马逊卡（待办 12 Q1、Q2，套用 Shopify 的写法、按店铺）', () => {
+  const amazon = (overrides: Partial<ChannelCard>) =>
+    card({ kind: 'amazon', queue: { status: 'normal', backlog: 0 }, ...overrides });
+
+  it('同步延迟：每个延迟的店铺一行在前，其余说明行照常', () => {
+    const delayed = amazon({
+      status: 'delayed',
+      issues: [
+        issue({
+          target: 'Forcome Auto',
+          status: 'delayed',
+          lastSuccessAt: '2026-09-11T02:05:00.000Z',
+          failingSince: null,
+          failures: 0,
+        }),
+      ],
+    });
+    expect(channelCardLines(delayed, STORES)).toEqual([
+      'Forcome Auto 10:05 后未同步成功，超过 10 分钟',
+      '2 个店铺 · 订单经 SP-API 准实时同步',
+    ]);
+    expect(needsRecheck(delayed)).toBe(false);
+  });
+
+  it('连接异常：每个异常的店铺一行、订单暂停同步写一次、延迟的店铺在后，卡底「重新检测」；只是 SQS 拉取失败不给「重新检测」', () => {
+    const failed = amazon({
+      status: 'error',
+      issues: [
+        issue({ target: 'Forcome Auto' }),
+        issue({ target: 'Forcome Direct', status: 'delayed', failingSince: null, failures: 0 }),
+      ],
+    });
+    expect(channelCardLines(failed, STORES)).toEqual([
+      'Forcome Auto 访问失败（10:05 起连续 3 次）：请检查 SP-API 应用凭据与卖家授权',
+      '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
+      'Forcome Direct 10:04 后未同步成功，超过 10 分钟',
+    ]);
+    expect(needsRecheck(failed)).toBe(true);
+    expect(needsRecheck(amazon({ queue: { status: 'failed', backlog: 3 } }))).toBe(false);
   });
 });

@@ -25,8 +25,14 @@ import { z } from 'zod';
  * - `SHOPIFY_CLIENT_ID` / `SHOPIFY_CLIENT_SECRET`：Shopify 自建应用（Dev Dashboard，与店铺同一组织）的客户端凭据，按店铺以
  *   client credentials 换 24 小时的访问令牌读订单（docs/部署说明.md 第 13 节；待办 11）。两项要么都不填、要么都填；都不填时照常启动
  *   （生产也一样，用户 2026-10-04 口径），真实接口的 Shopify 店铺为「未连接」，不出横幅、不发通知。
- * - `CREDENTIAL_MASTER_KEY`：主密钥（32 字节的 base64），动态凭据（各店铺的 Shopify 访问令牌，SP-API 刷新令牌随 12）用它 AES-256-GCM
- *   加密后存库（ADR 0013）。填了 Shopify 凭据就必填；单独填可以（先放好主密钥）。
+ * - `SP_API_CLIENT_ID` / `SP_API_CLIENT_SECRET`：SP-API 私有应用的 LWA 凭据（Seller Central「开发者中心」的应用，docs/部署说明.md
+ *   第 14 节；待办 12）。两项要么都不填、要么都填；都不填时照常启动（生产也一样，用户 2026-10-04 口径），真实接口的亚马逊店铺为「未连接」，
+ *   不出横幅、不发通知。各卖家授权的刷新令牌不在这里：用部署子命令 sp-api-token 加密存库（ADR 0013）。
+ * - `AMAZON_SQS_QUEUE_URL` / `AMAZON_SQS_ACCESS_KEY_ID` / `AMAZON_SQS_SECRET_ACCESS_KEY`：接收 ORDER_CHANGE 通知的 SQS 标准队列与
+ *   只能读、删这个队列的 IAM 访问密钥（区域从队列地址取，待办 12）。三项要么都不填、要么都填；都不填时照常启动，亚马逊卡的 SQS 行为
+ *   「未连接」，订单靠每 4 分钟的增量兜底。生产不允许用 Fake（`CLIENT_MODE_AMAZON_SQS`）。
+ * - `CREDENTIAL_MASTER_KEY`：主密钥（32 字节的 base64），动态凭据（各店铺的 Shopify 访问令牌、SP-API 刷新令牌）用它 AES-256-GCM
+ *   加密后存库（ADR 0013）。填了 Shopify 或 SP-API 凭据就必填；单独填可以（先放好主密钥）。
  * 空值视同未设置。
  */
 const envSchema = z.object({
@@ -62,6 +68,17 @@ const envSchema = z.object({
     .optional(),
   SHOPIFY_CLIENT_ID: z.string().optional(),
   SHOPIFY_CLIENT_SECRET: z.string().optional(),
+  SP_API_CLIENT_ID: z.string().optional(),
+  SP_API_CLIENT_SECRET: z.string().optional(),
+  AMAZON_SQS_QUEUE_URL: z
+    .string()
+    .regex(
+      /^https:\/\/sqs\.[a-z0-9-]+\.amazonaws\.com\/\d{12}\/[A-Za-z0-9_-]{1,80}$/,
+      '写成 https://sqs.<区域>.amazonaws.com/<账户>/<队列名>',
+    )
+    .optional(),
+  AMAZON_SQS_ACCESS_KEY_ID: z.string().optional(),
+  AMAZON_SQS_SECRET_ACCESS_KEY: z.string().optional(),
   CREDENTIAL_MASTER_KEY: z
     .string()
     .refine(
@@ -155,6 +172,31 @@ export interface ShopifyCredentials {
 
 const SHOPIFY_VARIABLES = ['SHOPIFY_CLIENT_ID', 'SHOPIFY_CLIENT_SECRET'] as const;
 
+/**
+ * SP-API 私有应用的 LWA 凭据（ADR 0011 修订，待办 12）：在 Seller Central 的开发者中心取；各卖家的刷新令牌另行加密存库。
+ * 只在亚马逊店铺用真实接口时用到
+ */
+export interface SpApiCredentials {
+  readonly clientId: string;
+  readonly clientSecret: string;
+}
+
+const SP_API_VARIABLES = ['SP_API_CLIENT_ID', 'SP_API_CLIENT_SECRET'] as const;
+
+/** 接收 ORDER_CHANGE 通知的 SQS 队列与访问密钥（待办 12）；区域从队列地址取 */
+export interface AmazonSqsConfig {
+  readonly queueUrl: string;
+  readonly region: string;
+  readonly accessKeyId: string;
+  readonly secretAccessKey: string;
+}
+
+const AMAZON_SQS_VARIABLES = [
+  'AMAZON_SQS_QUEUE_URL',
+  'AMAZON_SQS_ACCESS_KEY_ID',
+  'AMAZON_SQS_SECRET_ACCESS_KEY',
+] as const;
+
 const serviceAccountKeySchema = z.object({
   type: z.literal('service_account'),
   client_email: z.string().min(1),
@@ -181,6 +223,10 @@ export interface AppConfig {
   google: GoogleCredentials | null;
   /** Shopify 的客户端凭据；两项都没填为 null（照常启动，真实接口的 Shopify 店铺为未连接） */
   shopify: ShopifyCredentials | null;
+  /** SP-API 的 LWA 凭据；两项都没填为 null（照常启动，真实接口的亚马逊店铺为未连接） */
+  spApi: SpApiCredentials | null;
+  /** 订单通知队列（SQS）；三项都没填为 null（照常启动，亚马逊卡的 SQS 行为未连接） */
+  amazonSqs: AmazonSqsConfig | null;
   /** 动态凭据的主密钥（32 字节）；没填为 null */
   credentialMasterKey: Buffer | null;
 }
@@ -330,6 +376,47 @@ export function loadConfig(
     }
   }
 
+  // SP-API 的 LWA 凭据：同 Shopify，两项要么都填要么都不填；填了就要有主密钥加密存各卖家的刷新令牌
+  let spApi: SpApiCredentials | null = null;
+  if (result.success) {
+    const given = SP_API_VARIABLES.filter((name) => result.data[name]);
+    if (given.length > 0) {
+      const missing = SP_API_VARIABLES.filter((name) => !result.data[name]);
+      for (const name of missing) problems.push(`${name}：与另一项 SP-API 凭据一起填`);
+      if (!result.data.CREDENTIAL_MASTER_KEY) {
+        problems.push(
+          'CREDENTIAL_MASTER_KEY：填了 SP-API 凭据时必填（加密存放各卖家授权的刷新令牌）',
+        );
+      }
+      if (missing.length === 0) {
+        spApi = {
+          clientId: result.data.SP_API_CLIENT_ID ?? '',
+          clientSecret: result.data.SP_API_CLIENT_SECRET ?? '',
+        };
+      }
+    }
+  }
+
+  // 订单通知队列：三项要么都填要么都不填（都不填照常启动，SQS 行为未连接）
+  let amazonSqs: AmazonSqsConfig | null = null;
+  if (result.success) {
+    const given = AMAZON_SQS_VARIABLES.filter((name) => result.data[name]);
+    if (given.length > 0) {
+      const missing = AMAZON_SQS_VARIABLES.filter((name) => !result.data[name]);
+      for (const name of missing) problems.push(`${name}：与其他两项 SQS 配置一起填`);
+      if (missing.length === 0) {
+        const queueUrl = result.data.AMAZON_SQS_QUEUE_URL ?? '';
+        amazonSqs = {
+          queueUrl,
+          // https://sqs.<区域>.amazonaws.com/…
+          region: new URL(queueUrl).hostname.split('.')[1] ?? '',
+          accessKeyId: result.data.AMAZON_SQS_ACCESS_KEY_ID ?? '',
+          secretAccessKey: result.data.AMAZON_SQS_SECRET_ACCESS_KEY ?? '',
+        };
+      }
+    }
+  }
+
   if (!result.success || problems.length > 0) {
     throw new ConfigError(`环境变量配置有误：\n${problems.join('\n')}`);
   }
@@ -358,6 +445,8 @@ export function loadConfig(
     dingtalk,
     google,
     shopify,
+    spApi,
+    amazonSqs,
     credentialMasterKey: CREDENTIAL_MASTER_KEY
       ? Buffer.from(CREDENTIAL_MASTER_KEY, 'base64')
       : null,

@@ -1,6 +1,7 @@
 import type { ChannelCard, Store } from '@forcome/contracts';
 import { formatClock } from '@/lib/channel';
 import {
+  AMAZON_ISSUE_LINES,
   CARD_LINES,
   CHANNEL_CARDS,
   DINGTALK_ISSUE_LINES,
@@ -10,9 +11,9 @@ import {
 
 /*
  * 渠道卡的说明行（K20 与补充小样，待办 09）：
- * - 亚马逊：店铺数与同步方式（SQS 与回补行随 12、13）；
- * - Shopify（待办 11）：写法同 Gmail，按店铺——有连接异常的店铺时，每个异常的店铺一行原因与恢复指引，再写一次订单暂停同步，
- *   同步延迟的店铺排在后面；只有同步延迟时，每个延迟的店铺一行，其余说明行照常（回补窗口行随 13）；
+ * - 亚马逊（待办 12）与 Shopify（待办 11）：写法同 Gmail，按店铺——有连接异常的店铺时，每个异常的店铺一行原因与恢复指引，
+ *   再写一次订单暂停同步，同步延迟的店铺排在后面；只有同步延迟时，每个延迟的店铺一行，其余说明行照常（回补行随 13）；
+ *   亚马逊卡的「订单通知队列（SQS）」一行带状态标签，不在这里（channel-cards.tsx 的 OrderQueueLine），各状态下都照写；
  * - Gmail：都正常时写邮箱数与「已发送」；有连接异常的邮箱时，每个异常的邮箱一行原因与恢复指引（次数为实际的连续失败次数），
  *   再写一次来信暂存，同步延迟的邮箱排在后面；只有同步延迟时，每个延迟的邮箱一行，其余说明行照常；
  * - 钉钉：同步延迟与连接异常时第一行换成未同步成功的说明（从没同步成功过写「尚未同步成功」），其后两行固定。
@@ -26,21 +27,29 @@ function storeLines(kind: 'amazon' | 'shopify', stores: readonly Store[]): strin
   return [CHANNEL_CARDS[kind].stores(count)];
 }
 
-function shopifyLines(card: ChannelCard, stores: readonly Store[]): string[] {
+const ORDER_ISSUE_LINES = { amazon: AMAZON_ISSUE_LINES, shopify: SHOPIFY_ISSUE_LINES } as const;
+
+/** 订单渠道卡（亚马逊、Shopify）的说明行：按店铺列出异常与延迟 */
+function ordersLines(
+  kind: 'amazon' | 'shopify',
+  card: ChannelCard,
+  stores: readonly Store[],
+): string[] {
+  const words = ORDER_ISSUE_LINES[kind];
   const failed = card.issues.filter((issue) => issue.status === 'error');
   const delayed = card.issues
     .filter((issue) => issue.status === 'delayed')
-    .map((issue) => SHOPIFY_ISSUE_LINES.delayed(issue.target, clockOf(issue.lastSuccessAt)));
+    .map((issue) => words.delayed(issue.target, clockOf(issue.lastSuccessAt)));
   if (failed.length > 0) {
     return [
       ...failed.map((issue) =>
-        SHOPIFY_ISSUE_LINES.failed(issue.target, clockOf(issue.failingSince), issue.failures),
+        words.failed(issue.target, clockOf(issue.failingSince), issue.failures),
       ),
-      SHOPIFY_ISSUE_LINES.held,
+      words.held,
       ...delayed,
     ];
   }
-  return [...delayed, ...storeLines('shopify', stores)];
+  return [...delayed, ...storeLines(kind, stores)];
 }
 
 function gmailLines(card: ChannelCard, stores: readonly Store[]): string[] {
@@ -88,9 +97,8 @@ function dingtalkLines(card: ChannelCard): string[] {
 export function channelCardLines(card: ChannelCard, stores: readonly Store[]): string[] {
   switch (card.kind) {
     case 'amazon':
-      return storeLines(card.kind, stores);
     case 'shopify':
-      return shopifyLines(card, stores);
+      return ordersLines(card.kind, card, stores);
     case 'gmail':
       return gmailLines(card, stores);
     case 'dingtalk':
@@ -98,10 +106,10 @@ export function channelCardLines(card: ChannelCard, stores: readonly Store[]): s
   }
 }
 
-/** Gmail 卡有连接异常的邮箱、Shopify 卡有连接异常的店铺时，卡底给「重新检测」（K7、K20 补充小样；立即重测并补拉） */
+/**
+ * Gmail 卡有连接异常的邮箱、Shopify 与亚马逊卡有连接异常的店铺时，卡底给「重新检测」（K7、K20 补充小样；立即重测并补拉）。
+ * 只是订单通知队列拉取失败不算（Q7：只影响 SQS 那一行）
+ */
 export function needsRecheck(card: ChannelCard): boolean {
-  return (
-    (card.kind === 'gmail' || card.kind === 'shopify') &&
-    card.issues.some((issue) => issue.status === 'error')
-  );
+  return card.kind !== 'dingtalk' && card.issues.some((issue) => issue.status === 'error');
 }

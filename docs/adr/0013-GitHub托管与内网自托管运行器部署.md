@@ -81,3 +81,8 @@ status: accepted
 
 - **主密钥与动态凭据**：主密钥是环境变量 `CREDENTIAL_MASTER_KEY`（32 字节的 base64，`openssl rand -base64 32`），只读进 `integration`（`databaseCredentialVault`）。动态凭据按「外部系统 × 店铺」存进 `integration.credential`：AES-256-GCM（`node:crypto`），每次写入随机 12 字节 IV、16 字节认证标签，附加数据为「系统:店铺」（密文搬到别的行就解不开）；库里只有密文与签发、过期时间。主密钥换了或密文被改，解密失败当作没有凭据，真实现重新换一个，不让旧数据挡住同步。第一个使用者是 Shopify 的访问令牌（待办 11），SP-API 刷新令牌随 12。
 - **缺配置照常启动**（用户 2026-10-04 口径）：`SHOPIFY_CLIENT_ID` / `SHOPIFY_CLIENT_SECRET` 要么都填要么都不填，都不填时生产照常启动，Shopify 店铺为「未连接」（不出横幅、不发通知）；填了 Shopify 凭据就要有主密钥（只填一部分拒绝启动，只列变量名、不回显取值）。主密钥单独填可以。部署配置见 `docs/部署说明.md` 第 13 节。
+
+## 修订（2026-10-06，待办 12 落地）
+
+- **SP-API 刷新令牌是第二个动态凭据**：按店铺加密存 `integration.credential`（系统名 `sp_api`，附加数据「sp_api:店铺」）；平台不给过期时间，库里的过期时间按录入后一年记，只作提醒、不据此拒用（被撤销时换访问令牌失败，记连接失败）。主密钥换了时刷新令牌解不开、该店铺为「未连接」，要用子命令重新录入（Shopify 的访问令牌则会自动重新换）。
+- **部署子命令 `sp-api-token`**：`echo <刷新令牌> | node deploy/deploy.mjs <环境> sp-api-token --seller <卖家 ID>`，用当前部署的镜像起一次性容器（`docker compose run --rm --no-deps -T migrate node dist/sp-api-token.mjs --seller …`），令牌经标准输入传入，不出现在参数、shell 历史与输出里；卖家 ID 对不上亚马逊店铺时退出码为 1。环境变量 `SP_API_CLIENT_ID` / `_SECRET`、`AMAZON_SQS_QUEUE_URL` / `_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY`、`CLIENT_MODE_AMAZON_SQS` 进 `deploy/compose.yml` 与 `.env.example`（`docs/部署说明.md` 第 14 节）；填了 SP-API 凭据就要有主密钥。

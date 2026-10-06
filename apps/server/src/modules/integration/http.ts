@@ -1,5 +1,5 @@
 import pThrottle from 'p-throttle';
-import { EnvHttpProxyAgent, fetch, type Dispatcher } from 'undici';
+import { EnvHttpProxyAgent, fetch, type Dispatcher, type Headers } from 'undici';
 import { noCallRecords, summarize, type CallRecorder } from './call-records';
 import { ExternalCallFailedError, ExternalTimeoutError } from './faults';
 
@@ -34,6 +34,11 @@ export interface HttpRequestOptions {
   readonly headers?: Readonly<Record<string, string>>;
   /** 成功的响应体是凭证（换令牌）：调用记录里不留 */
   readonly secretResponse?: boolean;
+  /**
+   * 收到响应（不论状态码）时交给调用方状态码与响应头：SP-API 的配额以响应头 x-amzn-RateLimit-Limit 为准（待办 12）。
+   * 网络错误与超时没有响应，不调用
+   */
+  readonly onResponse?: (status: number, headers: Headers) => void;
 }
 
 export interface HttpClient {
@@ -165,6 +170,7 @@ export function createHttpClient(system: string, options: HttpClientOptions = {}
         throw translate(error, request.operation, signal);
       }
       status = res.status;
+      request.onResponse?.(res.status, res.headers);
       let text: string;
       try {
         text = await res.text();

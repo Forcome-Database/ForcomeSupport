@@ -14,6 +14,9 @@
 //   node deploy/deploy.mjs staging import-aftersales <登记表.xlsx|.csv> [--mapping <映射表.json>] [--dry-run]
 //                                               用当前部署的版本导入售后登记表（待办 27；--dry-run 只报告不写库，
 //                                               docs/部署说明.md「售后登记表导入」）
+//   echo <刷新令牌> | node deploy/deploy.mjs staging sp-api-token --seller <卖家 ID>
+//                                               用当前部署的版本录入某卖家的 SP-API 授权（待办 12；令牌从标准输入读、
+//                                               加密存库，docs/部署说明.md 第 14 节）
 //
 // 只依赖 Node（≥ 22）、git 与 Docker（含 compose），不需要 pnpm install；Linux 服务器与 Windows 本机通用。
 // 环境文件默认 deploy/.env.<环境>，可用 FORCOME_ENV_FILE 指到别处；部署产物（根证书、报告）在 deploy/.state/<环境>/。
@@ -34,11 +37,12 @@ import { ENVIRONMENTS } from './lib/environments.mjs';
 import { httpsGet, verifyCertificate } from './lib/https-check.mjs';
 import { IMPORT_AFTERSALES_SYNOPSIS, importAftersalesRun } from './lib/import-aftersales.mjs';
 import { capture, mustRun, run } from './lib/process.mjs';
+import { SP_API_TOKEN_SYNOPSIS, spApiTokenRun } from './lib/sp-api-token.mjs';
 import { formatReport, summarizePlaywright } from './lib/report.mjs';
 
 const ROOT_CERT_IN_CADDY = '/data/caddy/pki/authorities/local/root.crt';
 const USAGE = `用法：node deploy/deploy.mjs <环境> [deploy [--reset-inbound] | smoke | cert | compose <参数…> | down | reset-inbound
-  | ${IMPORT_AFTERSALES_SYNOPSIS}]
+  | ${IMPORT_AFTERSALES_SYNOPSIS} | ${SP_API_TOKEN_SYNOPSIS}]
 环境：${Object.keys(ENVIRONMENTS).join('、')}`;
 
 // 命令行里给的文件（售后登记表导入）按调用者所在的目录解析：pnpm 运行脚本时把它放在 INIT_CWD
@@ -362,6 +366,16 @@ async function main() {
       return (
         compose.status('run', '--rm', '--no-deps', ...volumes, 'migrate', ...planned.command) === 0
       );
+    }
+    case 'sp-api-token': {
+      // 录入卖家授权（待办 12）：一次性容器，-T 不分配终端，本命令的标准输入（刷新令牌）原样交给容器
+      const planned = spApiTokenRun(commandArgs);
+      if ('error' in planned) {
+        console.error(planned.error);
+        return false;
+      }
+      const compose = composeFor(loadDeployEnv(), deployedRelease());
+      return compose.status('run', '--rm', '--no-deps', '-T', 'migrate', ...planned.command) === 0;
     }
     default:
       console.error(USAGE);

@@ -45,6 +45,8 @@ describe('配置读取', () => {
       dingtalk: null,
       google: null,
       shopify: null,
+      spApi: null,
+      amazonSqs: null,
       credentialMasterKey: null,
     });
   });
@@ -405,5 +407,82 @@ describe('Shopify 的客户端凭据与主密钥（待办 11）', () => {
     ).toThrow(/CREDENTIAL_MASTER_KEY：必须是 32 字节密钥的 base64/);
     // 先放好主密钥、还没有 Shopify 凭据：可以
     expect(loadConfig({ DATABASE_URL, CREDENTIAL_MASTER_KEY: MASTER_KEY }).shopify).toBeNull();
+  });
+});
+
+describe('SP-API 的 LWA 凭据与订单通知队列（待办 12）', () => {
+  const MASTER_KEY = Buffer.alloc(32, 7).toString('base64');
+  const SP_API = {
+    SP_API_CLIENT_ID: 'amzn1.application-oa2-client.example',
+    SP_API_CLIENT_SECRET: 'lwa-client-secret',
+    CREDENTIAL_MASTER_KEY: MASTER_KEY,
+  };
+  const SQS = {
+    AMAZON_SQS_QUEUE_URL: 'https://sqs.us-east-1.amazonaws.com/123456789012/forcome-orders',
+    AMAZON_SQS_ACCESS_KEY_ID: 'AKIAEXAMPLE',
+    AMAZON_SQS_SECRET_ACCESS_KEY: 'sqs-secret-value',
+  };
+
+  it('生产环境都没填时照常启动（用户 2026-10-04 口径：亚马逊资质还没有），spApi 与 amazonSqs 为 null', () => {
+    const config = loadConfig({ DATABASE_URL, ...DINGTALK, APP_ENV: 'production' });
+    expect(config.spApi).toBeNull();
+    expect(config.amazonSqs).toBeNull();
+  });
+
+  it('填齐时读出 LWA 凭据与队列（区域从队列地址取）', () => {
+    const config = loadConfig({
+      DATABASE_URL,
+      ...DINGTALK,
+      ...SP_API,
+      ...SQS,
+      APP_ENV: 'production',
+    });
+    expect(config.spApi).toEqual({
+      clientId: 'amzn1.application-oa2-client.example',
+      clientSecret: 'lwa-client-secret',
+    });
+    expect(config.amazonSqs).toEqual({
+      queueUrl: SQS.AMAZON_SQS_QUEUE_URL,
+      region: 'us-east-1',
+      accessKeyId: 'AKIAEXAMPLE',
+      secretAccessKey: 'sqs-secret-value',
+    });
+  });
+
+  it('只填一部分、填了 SP-API 凭据没填主密钥、队列地址写错：拒绝启动，不回显取值；生产不允许 SQS 用 Fake', () => {
+    expect(() =>
+      loadConfig({ DATABASE_URL, SP_API_CLIENT_ID: 'id', CREDENTIAL_MASTER_KEY: MASTER_KEY }),
+    ).toThrow(/SP_API_CLIENT_SECRET：与另一项 SP-API 凭据一起填/);
+    let error: unknown;
+    try {
+      loadConfig({
+        DATABASE_URL,
+        SP_API_CLIENT_ID: 'id',
+        SP_API_CLIENT_SECRET: 'secret-value',
+        AMAZON_SQS_QUEUE_URL: SQS.AMAZON_SQS_QUEUE_URL,
+        AMAZON_SQS_SECRET_ACCESS_KEY: 'sqs-secret-value',
+      });
+    } catch (e) {
+      error = e;
+    }
+    const message = (error as Error).message;
+    expect(message).toContain('CREDENTIAL_MASTER_KEY：填了 SP-API 凭据时必填');
+    expect(message).toContain('AMAZON_SQS_ACCESS_KEY_ID：与其他两项 SQS 配置一起填');
+    expect(message).not.toContain('secret-value');
+    expect(() =>
+      loadConfig({
+        DATABASE_URL,
+        ...SQS,
+        AMAZON_SQS_QUEUE_URL: 'https://sqs.us-east-1.amazonaws.com/forcome-orders',
+      }),
+    ).toThrow(/AMAZON_SQS_QUEUE_URL：写成 https:\/\/sqs\.<区域>\.amazonaws\.com/);
+    expect(() =>
+      loadConfig({
+        DATABASE_URL,
+        ...DINGTALK,
+        APP_ENV: 'production',
+        CLIENT_MODE_AMAZON_SQS: 'fake',
+      }),
+    ).toThrow(/CLIENT_MODE_AMAZON_SQS/);
   });
 });

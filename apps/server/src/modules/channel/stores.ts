@@ -4,6 +4,7 @@ import {
   storeSaveMessages,
   type AdapterMode,
   type FieldErrors,
+  type Platform,
   type Store,
   type StoreInput,
   type StoreOption,
@@ -25,7 +26,7 @@ import {
   type StoreScope,
   type Tx,
 } from '../core';
-import { queueShopifySync, resetOrderSync } from '../order';
+import { queueAmazonSync, queueShopifySync, resetOrderSync } from '../order';
 import { storeConnections, type ConnectionSnapshot } from './connections';
 import { storeChangedJob } from './jobs';
 import { store, storeMailbox } from './schema';
@@ -85,6 +86,15 @@ export async function listStoreChoices(db: DbExecutor): Promise<{ id: string; na
  * 订单同步要知道的全部店铺（order 的 OrderStore：店铺名、平台、平台标识、数据来源），按建立先后。同步与连接状态是系统操作，不按范围过滤
  * （ADR 0010 修订登记的例外）：由组装根注入 order（order 不依赖 channel），全站横幅用它列出连接异常的店铺
  */
+/** 新增或编辑店铺后立即给它排一次订单同步（不等定时；Shopify 待办 11、亚马逊待办 12） */
+async function queueOrderSync(
+  tx: Tx,
+  saved: { readonly id: string; readonly platform: Platform },
+): Promise<void> {
+  if (saved.platform === 'shopify') await queueShopifySync(tx, saved.id);
+  else await queueAmazonSync(tx, saved.id);
+}
+
 export async function listOrderStores(db: DbExecutor) {
   return db
     .select({
@@ -280,7 +290,7 @@ export async function createStore(ctx: StoreSaveContext, raw: StoreInput): Promi
     });
     await tx.enqueue(storeChangedJob, { storeId: row.id, addedMailboxes: [...input.mailboxes] });
     // Shopify 店铺立即同步一次订单（不等每分钟的定时，新店铺随即显示已连接或异常，待办 11）
-    if (row.platform === 'shopify') await queueShopifySync(tx, row.id);
+    await queueOrderSync(tx, row);
     return created;
   });
 }
@@ -347,7 +357,7 @@ export async function updateStore(
       storeId: id,
       addedMailboxes: input.mailboxes.filter((m) => !current.mailboxes.includes(m)),
     });
-    // 平台、平台标识或数据来源改了：订单同步按新配置从头算（之前的同步记录不算数），Shopify 店铺立即同步一次（待办 11）
+    // 平台、平台标识或数据来源改了：订单同步按新配置从头算（之前的同步记录不算数），店铺立即同步一次（Shopify 待办 11、亚马逊待办 12）
     if (
       current.platform !== updated.platform ||
       current.platformId !== updated.platformId ||
@@ -355,7 +365,7 @@ export async function updateStore(
     ) {
       await resetOrderSync(tx, id);
     }
-    if (updated.platform === 'shopify') await queueShopifySync(tx, id);
+    await queueOrderSync(tx, updated);
     return updated;
   });
 }

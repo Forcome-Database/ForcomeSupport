@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   mailboxError,
   normalizeStoreInput,
+  orderQueueStatus,
   storeInputErrors,
   SYNC_DELAY_MS,
   syncConnectionStatus,
@@ -145,5 +146,30 @@ describe('按同步记录算连接状态（PRD 6.9：钉钉超过 2 小时未同
     expect(syncConnectionStatus({ lastSuccessAt: null, consecutiveFailures: 3 }, delay, now)).toBe(
       'error',
     );
+  });
+});
+
+describe('订单通知队列（SQS）的状态（待办 12，协调者 2026-10-06 决定 Q7）', () => {
+  it('没配置为未连接；连续 3 次拉取失败为拉取失败；等待拉取的达到 10 条为积压；否则正常', () => {
+    expect(orderQueueStatus({ configured: false, consecutiveFailures: 5, backlog: 40 })).toEqual({
+      status: 'not_connected',
+      backlog: null,
+    });
+    expect(orderQueueStatus({ configured: true, consecutiveFailures: 0, backlog: null })).toEqual({
+      status: 'normal',
+      backlog: null,
+    });
+    expect(orderQueueStatus({ configured: true, consecutiveFailures: 2, backlog: 9 })).toEqual({
+      status: 'normal',
+      backlog: 9,
+    });
+    expect(orderQueueStatus({ configured: true, consecutiveFailures: 0, backlog: 10 })).toEqual({
+      status: 'backlog',
+      backlog: 10,
+    });
+    expect(orderQueueStatus({ configured: true, consecutiveFailures: 3, backlog: 12 })).toEqual({
+      status: 'failed',
+      backlog: 12,
+    });
   });
 });

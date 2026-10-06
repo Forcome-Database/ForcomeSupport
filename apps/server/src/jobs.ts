@@ -29,7 +29,15 @@ import {
   dingtalkEventJob,
   dingtalkReconcileJob,
 } from './modules/org';
-import { createOrderJobHandlers, shopifyPollJob, shopifySyncJob } from './modules/order';
+import {
+  amazonOrderChangedJob,
+  amazonPollJob,
+  amazonSyncJob,
+  createOrderFeeds,
+  createOrderJobHandlers,
+  shopifyPollJob,
+  shopifySyncJob,
+} from './modules/order';
 import { createTicketJobHandlers } from './modules/ticket';
 
 export const jobDefinitions: readonly AnyJobDefinition[] = [
@@ -44,6 +52,9 @@ export const jobDefinitions: readonly AnyJobDefinition[] = [
   inboundReceivedJob,
   shopifyPollJob,
   shopifySyncJob,
+  amazonPollJob,
+  amazonSyncJob,
+  amazonOrderChangedJob,
 ];
 
 export function createJobHandlers(deps: ServerDeps): readonly AnyJobHandler[] {
@@ -65,5 +76,7 @@ export function createFeeds(deps: ServerDeps): readonly Feed[] {
   return [
     ...createChannelFeeds(deps),
     ...createOrgFeeds({ dingtalk: () => deps.clients.global(dingtalkClient) }),
+    // 亚马逊订单变化通知（SQS）：要的店铺同样来自 channel 的店铺配置
+    ...createOrderFeeds({ clients: deps.clients, stores: listOrderStores }),
   ];
 }

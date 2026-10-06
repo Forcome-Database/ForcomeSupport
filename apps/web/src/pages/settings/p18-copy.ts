@@ -1,4 +1,4 @@
-import { adapterModeLabels } from '@forcome/contracts';
+import { adapterModeLabels, ORDER_QUEUE_NAME } from '@forcome/contracts';
 
 /*
  * P18 渠道与店铺的界面文案（逐字照原型；p18-copy.test.ts 直接读原型生成物核对，原型改了而这里没跟上就失败）：
@@ -87,6 +87,30 @@ export const SHOPIFY_ISSUE_LINES = {
 } as const;
 
 /**
+ * 亚马逊卡的异常说明行（K20 补充小样，待办 12 Q1、Q2，协调者 2026-10-06 决定，套用 Shopify 的写法、按店铺）：每个连接异常的店铺一行原因与
+ * 恢复指引（次数为实际的连续失败次数），再写一次订单暂停同步，底部「重新检测」（GMAIL_ISSUE_LINES.recheck）；每个同步延迟的店铺一行，
+ * 排在异常行之后。第一阶段没有「重新授权」与错误日志页
+ */
+export const AMAZON_ISSUE_LINES = {
+  failed: (store: string, since: string, failures: number) =>
+    `${store} 访问失败（${since} 起连续 ${failures} 次）：请检查 SP-API 应用凭据与卖家授权`,
+  held: '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
+  delayed: (store: string, last: string) => `${store} ${last} 后未同步成功，超过 10 分钟`,
+} as const;
+
+/**
+ * 亚马逊卡的「订单通知队列（SQS）」一行（K20 与补充小样，待办 12 Q7，协调者 2026-10-06 决定）：左边固定的名字，右边带圆点的小标签——
+ * 正常写等待拉取的条数（0 绿色、其余黄色；还没检查过只写「正常」）、积压 N 条（黄）、拉取失败（红）、未连接（灰）。只影响这一行
+ */
+export const ORDER_QUEUE_LINE = {
+  label: ORDER_QUEUE_NAME,
+  normal: (backlog: number | null) => (backlog === null ? '正常' : `正常 · 积压 ${backlog}`),
+  backlog: (backlog: number) => `积压 ${backlog} 条`,
+  failed: '拉取失败',
+  notConnected: '未连接',
+} as const;
+
+/**
  * 钉钉卡同步延迟与连接异常时的说明行（K20；连接异常为待办 09 Q6 用户确认，从没同步成功过为 E4 协调者决定）：
  * 第一行换成未同步成功的说明，其后两行固定
  */
@@ -99,8 +123,8 @@ export const DINGTALK_ISSUE_LINES = {
 } as const;
 
 /**
- * 「测试连接」（K20 卡头的文字按钮与结果浮层，待办 09 Q4 用户确认；Shopify 为待办 11 协调者 2026-10-06 套用）：成功 3 秒消失；
- * 失败的标题由 notify 写成「测试连接失败：<接口给的原因>」，说明写怎么查
+ * 「测试连接」（K20 卡头的文字按钮与结果浮层，待办 09 Q4 用户确认；Shopify、亚马逊为待办 11、12 协调者 2026-10-06 套用）：成功 3 秒消失；
+ * 失败的标题由 notify 写成「测试连接失败：<接口给的原因>」，说明写怎么查（亚马逊按访问不了的第一个：店铺写 SP-API，只有订单通知队列写 AWS）
  */
 export const CONNECTION_TEST = {
   button: '测试连接',
@@ -109,12 +133,16 @@ export const CONNECTION_TEST = {
     gmail: (mailboxes: number) => `Gmail：${mailboxes} 个邮箱均可访问`,
     dingtalk: '钉钉：通讯录可访问',
     shopify: (stores: number) => `Shopify：${stores} 个店铺均可访问`,
+    amazon: (stores: number) => `亚马逊 SP-API：${stores} 个店铺均可访问`,
   },
   failedAction: '测试连接',
   failedDescription: {
     gmail: '请检查全域委派范围与邮箱状态',
     dingtalk: '请检查应用凭据与通讯录权限',
     shopify: '请检查 Admin API 应用凭据与授权范围',
+    amazon: '请检查 SP-API 应用凭据与卖家授权',
+    /** 亚马逊的店铺都能访问、只有订单通知队列访问不了 */
+    amazonQueue: '请检查 AWS 访问密钥与队列地址',
   },
 } as const;
 

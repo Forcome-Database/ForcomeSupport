@@ -1,26 +1,41 @@
 // order：本地订单镜像：平台订单、发货与单号快照；镜像缺失时按订单号补拉（ADR 0011）（ADR 0005；第一期起）。
 // 其他模块只能经本文件调用本模块，不能引用内部文件或读写本模块的表。
-// 第一期：Shopify 订单镜像（待办 11）；亚马逊订单随 12，回补与夜间对账随 13。order 不依赖 channel：店铺由调用方或组装根给出。
-import { handleJob, type AnyJobHandler } from '../core';
+// 第一期：Shopify 订单镜像（待办 11）、亚马逊订单镜像（待办 12）；回补与夜间对账随 13。order 不依赖 channel：店铺由调用方或组装根给出。
+import { handleJob, type AnyJobHandler, type Feed } from '../core';
 import type { IntegrationClients } from '../integration';
+import {
+  amazonOrderChangedJob,
+  amazonPollJob,
+  amazonSyncJob,
+  createAmazonNotificationsFeed,
+  fetchChangedOrder,
+  pollAmazonStores,
+  syncAmazonStore,
+} from './amazon-sync';
+import type { OrderStoreSource } from './incremental-sync';
 import {
   pollShopifyStores,
   shopifyPollJob,
   shopifySyncJob,
   syncShopifyStore,
-  type OrderStoreSource,
 } from './shopify-sync';
 
-export { findOrdersByEmail, type MirroredOrder, type OrderRef } from './mirror';
 export {
-  findOrder,
-  normalizeShopifyOrderName,
+  amazonOrderChangedJob,
+  amazonPollJob,
+  amazonSyncJob,
+  queueAmazonSync,
+  testAmazonConnection,
+} from './amazon-sync';
+export { type OrderStore, type OrderStoreSource } from './incremental-sync';
+export { findOrder, normalizeShopifyOrderName } from './lookup';
+export { findOrdersByEmail, type MirroredOrder, type OrderRef } from './mirror';
+export { orderQueueState } from './queue-health';
+export {
   queueShopifySync,
   shopifyPollJob,
   shopifySyncJob,
   testShopifyConnection,
-  type OrderStore,
-  type OrderStoreSource,
 } from './shopify-sync';
 export {
   orderSyncHealths,
@@ -41,5 +56,22 @@ export function createOrderJobHandlers(deps: {
     handleJob(shopifySyncJob, (payload, context) =>
       syncShopifyStore(deps.clients, deps.stores, payload, context),
     ),
+    handleJob(amazonPollJob, (_payload, { runtime, logger }) =>
+      pollAmazonStores(runtime, deps.stores, logger),
+    ),
+    handleJob(amazonSyncJob, (payload, context) =>
+      syncAmazonStore(deps.clients, deps.stores, payload, context),
+    ),
+    handleJob(amazonOrderChangedJob, (payload, context) =>
+      fetchChangedOrder(deps.clients, deps.stores, payload, context),
+    ),
   ];
+}
+
+/** order 的常驻拉取：亚马逊订单变化通知（SQS，独占） */
+export function createOrderFeeds(deps: {
+  clients: IntegrationClients;
+  stores: OrderStoreSource;
+}): Feed[] {
+  return [createAmazonNotificationsFeed(deps.clients, deps.stores)];
 }

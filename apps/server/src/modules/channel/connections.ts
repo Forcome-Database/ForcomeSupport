@@ -5,27 +5,24 @@ import {
   type ChannelCard,
   type ChannelIssue,
   type ConnectionStatus,
+  type OrderQueue,
   type Platform,
   type StoreConnection,
 } from '@forcome/contracts';
 import type { DbExecutor } from '../core';
-import { orderSyncHealths, orderSyncStatus, type OrderSyncHealth } from '../order';
+import { orderQueueState, orderSyncHealths, orderSyncStatus, type OrderSyncHealth } from '../order';
 import { mailboxHealths, mailboxStatus, type MailboxHealth } from './mailbox-health';
 
 /*
  * 渠道连接状态（PRD 6.9、K20、K7、G4）：按店铺计算，渠道卡显示该渠道下最差的状态并列出异常的邮箱，店铺表「状态」列显示该店铺各连接的状态。
  * - Gmail（待办 09）：按每个进线邮箱的同步记录（mailbox-health.ts）——连续 3 次失败为连接异常、从没成功过为未连接、
  *   超过 10 分钟没同步成功为同步延迟；店铺取其邮箱中最差的，卡片取全部邮箱中最差的，最近同步时间取各邮箱中最旧的一次；
- * - Shopify（待办 11）：按每个 Shopify 店铺的订单同步记录（order 的 orderSyncHealths）——口径同 Gmail（订单 10 分钟为同步延迟），
- *   卡片取各店铺中最差的并列出延迟与异常的店铺（按店铺名），最近同步时间取各店铺中最旧的一次；
- * - 钉钉卡按通讯录的同步记录（org 的 dingtalkConnection，待办 05）；
- * - 亚马逊订单还没有同步记录，只由数据来源决定：模拟数据视为已连接、真实接口为未连接（12 按同步记录替换 statusOf）。
+ * - Shopify（待办 11）与亚马逊（待办 12）：按每个店铺的订单同步记录（order 的 orderSyncHealths，按数据源）——口径同 Gmail
+ *   （订单 10 分钟为同步延迟），卡片取该平台各店铺中最差的并列出延迟与异常的店铺（按店铺名），最近同步时间取各店铺中最旧的一次；
+ *   亚马逊卡另有订单通知队列（SQS）一行（order 的 orderQueueState），只影响这一行，不进卡片与店铺的状态（待办 12 Q7）；
+ * - 钉钉卡按通讯录的同步记录（org 的 dingtalkConnection，待办 05）。
  * 接模拟数据（Fake）时卡头另标「模拟数据」。连接异常的渠道（钉钉除外）出全站横幅（channelAlerts），几个渠道同时异常时各一条。
  */
-
-function statusOf(mode: AdapterMode): ConnectionStatus {
-  return mode === 'fake' ? 'connected' : 'not_connected';
-}
 
 /** 计算连接状态用到的店铺字段 */
 export interface StoreConnectionSource {
@@ -36,11 +33,14 @@ export interface StoreConnectionSource {
   readonly mailboxes: readonly string[];
 }
 
-/** 计算连接状态的时刻与同步记录：全部进线邮箱（按地址）、全部 Shopify 店铺的订单同步（按店铺 ID） */
+/**
+ * 计算连接状态的时刻与同步记录：全部进线邮箱（按地址）、各平台店铺的订单同步（按平台、再按店铺 ID）、订单通知队列（亚马逊卡的 SQS 行）
+ */
 export interface ConnectionSnapshot {
   readonly now: Date;
   readonly mailboxes: ReadonlyMap<string, MailboxHealth>;
-  readonly shopifyOrders: ReadonlyMap<string, OrderSyncHealth>;
+  readonly orders: Readonly<Record<Platform, ReadonlyMap<string, OrderSyncHealth>>>;
+  readonly orderQueue: OrderQueue;
 }
 
 export async function loadConnections(db: DbExecutor, now: Date): Promise<ConnectionSnapshot> {
@@ -48,7 +48,11 @@ export async function loadConnections(db: DbExecutor, now: Date): Promise<Connec
   return {
     now,
     mailboxes: new Map(healths.map((health) => [health.address, health])),
-    shopifyOrders: await orderSyncHealths(db, 'shopify_orders'),
+    orders: {
+      shopify: await orderSyncHealths(db, 'shopify_orders'),
+      amazon: await orderSyncHealths(db, 'amazon_orders'),
+    },
+    orderQueue: await orderQueueState(db),
   };
 }
 
@@ -58,16 +62,17 @@ function healthOf(snapshot: ConnectionSnapshot, address: string) {
   return snapshot.mailboxes.get(address) ?? { address, ...NO_HEALTH };
 }
 
-/** 一个 Shopify 店铺的订单同步记录（还没同步过为空记录） */
-function shopifyHealthOf(snapshot: ConnectionSnapshot, storeId: string) {
-  return snapshot.shopifyOrders.get(storeId) ?? { storeId, ...NO_HEALTH };
+/** 一个店铺的订单同步记录（按店铺的平台；还没同步过为空记录） */
+function orderHealthOf(
+  snapshot: ConnectionSnapshot,
+  store: Pick<StoreConnectionSource, 'id' | 'platform'>,
+) {
+  return snapshot.orders[store.platform].get(store.id) ?? { storeId: store.id, ...NO_HEALTH };
 }
 
-/** 店铺订单连接的状态：Shopify 按订单同步记录，亚马逊在 12 之前只看数据来源 */
+/** 店铺订单连接的状态：按该平台的订单同步记录 */
 function ordersStatus(store: StoreConnectionSource, snapshot: ConnectionSnapshot) {
-  return store.platform === 'shopify'
-    ? orderSyncStatus(shopifyHealthOf(snapshot, store.id), snapshot.now)
-    : statusOf(store.adapterMode);
+  return orderSyncStatus(orderHealthOf(snapshot, store), snapshot.now);
 }
 
 /** 一组邮箱里最差的状态（没有邮箱为未连接） */
@@ -88,26 +93,19 @@ export function storeConnections(
   ];
 }
 
-/** 亚马逊卡：12 之前只由数据来源决定，没有最近同步时间与异常店铺 */
-function amazonCard(stores: readonly StoreConnectionSource[]): ChannelCard {
-  return {
-    kind: 'amazon',
-    status: worstConnectionStatus(stores.map((store) => statusOf(store.adapterMode))),
-    simulated: stores.some((store) => store.adapterMode === 'fake'),
-    lastSyncAt: null,
-    issues: [],
-  };
-}
-
-/** Shopify 卡：各 Shopify 店铺的订单同步（按店铺名列出延迟与异常的店铺，最近同步取最旧的一次） */
-function shopifyCard(
+/**
+ * 订单渠道卡（亚马逊、Shopify）：该平台各店铺的订单同步（按店铺名列出延迟与异常的店铺，最近同步取最旧的一次）；
+ * 亚马逊卡另带订单通知队列（SQS）
+ */
+function ordersCard(
+  kind: Platform,
   stores: readonly StoreConnectionSource[],
   snapshot: ConnectionSnapshot,
 ): ChannelCard {
   const issues: ChannelIssue[] = [];
   let oldest: Date | null = null;
   for (const store of [...stores].sort((a, b) => a.name.localeCompare(b.name))) {
-    const health = shopifyHealthOf(snapshot, store.id);
+    const health = orderHealthOf(snapshot, store);
     if (health.lastSuccessAt && (!oldest || health.lastSuccessAt < oldest)) {
       oldest = health.lastSuccessAt;
     }
@@ -123,11 +121,12 @@ function shopifyCard(
     }
   }
   return {
-    kind: 'shopify',
+    kind,
     status: worstConnectionStatus(stores.map((store) => ordersStatus(store, snapshot))),
     simulated: stores.some((store) => store.adapterMode === 'fake'),
     lastSyncAt: oldest?.toISOString() ?? null,
     issues,
+    queue: kind === 'amazon' ? snapshot.orderQueue : null,
   };
 }
 
@@ -161,6 +160,7 @@ function gmailCard(
     simulated: stores.some((store) => store.adapterMode === 'fake'),
     lastSyncAt: oldest?.toISOString() ?? null,
     issues,
+    queue: null,
   };
 }
 
@@ -181,8 +181,13 @@ export function channelCards(
   dingtalk: DingtalkCardSource,
 ): ChannelCard[] {
   return [
-    amazonCard(stores.filter((s) => s.platform === 'amazon')),
-    shopifyCard(
+    ordersCard(
+      'amazon',
+      stores.filter((s) => s.platform === 'amazon'),
+      snapshot,
+    ),
+    ordersCard(
+      'shopify',
       stores.filter((s) => s.platform === 'shopify'),
       snapshot,
     ),
@@ -193,6 +198,7 @@ export function channelCards(
       simulated: dingtalk.mode === 'fake',
       lastSyncAt: dingtalk.lastSyncAt?.toISOString() ?? null,
       issues: [],
+      queue: null,
     },
   ];
 }
@@ -209,9 +215,9 @@ function earliestFailure(
 }
 
 /**
- * 全站横幅（G4）：连接异常的渠道，钉钉除外（6.9）。Gmail——任一进线邮箱连接异常就出，列出这些邮箱；Shopify（待办 11）——任一
- * Shopify 店铺的订单同步连接异常就出，列出这些店铺。时刻取其中最早的一串连续失败的开始；两个渠道都异常时各一条，Gmail 在前
- * （协调者 2026-10-06 决定）。亚马逊随 12
+ * 全站横幅（G4）：连接异常的渠道，钉钉除外（6.9）。Gmail——任一进线邮箱连接异常就出，列出这些邮箱；亚马逊（待办 12）与 Shopify
+ * （待办 11）——该平台任一店铺的订单同步连接异常就出，列出这些店铺。时刻取其中最早的一串连续失败的开始；几个渠道都异常时各一条，
+ * 顺序 Gmail → 亚马逊 → Shopify（contracts 的 channelAlertKinds；协调者 2026-10-06 决定）。订单通知队列（SQS）不出横幅
  */
 export function channelAlerts(
   stores: readonly Pick<StoreConnectionSource, 'id' | 'name' | 'platform'>[],
@@ -228,20 +234,22 @@ export function channelAlerts(
       since: earliestFailure(failingMailboxes, snapshot.now),
     });
   }
-  const failingStores = stores
-    .filter((store) => store.platform === 'shopify')
-    .map((store) => ({ store, health: shopifyHealthOf(snapshot, store.id) }))
-    .filter(({ health }) => orderSyncStatus(health, snapshot.now) === 'error')
-    .sort((a, b) => a.store.name.localeCompare(b.store.name));
-  if (failingStores.length > 0) {
-    alerts.push({
-      kind: 'shopify',
-      targets: failingStores.map(({ store }) => store.name),
-      since: earliestFailure(
-        failingStores.map(({ health }) => health),
-        snapshot.now,
-      ),
-    });
+  for (const platform of ['amazon', 'shopify'] as const) {
+    const failingStores = stores
+      .filter((store) => store.platform === platform)
+      .map((store) => ({ store, health: orderHealthOf(snapshot, store) }))
+      .filter(({ health }) => orderSyncStatus(health, snapshot.now) === 'error')
+      .sort((a, b) => a.store.name.localeCompare(b.store.name));
+    if (failingStores.length > 0) {
+      alerts.push({
+        kind: platform,
+        targets: failingStores.map(({ store }) => store.name),
+        since: earliestFailure(
+          failingStores.map(({ health }) => health),
+          snapshot.now,
+        ),
+      });
+    }
   }
   return alerts;
 }

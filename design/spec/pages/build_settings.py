@@ -95,9 +95,18 @@ def ch_card(ic, name, st, lines, foot='', tone='accent', card_tone=None, sync=No
 
 
 def sqs_line(st=SQS_STATE):
-    """亚马逊卡的订单通知队列状态：正常 / 积压 N 条 / 拉取失败（D-21）。"""
+    """亚马逊卡的订单通知队列状态（D-21；四种写法为待办 12 Q7 · 协调者 10-06 决定）：正常（少于 10 条，写出等待拉取的条数，0 绿、其余黄）、
+    积压 N 条（≥ 10 条，黄）、拉取失败（连续 3 次，红）、未连接（没配置 SQS，灰）。只影响这一行，不改卡片状态。"""
     s, n = st
-    return row(nowrap('订单通知队列（SQS）', 12, T['ink3']) + chip('%s · 积压 %d' % (s, n), 'success' if (s == '正常' and not n) else 'warning', 11, dot=True), 6)
+    if s == '正常':
+        c = chip('正常 · 积压 %d' % n, 'success' if not n else 'warning', 11, dot=True)
+    elif s == '积压':
+        c = chip('积压 %d 条' % n, 'warning', 11, dot=True)
+    elif s == '拉取失败':
+        c = chip('拉取失败', 'danger', 11, dot=True)
+    else:
+        c = chip('未连接', 'muted', 11, dot=True)
+    return row(nowrap('订单通知队列（SQS）', 12, T['ink3']) + c, 6)
 
 
 def amazon_card(err=False):
@@ -200,6 +209,31 @@ def shopify_card_p1(st='已连接'):
     return ch_card('store', 'Shopify Admin API', state('已连接'), SHOPIFY_LINES_P1 + [shopify_backfill_line()], '', 'ok', sync=CHANNEL_SYNC['Shopify'])
 
 
+AMAZON_LINES_P1 = ['2 个店铺 · 订单经 SP-API 准实时同步']  # 第一阶段亚马逊卡的店铺行（SQS 行另画；回补行随待办 13）
+
+
+def amazon_backfill_line():
+    return row(nowrap('订单回补 %d 天' % AMZ_BACKFILL_DAYS, 12, T['ink3']) + chip('已完成', 'success', 11, 'check'), 6)
+
+
+def amazon_card_p1(st='已连接', sqs=SQS_STATE):
+    """第一阶段亚马逊卡（K20；待办 12 · 协调者 10-06 决定 Q1、Q2、Q7，套用 Shopify 卡的写法，异常与延迟按店铺）。同步延迟（超过 10 分钟）：
+    每个延迟的店铺一行「<店铺> hh:mm 后未同步成功，超过 10 分钟」，其余说明行照常。连接异常（连续 3 次失败）：每个异常的店铺一行原因与恢复指引，
+    再写一次订单暂停同步，底部「重新检测」；第一阶段没有「重新授权」与错误日志页。SQS 行（订单通知队列）与连接状态无关，各状态下都照写。"""
+    if st == '同步延迟':
+        d = AMAZON_DELAYED
+        return ch_card('store', '亚马逊 SP-API', state('同步延迟'),
+                       ['%s %s 后未同步成功，超过 10 分钟' % (d['store'], d['last'])] + AMAZON_LINES_P1 + [sqs_line(sqs), amazon_backfill_line()],
+                       '', 'warn', 'warning', sync=d['last'])
+    if st == '连接异常':
+        e = AMAZON_ISSUE
+        return ch_card('store', '亚马逊 SP-API', state('连接异常'),
+                       ['%s 访问失败（%s 起连续 %d 次）：请检查 SP-API 应用凭据与卖家授权' % (e['store'], e['since'], e['failures']),
+                        '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取', sqs_line(sqs)],
+                       row(btn('重新检测', 'primary', 'sm', 'refresh'), 6), 'bad', 'danger', sync=e['last'])
+    return ch_card('store', '亚马逊 SP-API', state('已连接'), AMAZON_LINES_P1 + [sqs_line(sqs), amazon_backfill_line()], '', 'ok', sync=CHANNEL_SYNC['SP-API'])
+
+
 def grid3(cells):
     return '<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: stretch;">%s</div>' % ''.join(cells)
 
@@ -219,9 +253,7 @@ def phase2_card(ic, name, desc):
 
 def p18_channels_p1():
     """第一阶段渠道卡（K20）：订单同步、回补与来信收取；积加、易仓第二阶段接入，不显示 17TRACK。"""
-    amz = ch_card('store', '亚马逊 SP-API', state('已连接'),
-                  ['2 个店铺 · 订单经 SP-API 准实时同步', sqs_line(), row(nowrap('订单回补 %d 天' % AMZ_BACKFILL_DAYS, 12, T['ink3']) + chip('已完成', 'success', 11, 'check'), 6)],
-                  '', 'ok', sync=CHANNEL_SYNC['SP-API'])
+    amz = amazon_card_p1()
     shp = shopify_card_p1()
     gm = gmail_card_p1()
     return grid3([amz, shp, gm, dingtalk_card(late=True),

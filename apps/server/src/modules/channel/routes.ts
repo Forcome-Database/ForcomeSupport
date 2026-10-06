@@ -13,7 +13,7 @@ import {
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { AppEnv, Logger, Runtime } from '../core';
 import { dingtalkClient, type IntegrationClients } from '../integration';
-import { testShopifyConnection } from '../order';
+import { testAmazonConnection, testShopifyConnection } from '../order';
 import {
   checkDingtalkDirectory,
   dingtalkConnection,
@@ -112,7 +112,7 @@ const connectionTestRoute = createRoute({
   method: 'post',
   path: '/api/channel/connection-tests/{kind}',
   summary:
-    '测试连接（K20）：Gmail 逐个进线邮箱试访问、Shopify 逐个店铺读店铺信息，测完立即排一次同步；钉钉取根部门。不改连接状态',
+    '测试连接（K20）：Gmail 逐个进线邮箱试访问、Shopify 逐个店铺读店铺信息、亚马逊逐个店铺读卖家参与的站点并探一次订单通知队列，测完立即排一次同步；钉钉取根部门。不改连接状态',
   request: { params: z.object({ kind: connectionTestKindSchema }) },
   responses: {
     200: json(connectionTestResultSchema, '全部可访问'),
@@ -211,7 +211,9 @@ export function createChannelRoutes(deps: {
     const result =
       kind === 'shopify'
         ? await testShopifyConnection(runtime, clients, listOrderStores, logger)
-        : await testGmailConnection(runtime, clients, logger);
+        : kind === 'amazon'
+          ? await testAmazonConnection(runtime, clients, listOrderStores, logger)
+          : await testGmailConnection(runtime, clients, logger);
     return result.unreachable.length === 0
       ? c.json({ kind, targets: result.reachable }, 200)
       : c.json(

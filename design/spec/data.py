@@ -352,6 +352,59 @@ SHOPIFY_ORDERS_P1 = {
               'items': [('V2 车载吸尘器', 1)], 'total': 54.99, 'paid': 'PAID', 'fulfilled': 'FULFILLED',
               'ship_to': ('1550 Larimer St', None, 'Denver', 'CO', '80202', 'US'), 'tracking': ('UPS', '1Z9X4E770377712345')},
 }
+# 第一阶段亚马逊订单镜像的示例（待办 12）：第一阶段工单与台账引用的亚马逊订单，Fake SP-API 回放它们（经夹具）。
+# 店铺、站点、下单与最近更新（平台 lastUpdatedTime）、商品行（名称, 数量）、金额（原币, 币种）、履约状态（SP-API 的 fulfillmentStatus）、
+# 履约方（MFN 自发货 / AFN 亚马逊配送）、承诺发货与送达（最晚时刻）、收件地址（城市, 州, 邮编, 国家：非受限角色读不到姓名与街道，美国站也读不到邮编）、
+# MFN 包裹单号（承运商, 单号；AFN 没有）。customer 只是给人看的对照（非受限角色读不到买家姓名，不进夹具）。
+# 113-4567890-1234567、302-8811234-9901122、114-7788990-2233441、204-5566778-9900112 的商品、金额、下单日、单号同 ORDERS
+AMAZON_ORDERS_P1 = {
+    '113-4567890-1234567': {'store': 'Forcome Direct', 'site': 'US', 'customer': 'Sarah Mitchell', 'placed': '09-03 08:12', 'updated': '09-05 19:40',
+                            'items': [('V2 车载吸尘器 黑色', 1)], 'total': (49.99, 'USD'), 'status': 'SHIPPED', 'fulfil': 'MFN',
+                            'ship_by': '09-04 23:59', 'deliver_by': '09-09 23:59', 'ship_to': ('Seattle', 'WA', None, 'US'),
+                            'tracking': ('UPS', '1Z4R28830358229017')},
+    '302-8811234-9901122': {'store': 'Forcome Direct', 'site': 'MX', 'customer': 'Mateo Rivas', 'placed': '08-20 21:05', 'updated': '08-27 15:30',
+                            'items': [('车载吸尘器 V2', 1)], 'total': (889.00, 'MXN'), 'status': 'SHIPPED', 'fulfil': 'MFN',
+                            'ship_by': '08-21 23:59', 'deliver_by': '08-28 23:59', 'ship_to': ('Monterrey', 'NL', '64000', 'MX'),
+                            'tracking': ('Estafeta', '8055123450001')},
+    '114-7788990-2233441': {'store': 'Forcome Direct', 'site': 'US', 'customer': 'Ethan Brooks', 'placed': '08-19 10:22', 'updated': '08-23 09:10',
+                            'items': [('V2 车载吸尘器', 1)], 'total': (49.99, 'USD'), 'status': 'SHIPPED', 'fulfil': 'AFN',
+                            'ship_by': '08-20 23:59', 'deliver_by': '08-23 23:59', 'ship_to': ('Columbus', 'OH', None, 'US'), 'tracking': None},
+    '204-5566778-9900112': {'store': 'Forcome Direct', 'site': 'CA', 'customer': 'Oliver Grant', 'placed': '08-20 09:30', 'updated': '08-26 16:20',
+                            'items': [('车载吸尘器 V2 黑色', 1)], 'total': (67.99, 'CAD'), 'status': 'SHIPPED', 'fulfil': 'MFN',
+                            'ship_by': '08-21 23:59', 'deliver_by': '08-27 23:59', 'ship_to': ('Toronto', 'ON', 'M5V 2T6', 'CA'),
+                            'tracking': ('Canada Post', '7316204855219087')},
+    '113-2244668-8800997': {'store': 'Forcome Direct', 'site': 'US', 'customer': 'Marcus Lee', 'placed': '08-28 17:45', 'updated': '09-01 10:20',
+                            'items': [('V2 车载吸尘器 黑色', 1)], 'total': (49.99, 'USD'), 'status': 'SHIPPED', 'fulfil': 'MFN',
+                            'ship_by': '08-29 23:59', 'deliver_by': '09-03 23:59', 'ship_to': ('Chicago', 'IL', None, 'US'),
+                            'tracking': ('UPS', '1Z4R28830355508812')},
+    '305-1122334-4455667': {'store': 'Forcome Direct', 'site': 'MX', 'customer': 'Diego Salazar', 'placed': '09-02 12:10', 'updated': '09-06 18:35',
+                            'items': [('车载吸尘器 V2', 1)], 'total': (889.00, 'MXN'), 'status': 'SHIPPED', 'fulfil': 'MFN',
+                            'ship_by': '09-03 23:59', 'deliver_by': '09-10 23:59', 'ship_to': ('Ciudad de México', 'CDMX', '06600', 'MX'),
+                            'tracking': ('Estafeta', '8055123450417')},
+    '302-4455667-1122334': {'store': 'Forcome Direct', 'site': 'MX', 'customer': 'Sofía Márquez', 'placed': '08-30 19:20', 'updated': '09-05 12:00',
+                            'items': [('车载吸尘器 V2', 1)], 'total': (889.00, 'MXN'), 'status': 'SHIPPED', 'fulfil': 'MFN',
+                            'ship_by': '08-31 23:59', 'deliver_by': '09-07 23:59', 'ship_to': ('Guadalajara', 'JAL', '44100', 'MX'),
+                            'tracking': ('Estafeta', '8055123450288')},
+    '113-3344556-6677889': {'store': 'Forcome Direct', 'site': 'US', 'customer': 'Noah Kim', 'placed': '08-24 11:00', 'updated': '08-29 15:15',
+                            'items': [('V2 车载吸尘器', 1)], 'total': (49.99, 'USD'), 'status': 'SHIPPED', 'fulfil': 'AFN',
+                            'ship_by': '08-25 23:59', 'deliver_by': '08-28 23:59', 'ship_to': ('Denver', 'CO', None, 'US'), 'tracking': None},
+    '113-6677001-2233445': {'store': 'Forcome Direct', 'site': 'US', 'customer': 'Hannah Ross', 'placed': '09-02 08:40', 'updated': '09-05 10:30',
+                            'items': [('V2 车载吸尘器 白色', 1)], 'total': (49.99, 'USD'), 'status': 'SHIPPED', 'fulfil': 'MFN',
+                            'ship_by': '09-03 23:59', 'deliver_by': '09-08 23:59', 'ship_to': ('Boston', 'MA', None, 'US'),
+                            'tracking': ('UPS', '1Z4R28830370012345')},
+    '111-2233445-5566778': {'store': 'Forcome Auto', 'site': 'US', 'customer': 'Laura Bennett', 'placed': '09-01 14:30', 'updated': '09-04 11:05',
+                            'items': [('V2 车载吸尘器 灰色', 1)], 'total': (59.99, 'USD'), 'status': 'SHIPPED', 'fulfil': 'MFN',
+                            'ship_by': '09-02 23:59', 'deliver_by': '09-07 23:59', 'ship_to': ('Atlanta', 'GA', None, 'US'),
+                            'tracking': ('UPS', '1Z4R28830361110245')},
+    '113-5566112-7788990': {'store': 'Forcome Auto', 'site': 'US', 'customer': 'James Walker', 'placed': '09-06 20:15', 'updated': '09-08 13:40',
+                            'items': [('V2 车载吸尘器 灰色', 1)], 'total': (59.99, 'USD'), 'status': 'SHIPPED', 'fulfil': 'MFN',
+                            'ship_by': '09-07 23:59', 'deliver_by': '09-12 23:59', 'ship_to': ('Phoenix', 'AZ', None, 'US'),
+                            'tracking': ('UPS', '1Z4R28830366677120')},
+    '113-9988776-5544332': {'store': 'Forcome Auto', 'site': 'US', 'customer': 'Marcus Lee', 'placed': '09-04 09:55', 'updated': '09-07 16:10',
+                            'items': [('V2 车载吸尘器 灰色', 1)], 'total': (59.99, 'USD'), 'status': 'SHIPPED', 'fulfil': 'MFN',
+                            'ship_by': '09-05 23:59', 'deliver_by': '09-10 23:59', 'ship_to': ('Chicago', 'IL', None, 'US'),
+                            'tracking': ('UPS', '1Z4R28830369981234')},
+}
 # 生产厂报价（StatesFactory F3、F7、F9 用的「提交后」画面；S-20260911-0019 在演示时刻 NOW 仍为待报价）
 QUOTES = {
     'S-20260911-0019': {'product': 5.20, 'freight': 12.80, 'carrier': '云途专线', 'ship_date': '2026-09-14', 'at': '10:22',
@@ -675,7 +728,19 @@ SHOPIFY_NOTICES = [('Shopify 连接异常', '%s 连续 3 次失败，订单暂�
                    ('Shopify 已恢复', '%s 已重新连接，补拉 2 笔订单' % SHOPIFY_ISSUE['store'])]
 SHOPIFY_AUDIT = {'object': 'Shopify · %s' % SHOPIFY_ISSUE['store'], 'summary': '状态：连接异常 → 已连接（补拉 2 笔订单）',
                  'backfilled': '2 笔订单（10:05–10:13 更新）'}
+# 亚马逊订单同步（待办 12 · 协调者 10-06 决定 Q1–Q8，套用 Shopify 的写法，按店铺）：某个店铺的连接异常与同步延迟示例、全站横幅
+# （几个渠道同时异常时 Gmail → 亚马逊 → Shopify 上下叠放）、连接异常与恢复的站内通知、P27 的对象与「补拉」写法
+AMAZON_ISSUE = {'store': 'Forcome Auto', 'since': '10:05', 'failures': 3, 'last': CHANNEL_SYNC['SP-API 异常']}
+AMAZON_DELAYED = {'store': 'Forcome Auto', 'last': '10:05'}
+G4_BANNER_AMAZON = ('亚马逊订单同步中断', '09-11 %s 起未同步。来信照常收取，恢复后自动补拉订单。管理员、客服主管已收到通知。' % AMAZON_ISSUE['since'])
+AMAZON_NOTICES = [('亚马逊 SP-API 连接异常', '%s 连续 3 次失败，订单暂停同步' % AMAZON_ISSUE['store']),
+                  ('亚马逊 SP-API 已恢复', '%s 已重新连接，补拉 2 笔订单' % AMAZON_ISSUE['store'])]
+AMAZON_AUDIT = {'object': '亚马逊 SP-API · %s' % AMAZON_ISSUE['store'], 'summary': '状态：连接异常 → 已连接（补拉 2 笔订单）',
+                'backfilled': '2 笔订单（10:05–10:13 更新）'}
 SQS_STATE = ('正常', 0)       # 亚马逊订单通知队列（SQS）：状态, 积压条数（P18、K20）
+# SQS 行的四种写法（Q7）：正常（等待拉取的通知少于 10 条，写出条数）、积压（≥ 10 条）、拉取失败（连续 3 次）、未连接（没配置 SQS）；
+# 只影响这一行，不改卡片与店铺的连接状态、不出横幅、不发通知
+SQS_STATES = [('正常', 0), ('积压', 12), ('拉取失败', None), ('未连接', None)]
 AMZ_BACKFILL_DAYS = 90        # 第一阶段亚马逊订单回补天数（K20）
 SLA_HOURS = {'亚马逊': 24, '内部目标': 24}  # K22：亚马逊首次回复时限（平台考核）与 Shopify 与邮件内部目标的全局值
 # K24 模板编辑示例：正文含具体时刻「by Friday」，保存时按 R-SL-05 报错

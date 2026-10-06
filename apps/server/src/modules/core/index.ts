@@ -38,6 +38,8 @@ export {
   type GoogleCredentials,
   type MailSendPolicy,
   type ShopifyCredentials,
+  type AmazonSqsConfig,
+  type SpApiCredentials,
 } from './config';
 export { type Database, type DbExecutor, type DbTransaction } from './db';
 export {

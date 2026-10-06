@@ -1,32 +1,27 @@
-import type { AdapterMode, Platform } from '@forcome/contracts';
 import { z } from 'zod';
 import {
   defineJob,
-  isStoreInScope,
   transaction,
   type DbExecutor,
   type JobContext,
   type Logger,
   type Runtime,
-  type StoreScope,
   type Tx,
 } from '../core';
 import {
-  ClientNotConfiguredError,
-  ExternalServiceError,
   shopifyClient,
   type IntegrationClients,
   type ShopifyClient,
+  type ShopifyOrder,
 } from '../integration';
 import {
-  mirroredOrder,
-  mirrorShopifyOrders,
-  noWrites,
-  upsertShopifyOrder,
-  type MirroredOrder,
-  type OrderRef,
-} from './mirror';
-import { orderSyncWatermark, recordOrderSyncFailure, recordOrderSyncSuccess } from './sync-health';
+  storesOf,
+  syncIncrementally,
+  type IncrementalFeed,
+  type OrderStore,
+  type OrderStoreSource,
+} from './incremental-sync';
+import { mirrorShopifyOrders, upsertShopifyOrder } from './mirror';
 
 /*
  * Shopify 订单同步（规格 order「Shopify：Admin GraphQL，每 1–2 分钟 updated_at 增量」，ADR 0008、0011，待办 11）：
@@ -37,21 +32,9 @@ import { orderSyncWatermark, recordOrderSyncFailure, recordOrderSyncSuccess } fr
  * 3. 外部调用失败记进同步记录（sync-health.ts）：连续 3 次为连接异常（通知、审计、全站横幅），之后同步成功即恢复；
  *    任务本身不重试，下一分钟的同步就是重试；
  * 4. 没配置 Shopify 凭据（ClientNotConfiguredError，用户 2026-10-04 口径）不算失败、什么也不记，店铺为未连接。
- * 镜像缺失时按订单名补拉（findOrder）；「测试连接」逐个店铺读店铺信息、测完排一次同步（testShopifyConnection）。
+ * 镜像缺失时按订单名补拉（backfillShopifyOrder，经 lookup.ts 的 findOrder）；「测试连接」逐个店铺读店铺信息、测完排一次同步
+ * （testShopifyConnection）。增量的取法交给共用的 incremental-sync.ts。
  */
-
-/** 订单同步要知道的店铺（channel 的店铺配置，由组装根注入，order 不依赖 channel） */
-export interface OrderStore {
-  readonly id: string;
-  readonly name: string;
-  readonly platform: Platform;
-  /** 平台标识：Shopify 店铺域名（<名字>.myshopify.com） */
-  readonly platformId: string;
-  readonly adapterMode: AdapterMode;
-}
-
-/** 全部店铺（按建立先后）；组装根注入 channel 的查询 */
-export type OrderStoreSource = (db: DbExecutor) => Promise<readonly OrderStore[]>;
 
 /** 每次从水位往前多取这么久（平台搜索索引的延迟、两边时钟的偏差） */
 export const SHOPIFY_SYNC_OVERLAP_MS = 2 * 60_000;
@@ -85,8 +68,8 @@ function shopifyFor(clients: IntegrationClients, store: OrderStore): ShopifyClie
   });
 }
 
-async function shopifyStores(db: DbExecutor, stores: OrderStoreSource): Promise<OrderStore[]> {
-  return (await stores(db)).filter((store) => store.platform === 'shopify');
+function shopifyStores(db: DbExecutor, stores: OrderStoreSource): Promise<OrderStore[]> {
+  return storesOf(db, stores, 'shopify');
 }
 
 /** 在事务里排一次某店铺的同步（新增或编辑店铺后立即同步，不等每分钟的定时）；已在排队的不重复排 */
@@ -107,25 +90,19 @@ export async function pollShopifyStores(
   logger.debug({ stores: targets.length }, '已排 Shopify 订单同步');
 }
 
-/**
- * 外部调用的失败记进同步记录（连续 3 次为连接异常）。我们自己的错误不算；没配置凭据也不算（还没接通，6.9 的「未连接」）。
- * 记录本身出错只记日志，不盖掉原来的错误
- */
-async function noteFailure(
-  runtime: Runtime,
-  store: OrderStore,
-  error: unknown,
-  logger: Logger,
-): Promise<void> {
-  if (!(error instanceof ExternalServiceError) || error instanceof ClientNotConfiguredError) {
-    return;
-  }
-  try {
-    const failures = await recordOrderSyncFailure(runtime, store, error);
-    logger.warn({ err: error, store: store.name, failures }, 'Shopify 调用失败，已记入同步记录');
-  } catch (recordError) {
-    logger.error({ err: recordError, store: store.name }, '记同步失败时出错');
-  }
+/** Shopify 的增量取法：按 updated_at 分页（sortKey UPDATED_AT），从水位前 2 分钟起 */
+function shopifyFeed(shopify: ShopifyClient): IncrementalFeed<ShopifyOrder> {
+  return {
+    source: 'shopify_orders',
+    label: 'Shopify',
+    overlapMs: SHOPIFY_SYNC_OVERLAP_MS,
+    page: async (since, cursor) => {
+      const page = await shopify.listOrders({ updatedSince: since, after: cursor });
+      return { orders: page.orders, next: page.nextCursor };
+    },
+    updatedAt: (order) => order.updatedAt,
+    mirror: mirrorShopifyOrders,
+  };
 }
 
 /** 同步一个店铺（增量）。外部调用失败记进同步记录后照常抛出（任务失败）；没配置凭据安静结束 */
@@ -140,91 +117,23 @@ export async function syncShopifyStore(
     logger.warn({ storeId }, '不是 Shopify 店铺（或已不存在），跳过订单同步');
     return;
   }
-  const shopify = shopifyFor(clients, store);
-  const startedAt = runtime.clock.now();
-  const watermark = await orderSyncWatermark(runtime.db, store.id);
-  const since = new Date((watermark ?? startedAt).getTime() - SHOPIFY_SYNC_OVERLAP_MS);
-  const writes = noWrites();
-  let newest = watermark;
-  try {
-    let cursor: string | null = null;
-    do {
-      const page = await shopify.listOrders({ updatedSince: since, after: cursor });
-      await transaction(runtime, (tx) => mirrorShopifyOrders(tx, store.id, page.orders, writes));
-      for (const order of page.orders) {
-        if (!newest || order.updatedAt > newest) newest = order.updatedAt;
-      }
-      cursor = page.nextCursor;
-    } while (cursor);
-  } catch (error) {
-    if (error instanceof ClientNotConfiguredError) {
-      logger.debug({ store: store.name }, '没有配置 Shopify 凭据，订单不同步（店铺为未连接）');
-      return;
-    }
-    if (await configChanged(runtime.db, stores, store)) throw error;
-    await noteFailure(runtime, store, error, logger);
-    throw error;
-  }
-  // 这一轮期间店铺换了数据源（同步记录已按新配置清掉）：旧配置的结果不记，下一轮按新配置从头同步
-  if (await configChanged(runtime.db, stores, store)) {
-    logger.info({ store: store.name }, '同步期间店铺的数据源改了，这一轮的结果不记进同步记录');
-    return;
-  }
-  // 第一次同步、一笔也没有：水位从开始同步的时刻起
-  await transaction(runtime, (tx) =>
-    recordOrderSyncSuccess(tx, store, newest ?? startedAt, writes),
-  );
-}
-
-/** 店铺的平台、平台标识或数据来源与这一轮开始时不同了（或店铺已不是 Shopify 店铺） */
-async function configChanged(
-  db: DbExecutor,
-  stores: OrderStoreSource,
-  started: OrderStore,
-): Promise<boolean> {
-  const now = (await stores(db)).find((s) => s.id === started.id);
-  return (
-    !now ||
-    now.platform !== started.platform ||
-    now.platformId !== started.platformId ||
-    now.adapterMode !== started.adapterMode
-  );
-}
-
-/** Shopify 订单名的规范写法：只写了数字的补上 #（来信里常写成「order 1063」） */
-export function normalizeShopifyOrderName(name: string): string {
-  const trimmed = name.trim();
-  return /^\d+$/.test(trimmed) ? `#${trimmed}` : trimmed;
+  await syncIncrementally(runtime, logger, stores, store, shopifyFeed(shopifyFor(clients, store)));
 }
 
 /**
- * 在某店铺内按订单名或平台订单号查订单（规格 order 对外接口）：先查镜像；镜像没有、给的是订单名、店铺是 Shopify 时按订单名补拉并入库。
- * 店铺不在范围内、补拉也没有返回 null；没配置 Shopify 凭据时只查镜像。补拉的外部调用失败照常抛出（调用方决定稍后重试）
+ * 按订单名从 Shopify 补拉一笔并写进镜像（镜像缺失时，lookup.ts 的 findOrder 调用）；平台也没有返回 false。
+ * 没配置凭据以 ClientNotConfiguredError 失败，其余外部调用失败照常抛出（调用方决定稍后重试）
  */
-export async function findOrder(
+export async function backfillShopifyOrder(
   runtime: Runtime,
   clients: IntegrationClients,
-  scope: StoreScope,
   store: OrderStore,
-  ref: OrderRef,
-): Promise<MirroredOrder | null> {
-  if (!isStoreInScope(scope, store.id)) return null;
-  const lookup: OrderRef =
-    'name' in ref && store.platform === 'shopify'
-      ? { name: normalizeShopifyOrderName(ref.name) }
-      : ref;
-  const mirrored = await mirroredOrder(runtime.db, scope, store.id, lookup);
-  if (mirrored || !('name' in lookup) || store.platform !== 'shopify') return mirrored;
-  let fetched;
-  try {
-    fetched = await shopifyFor(clients, store).findOrderByName(lookup.name);
-  } catch (error) {
-    if (error instanceof ClientNotConfiguredError) return null;
-    throw error;
-  }
-  if (!fetched) return null;
+  name: string,
+): Promise<boolean> {
+  const fetched = await shopifyFor(clients, store).findOrderByName(name);
+  if (!fetched) return false;
   await transaction(runtime, (tx) => upsertShopifyOrder(tx, store.id, fetched));
-  return mirroredOrder(runtime.db, scope, store.id, lookup);
+  return true;
 }
 
 /**

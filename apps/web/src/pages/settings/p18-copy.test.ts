@@ -12,6 +12,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { pages } from '@/lib/pages';
 import {
+  AMAZON_ISSUE_LINES,
   CARD_LINES,
   CHANNEL_CARDS,
   CHANNEL_SECTION,
@@ -26,6 +27,7 @@ import {
   MENU_NOTE,
   MENU_TITLE,
   NOT_AUTHORIZED,
+  ORDER_QUEUE_LINE,
   PAGE_DESCRIPTION,
   PAGE_TITLE,
   PHASE2_CARDS,
@@ -253,5 +255,30 @@ describe('K20 补充小样：Shopify 卡（待办 11，协调者 2026-10-06 决�
     expectText(STATES_ADMIN, CONNECTION_TEST.ok.shopify(2));
     expectText(STATES_ADMIN, `${CONNECTION_TEST.failedAction}失败：forcome.mx 无法访问`);
     expectText(STATES_ADMIN, CONNECTION_TEST.failedDescription.shopify);
+  });
+});
+
+describe('K20 补充小样：亚马逊卡（待办 12，协调者 2026-10-06 决定 Q1、Q2、Q6、Q7，套用 Shopify 的写法、按店铺）', () => {
+  it('同步延迟与连接异常：每个店铺一行、订单暂停同步、「重新检测」', () => {
+    expectText(STATES_ADMIN, AMAZON_ISSUE_LINES.delayed('Forcome Auto', '10:05'));
+    expectText(STATES_ADMIN, AMAZON_ISSUE_LINES.failed('Forcome Auto', '10:05', 3));
+    expectText(STATES_ADMIN, AMAZON_ISSUE_LINES.held);
+    expectText(STATES_ADMIN, CHANNEL_CARDS.amazon.stores(2));
+  });
+
+  it('订单通知队列（SQS）一行的四种写法（第一期参照页为「正常 · 积压 0」）', () => {
+    expectText(P18, ORDER_QUEUE_LINE.label);
+    expectIn(P18, `>${ORDER_QUEUE_LINE.normal(0)}<`);
+    expectIn(STATES_ADMIN, ORDER_QUEUE_LINE.backlog(12));
+    expectIn(STATES_ADMIN, `>${ORDER_QUEUE_LINE.failed}<`);
+    expectIn(STATES_ADMIN, `>${ORDER_QUEUE_LINE.notConnected}<`);
+  });
+
+  it('「测试连接」的结果浮层（店铺与订单通知队列）', () => {
+    expectText(STATES_ADMIN, CONNECTION_TEST.ok.amazon(2));
+    expectText(STATES_ADMIN, `${CONNECTION_TEST.failedAction}失败：Forcome Auto 无法访问`);
+    expectText(STATES_ADMIN, CONNECTION_TEST.failedDescription.amazon);
+    expectText(STATES_ADMIN, `${CONNECTION_TEST.failedAction}失败：订单通知队列（SQS） 无法访问`);
+    expectText(STATES_ADMIN, CONNECTION_TEST.failedDescription.amazonQueue);
   });
 });

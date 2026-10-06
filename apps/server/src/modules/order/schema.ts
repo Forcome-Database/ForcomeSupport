@@ -1,6 +1,7 @@
 import { platforms } from '@forcome/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -25,7 +26,9 @@ export interface MirroredLineItem {
   readonly quantity: number;
 }
 
-/** 镜像里的收件地址（Shopify 有街道与邮编；亚马逊非受限角色只有城市、州、国家，随 12） */
+/**
+ * 镜像里的收件地址：Shopify 有街道与邮编；亚马逊非受限角色只有城市、州、国家（加拿大、墨西哥另有邮编），其余为 null（待办 12）
+ */
 export interface MirroredAddress {
   readonly name: string | null;
   readonly address1: string | null;
@@ -43,11 +46,16 @@ export interface MirroredTracking {
   readonly number: string | null;
 }
 
+/** 亚马逊订单的履约方（PRD 1.4）：MFN 自发货、AFN 亚马逊配送（FBA）；Shopify 订单为空 */
+export const fulfillmentChannels = ['MFN', 'AFN'] as const;
+export type FulfillmentChannel = (typeof fulfillmentChannels)[number];
+
 /**
  * 本地订单镜像（规格 order、ADR 0011，待办 11 起）：平台订单的快照，一笔订单一行，以「店铺 + 平台订单号」为关联键
- * （Shopify 为 Admin API 的全局 ID），Shopify 另存订单名（平台保证店铺内唯一，来信里写的是它）。订单名只建普通索引、不加唯一约束：
- * 万一平台那边改名撞名，也不能让整页写入失败、同步卡住；按订单名查时取平台更新时间最新的一笔。同步按平台更新时间只进不退：
- * 拉到的版本比镜像里的旧就不改。亚马逊（MFN/AFN、承诺时效等）随 12 加列。
+ * （Shopify 为 Admin API 的全局 ID，亚马逊为 AmazonOrderId，来信里写的就是它），Shopify 另存订单名（平台保证店铺内唯一，来信里写的是它）。
+ * 订单名只建普通索引、不加唯一约束：万一平台那边改名撞名，也不能让整页写入失败、同步卡住；按订单名查时取平台更新时间最新的一笔。
+ * 同步按平台更新时间只进不退：拉到的版本比镜像里的旧就不改。亚马逊另有履约方（MFN/AFN）与承诺时效（待办 12）；
+ * 亚马逊待付款等订单还没有金额，金额与币种可以为空（两列要么都有要么都没有）。
  */
 export const platformOrder = orderSchema.table(
   'platform_order',
@@ -59,21 +67,30 @@ export const platformOrder = orderSchema.table(
     platformOrderId: text('platform_order_id').notNull(),
     /** 订单名（Shopify 如 #1063）；亚马逊没有 */
     name: text('name'),
-    /** 平台的订单状态：Shopify 为履约状态（displayFulfillmentStatus，如 FULFILLED） */
+    /**
+     * 平台的订单状态：Shopify 为履约状态（displayFulfillmentStatus，如 FULFILLED），亚马逊为 fulfillmentStatus（如 SHIPPED、CANCELLED）
+     */
     status: text('status').notNull(),
     /** 付款状态（Shopify displayFinancialStatus，如 PAID、REFUNDED） */
     financialStatus: text('financial_status'),
     cancelledAt: timestamptz('cancelled_at'),
     lineItems: jsonb('line_items').$type<MirroredLineItem[]>().notNull(),
-    totalAmount: amount('total_amount').notNull(),
-    totalCurrency: currency('total_currency').notNull(),
+    /** 订单金额（Shopify 订单总额；亚马逊 proceeds.grandTotal，待付款的还没有，为空） */
+    totalAmount: amount('total_amount'),
+    totalCurrency: currency('total_currency'),
     /** 客户邮箱（小写；亚马逊非受限角色读不到，为空）：Shopify 来信按它反查订单（R-TK-02，14） */
     customerEmail: text('customer_email'),
     /** 收件国家代码（US / CA / MX…）：Shopify 工单按它定站点（14） */
     shipCountry: text('ship_country'),
     shipAddress: jsonb('ship_address').$type<MirroredAddress>(),
-    /** 履约单号（承运商 + 单号） */
+    /** 履约单号（承运商 + 单号；亚马逊为 MFN 包裹的单号，O-2 待实测） */
     tracking: jsonb('tracking').$type<MirroredTracking[]>().notNull(),
+    /** 亚马逊的履约方 MFN / AFN（待办 12）；Shopify 为空 */
+    fulfillmentChannel: text('fulfillment_channel', { enum: fulfillmentChannels }),
+    /** 亚马逊的承诺发货时限（shipByWindow 的最晚时刻）；Shopify 为空 */
+    promisedShipBy: timestamptz('promised_ship_by'),
+    /** 亚马逊的承诺送达时限（deliverByWindow 的最晚时刻）；Shopify 为空 */
+    promisedDeliveryBy: timestamptz('promised_delivery_by'),
     /** 下单时间（平台） */
     placedAt: timestamptz('placed_at').notNull(),
     /** 平台更新时间：增量同步的水位，镜像只进不退 */
@@ -88,11 +105,15 @@ export const platformOrder = orderSchema.table(
       .on(t.storeId, t.name)
       .where(sql`${t.name} is not null`),
     index('platform_order_store_email_idx').on(t.storeId, t.customerEmail),
+    check(
+      'platform_order_total_pair',
+      sql`(${t.totalAmount} is null) = (${t.totalCurrency} is null)`,
+    ),
   ],
 );
 
-/** 数据源：Shopify 订单（11）；亚马逊订单随 12 */
-export const orderSources = ['shopify_orders'] as const;
+/** 数据源：Shopify 订单（11）、亚马逊订单（12） */
+export const orderSources = ['shopify_orders', 'amazon_orders'] as const;
 export type OrderSource = (typeof orderSources)[number];
 
 /**
@@ -119,3 +140,25 @@ export const orderSync = orderSchema.table(
   },
   (t) => [unique('order_sync_store_source_key').on(t.storeId, t.source)],
 );
+
+/** 订单通知队列：亚马逊 ORDER_CHANGE 经 SQS（待办 12） */
+export const orderQueues = ['amazon_orders'] as const;
+export type OrderQueueName = (typeof orderQueues)[number];
+
+/**
+ * 订单通知队列的拉取与检查记录（PRD P18「第一阶段」亚马逊卡的 SQS 行，待办 12）：整个环境一个队列一行。长轮询拉取的连续失败次数
+ * （连续 3 次为「拉取失败」，拉取成功清零）与每分钟检查一次的等待拉取的通知数（达到 10 条为「积压」）；只影响卡上的这一行，
+ * 不进连接状态（contracts 的 orderQueueStatus）。
+ */
+export const orderQueue = orderSchema.table('order_queue', {
+  id: primaryId(),
+  name: text('name', { enum: orderQueues }).notNull().unique('order_queue_name_key'),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  /** 这一串连续拉取失败的第 1 次 */
+  failingSince: timestamptz('failing_since'),
+  lastError: text('last_error'),
+  /** 最近一次检查时等待拉取的通知数（SQS 的 ApproximateNumberOfMessages） */
+  backlog: integer('backlog'),
+  checkedAt: timestamptz('checked_at'),
+  updatedAt: timestamptz('updated_at').notNull(),
+});

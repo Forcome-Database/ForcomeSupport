@@ -41,6 +41,14 @@ x-app: &app
     # （都不填照常启动，Shopify 为「未连接」）；填了就要有主密钥 CREDENTIAL_MASTER_KEY（各店铺的访问令牌用它加密存库）
     SHOPIFY_CLIENT_ID: ${SHOPIFY_CLIENT_ID:-}
     SHOPIFY_CLIENT_SECRET: ${SHOPIFY_CLIENT_SECRET:-}
+    # 亚马逊订单（待办 12，docs/部署说明.md 第 14 节）：店铺按「数据来源」选择；SP-API 的 LWA 凭据两项要么都填要么都不填，
+    # SQS 三项要么都填要么都不填（都不填照常启动，为「未连接」）；各卖家的刷新令牌用 sp-api-token 子命令加密存库
+    SP_API_CLIENT_ID: ${SP_API_CLIENT_ID:-}
+    SP_API_CLIENT_SECRET: ${SP_API_CLIENT_SECRET:-}
+    CLIENT_MODE_AMAZON_SQS: ${CLIENT_MODE_AMAZON_SQS:-}
+    AMAZON_SQS_QUEUE_URL: ${AMAZON_SQS_QUEUE_URL:-}
+    AMAZON_SQS_ACCESS_KEY_ID: ${AMAZON_SQS_ACCESS_KEY_ID:-}
+    AMAZON_SQS_SECRET_ACCESS_KEY: ${AMAZON_SQS_SECRET_ACCESS_KEY:-}
     CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY:-}
     TZ: UTC
   volumes:

@@ -95,3 +95,8 @@ status: accepted
 - **Shopify 订单同步的任务**：定时任务 `order.shopify_poll` 每分钟（cron `* * * * *`，worker 启动时也一次）给每个 Shopify 店铺排 `order.shopify_sync`（`stately`，`singletonKey` 为店铺，排队里已有的不重复排）；`order.shopify_sync` 不重试（`retryLimit: 0`）——下一分钟的同步就是重试，失败照常抛出、在 pg-boss 里记失败，连续失败次数记在同步记录里（ADR 0011 修订）。新增或编辑 Shopify 店铺的事务里直接排一次（`order` 的 `queueShopifySync`），不等定时。
 - **任务的并发数**：`defineJob` 第 5 个参数是每个 worker 进程同时处理几个（pg-boss 的 `localConcurrency`，默认 1；每个处理者取一个、处理完等轮询间隔 2 秒再取）。`order.shopify_sync` 设 5：每分钟给每个店铺各排一个，店铺多时（开发测试环境长期累积了 20 多个测试店铺）一个一个取会排成长队，新编辑的店铺要等二十多秒才同步（部署冒烟发现）；同一店铺仍由 stately + `singletonKey` 保证同时只跑一个。
 - **任务要的店铺由组装根注入**：`order` 的处理器拿 `jobs.ts` 注入的 `channel.listOrderStores`（全部店铺的店铺名、平台、平台标识与数据来源），`order` 不依赖 `channel`（ADR 0005 修订）。
+
+## 修订（2026-10-06，待办 12 落地）
+
+- **亚马逊订单的任务与常驻拉取**：定时任务 `order.amazon_poll` 每 4 分钟（cron `*/4 * * * *`，worker 启动时也一次）给每个亚马逊店铺排 `order.amazon_sync`（`stately`、`singletonKey` 为店铺、不重试——下一轮就是重试，每个 worker 并发 5）；规格写「每 3–5 分钟」，取 4 分钟：searchOrders 默认配额约 3 分钟 1 次，给 13 的回补与夜间对账留出约四分之一，一次失败后的下一次成功仍在 10 分钟的同步延迟阈值内。常驻拉取 `order.amazon_notifications` 独占（咨询锁选主），长轮询 SQS（最多 20 秒），每条 ORDER_CHANGE 排 `order.amazon_order_changed`（`stately`，`singletonKey` 为「店铺:订单号」，失败 30 秒起退避重试 3 次），事务提交后才删消息；拉取源每分钟最多检查一次队列积压。通知触发的拉取失败不计连接状态（通知只是加速通道，漏了由增量补上）。
+- **SP-API 配额的落地**：令牌桶在 `integration` 的真实现里、按「卖家 × 接口」进程内共享（`sp-api-quota.ts`）——订单同步的调用都在 worker 一个进程，api 进程只有偶尔的「测试连接」（读 Sellers API，另一个桶）；以后部署多个 worker 时再把桶移到库里。排队按优先级：高（增量、通知触发与按订单号补拉）先于低（13 的回补与对账），同一优先级先来先得；默认用量计划取官方模型文件（searchOrders 0.0056 / 秒、突发 20；getOrder 0.5 / 秒、突发 30），响应头 `x-amzn-RateLimit-Limit` 给出的 rate 覆盖它，429 时清空桶。

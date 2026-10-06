@@ -15,7 +15,9 @@
   第二期的「新审批单」不转换；只写时:分的落在演示当天。
 - Shopify 订单取 SHOPIFY_ORDERS_P1（待办 11，Fake Shopify 回放）：时间按北京时间，金额两位小数的美元，
   状态保留 Admin API 的枚举写法（PAID、FULFILLED 等），客户邮箱不在夹具里（由回放按客户名推出，同 Fake 来信）。
-亚马逊订单、未归属店铺来信等其余数据，由需要它们的待办在这里补充转换规则。
+- 亚马逊订单取 AMAZON_ORDERS_P1（待办 12，Fake SP-API 回放）：时间按北京时间，金额两位小数的原币与币种，状态保留 SP-API 的枚举写法
+  （SHIPPED 等），履约方写 MFN / AFN；收件地址只有非受限角色能读到的城市、州、邮编（美国站为 null）、国家；买家姓名不进夹具。
+未归属店铺来信等其余数据，由需要它们的待办在这里补充转换规则。
 
 用法（仓库根目录）：pnpm fixtures:generate；pnpm fixtures:verify 检查产物与 data.py 一致。
 可直接运行：python scripts/fixtures/export_demo_fixture.py [输出路径]
@@ -266,6 +268,30 @@ def shopify_orders():
     return out
 
 
+# ---------------------------------------------------------------- 亚马逊订单（待办 12）
+def amazon_orders():
+    out = []
+    for order_id, o in d.AMAZON_ORDERS_P1.items():
+        city, state, zip_, country = o['ship_to']
+        amount, currency = o['total']
+        out.append({
+            'orderId': order_id,
+            'storeKey': store_key(o['store']),
+            'site': o['site'],
+            'placedAt': at(o['placed']),
+            'updatedAt': at(o['updated']),
+            'lineItems': [{'title': t, 'quantity': q} for t, q in o['items']],
+            'total': {'amount': money(amount), 'currency': currency},
+            'status': o['status'],
+            'fulfillmentChannel': o['fulfil'],
+            'shipBy': at(o['ship_by']),
+            'deliverBy': at(o['deliver_by']),
+            'shipTo': {'city': city, 'stateOrRegion': state, 'postalCode': zip_, 'countryCode': country},
+            'tracking': {'carrier': o['tracking'][0], 'number': o['tracking'][1]} if o['tracking'] else None,
+        })
+    return out
+
+
 # ---------------------------------------------------------------- P05 时间线（I18）
 def ticket_timeline():
     o = d.P1_OLIVER
@@ -345,6 +371,7 @@ def build():
         'aftersalesLastSequence': max(int(a['no'][-4:]) for a in d.AFTERSALES),
         'ticketTimeline': ticket_timeline(),
         'shopifyOrders': shopify_orders(),
+        'amazonOrders': amazon_orders(),
         'notifications': notifications(),
     }
 

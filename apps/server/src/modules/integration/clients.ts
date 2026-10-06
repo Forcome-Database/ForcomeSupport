@@ -12,6 +12,8 @@ import {
   type GoogleCredentials,
   type MailSendPolicy,
   type ShopifyCredentials,
+  type AmazonSqsConfig,
+  type SpApiCredentials,
 } from '../core';
 import { noCallRecords, type CallRecorder } from './call-records';
 import type { CredentialVault } from './credential-vault';
@@ -65,6 +67,10 @@ export interface IntegrationClientsOptions {
   readonly callRecorder?: CallRecorder;
   /** Shopify 的客户端凭据（AppConfig.shopify），交给 Shopify 的真实现；不传为 null */
   readonly shopify?: ShopifyCredentials | null;
+  /** SP-API 的 LWA 凭据（AppConfig.spApi），交给 SP-API 订单的真实现；不传为 null */
+  readonly spApi?: SpApiCredentials | null;
+  /** 订单通知队列（AppConfig.amazonSqs），交给 SQS 的真实现；不传为 null */
+  readonly amazonSqs?: AmazonSqsConfig | null;
   /** 动态凭据保管（api、worker 传 databaseCredentialVault）；不传为 null */
   readonly credentialVault?: CredentialVault | null;
   /** 真实现的当前时间（凭据何时换新）；不传为系统时钟 */
@@ -83,6 +89,8 @@ export class IntegrationClients {
   readonly #google: GoogleCredentials | null;
   readonly #callRecorder: CallRecorder;
   readonly #shopify: ShopifyCredentials | null;
+  readonly #spApi: SpApiCredentials | null;
+  readonly #amazonSqs: AmazonSqsConfig | null;
   readonly #credentialVault: CredentialVault | null;
   readonly #clock: Clock;
   /** 发信白名单守卫，经 RealClientContext 交给真实现 */
@@ -100,6 +108,8 @@ export class IntegrationClients {
     this.#google = options.google ?? null;
     this.#callRecorder = options.callRecorder ?? noCallRecords;
     this.#shopify = options.shopify ?? null;
+    this.#spApi = options.spApi ?? null;
+    this.#amazonSqs = options.amazonSqs ?? null;
     this.#credentialVault = options.credentialVault ?? null;
     this.#clock = options.clock ?? systemClock;
     for (const [system, mode] of Object.entries(this.#modes)) {
@@ -144,6 +154,8 @@ export class IntegrationClients {
       google: this.#google,
       callRecorder: this.#callRecorder,
       shopify: this.#shopify,
+      spApi: this.#spApi,
+      amazonSqs: this.#amazonSqs,
       credentialVault: this.#credentialVault,
       clock: this.#clock,
     };
@@ -224,7 +236,14 @@ export class IntegrationClients {
 export function createIntegrationClients(
   config: Pick<
     AppConfig,
-    'appEnv' | 'clientModes' | 'mailSend' | 'dingtalk' | 'google' | 'shopify'
+    | 'appEnv'
+    | 'clientModes'
+    | 'mailSend'
+    | 'dingtalk'
+    | 'google'
+    | 'shopify'
+    | 'spApi'
+    | 'amazonSqs'
   >,
   options: {
     definitions?: readonly AnyClientDefinition[];
@@ -241,6 +260,8 @@ export function createIntegrationClients(
     dingtalk: config.dingtalk,
     google: config.google,
     shopify: config.shopify,
+    spApi: config.spApi,
+    amazonSqs: config.amazonSqs,
     definitions: options.definitions,
     callRecorder: options.callRecorder,
     credentialVault: options.credentialVault,
