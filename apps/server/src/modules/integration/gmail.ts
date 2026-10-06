@@ -185,7 +185,7 @@ export class FakeGmail implements FakeClient<GmailClient> {
       const id = mail.gmailId && recipients.length === 1 ? mail.gmailId : this.#newId();
       this.#append(address, {
         id,
-        threadId: id,
+        threadId: (recipients.length === 1 && mail.threadId) || id,
         labelIds: ['INBOX', 'UNREAD'],
         internalDate: built.internalDate,
         raw: built.raw,
@@ -206,7 +206,7 @@ export class FakeGmail implements FakeClient<GmailClient> {
     const id = mail.gmailId ?? this.#newId();
     this.#append(mail.from, {
       id,
-      threadId: id,
+      threadId: mail.threadId ?? id,
       labelIds: ['SENT'],
       internalDate: built.internalDate,
       raw: built.raw,

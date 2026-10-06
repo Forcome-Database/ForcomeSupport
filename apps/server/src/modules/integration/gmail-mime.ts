@@ -17,6 +17,10 @@ export interface FakeMailInput {
   readonly messageId?: string | null;
   /** Gmail 消息 ID；只发给一个邮箱时可以指定（回放示例数据用确定的 ID，重启后不变） */
   readonly gmailId?: string;
+  /**
+   * Gmail 线程 ID（只在那个邮箱里有意义）：同一邮箱里回信与它回复的来信在同一个线程。不给时自成一个线程（与 Gmail 消息 ID 相同）
+   */
+  readonly threadId?: string;
   /** 另加的头字段（如 In-Reply-To、Auto-Submitted、List-Unsubscribe），值为原文 */
   readonly headers?: Readonly<Record<string, string>>;
 }

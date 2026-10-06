@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { siteSchema } from './channel';
+import { slaResultSchema, slaTargetSchema } from './sla';
 
 /*
  * 工单（PRD 11.1 Ticket、6.1「第一阶段工单生命周期」、P04「第一阶段」）：状态、渠道、迁移的事件与触发方、
@@ -114,7 +115,7 @@ export const ticketCloseReasonLabels: Record<TicketCloseReason, string> = {
   reply_not_detected: '未识别到回复',
 };
 
-/** 消息的方向：来信 inbound（不论来源）/ 我方发出 outbound（「已发送」，09 起） */
+/** 消息的方向：来信 inbound（不论来源）/ 我方发出 outbound（「已发送」，09 入库，16 起按回复识别归到工单） */
 export const messageDirections = ['inbound', 'outbound'] as const;
 export const messageDirectionSchema = z.enum(messageDirections);
 export type MessageDirection = z.infer<typeof messageDirectionSchema>;
@@ -122,7 +123,7 @@ export type MessageDirection = z.infer<typeof messageDirectionSchema>;
 /** 工单号 T-日期-4 位当日序号（11.2；日期取首封来信日期，北京时间） */
 export const ticketNumberSchema = z.string().regex(/^T-\d{8}-\d{4}$/, '工单号的格式是 T-日期-序号');
 
-/** P04 工单列表的一行（第一阶段；SLA 剩余随 16、18） */
+/** P04 工单列表的一行（第一阶段；SLA 剩余随 18） */
 export const ticketListItemSchema = z.object({
   id: z.uuid(),
   number: ticketNumberSchema,
@@ -143,6 +144,8 @@ export const ticketListItemSchema = z.object({
    */
   orderNumber: z.string().nullable(),
   status: ticketStatusSchema,
+  /** 关闭原因（6.1 三种，按时关闭时写入，16）；没关闭为空 */
+  closeReason: ticketCloseReasonSchema.nullable(),
   /** 工单内最近一封来信的到达时间（Gmail internalDate） */
   lastInboundAt: z.iso.datetime({ offset: true }),
 });
@@ -152,23 +155,46 @@ export type TicketListItem = z.infer<typeof ticketListItemSchema>;
 export const ticketListSchema = z.object({ tickets: z.array(ticketListItemSchema) });
 export type TicketList = z.infer<typeof ticketListSchema>;
 
-/** 工单里的一封消息（待办 08 只有来信；正文、我方回复、SLA 与「无需回复」随 09、16、17） */
+/**
+ * 一封应回复来信（来源为客户）的 SLA（R-SL-01–R-SL-03、R-SL-08，16）：目标种类（亚马逊为平台 SLA，Shopify 与邮件为内部目标）、
+ * 截止（到达 + 24 小时）与结果（达标 / 未达标 / 未到期 / 无需回复）。生产厂、其他供应商的来信与我方发出的消息没有
+ */
+export const ticketMessageSlaSchema = z.object({
+  target: slaTargetSchema,
+  dueAt: z.iso.datetime({ offset: true }),
+  result: slaResultSchema,
+});
+export type TicketMessageSla = z.infer<typeof ticketMessageSlaSchema>;
+
+/** 工单里的一封消息：来信与「已发送」里归到这张工单的我方回复（16；正文与「无需回复」随 17） */
 export const ticketMessageSchema = z.object({
   id: z.uuid(),
   direction: messageDirectionSchema,
   /** 收到这封信的店铺邮箱（进线邮箱） */
   mailbox: z.string(),
   /**
-   * 发件人：客户渠道身份（R-TK-08）——亚马逊为买家消息中转地址，Shopify 联系表单为表单里的回复邮箱，其余为发件地址
+   * 发件人：来信为客户渠道身份（R-TK-08）——亚马逊为买家消息中转地址，Shopify 联系表单为表单里的回复邮箱，其余为发件地址；
+   * 我方发出的为发件的店铺邮箱（P05「我方 · 发件邮箱」）
    */
   from: z.object({ name: z.string(), address: z.string() }),
-  /** 来信的来源（归档的平台通知与营销不会进工单）；我方发出的消息为空（16） */
+  /** 来信的来源（归档的平台通知与营销不会进工单）；我方发出的消息为空 */
   source: ticketSourceSchema.nullable(),
   subject: z.string(),
   /** 到达时间（Gmail internalDate） */
   arrivedAt: z.iso.datetime({ offset: true }),
   /** 同一封邮件（Message-ID 相同）同时发到的其他店铺邮箱（R-TK-07）：只按最早收到（同步入库）的一封归并，其余记在这里 */
   alsoSentTo: z.array(z.string()),
+  /**
+   * 我方发出的自动回复（带 Auto-Submitted 或自动回复标记，R-SL-08）：不算回复，P05 显示灰色「自动回复 · 不算回复」；来信为 false
+   */
+  autoReply: z.boolean(),
+  /**
+   * 来信的首次回复时间：同一工单内它之后的第一封我方回复（不含自动回复）的 internalDate，结束它的计时（R-SL-08，不论来源）；
+   * 还没回复与我方发出的消息为空
+   */
+  firstReplyAt: z.iso.datetime({ offset: true }).nullable(),
+  /** 应回复来信（来源为客户）的 SLA；生产厂、其他供应商的来信与我方发出的消息为空（不计 SLA） */
+  sla: ticketMessageSlaSchema.nullable(),
 });
 export type TicketMessage = z.infer<typeof ticketMessageSchema>;
 

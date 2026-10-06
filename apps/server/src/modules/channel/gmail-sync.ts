@@ -44,7 +44,8 @@ import { loadSenderRules } from './sender-rules';
  *    以及让「最近同步成功的时间」在没有新信时也前进）；channel.gmail_renew_watch：每天续订 watch（不按标签过滤，7 天到期）；
  * 3. 任务 channel.gmail_sync：history.list 取游标之后新到的消息，逐封取原文、解析、入库（去重），全部入库后才推进游标并记同步成功
  *    （水位只在持久化成功后推进）。来信入库时识别渠道、站点、来源与客户渠道身份（recognition.ts，待办 10），新入库、不是别处已收过、
- *    来源也不是平台通知或营销的，在同一事务里发出「来信已接收」；「已发送」里我方发出的信入库、方向为我方（归到工单与回复识别随 16）；
+ *    来源也不是平台通知或营销的，在同一事务里发出「来信已接收」；「已发送」里我方发出的信入库、方向为我方，同一事务里发出
+ *    「我方发信已同步」（ticket 据此识别回复，16）；
  * 4. 游标过期（history.list 404）：先取邮箱此刻的新游标，再按 internalDate 从上次成功同步前 1 小时起全量补拉，全部入库后才换上新游标；
  *    补拉中途失败下次接着补，补拉完成前「最近同步成功的时间」不前移（报表的「更新于」不谎报新鲜度）；
  * 5. 外部调用失败记进同步记录（mailbox-health.ts）：连续 3 次为连接异常（通知、审计、全站横幅），之后同步成功即恢复并补拉。
@@ -94,6 +95,16 @@ export const gmailRenewWatchJob = defineJob(
  */
 export const inboundReceivedJob = defineJob(
   'channel.inbound_received',
+  z.object({ messageId: z.uuid() }),
+  { retryLimit: 5, retryDelay: 10, retryBackoff: true },
+);
+
+/**
+ * 领域事件「我方发信已同步」：店铺邮箱「已发送」里的一封我方邮件入库（不是别的邮箱已收过的同一封），
+ * ticket 据此按 In-Reply-To、References、Gmail 线程把它归到工单（回复识别，R-SL-08，待办 16）
+ */
+export const outboundSyncedJob = defineJob(
+  'channel.outbound_synced',
   z.object({ messageId: z.uuid() }),
   { retryLimit: 5, retryDelay: 10, retryBackoff: true },
 );
@@ -350,7 +361,7 @@ function messageIdOf(value: string | undefined): string | null {
  * - 同方向、Message-ID 相同的信已在别的店铺邮箱入库：只记「同时发送到」，不识别店铺、不发事件；
  * - 来信：按收件邮箱识别店铺，识别渠道、站点、来源与客户渠道身份（recognition.ts）；来源是平台通知或营销的只入库归档（PRD 1.4），
  *   其余在同一事务里发出「来信已接收」；
- * - 我方发出（「已发送」）：店铺就是发件邮箱的店铺，不识别来源；归到工单与回复识别随 16（届时在这里发「我方发信已同步」）。
+ * - 我方发出（「已发送」）：店铺就是发件邮箱的店铺，不识别来源；在同一事务里发出「我方发信已同步」（ticket 识别回复，16）。
  */
 /** 一封邮件入库的结果：新的一封、别的邮箱已收过的同一封（只记「同时发送到」）、同一邮箱里重复投递的（丢弃） */
 type IngestResult = 'created' | 'copy' | 'duplicate';
@@ -442,6 +453,7 @@ async function ingestMessage(
       return 'copy';
     }
     if (direction === 'outbound') {
+      await tx.enqueue(outboundSyncedJob, { messageId: row.id });
       logger.info({ mailbox: target.address, messageId: row.id }, '「已发送」的我方回信已入库');
       return 'created';
     }

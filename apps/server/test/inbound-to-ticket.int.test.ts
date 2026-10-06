@@ -93,6 +93,7 @@ describe('来信到工单', () => {
         // 来信没有订单号、直邮的店铺是亚马逊店铺（不按邮箱反查）：无订单工单（R-TK-02）
         orderNumber: null,
         status: 'awaiting_reply',
+        closeReason: null,
         lastInboundAt: '2026-09-10T00:15:00.000Z',
       },
     ]);

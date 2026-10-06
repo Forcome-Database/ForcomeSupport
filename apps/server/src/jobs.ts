@@ -12,6 +12,7 @@ import {
   gmailSyncJob,
   inboundReceivedJob,
   listOrderStores,
+  outboundSyncedJob,
   storeChangedJob,
 } from './modules/channel';
 import {
@@ -41,7 +42,7 @@ import {
   shopifyPollJob,
   shopifySyncJob,
 } from './modules/order';
-import { createTicketJobHandlers } from './modules/ticket';
+import { attributeReplyJob, createTicketJobHandlers, ticketTimeLimitsJob } from './modules/ticket';
 
 export const jobDefinitions: readonly AnyJobDefinition[] = [
   syncExchangeRatesJob,
@@ -53,6 +54,9 @@ export const jobDefinitions: readonly AnyJobDefinition[] = [
   gmailPollJob,
   gmailRenewWatchJob,
   inboundReceivedJob,
+  outboundSyncedJob,
+  attributeReplyJob,
+  ticketTimeLimitsJob,
   shopifyPollJob,
   shopifySyncJob,
   amazonPollJob,

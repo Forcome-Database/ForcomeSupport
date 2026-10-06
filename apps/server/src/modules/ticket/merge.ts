@@ -23,7 +23,9 @@ import {
   type MirroredOrder,
   type OrderStore,
 } from '../order';
+import { lockReplyLinks, retryWaitingReplies } from './replies';
 import { customer, customerIdentity, ticket, ticketMessage } from './schema';
+import { firstReplyAfter, inboundSlaColumns } from './sla';
 import { applyTransition, closedTimes, createTicket } from './ticket-status';
 
 /*
@@ -35,8 +37,13 @@ import { applyTransition, closedTimes, createTicket } from './ticket-status';
  *    无订单（R-TK-02）：同店铺同客户渠道身份有未关闭的无订单工单则追加，否则新建。
  * 3. 新建的工单站点：Shopify 店铺关联到订单时按订单收件国家（不是 US / CA / MX 时取识别出的站点，即店铺默认站点）；
  *    其余取 channel 识别出的站点（亚马逊按发件域）。工单的来源取首封来信，追加与重开都不改（11.1 Ticket）。
- * 在事务内先取客户身份锁（建客户），再按「店铺 + 订单号」或「店铺 + 客户渠道身份」取 pg_advisory_xact_lock，加锁后再查再写，
- * 顺序固定、不会互相等死；同一订单或同一客户的几封信同时归并只建一张工单。
+ * 4. 回复与 SLA（R-SL-08，16）：来信记来源、渠道与首次回复，应回复来信（来源为客户）另记 SLA 截止与结果（sla.ts）。
+ *    晚到的来信若早于工单里已归属的我方回复，按 internalDate 判为已被该回复结束计时：它不是未回复来信，追加时状态不变；
+ *    其余追加按迁移表（等客户、已解决 → 待回复）。状态变更记下触发的来信（工单量只计客户来信触发的新建与重开）。
+ *    归并后找等着这封来信的我方回复（回复先于来信入库），排任务重新识别（replies.ts）。
+ * 在事务内先取客户身份锁（建客户），再按「店铺 + 订单号」或「店铺 + 客户渠道身份」取 pg_advisory_xact_lock，再取回复识别的
+ * 咨询锁（这封信的 Message-ID 与线程，与回复识别互斥），最后锁工单行，加锁后再查再写；顺序固定、不会互相等死；
+ * 同一订单或同一客户的几封信同时归并只建一张工单。
  * 任务幂等：一封信只归并一次（工单消息按邮件 id 唯一），重跑结果不变。补拉的外部调用失败时任务失败、稍后重试；
  * 最后一次尝试仍失败就不再等这个候选（按查不到处理），照常归并——来信不能因订单平台连不上而一直不成工单。
  * 未归属店铺的来信进队列随 15。
@@ -252,11 +259,20 @@ export async function mergeInbound(
     );
     // 加锁后再查一次：同一封信的归并任务可能被重复执行
     if (await alreadyMerged(tx, messageId)) return;
+    // 与回复识别互斥（回复先于来信入库时它在等这封信），要在锁工单行之前取
+    await lockReplyLinks(tx, {
+      messageIds: [mail.rfcMessageId],
+      mailbox: mail.mailbox,
+      gmailThreadId: mail.gmailThreadId,
+    });
 
     const target = orderNumber
       ? await targetForOrder(tx, SYSTEM_STORE_SCOPE, storeId, orderNumber, mail.receivedAt)
       : await targetForCustomer(tx, SYSTEM_STORE_SCOPE, storeId, customerId);
+    const cause = { messageId };
     let merged: { id: string; number: string };
+    // 工单里已有、晚于这封信的第一封我方回复（乱序时才有）：有就说明它已被回复，不是未回复来信
+    let firstReplyAt: Date | null = null;
     if (target.kind === 'create') {
       merged = await createTicket(
         tx,
@@ -274,15 +290,22 @@ export async function mergeInbound(
         },
         'inbound',
         systemActor,
+        cause,
       );
     } else {
-      // 追加（待回复保持待回复）或重开（已关闭 → 待回复）：状态按迁移表变化；最近来信取较晚的一封（来信可能乱序到达）
-      const current = await applyTransition(
-        tx,
-        target.ticket,
-        target.kind === 'reopen' ? 'inbound_reopen' : 'inbound',
-        systemActor,
-      );
+      // 追加（待回复保持待回复，等客户、已解决回到待回复）或重开（已关闭 → 待回复）：状态按迁移表变化；
+      // 已被回复的晚到来信追加时状态不变（迁移表看的是未回复来信）。最近来信取较晚的一封（来信可能乱序到达）
+      firstReplyAt = await firstReplyAfter(tx, target.ticket.id, mail.receivedAt);
+      const current =
+        target.kind === 'append' && firstReplyAt
+          ? target.ticket
+          : await applyTransition(
+              tx,
+              target.ticket,
+              target.kind === 'reopen' ? 'inbound_reopen' : 'inbound',
+              systemActor,
+              cause,
+            );
       const latest =
         mail.receivedAt > current.lastInboundAt ? mail.receivedAt : current.lastInboundAt;
       merged = await updateWithVersion(tx, ticket, current, {
@@ -296,8 +319,18 @@ export async function mergeInbound(
       channelMessageId: messageId,
       direction: 'inbound',
       receivedAt: mail.receivedAt,
+      source,
+      channel,
+      ...inboundSlaColumns({
+        source,
+        channel,
+        receivedAt: mail.receivedAt,
+        firstReplyAt,
+        now: tx.now,
+      }),
       createdAt: tx.now,
     });
+    await retryWaitingReplies(tx, mail);
     logger.info(
       { messageId, ticket: merged.number, orderNumber, merged: target.kind },
       MERGED_LOG[target.kind],

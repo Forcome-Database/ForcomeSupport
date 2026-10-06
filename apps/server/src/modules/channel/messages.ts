@@ -5,16 +5,17 @@ import {
   type Site,
   type TicketChannel,
 } from '@forcome/contracts';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, or } from 'drizzle-orm';
 import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
+import { isAutoReply } from './auto-reply';
 import { extractOrderNumbers } from './order-numbers';
 import type { MailAddress, Recognition } from './recognition';
 import { message, store } from './schema';
 
 /*
  * 收取的邮件对外的读服务（ADR 0005：别的模块只经 index.ts 读 channel 的数据）：
- * ticket 归并时取一封来信的识别结果（系统操作，SYSTEM_STORE_SCOPE），工单详情取消息摘要（成员的店铺范围），
- * 核对与排查时列出收取的邮件（含归档的平台通知与营销）。
+ * ticket 归并时取一封来信的识别结果、回复识别时取一封我方发信与它可能回复的邮件（系统操作，SYSTEM_STORE_SCOPE），
+ * 工单详情取消息摘要（成员的店铺范围），核对与排查时列出收取的邮件（含归档的平台通知与营销）。
  * 都带店铺范围（ADR 0010）；店铺为空的邮件（未归属店铺，15）只在不受限的范围里看得到。
  */
 
@@ -45,6 +46,10 @@ function recognitionOf(row: RecognitionColumns): Recognition | null {
 export interface InboundMessage {
   readonly id: string;
   readonly direction: MessageDirection;
+  /** 收到它的店铺邮箱与 Gmail 线程、RFC Message-ID：归并后据此找先到的我方回复（回复识别的乱序，16） */
+  readonly mailbox: string;
+  readonly gmailThreadId: string;
+  readonly rfcMessageId: string | null;
   /** 识别出的店铺；未归属店铺（15）与同一封邮件的其余副本为空 */
   readonly storeId: string | null;
   /** 识别结果；同一封邮件的其余副本（duplicateOfId 不为空）为空。平台通知与营销已归档，不会发「来信已接收」 */
@@ -70,6 +75,9 @@ export async function findInboundMessage(
     .select({
       id: message.id,
       direction: message.direction,
+      mailbox: message.mailbox,
+      gmailThreadId: message.gmailThreadId,
+      rfcMessageId: message.rfcMessageId,
       storeId: message.storeId,
       ...recognitionColumns,
       subject: message.subject,
@@ -88,6 +96,9 @@ export async function findInboundMessage(
   return {
     id: messageId,
     direction,
+    mailbox: row.mailbox,
+    gmailThreadId: row.gmailThreadId,
+    rfcMessageId: row.rfcMessageId,
     storeId,
     recognition: recognitionOf(row),
     subject,
@@ -99,11 +110,102 @@ export async function findInboundMessage(
   };
 }
 
-/** 工单详情里一封消息的摘要（正文、我方回复等随 09、17） */
+/**
+ * 「已发送」里的一封我方邮件（回复识别，R-SL-08，待办 16）：发件的店铺邮箱与店铺、Gmail 线程、它回复的 Message-ID
+ * （In-Reply-To 与 References，按出现顺序）、发出时间与是否自动回复（auto-reply.ts，读的时候按头字段判断）
+ */
+export interface OutboundMessage {
+  readonly id: string;
+  readonly direction: MessageDirection;
+  readonly mailbox: string;
+  /** 发件邮箱所属的店铺；同一封邮件的其余副本为空 */
+  readonly storeId: string | null;
+  readonly gmailThreadId: string;
+  readonly inReplyTo: string | null;
+  readonly references: readonly string[];
+  /** 发出时间（Gmail internalDate） */
+  readonly receivedAt: Date;
+  readonly duplicateOfId: string | null;
+  /** 带 Auto-Submitted 或自动回复标记：不算回复 */
+  readonly autoReply: boolean;
+}
+
+export async function findOutboundMessage(
+  db: DbExecutor,
+  scope: StoreScope,
+  id: string,
+): Promise<OutboundMessage | null> {
+  const [row] = await db
+    .select({
+      id: message.id,
+      direction: message.direction,
+      mailbox: message.mailbox,
+      storeId: message.storeId,
+      gmailThreadId: message.gmailThreadId,
+      inReplyTo: message.inReplyTo,
+      references: message.references,
+      receivedAt: message.receivedAt,
+      duplicateOfId: message.duplicateOfId,
+      headers: message.headers,
+    })
+    .from(message)
+    .where(and(eq(message.id, id), storeScopeCondition(scope, message.storeId)))
+    .limit(1);
+  if (!row) return null;
+  const { headers, ...rest } = row;
+  return { ...rest, autoReply: isAutoReply(headers) };
+}
+
+/** 一封我方回复可能回复的邮件：按 Message-ID 或同一 Gmail 线程找到的已入库邮件（不论方向） */
+export interface ReplyTarget {
+  readonly id: string;
+  readonly rfcMessageId: string | null;
+  readonly mailbox: string;
+  readonly gmailThreadId: string;
+  readonly receivedAt: Date;
+}
+
+/**
+ * 回复识别的候选（R-SL-08）：Message-ID 在给定的 In-Reply-To / References 里的邮件，与同一邮箱同一 Gmail 线程里的邮件
+ * （不含这封回复自己）。同一封邮件发到几个邮箱时只取准的那封（其余副本不归并、不在工单里）。
+ * 按哪一种先匹配、归到哪张工单由 ticket 决定
+ */
+export async function listReplyTargets(
+  db: DbExecutor,
+  scope: StoreScope,
+  reply: Pick<OutboundMessage, 'id' | 'mailbox' | 'gmailThreadId' | 'inReplyTo' | 'references'>,
+): Promise<ReplyTarget[]> {
+  const ids = [...new Set([reply.inReplyTo, ...reply.references].filter((x) => x !== null))];
+  return db
+    .select({
+      id: message.id,
+      rfcMessageId: message.rfcMessageId,
+      mailbox: message.mailbox,
+      gmailThreadId: message.gmailThreadId,
+      receivedAt: message.receivedAt,
+    })
+    .from(message)
+    .where(
+      and(
+        ne(message.id, reply.id),
+        isNull(message.duplicateOfId),
+        storeScopeCondition(scope, message.storeId),
+        or(
+          ids.length > 0 ? inArray(message.rfcMessageId, ids) : undefined,
+          and(eq(message.mailbox, reply.mailbox), eq(message.gmailThreadId, reply.gmailThreadId)),
+        ),
+      ),
+    )
+    .orderBy(asc(message.receivedAt), asc(message.id));
+}
+
+/** 工单详情里一封消息的摘要（正文随 17） */
 export interface MessageSummary {
   readonly id: string;
   readonly direction: MessageDirection;
   readonly mailbox: string;
+  /** From 头：我方发出的消息显示发件邮箱（来信看识别出的客户渠道身份） */
+  readonly from: MailAddress;
   /** 识别结果（客户渠道身份、来源等）；工单里的来信都识别过 */
   readonly recognition: Recognition | null;
   readonly subject: string;
@@ -123,6 +225,8 @@ export async function listMessageSummaries(
       id: message.id,
       direction: message.direction,
       mailbox: message.mailbox,
+      fromAddress: message.fromAddress,
+      fromName: message.fromName,
       ...recognitionColumns,
       subject: message.subject,
       receivedAt: message.receivedAt,
@@ -134,6 +238,7 @@ export async function listMessageSummaries(
     id: row.id,
     direction: row.direction,
     mailbox: row.mailbox,
+    from: { address: row.fromAddress, name: row.fromName },
     recognition: recognitionOf(row),
     subject: row.subject,
     receivedAt: row.receivedAt,

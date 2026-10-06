@@ -10,7 +10,6 @@ import { getDemoFixture } from '@forcome/fixtures';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { inboundReceivedJob } from '../src/modules/channel';
-import { transaction } from '../src/modules/core';
 import {
   amazonOrdersClient,
   gmailClient,
@@ -20,6 +19,7 @@ import {
   type FakeMailInput,
   type FakeShopify,
 } from '../src/modules/integration';
+import { ticketTimeLimitsJob } from '../src/modules/ticket';
 import type { ApiClient } from './api-client';
 import { startTestHarness, type TestHarness } from './harness';
 
@@ -95,19 +95,23 @@ async function ticketsOf(client: ApiClient, customer: string): Promise<TicketLis
 }
 
 /**
- * 把工单关在某个时刻（测试的准备步骤）：按时关闭随 16 号待办，在那之前直接写一条「已关闭」的状态变更记录并改工单状态，
- * 同一事务提交，满足数据库的状态守卫（迁移 0007：工单状态等于最近一条记录的目标状态）。16 落地后改成推进时钟跑时限扫描
+ * 把工单关在某个时刻（测试的准备步骤）：把时钟拨到那一刻跑一次每分钟的时限扫描（待回复 14 天无新来信 → 已关闭，待办 16），
+ * 关闭时刻就是扫描时的「当前时间」；扫完拨回原来的时刻（会话按 7 天无操作过期，时钟不留在过去）。
+ * 扫描影响库里全部工单：给的时刻要满足「这张工单最近来信 + 14 天 ≤ 关闭时刻」，且不会顺带关掉别的用例还要用的工单
  */
 async function closeTicket(t: TestHarness, number: string, closedAt: string): Promise<void> {
-  await transaction(t.runtime, async (tx) => {
-    await tx.db.execute(sql`
-      INSERT INTO ticket.status_change (ticket_id, from_status, to_status, event, trigger, actor_name, close_reason, occurred_at)
-      SELECT id, status, 'closed', 'idle_14_days', 'system', '系统', 'reply_not_detected', ${closedAt}::timestamptz
-        FROM ticket.ticket WHERE number = ${number}`);
-    await tx.db.execute(sql`
-      UPDATE ticket.ticket SET status = 'closed', close_reason = 'reply_not_detected', version = version + 1
-       WHERE number = ${number}`);
-  });
+  const before = t.clock.now();
+  t.clock.set(closedAt);
+  try {
+    await t.enqueue(ticketTimeLimitsJob, {});
+    await t.runJobs();
+  } finally {
+    t.clock.set(before);
+  }
+  const { rows } = await t.runtime.db.execute<{ status: string }>(
+    sql`SELECT status FROM ticket.ticket WHERE number = ${number}`,
+  );
+  expect(rows).toEqual([{ status: 'closed' }]);
 }
 
 /** 工单的状态变更记录（事件、目标状态），按先后 */

@@ -21,12 +21,21 @@ function triggerOf(actor: Actor): TicketTrigger {
   return actor.kind === 'member' ? 'member' : 'system';
 }
 
+/**
+ * 引起这次迁移的消息（channel.message 的 id）：新建、追加、重开为触发的来信，识别到回复为那封我方回复；按时关闭与成员的动作没有。
+ * 工单量只计由客户来信触发的新建与重开，按它找来信的来源（待办 16 记录，24 统计）
+ */
+export interface TransitionCause {
+  readonly messageId?: string;
+}
+
 async function recordChange(
   tx: Tx,
   ticketId: string,
   result: Transition,
   event: TicketEvent,
   actor: Actor,
+  cause: TransitionCause,
 ): Promise<void> {
   await tx.db.insert(statusChange).values({
     ticketId,
@@ -37,6 +46,7 @@ async function recordChange(
     actorId: actor.kind === 'member' ? actor.memberId : null,
     actorName: actor.kind === 'member' ? actor.name : SYSTEM_ACTOR_NAME,
     closeReason: result.closeReason,
+    channelMessageId: cause.messageId ?? null,
     occurredAt: tx.now,
   });
 }
@@ -47,6 +57,7 @@ export async function createTicket(
   values: NewTicket,
   event: TicketEvent,
   actor: Actor,
+  cause: TransitionCause = {},
 ): Promise<TicketRow> {
   const result = transition(null, event, triggerOf(actor));
   const [row] = await tx.db
@@ -60,7 +71,7 @@ export async function createTicket(
     })
     .returning();
   if (!row) throw new Error('工单创建失败');
-  await recordChange(tx, row.id, result, event, actor);
+  await recordChange(tx, row.id, result, event, actor, cause);
   return row;
 }
 
@@ -74,6 +85,7 @@ export async function applyTransition(
   current: TicketRow,
   event: TicketEvent,
   actor: Actor,
+  cause: TransitionCause = {},
 ): Promise<TicketRow> {
   const result = transition(current.status, event, triggerOf(actor));
   if (!result.changed) return current;
@@ -82,7 +94,7 @@ export async function applyTransition(
     closeReason: result.closeReason,
     updatedAt: tx.now,
   });
-  await recordChange(tx, current.id, result, event, actor);
+  await recordChange(tx, current.id, result, event, actor, cause);
   return updated;
 }
 

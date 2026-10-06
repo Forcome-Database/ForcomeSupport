@@ -2,5 +2,7 @@
 // 其他模块只能经本文件调用本模块，不能引用内部文件或读写本模块的表。
 export { createTicketJobHandlers } from './jobs';
 export { findTicketReference, type TicketReference } from './queries';
+export { attributeReplyJob } from './replies';
 export { clearTickets } from './reset';
 export { createTicketRoutes } from './routes';
+export { ticketTimeLimitsJob } from './time-limits';
