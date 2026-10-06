@@ -156,6 +156,8 @@ export interface SpApiTokens {
 
 /** 本进程缓存的访问令牌（按店铺；api 与 worker 各一份） */
 const accessTokens = new Map<string, { readonly token: string; readonly expiresAt: number }>();
+/** 正在换的访问令牌（按店铺）：几个同步任务同时发现令牌到期时只向 LWA 换一次 */
+const issuing = new Map<string, Promise<string>>();
 
 export function createSpApiTokens(
   http: HttpClient,
@@ -170,7 +172,16 @@ export function createSpApiTokens(
 ): SpApiTokens {
   const { storeId, credentials, vault, clock } = options;
   const cache = options.cache ?? accessTokens;
-  async function issue(): Promise<string> {
+  /** 换一个新的；同一店铺已经在换时等那一次的结果 */
+  function issue(): Promise<string> {
+    let pending = issuing.get(storeId);
+    if (!pending) {
+      pending = exchange().finally(() => issuing.delete(storeId));
+      issuing.set(storeId, pending);
+    }
+    return pending;
+  }
+  async function exchange(): Promise<string> {
     const refresh = await vault.read(SP_API_REFRESH_TOKEN, storeId);
     if (!refresh) {
       throw new ClientNotConfiguredError(

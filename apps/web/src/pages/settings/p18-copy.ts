@@ -100,11 +100,12 @@ export const AMAZON_ISSUE_LINES = {
 
 /**
  * 亚马逊卡的「订单通知队列（SQS）」一行（K20 与补充小样，待办 12 Q7，协调者 2026-10-06 决定）：左边固定的名字，右边带圆点的小标签——
- * 正常写等待拉取的条数（0 绿色、其余黄色；还没检查过只写「正常」）、积压 N 条（黄）、拉取失败（红）、未连接（灰）。只影响这一行
+ * 正常写等待拉取的条数（0 绿色、其余黄色；拉取正常而积压还没检查到时按 0 写——拉取源同一轮先检查再拉，只有检查本身失败时才会没有）、
+ * 积压 N 条（黄）、拉取失败（红）、未连接（灰）。只影响这一行
  */
 export const ORDER_QUEUE_LINE = {
   label: ORDER_QUEUE_NAME,
-  normal: (backlog: number | null) => (backlog === null ? '正常' : `正常 · 积压 ${backlog}`),
+  normal: (backlog: number) => `正常 · 积压 ${backlog}`,
   backlog: (backlog: number) => `积压 ${backlog} 条`,
   failed: '拉取失败',
   notConnected: '未连接',

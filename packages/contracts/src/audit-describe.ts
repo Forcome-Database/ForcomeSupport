@@ -17,9 +17,11 @@ import {
   ACCESS_DENIED_ACTION,
   SYSTEM_ACTOR_NAME,
   auditActions,
+  auditChannels,
   auditSnapshotSchemas,
   isAuditAction,
   loginMethodLabels,
+  type AuditChannel,
   type AuditObjectType,
   type AuditSnapshotKind,
 } from './audit';
@@ -252,9 +254,6 @@ interface FormatContext {
   readonly channel: AuditChannel;
 }
 
-/** 渠道连接记录的渠道（快照的 channel） */
-type AuditChannel = 'gmail' | 'shopify' | 'amazon';
-
 /** 订单的补拉：N 笔订单，平台更新时间的起止 */
 const ORDER_BACKFILL = {
   count: (n: number) => `${n} 笔订单`,
@@ -279,7 +278,8 @@ const BACKFILL_WORDS: Record<
 /** 快照里写的渠道；待办 09 写下的记录没有它，是 Gmail */
 function auditChannelOf(after: unknown): AuditChannel {
   if (!isPlainObject(after)) return 'gmail';
-  return after.channel === 'shopify' || after.channel === 'amazon' ? after.channel : 'gmail';
+  const channel = auditChannels.find((c) => c === after.channel);
+  return channel ?? 'gmail';
 }
 
 function dateTimeWords(value: unknown, ctx: FormatContext): string {

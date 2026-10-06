@@ -181,8 +181,12 @@ export const accessDeniedAuditSnapshotSchema = z.object({
  * Shopify 与亚马逊为订单与平台更新时间的起止）与触发（前值「连续 N 次失败」、恢复的后值「第 N 次重试成功」）。
  * channel 写是哪个渠道（决定「补拉」的单位）；待办 09 写下的记录没有它，是 Gmail
  */
+/** 渠道连接记录的渠道（快照的 channel） */
+export const auditChannels = ['gmail', 'shopify', 'amazon'] as const;
+export type AuditChannel = (typeof auditChannels)[number];
+
 export const channelAuditSnapshotSchema = z.object({
-  channel: z.enum(['gmail', 'shopify', 'amazon']).optional(),
+  channel: z.enum(auditChannels).optional(),
   status: connectionStatusSchema,
   lastSuccessAt: z.string().nullable(),
   backfilled: z.object({ count: z.int().positive(), from: z.string(), to: z.string() }).nullable(),

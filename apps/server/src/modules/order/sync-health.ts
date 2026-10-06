@@ -198,7 +198,16 @@ export async function recordOrderSyncSuccess(
   await tx.db
     .insert(orderSync)
     .values({ storeId: store.id, source, createdAt: tx.now, ...success })
-    .onConflictDoUpdate({ target: [orderSync.storeId, orderSync.source], set: success });
+    .onConflictDoUpdate({
+      target: [orderSync.storeId, orderSync.source],
+      set: {
+        ...success,
+        // 水位只进不退：任务过期后旧的一轮晚结束（SP-API 配额排队可能很久）时，不把新一轮推进的水位改回去
+        ...(watermark
+          ? { watermark: sql`greatest(${orderSync.watermark}, excluded.watermark)` }
+          : {}),
+      },
+    });
   if (!before || before.failures < CONNECTION_FAILURE_LIMIT) return;
 
   const { channel, notices, auditObject } = CHANNELS[source];

@@ -1,5 +1,5 @@
 // 入口：sp-api-token（一次性，开发测试与生产都用）。录入某卖家的 SP-API 授权刷新令牌（待办 12）：
-//   echo <刷新令牌> | node dist/sp-api-token.mjs --seller <卖家 ID>
+//   node dist/sp-api-token.mjs --seller <卖家 ID> < <放刷新令牌的文件>
 // 令牌从标准输入读，用主密钥加密存给平台标识为该卖家 ID 的亚马逊店铺；先跑 migrate、先在 P18 登记店铺。命令本身在
 // sp-api-token-command.ts，这里只组装运行时。部署脚本子命令：node deploy/deploy.mjs <环境> sp-api-token --seller <卖家 ID>。
 import { text } from 'node:stream/consumers';

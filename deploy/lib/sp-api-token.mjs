@@ -1,6 +1,6 @@
-// 「录入卖家授权」子命令（待办 12）：echo <刷新令牌> | node deploy/deploy.mjs <环境> sp-api-token --seller <卖家 ID>
+// 「录入卖家授权」子命令（待办 12）：node deploy/deploy.mjs <环境> sp-api-token --seller <卖家 ID> < <放刷新令牌的文件>
 // 用当前部署的版本起一次性容器执行 dist/sp-api-token.mjs；刷新令牌经标准输入传进容器（docker compose run -T，不分配终端），
-// 不出现在命令行参数、shell 历史与输出里。容器用环境文件里的主密钥加密后存库。
+// 不出现在命令行参数、shell 历史与输出里（不要用 echo 传：echo 的参数会进 shell 历史）。容器用环境文件里的主密钥加密后存库。
 import { parseArgs } from 'node:util';
 
 export const SP_API_TOKEN_SYNOPSIS = 'sp-api-token --seller <卖家 ID>（刷新令牌从标准输入读）';

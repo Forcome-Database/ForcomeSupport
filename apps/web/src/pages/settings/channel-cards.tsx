@@ -252,7 +252,7 @@ function orderQueueBadge(queue: OrderQueue): { text: string; tone: BadgeTone } {
   switch (queue.status) {
     case 'normal':
       return {
-        text: ORDER_QUEUE_LINE.normal(queue.backlog),
+        text: ORDER_QUEUE_LINE.normal(queue.backlog ?? 0),
         tone: queue.backlog ? 'warning' : 'success',
       };
     case 'backlog':

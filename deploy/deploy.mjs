@@ -14,7 +14,7 @@
 //   node deploy/deploy.mjs staging import-aftersales <登记表.xlsx|.csv> [--mapping <映射表.json>] [--dry-run]
 //                                               用当前部署的版本导入售后登记表（待办 27；--dry-run 只报告不写库，
 //                                               docs/部署说明.md「售后登记表导入」）
-//   echo <刷新令牌> | node deploy/deploy.mjs staging sp-api-token --seller <卖家 ID>
+//   node deploy/deploy.mjs staging sp-api-token --seller <卖家 ID> < <放刷新令牌的文件>
 //                                               用当前部署的版本录入某卖家的 SP-API 授权（待办 12；令牌从标准输入读、
 //                                               加密存库，docs/部署说明.md 第 14 节）
 //

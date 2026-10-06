@@ -82,19 +82,23 @@ export async function listStoreChoices(db: DbExecutor): Promise<{ id: string; na
     .orderBy(asc(store.createdAt), asc(store.id));
 }
 
-/**
- * 订单同步要知道的全部店铺（order 的 OrderStore：店铺名、平台、平台标识、数据来源），按建立先后。同步与连接状态是系统操作，不按范围过滤
- * （ADR 0010 修订登记的例外）：由组装根注入 order（order 不依赖 channel），全站横幅用它列出连接异常的店铺
- */
 /** 新增或编辑店铺后立即给它排一次订单同步（不等定时；Shopify 待办 11、亚马逊待办 12） */
 async function queueOrderSync(
   tx: Tx,
   saved: { readonly id: string; readonly platform: Platform },
 ): Promise<void> {
-  if (saved.platform === 'shopify') await queueShopifySync(tx, saved.id);
-  else await queueAmazonSync(tx, saved.id);
+  switch (saved.platform) {
+    case 'shopify':
+      return queueShopifySync(tx, saved.id);
+    case 'amazon':
+      return queueAmazonSync(tx, saved.id);
+  }
 }
 
+/**
+ * 订单同步要知道的全部店铺（order 的 OrderStore：店铺名、平台、平台标识、数据来源），按建立先后。同步与连接状态是系统操作，不按范围过滤
+ * （ADR 0010 修订登记的例外）：由组装根注入 order（order 不依赖 channel），全站横幅用它列出连接异常的店铺
+ */
 export async function listOrderStores(db: DbExecutor) {
   return db
     .select({
@@ -289,7 +293,7 @@ export async function createStore(ctx: StoreSaveContext, raw: StoreInput): Promi
       after: snapshot(created),
     });
     await tx.enqueue(storeChangedJob, { storeId: row.id, addedMailboxes: [...input.mailboxes] });
-    // Shopify 店铺立即同步一次订单（不等每分钟的定时，新店铺随即显示已连接或异常，待办 11）
+    // 立即同步一次订单（不等定时，新店铺随即显示已连接或异常；Shopify 待办 11、亚马逊待办 12）
     await queueOrderSync(tx, row);
     return created;
   });

@@ -59,13 +59,16 @@ export const AMAZON_SYNC_OVERLAP_MS = 5 * 60_000;
 /** 亚马逊订单号（3-7-7）：来信里抽到的就是它（规格「订单号抽取」） */
 export const AMAZON_ORDER_ID = /^\d{3}-\d{7}-\d{7}$/;
 
+/** 每个 worker 同时处理几个同步、几个通知触发的拉取（同一店铺、同一笔订单仍由 stately + singletonKey 保证只跑一个） */
+export const AMAZON_JOB_CONCURRENCY = 5;
+
 /** 同步一个店铺：每个店铺最多一个在排队、一个在跑；不重试，下一轮（4 分钟后）的同步就是重试 */
 export const amazonSyncJob = defineJob(
   'order.amazon_sync',
   z.object({ storeId: z.uuid() }),
   { policy: 'stately', retryLimit: 0 },
   undefined,
-  5,
+  AMAZON_JOB_CONCURRENCY,
 );
 
 /** 每 4 分钟给每个亚马逊店铺排一次增量同步（规格「每 3–5 分钟」）；worker 启动时也一次 */
@@ -82,7 +85,7 @@ export const amazonOrderChangedJob = defineJob(
   z.object({ storeId: z.uuid(), orderId: z.string().regex(AMAZON_ORDER_ID) }),
   { policy: 'stately', retryLimit: 3, retryDelay: 30, retryBackoff: true },
   undefined,
-  5,
+  AMAZON_JOB_CONCURRENCY,
 );
 
 function amazonFor(clients: IntegrationClients, store: OrderStore): AmazonOrdersClient {

@@ -11,7 +11,7 @@ import { databaseCredentialVault, storeSpApiRefreshToken } from './modules/integ
  */
 
 export const SP_API_TOKEN_USAGE =
-  '用法：echo <刷新令牌> | node dist/sp-api-token.mjs --seller <卖家 ID>（令牌从标准输入读）';
+  '用法：node dist/sp-api-token.mjs --seller <卖家 ID> < <放刷新令牌的文件>（令牌从标准输入读，不要写在命令行上）';
 
 /** LWA 刷新令牌的样子（Atzr| 开头）；只防贴错，不校验真伪（真伪在换访问令牌时才知道） */
 const REFRESH_TOKEN = /^Atzr\|\S{10,}$/;

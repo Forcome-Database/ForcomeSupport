@@ -208,12 +208,12 @@ export function createChannelRoutes(deps: {
             502,
           );
     }
-    const result =
-      kind === 'shopify'
-        ? await testShopifyConnection(runtime, clients, listOrderStores, logger)
-        : kind === 'amazon'
-          ? await testAmazonConnection(runtime, clients, listOrderStores, logger)
-          : await testGmailConnection(runtime, clients, logger);
+    const tests = {
+      gmail: () => testGmailConnection(runtime, clients, logger),
+      shopify: () => testShopifyConnection(runtime, clients, listOrderStores, logger),
+      amazon: () => testAmazonConnection(runtime, clients, listOrderStores, logger),
+    } as const;
+    const result = await tests[kind]();
     return result.unreachable.length === 0
       ? c.json({ kind, targets: result.reachable }, 200)
       : c.json(

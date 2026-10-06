@@ -244,6 +244,15 @@ describe('SP-API 卖家授权与访问令牌', () => {
     expect(requests.at(-1)?.token).toBe('Atza|access-2');
   });
 
+  it('几个调用同时发现没有访问令牌：只向 LWA 换一次，都用这一个', async () => {
+    const c = client();
+    tokenGrant('Atza|shared');
+    searchReply(undefined, { times: 3 });
+    await Promise.all([0, 1, 2].map(() => c.searchOrders({ lastUpdatedAfter: t.clock.now() })));
+    expect(grants).toHaveLength(1);
+    expect(requests.map((r) => r.token)).toEqual(['Atza|shared', 'Atza|shared', 'Atza|shared']);
+  });
+
   it('访问令牌被拒（403 Unauthorized）时换新再试一次；新令牌也被拒以 403 失败', async () => {
     const c = client();
     tokenGrant('Atza|stale');
