@@ -366,6 +366,8 @@ describe('Shopify 订单镜像', () => {
       objectType: 'channel',
       objectId: `shopify:${MX.id}`,
       objectLabel: 'Shopify · forcome.mx',
+      // 按店铺的记录：P27 按查看者的店铺范围过滤
+      storeId: MX.id,
     });
     const p27 = auditLogSchema.parse(
       await (await admin.get('/api/audit?period=today&type=channel')).json(),

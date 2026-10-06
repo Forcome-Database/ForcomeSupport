@@ -154,12 +154,33 @@ export async function syncShopifyStore(
       logger.debug({ store: store.name }, '没有配置 Shopify 凭据，订单不同步（店铺为未连接）');
       return;
     }
+    if (await configChanged(runtime.db, stores, store)) throw error;
     await noteFailure(runtime, store, error, logger);
     throw error;
+  }
+  // 这一轮期间店铺换了数据源（同步记录已按新配置清掉）：旧配置的结果不记，下一轮按新配置从头同步
+  if (await configChanged(runtime.db, stores, store)) {
+    logger.info({ store: store.name }, '同步期间店铺的数据源改了，这一轮的结果不记进同步记录');
+    return;
   }
   // 第一次同步、一笔也没有：水位从开始同步的时刻起
   await transaction(runtime, (tx) =>
     recordOrderSyncSuccess(tx, store, newest ?? startedAt, writes),
+  );
+}
+
+/** 店铺的平台、平台标识或数据来源与这一轮开始时不同了（或店铺已不是 Shopify 店铺） */
+async function configChanged(
+  db: DbExecutor,
+  stores: OrderStoreSource,
+  started: OrderStore,
+): Promise<boolean> {
+  const now = (await stores(db)).find((s) => s.id === started.id);
+  return (
+    !now ||
+    now.platform !== started.platform ||
+    now.platformId !== started.platformId ||
+    now.adapterMode !== started.adapterMode
   );
 }
 
@@ -181,7 +202,10 @@ export async function findOrder(
   ref: OrderRef,
 ): Promise<MirroredOrder | null> {
   if (!isStoreInScope(scope, store.id)) return null;
-  const lookup: OrderRef = 'name' in ref ? { name: normalizeShopifyOrderName(ref.name) } : ref;
+  const lookup: OrderRef =
+    'name' in ref && store.platform === 'shopify'
+      ? { name: normalizeShopifyOrderName(ref.name) }
+      : ref;
   const mirrored = await mirroredOrder(runtime.db, scope, store.id, lookup);
   if (mirrored || !('name' in lookup) || store.platform !== 'shopify') return mirrored;
   let fetched;
