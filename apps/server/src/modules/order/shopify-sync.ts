@@ -56,11 +56,18 @@ export type OrderStoreSource = (db: DbExecutor) => Promise<readonly OrderStore[]
 /** 每次从水位往前多取这么久（平台搜索索引的延迟、两边时钟的偏差） */
 export const SHOPIFY_SYNC_OVERLAP_MS = 2 * 60_000;
 
-/** 同步一个店铺：每个店铺最多一个在排队、一个在跑（stately）；不重试，下一分钟的同步就是重试 */
-export const shopifySyncJob = defineJob('order.shopify_sync', z.object({ storeId: z.uuid() }), {
-  policy: 'stately',
-  retryLimit: 0,
-});
+/**
+ * 同步一个店铺：每个店铺最多一个在排队、一个在跑（stately）；不重试，下一分钟的同步就是重试。每分钟给每个店铺各排一个，
+ * 每个 worker 同时处理 5 个（店铺多时不排成长队，新编辑的店铺也能及时同步）
+ */
+export const SHOPIFY_SYNC_CONCURRENCY = 5;
+export const shopifySyncJob = defineJob(
+  'order.shopify_sync',
+  z.object({ storeId: z.uuid() }),
+  { policy: 'stately', retryLimit: 0 },
+  undefined,
+  SHOPIFY_SYNC_CONCURRENCY,
+);
 
 /** 每分钟给每个 Shopify 店铺排一次同步（规格「每 1–2 分钟」）；worker 启动时也一次 */
 export const shopifyPollJob = defineJob(

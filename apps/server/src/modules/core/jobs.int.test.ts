@@ -26,6 +26,13 @@ const tickJob = defineJob('test.tick', z.object({}), undefined, {
   runAtStartup: true,
 });
 
+// 示范并发任务：一个 worker 进程同时处理 3 个（处理器等放行，记下同时在处理的最大个数）
+const slowJob = defineJob('test.slow', z.object({ n: z.int() }), undefined, undefined, 3);
+let running = 0;
+let peak = 0;
+let release: () => void = () => undefined;
+const gate = new Promise<void>((resolve) => (release = resolve));
+
 let database: TestDatabase;
 let t: TestRuntime;
 const received: string[] = [];
@@ -33,7 +40,7 @@ const received: string[] = [];
 beforeAll(async () => {
   database = await createTestDatabase();
   t = await createTestRuntime(database.url, { role: 'worker' });
-  await ensureQueues(t.runtime.boss, [echoJob]);
+  await ensureQueues(t.runtime.boss, [echoJob, slowJob]);
   await startWorker(
     t.runtime,
     [
@@ -44,6 +51,12 @@ beforeAll(async () => {
       handleJob(tickJob, () => {
         received.push('tick');
         return Promise.resolve();
+      }),
+      handleJob(slowJob, async () => {
+        running += 1;
+        peak = Math.max(peak, running);
+        await gate;
+        running -= 1;
       }),
     ],
     { logger: silentLogger, pollingIntervalSeconds: 0.5 },
@@ -115,6 +128,17 @@ describe('后台任务：任务表即发件箱（ADR 0008）', () => {
         tz: 'UTC',
       }),
     ).toThrow(/载荷要接受 \{\}/);
+  });
+
+  it('任务可设每个 worker 进程的并发数：同时处理几个（待办 11，每分钟按店铺排的同步）', async () => {
+    await transaction(t.runtime, async (tx) => {
+      for (const n of [1, 2, 3, 4]) await tx.enqueue(slowJob, { n });
+    });
+    await vi.waitFor(() => expect(peak).toBe(3), { timeout: 10_000, interval: 50 });
+    release();
+    await vi.waitFor(() => expect(running).toBe(0), { timeout: 10_000, interval: 50 });
+    expect(peak).toBe(3);
+    expect(() => defineJob('test.bad', z.object({}), undefined, undefined, 0)).toThrow(/正整数/);
   });
 
   it('任务名必须是「模块.任务」形式', () => {

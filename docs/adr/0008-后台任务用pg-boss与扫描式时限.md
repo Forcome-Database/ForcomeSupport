@@ -93,4 +93,5 @@ status: accepted
 ## 修订（2026-10-06，待办 11 落地）
 
 - **Shopify 订单同步的任务**：定时任务 `order.shopify_poll` 每分钟（cron `* * * * *`，worker 启动时也一次）给每个 Shopify 店铺排 `order.shopify_sync`（`stately`，`singletonKey` 为店铺，排队里已有的不重复排）；`order.shopify_sync` 不重试（`retryLimit: 0`）——下一分钟的同步就是重试，失败照常抛出、在 pg-boss 里记失败，连续失败次数记在同步记录里（ADR 0011 修订）。新增或编辑 Shopify 店铺的事务里直接排一次（`order` 的 `queueShopifySync`），不等定时。
+- **任务的并发数**：`defineJob` 第 5 个参数是每个 worker 进程同时处理几个（pg-boss 的 `localConcurrency`，默认 1；每个处理者取一个、处理完等轮询间隔 2 秒再取）。`order.shopify_sync` 设 5：每分钟给每个店铺各排一个，店铺多时（开发测试环境长期累积了 20 多个测试店铺）一个一个取会排成长队，新编辑的店铺要等二十多秒才同步（部署冒烟发现）；同一店铺仍由 stately + `singletonKey` 保证同时只跑一个。
 - **任务要的店铺由组装根注入**：`order` 的处理器拿 `jobs.ts` 注入的 `channel.listOrderStores`（全部店铺的店铺名、平台、平台标识与数据来源），`order` 不依赖 `channel`（ADR 0005 修订）。

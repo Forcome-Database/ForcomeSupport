@@ -29,6 +29,11 @@ export interface JobDefinition<T extends object> {
   readonly queue?: Omit<Queue, 'name'>;
   /** 定时；载荷模式要接受 `{}` */
   readonly schedule?: JobSchedule;
+  /**
+   * 每个 worker 进程同时处理几个（pg-boss 的 localConcurrency，默认 1）。每个处理者取一个、处理完等轮询间隔（2 秒）再取，
+   * 一次要处理很多个的队列（每分钟给每个店铺排一次的同步）调大，免得排成长队（待办 11）
+   */
+  readonly concurrency?: number;
 }
 
 const JOB_NAME = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
@@ -38,6 +43,7 @@ export function defineJob<T extends object>(
   payload: z.ZodType<T>,
   queue?: Omit<Queue, 'name'>,
   schedule?: JobSchedule,
+  concurrency?: number,
 ): JobDefinition<T> {
   if (!JOB_NAME.test(name)) {
     throw new Error(`任务名必须是「模块.任务」形式的小写 snake_case：${name}`);
@@ -45,7 +51,16 @@ export function defineJob<T extends object>(
   if (schedule && !payload.safeParse({}).success) {
     throw new Error(`定时任务的载荷要接受 {}：${name}`);
   }
-  return { name, payload, ...(queue ? { queue } : {}), ...(schedule ? { schedule } : {}) };
+  if (concurrency !== undefined && (!Number.isInteger(concurrency) || concurrency < 1)) {
+    throw new Error(`任务的并发数必须是正整数：${name}`);
+  }
+  return {
+    name,
+    payload,
+    ...(queue ? { queue } : {}),
+    ...(schedule ? { schedule } : {}),
+    ...(concurrency ? { concurrency } : {}),
+  };
 }
 
 export interface JobContext {
@@ -169,7 +184,11 @@ export async function startWorker(
   for (const handler of handlers) {
     await runtime.boss.work(
       handler.job.name,
-      { batchSize: 1, pollingIntervalSeconds: options.pollingIntervalSeconds ?? 2 },
+      {
+        batchSize: 1,
+        localConcurrency: handler.job.concurrency ?? 1,
+        pollingIntervalSeconds: options.pollingIntervalSeconds ?? 2,
+      },
       async (jobs) => {
         for (const job of jobs) {
           await runJob(runtime, handler, job, options.logger);
