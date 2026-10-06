@@ -12,7 +12,7 @@
 时间一律写成带 +08:00 的 ISO 8601（原型的时间都是北京时间）；金额写成两位小数的字符串，未填为 null。
 成员与店铺的 id 用 UUIDv5 从 key 派生，重复运行结果不变，各模块的加载步骤与测试可以直接引用。
 - 站内通知取 NOTIFICATIONS（G10，周敏的面板）：只转第一期的类型（11.4 阶段「一起」，按原型的图标对上通知类型），
-  第二期的「新审批单」不转换；时刻落在演示当天。
+  第二期的「新审批单」不转换；只写时:分的落在演示当天。
 订单、未归属店铺来信等其余数据，由需要它们的待办在这里补充转换规则。
 
 用法（仓库根目录）：pnpm fixtures:generate；pnpm fixtures:verify 检查产物与 data.py 一致。
@@ -281,7 +281,8 @@ def notifications():
             'title': title,
             'body': desc,
             'object': {'type': object_type, 'id': object_id or entity_id('message', desc), 'label': obj},
-            'at': at('%s %s' % (d.NOW[5:10], hhmm)),
+            # 当天的只写时:分，之前的写「月-日 时:分」（G10）
+            'at': at(hhmm if len(hhmm) > 5 else '%s %s' % (d.NOW[5:10], hhmm)),
             'read': read,
         })
     return out

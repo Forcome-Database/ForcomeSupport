@@ -26,9 +26,9 @@ describe('G10 站内通知面板', () => {
     expectIn(`>${copy.footer}<`);
   });
 
-  it('没有通知时的空状态（第一期的说明见 G10 第一阶段）', () => {
+  it('没有通知时的空状态（第一阶段的说明）与置灰「全部已读」的悬停说明（G10 ②）', () => {
     expectIn(`>${copy.empty.title}<`);
-    // 第一期没有审批类通知，去掉原型完整版说明开头的「审批、」（待协调者确认，见待办 31 Comments；确认后回写原型 G10 ②，这里改回逐字核对）
-    expectIn(`>审批、${copy.empty.description}<`);
+    expectIn(`>${copy.markAllDisabled}<`);
+    expectIn(`>${copy.empty.description}<`);
   });
 });

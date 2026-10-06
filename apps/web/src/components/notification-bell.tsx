@@ -301,8 +301,9 @@ function NotificationItem({
           </span>
         </span>
         <span className="truncate text-minor text-muted-foreground">{item.body}</span>
+        {/* 能打开目标页的对象编号是主色 500，打不开的是灰字（G10 ①，同 P27） */}
         <span
-          className={cn('truncate text-minor font-medium', target ? 'text-primary' : 'text-ink-2')}
+          className={cn('truncate text-minor', target ? 'font-medium text-primary' : 'text-ink-2')}
         >
           {item.object.label}
         </span>

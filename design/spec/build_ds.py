@@ -380,22 +380,28 @@ def topbar_crop(w, bell_n=UNREAD):
         w, UI._topbar(ZM_NAV, '审批', ZM, ZM_BADGES, bell_n=bell_n))
 
 
-def notif_item(n):
+# 周敏（客服主管）能打开哪些对象的目标页：P18 渠道与店铺只对管理员开放（PRD 10.1）。打不开的通知点一条只标为已读、不跳转，
+# 对象编号为灰字（同 P27「对象按查看者能否打开目标页决定可不可点」，待办 31 用户确认 10-06）
+def zm_can_open(obj):
+    return not obj.startswith('P18')
+
+
+def notif_item(n, can_open=True):
     tm, tone, ic, title, desc, obj, read = n
     fg, bg, _ = TONES[tone]
     ico = '<div style="width: 28px; height: 28px; border-radius: 8px; background: %s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (bg, icon(ic, 15, fg, 2))
     dot = '<div style="width: 7px; height: 7px; border-radius: 999px; background: %s; flex-shrink: 0; margin-top: 6px;"></div>' % (T['accent'] if not read else 'transparent')
     body = col(between(ellipsis(title, 13, T['ink'] if not read else T['ink2'], 600 if not read else 500), nowrap(tm, 11, T['ink4'])) +
-               ellipsis(desc, 12, T['ink3']) + nowrap(obj, 12, T['accent'], 500), 1, 'flex: 1; min-width: 0px;')
+               ellipsis(desc, 12, T['ink3']) + (nowrap(obj, 12, T['accent'], 500) if can_open else nowrap(obj, 12, T['ink2'])), 1, 'flex: 1; min-width: 0px;')
     return '<div style="display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border-radius: 8px; background: %s;">%s%s%s</div>' % (
         T['subtle'] if not read else '#ffffff', ico, body, dot)
 
 
-def notif_panel(items, unread, tab='全部', empty_html=''):
-    """站内通知面板（shadcn Popover + Tabs + ScrollArea），宽 360。"""
+def notif_panel(items, unread, tab='全部', empty_html='', can_open=lambda obj: True):
+    """站内通知面板（shadcn Popover + Tabs + ScrollArea），宽 360。can_open：查看者能否打开该对象的目标页。"""
     head = between(text('通知', 14, T['ink'], 700), link('全部已读', 12, 'check') if unread else nowrap('全部已读', 12, T['ink5']))
     tb = tabs([('全部', None), ('未读', unread)], tab)
-    lst = ''.join(notif_item(n) for n in items) if items else empty_html
+    lst = ''.join(notif_item(n, can_open(n[5])) for n in items) if items else empty_html
     foot = '<div style="padding: 8px 14px; border-top: 1px solid %s; font-size: 11px; color: %s;">点一条即跳到对应对象并标为已读</div>' % (T['line2'], T['ink4']) if items else ''
     return '<div style="width: 360px; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; box-shadow: %s; display: flex; flex-direction: column; overflow: hidden;"><div style="padding: 12px 14px 0px 14px; display: flex; flex-direction: column; gap: 4px;">%s%s</div><div style="padding: 6px; display: flex; flex-direction: column; gap: 2px;">%s</div>%s</div>' % (
         T['line'], SHADOW_MD, head, tb, lst, foot)
@@ -418,8 +424,12 @@ def cap(t):
 
 g10_a = col(cap('① 点铃铛 · 全部（周敏，未读 %d）' % UNREAD) +
             '<div style="width: 640px; height: 640px; position: relative; background: %s; border: 1px solid %s; border-radius: 12px; overflow: hidden;">%s<div style="position: absolute; right: 98px; top: 62px;">%s</div></div>' % (
-                T['canvas'], T['line'], topbar_crop(640), notif_panel(NOTIFICATIONS, UNREAD)), 8)
-g10_b = col(cap('② 没有通知时') + notif_panel([], 0, '全部', empty('bell', '暂无通知', '审批、渠道异常、未归属店铺来信等需要你知道的事会出现在这里。', compact=True)), 8)
+                T['canvas'], T['line'], topbar_crop(640), notif_panel(NOTIFICATIONS, UNREAD, can_open=zm_can_open)), 8)
+# 没有通知：第一阶段的说明不写「审批、」（11.4 审批类通知二起，待办 31 用户确认 10-06）；置灰的「全部已读」悬停写原因（协调者决定 10-06）
+EMPTY_NOTE_P1 = '渠道异常、未归属店铺来信等需要你知道的事会出现在这里。'
+g10_b = col(cap('② 没有通知时 · 悬停置灰的「全部已读」') +
+            '<div style="position: relative; padding-top: 40px;"><div style="position: absolute; right: 0px; top: 0px;">%s</div>%s</div>' % (
+                tooltip('没有未读通知'), notif_panel([], 0, '全部', empty('bell', '暂无通知', EMPTY_NOTE_P1, compact=True))), 8)
 g10_c = col(cap('③ 点头像 · 头像菜单') +
             '<div style="width: 420px; height: 300px; position: relative; background: %s; border: 1px solid %s; border-radius: 12px; overflow: hidden;">%s<div style="position: absolute; right: 12px; top: 62px;">%s</div></div>' % (
                 T['canvas'], T['line'], topbar_crop(420), avatar_menu(ZM)) +
@@ -493,7 +503,7 @@ gs_body = col(
          variant('G8 未保存离开', '草稿类（回复框、内部备注）自动保存，离开时只弹「草稿已保存」浮层，不拦截。表单类（设置页）有未保存修改时弹窗：继续编辑 · 放弃修改 · 保存并离开，默认焦点在「继续编辑」。', unsaved_frame, 700), 2, 32) +
     variant('G9 密度切换', '第一期提供舒适（默认）与紧凑两档（Q-24）。顶栏「密度」按钮切换，按用户保存；只改字号、行距与内边距，不改布局和信息量。紧凑：正文 12、次要 11（中文最小 11）、队列行内边距 6、行距 2、表格行高 32。两档一致：队列卡片左侧色条只表示风险（转人工红），选中用浅底 + 描边。', dens_frame, 1500,
             trigger='点顶栏「密度」按钮（图标：三条横线）。') +
-    variant('G10 站内通知', '顶栏铃铛带未读数（本例 %d）；点开 360px 面板，页签「全部 · 未读」，每条写类型图标、标题、说明、对象编号与时间，未读带圆点并用浅底；点一条即跳到对象并标为已读；右上「全部已读」；没有通知时显示空状态。头像菜单：姓名、角色与部门（来自钉钉），「审计日志」所有角色可见（P27，按 10.2 过滤），「密度」同 G9，「退出登录」。示例为完整版；第一阶段只有 11.4 中阶段为「一起」的通知类型。' % UNREAD,
+    variant('G10 站内通知', '顶栏铃铛带未读数（本例 %d）；点开 360px 面板，页签「全部 · 未读」，每条写类型图标、标题、说明、对象编号与时间（当天只写时:分，之前的写「月-日 时:分」，不在今年的写全年份，同 P27），未读带圆点并用浅底；点一条即跳到对象并标为已读——查看者打不开目标页的（如客服主管收到的渠道通知，P18 只对管理员开放）只标为已读、不跳转，对象编号为灰字（同 P27）；右上「全部已读」，没有未读时置灰、悬停写「没有未读通知」；没有通知时显示空状态（第一阶段说明不写「审批、」，第二阶段起写「审批、渠道异常、未归属店铺来信等……」）。头像菜单：姓名、角色与部门（来自钉钉），「审计日志」所有角色可见（P27，按 10.2 过滤），「密度」同 G9，「退出登录」。示例为完整版；第一阶段只有 11.4 中阶段为「一起」的通知类型。' % UNREAD,
             g10_frame, 1510, trigger='点顶栏铃铛；点顶栏头像。示例为周敏 · 客服主管（data.NOTIFICATIONS）。') +
     grid(variant('G11 登录', '居中卡片：产品名、「用钉钉扫码登录」二维码（2 分钟过期，过期后二维码上加蒙层与「刷新」），下方说明「成员与部门来自钉钉通讯录，由管理员在本系统分配角色后才能进入」。在钉钉内打开时免登（第二阶段）。会话 7 天无操作过期（G12）。', g11_frame, 880,
                  trigger='未登录或会话过期后访问任意页面。') +
