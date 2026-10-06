@@ -7,6 +7,7 @@
 - 台账取 p1_ledger_rows()：丢弃待确认的单，带 LEDGER_EXTRA 的登记字段；创建路径一律记「手工登记」，
   登记人取负责人（原型的 reg 字段不转换）；
 - P05 时间线取 P1_OLIVER；
+- 自动回复取 P1_AUTO_REPLY（I18，待办 16）：我方店铺邮箱对生产厂来信（第一期示例里唯一的生产厂工单）发出的自动回复，头字段拆成名与值；
 - Fake 汇率固定为演示汇率 1 USD = 18.00 MXN、1.36 CAD，保证 $188.79 等按原型数据验收的数字可复现；
 - 另带被引用的参照数据：成员（钉钉通讯录里的人）、店铺、生产厂、配件与生产厂对应、责任类型默认比例。
 时间一律写成带 +08:00 的 ISO 8601（原型的时间都是北京时间）；金额写成两位小数的字符串，未填为 null。
@@ -322,6 +323,16 @@ def ticket_timeline():
     }
 
 
+# ---------------------------------------------------------------- 自动回复（I18）
+def auto_reply():
+    a = d.P1_AUTO_REPLY
+    producer = [t for t in d.p1_tickets() if t['source'] == '生产厂']
+    if len(producer) != 1:
+        raise ValueError('自动回复的示例要对上唯一一张生产厂工单，实际有 %d 张' % len(producer))
+    name, value = a['header'].split(': ', 1)
+    return {'ticket': producer[0]['no'], 'from': a['from'], 'at': at(a['at']), 'headers': {name: value}, 'body': a['body']}
+
+
 # ---------------------------------------------------------------- 站内通知（G10）
 # 原型的图标 → 第一期的通知类型（contracts 的 notificationTypes）；不在表里的（新审批单 approve）是第二期的，不转换
 NOTIFICATION_TYPES = {'check_c': 'channel_recovered', 'alert': 'channel_disconnected', 'store': 'unassigned_mail'}
@@ -371,6 +382,7 @@ def build():
         # 原型用过的最大售后单序号（含第一期丢弃的待确认单 S-20260911-0022）：加载示例台账后新单号接在它之后，不与原型撞号
         'aftersalesLastSequence': max(int(a['no'][-4:]) for a in d.AFTERSALES),
         'ticketTimeline': ticket_timeline(),
+        'autoReply': auto_reply(),
         'shopifyOrders': shopify_orders(),
         # 示例 Shopify 应用没开通 read_all_orders 时订单只回补 60 天（K19、K20，待办 13）
         'shopifyReadAllOrders': d.SHOPIFY_BACKFILL_DAYS >= d.AMZ_BACKFILL_DAYS,

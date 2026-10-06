@@ -146,6 +146,18 @@ export const fixtureTicketTimelineSchema = z.object({
 });
 
 /**
+ * 我方发出的自动回复（I18 的示例，data.py 的 P1_AUTO_REPLY，待办 16）：店铺邮箱对那张生产厂工单的来信自动回复，
+ * 带 Auto-Submitted，不算回复（AC-P1-03）；Fake Gmail 回放进该邮箱的「已发送」
+ */
+export const fixtureAutoReplySchema = z.object({
+  ticket: z.string().regex(/^T-\d{8}-\d{4}$/),
+  from: z.string(),
+  at: instant,
+  headers: z.record(z.string(), z.string()),
+  body: z.string(),
+});
+
+/**
  * Shopify 订单（待办 11，data.py 的 SHOPIFY_ORDERS_P1）：Fake Shopify 回放它们。状态保留 Admin API 的枚举写法；
  * 客户邮箱：data.py 写了的照用（#0991 是 Emily Chen 用另一个邮箱下的单，待办 14），没写的为 null、回放按客户名推出（同 Fake 来信）
  */
@@ -244,6 +256,7 @@ export const demoFixtureSchema = z.object({
   /** 原型用过的最大售后单序号（含第一期丢弃的待确认单）；示例台账之后新发的单号接在它后面 */
   aftersalesLastSequence: z.int().positive(),
   ticketTimeline: fixtureTicketTimelineSchema,
+  autoReply: fixtureAutoReplySchema,
   notifications: z.array(fixtureNotificationSchema),
   shopifyOrders: z.array(fixtureShopifyOrderSchema),
   /** 示例 Shopify 应用开通了 read_all_orders 没有（K19、K20 的示例没开通：Shopify 订单只回补 60 天，待办 13） */

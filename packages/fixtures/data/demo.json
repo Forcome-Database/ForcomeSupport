@@ -1500,6 +1500,15 @@
     "closeReason": "已解决后无来信",
     "orderSyncedAt": "2026-09-10T09:02:00+08:00"
   },
+  "autoReply": {
+    "ticket": "T-20260911-0036",
+    "from": "support@forcome.com",
+    "at": "2026-09-11T09:59:00+08:00",
+    "headers": {
+      "Auto-Submitted": "auto-replied"
+    },
+    "body": "Thanks for contacting Forcome. We have received your email and will reply within 24 hours."
+  },
   "shopifyOrders": [
     {
       "name": "#0991",

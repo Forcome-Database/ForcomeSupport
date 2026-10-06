@@ -14,6 +14,7 @@ import {
   type FakeMailInput,
 } from '../src/modules/integration';
 import { inboundReceivedJob } from '../src/modules/channel';
+import { ticketTimeLimitsJob } from '../src/modules/ticket';
 import type { ApiClient } from './api-client';
 import { startTestHarness, type TestHarness } from './harness';
 
@@ -513,8 +514,11 @@ describe('开发测试环境的示例来信回放（ADR 0009 修订）', () => {
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
-    // 与 worker 启动时一样：Fake 从示例数据夹具回放来信，邮箱开始监听后送达
+    // 与 worker 启动时一样：Fake 从示例数据夹具回放来信与我方回复，邮箱开始监听后送达；时钟在演示时刻，不平移
     t.clients.replayFixtures(getDemoFixture());
+    await t.runJobs();
+    // worker 每分钟的时限扫描（客户未回复的那张 7 天前就该关了）
+    await t.enqueue(ticketTimeLimitsJob, {});
     await t.runJobs();
   });
 
@@ -522,14 +526,35 @@ describe('开发测试环境的示例来信回放（ADR 0009 修订）', () => {
     await t.close();
   });
 
-  it('示例工单的来信都归并成待回复工单，一张示例工单一张（按订单归并的核对见 order-merge）', async () => {
+  it('示例工单的来信都归并成工单，一张示例工单一张，状态与原型一致（按订单归并的核对见 order-merge）', async () => {
     const fixture = getDemoFixture();
     const tickets = await ticketList(await t.loginAs('客服主管'));
     const customers = new Set(fixture.tickets.map((ticket) => ticket.customer));
     // Priya Raman 在 forcome.com 有两张示例工单（#1057、#1049 两笔订单），按订单归并成两张（14）
     expect(tickets).toHaveLength(fixture.tickets.length);
     expect(new Set(tickets.map((ticket) => ticket.customer.name))).toEqual(customers);
-    expect(new Set(tickets.map((ticket) => ticket.status))).toEqual(new Set(['awaiting_reply']));
+    // 等客户的示例工单回放了我方回复（16）；「客户未回复」关闭的那张按时关闭；已解决的两张要「标记无需回复」，随 17
+    const expected = {
+      待回复: 'awaiting_reply',
+      等客户: 'awaiting_customer',
+      已解决: 'awaiting_reply',
+      已关闭: 'closed',
+    };
+    const byOrderOrCustomer = (sample: (typeof fixture.tickets)[number]) =>
+      tickets.find(
+        (ticket) =>
+          ticket.customer.name === sample.customer &&
+          (sample.order === null || ticket.orderNumber === sample.order),
+      )!;
+    for (const sample of fixture.tickets) {
+      expect([sample.no, byOrderOrCustomer(sample).status]).toEqual([
+        sample.no,
+        expected[sample.status],
+      ]);
+    }
+    expect(byOrderOrCustomer(fixture.tickets.find((x) => x.status === '已关闭')!).closeReason).toBe(
+      'customer_no_reply',
+    );
 
     const james = tickets.find((ticket) => ticket.customer.name === 'James Walker')!;
     // 当日序号按归并先后发放，几个邮箱的同步谁先跑不确定，这里只核对日期
@@ -575,17 +600,40 @@ describe('开发测试环境的示例来信回放（ADR 0009 修订）', () => {
     expect(recognized('FQD 品质部')).toEqual({ channel: 'email', site: 'US', source: 'producer' });
   });
 
-  it('P05 时间线那张工单（Oliver Grant）按时间线里的三封来信回放，编号日期取首封来信', async () => {
+  it('P05 时间线那张工单（Oliver Grant）按时间线回放三封来信与两封我方回复，编号日期取首封来信，首次回复与原型一致', async () => {
     const agent = await t.loginAs('坐席');
     const oliver = (await ticketList(agent)).find(
       (ticket) => ticket.customer.name === 'Oliver Grant',
     )!;
     expect(oliver.number).toBe('T-20260904-0001');
     const detail = await ticketDetail(agent, oliver.number);
-    expect(detail.messages.map((m) => [m.mailbox, m.arrivedAt])).toEqual([
-      [DIRECT.mailbox, '2026-09-04T02:12:00.000Z'],
-      [DIRECT.mailbox, '2026-09-05T00:58:00.000Z'],
-      [DIRECT.mailbox, '2026-09-10T01:00:00.000Z'],
+    expect(detail.messages.map((m) => [m.direction, m.mailbox, m.arrivedAt])).toEqual([
+      ['inbound', DIRECT.mailbox, '2026-09-04T02:12:00.000Z'],
+      ['outbound', DIRECT.mailbox, '2026-09-04T02:40:00.000Z'],
+      ['inbound', DIRECT.mailbox, '2026-09-05T00:58:00.000Z'],
+      ['outbound', DIRECT.mailbox, '2026-09-05T07:30:00.000Z'],
+      ['inbound', DIRECT.mailbox, '2026-09-10T01:00:00.000Z'],
+    ]);
+    // 原型 P1_OLIVER 的 SLA：首次回复 28m、6h 32m，都达标（第三封「无需回复」随 17）
+    expect(
+      detail.messages
+        .filter((m) => m.direction === 'inbound')
+        .slice(0, 2)
+        .map((m) => [m.firstReplyAt, m.sla?.result]),
+    ).toEqual([
+      ['2026-09-04T02:40:00.000Z', 'met'],
+      ['2026-09-05T07:30:00.000Z', 'met'],
+    ]);
+  });
+
+  it('生产厂工单的来信 1 分钟后有一封自动回复（I18）：进全程记录、标「自动回复」，工单仍是待回复', async () => {
+    const agent = await t.loginAs('坐席');
+    const fqd = (await ticketList(agent)).find((ticket) => ticket.customer.name === 'FQD 品质部')!;
+    expect(fqd.status).toBe('awaiting_reply');
+    const detail = await ticketDetail(agent, fqd.number);
+    expect(detail.messages.map((m) => [m.direction, m.autoReply, m.sla])).toEqual([
+      ['inbound', false, null],
+      ['outbound', true, null],
     ]);
   });
 
@@ -598,5 +646,40 @@ describe('开发测试环境的示例来信回放（ADR 0009 修订）', () => {
     for (const store of stores) await gmail.client().watch(store.mailbox);
     await t.runJobs();
     expect(await ticketList(await t.loginAs('客服主管'))).toEqual(before);
+  });
+});
+
+describe('示例邮件回放到当前日期（开发测试环境与 Playwright 用真实时钟，待办 16）', () => {
+  let t: TestHarness;
+  /** 演示时刻（2026-09-11 10:20）之后 26 天 5 小时：平移 26 天，演示时刻落在现在之前 5 小时 */
+  const NOW = '2026-10-07T15:20:00+08:00';
+
+  beforeAll(async () => {
+    t = await startTestHarness({ now: NOW });
+    await t.loadFixtures();
+    t.clients.replayFixtures(getDemoFixture());
+    await t.runJobs();
+    await t.enqueue(ticketTimeLimitsJob, {});
+    await t.runJobs();
+  });
+
+  afterAll(async () => {
+    await t.close();
+  });
+
+  it('来信与回复按整天平移（时分不变），工单编号日期跟着平移；状态与演示时刻一样，没有一上来就按 7 天、14 天关闭', async () => {
+    const tickets = await ticketList(await t.loginAs('坐席'));
+    const james = tickets.find((ticket) => ticket.customer.name === 'James Walker')!;
+    expect(james.number).toMatch(/^T-20261006-\d{4}$/);
+    expect(james).toMatchObject({
+      status: 'awaiting_reply',
+      lastInboundAt: '2026-10-06T00:15:00.000Z',
+    });
+    const statuses = tickets.reduce<Record<string, number>>((count, ticket) => {
+      count[ticket.status] = (count[ticket.status] ?? 0) + 1;
+      return count;
+    }, {});
+    // 与演示时刻相同：7 张待回复 + 2 张已解决（随 17，现为待回复）、6 张等客户、1 张客户未回复关闭
+    expect(statuses).toEqual({ awaiting_reply: 9, awaiting_customer: 6, closed: 1 });
   });
 });

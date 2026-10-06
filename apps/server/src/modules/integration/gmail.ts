@@ -1,9 +1,10 @@
 import type { DemoFixture } from '@forcome/fixtures';
+import type { Clock } from '../core';
 import { defineClient, type FakeClient } from './definition';
 import { ExternalCallFailedError, FaultInjector } from './faults';
 import { buildFakeMail, type FakeMailInput } from './gmail-mime';
 import { createRealGmail, createRealGmailPush } from './gmail-real';
-import { fixtureMails } from './gmail-replay';
+import { fixtureMails, type ReplayMail } from './gmail-replay';
 
 /*
  * Gmail（规格 channel「Gmail 客户端」、ADR 0008 修订；待办 08 是最小形态，09 补健壮性）：
@@ -76,8 +77,8 @@ interface FakeMailbox {
   historyId: number;
   watched: boolean;
   readonly messages: StoredMessage[];
-  /** 回放的示例来信：开始监听后才送达（演示环境里它们是系统上线后到达的来信） */
-  pending: FakeMailInput[];
+  /** 回放的示例邮件（来信与「已发送」）：开始监听后才送达（演示环境里它们是系统上线后到达的邮件） */
+  pending: ReplayMail[];
 }
 
 /** 不在收信范围里的标签（同 Gmail 的 messages.list 默认：不含垃圾邮件与已删除） */
@@ -91,6 +92,23 @@ function recipientsOf(mail: FakeMailInput): readonly string[] {
 const HISTORY_START = 1000;
 /** Gmail 推送的有效期 */
 const WATCH_DAYS = 7;
+
+const DAY_MS = 86_400_000;
+
+/**
+ * 示例邮件平移几天（待办 16）：夹具的时间在 9 月的演示时刻附近，开发测试环境与 Playwright 用真实时钟，原样回放的话
+ * 时限扫描一上来就把它们按 7 天、14 天关闭（与归并交错时还会重开、另建工单）。回放时按整天平移到当前日期：
+ * 演示时刻落在「现在」之前不到一天，时分不变（北京时间没有夏令时），原型画面的状态在当下重现，之后照规则随时间推进。
+ * 时钟在演示时刻（本机截图的 CLOCK_START、集成测试）或更早时不平移
+ */
+function replayShiftMs(fixture: DemoFixture, now: Date): number {
+  const ahead = now.getTime() - new Date(fixture.meta.now).getTime();
+  return ahead > 0 ? Math.floor(ahead / DAY_MS) * DAY_MS : 0;
+}
+
+function shifted(mail: FakeMailInput, ms: number): FakeMailInput {
+  return ms === 0 ? mail : { ...mail, at: new Date(new Date(mail.at).getTime() + ms) };
+}
 
 /**
  * Fake 推送：Fake 邮箱被 watch 后，每到一封信发一条通知进来。拉走但没确认的通知，下次拉取时再次投递
@@ -145,11 +163,13 @@ export class FakeGmailPush implements FakeClient<GmailPushClient> {
 export class FakeGmail implements FakeClient<GmailClient> {
   readonly faults = new FaultInjector('gmail');
   readonly #push: () => FakeGmailPush;
+  readonly #clock: Clock;
   readonly #mailboxes = new Map<string, FakeMailbox>();
   #nextId = 1;
 
-  constructor(push: () => FakeGmailPush) {
+  constructor(push: () => FakeGmailPush, clock: Clock) {
     this.#push = push;
+    this.#clock = clock;
   }
 
   #mailbox(address: string): FakeMailbox {
@@ -232,10 +252,10 @@ export class FakeGmail implements FakeClient<GmailClient> {
         const box = this.#mailbox(mailbox);
         const historyId = String(box.historyId);
         box.watched = true;
-        // 回放的示例来信在开始监听之后送达
+        // 回放的示例邮件在开始监听之后送达
         const pending = box.pending;
         box.pending = [];
-        for (const mail of pending) this.deliver(mail);
+        for (const entry of pending) this.#replayOne(entry);
         // Gmail 的推送 7 天后到期，要每天续订（09）；Fake 没有时钟，到期时间只作展示，按到达的最后一封信推算
         const last = box.messages.at(-1)?.internalDate.getTime() ?? 0;
         return { historyId, expiration: new Date(last + WATCH_DAYS * 86_400_000) };
@@ -289,17 +309,28 @@ export class FakeGmail implements FakeClient<GmailClient> {
     this.faults.reset();
   }
 
-  /** 从示例数据夹具回放来信：每个邮箱的来信按到达时间排好，等开始监听后送达（ADR 0009 修订） */
+  /** 回放的一封：来信送到店铺邮箱，我方邮件放进发件邮箱的「已发送」 */
+  #replayOne({ mailbox, sent, mail }: ReplayMail): void {
+    if (sent) {
+      this.send({ ...mail, from: mailbox, to: recipientsOf(mail)[0]! });
+    } else {
+      this.deliver({ ...mail, to: mailbox });
+    }
+  }
+
+  /**
+   * 从示例数据夹具回放来信与我方回复（ADR 0009 修订）：按时间排好、整天平移到当前日期（replayShiftMs），
+   * 每个邮箱的邮件等开始监听后送达
+   */
   replay(fixture: DemoFixture): void {
-    const mails = fixtureMails(fixture).sort(
-      (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime(),
-    );
-    for (const mail of mails) {
-      for (const address of recipientsOf(mail)) {
-        const box = this.#mailbox(address);
-        if (box.watched) this.deliver({ ...mail, to: address });
-        else box.pending.push({ ...mail, to: address });
-      }
+    const shift = replayShiftMs(fixture, this.#clock.now());
+    const mails = fixtureMails(fixture)
+      .map((entry) => ({ ...entry, mail: shifted(entry.mail, shift) }))
+      .sort((a, b) => new Date(a.mail.at).getTime() - new Date(b.mail.at).getTime());
+    for (const entry of mails) {
+      const box = this.#mailbox(entry.mailbox);
+      if (box.watched) this.#replayOne(entry);
+      else box.pending.push(entry);
     }
   }
 }
@@ -317,5 +348,5 @@ export const gmailClient = defineClient({
   system: 'gmail',
   scope: 'store',
   createReal: createRealGmail,
-  createFake: ({ fake }) => new FakeGmail(() => fake(gmailPushClient)),
+  createFake: ({ fake, clock }) => new FakeGmail(() => fake(gmailPushClient), clock),
 });
