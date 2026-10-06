@@ -165,11 +165,17 @@ export const notificationUnreadSchema = z.object({
 export type NotificationUnread = z.infer<typeof notificationUnreadSchema>;
 
 /**
- * 示例通知（POST /api/dev/notifications，同开发登录只在非生产环境存在）：请求体是一条通知的内容，按 11.4 发给该类型的接收人，
+ * 示例通知（POST /api/dev/notifications，同开发登录只在非生产环境存在）：请求体是一条通知的内容（devNotificationRequestSchema），按 11.4 发给该类型的接收人，
  * 走与业务调用方相同的写入；返回发给了谁（成员 ID）。第一期产生通知的业务（渠道连接 09/11/12、钉钉同步 05、未归属来信 15、
  * 改派队列 23）上线前，演示与 Playwright 用它产生通知
  */
 export const devNotificationResponseSchema = z.object({ recipients: z.array(z.string()) });
+
+/** 示例通知的请求体：一条通知的内容，另可给时刻 at（带时区的 ISO；不给为服务端当前时间），演示与 e2e 用它造前一天的通知（G10 跨天写法） */
+export const devNotificationRequestSchema = notificationContentSchema.extend({
+  at: z.iso.datetime({ offset: true }).optional(),
+});
+export type DevNotificationRequest = z.infer<typeof devNotificationRequestSchema>;
 
 // ---------------------------------------------------------------- 写法
 

@@ -40,6 +40,8 @@ const stamp = () => `E2E${Date.now().toString(36).toUpperCase()}`;
 interface Sample {
   readonly type: 'channel_disconnected' | 'dingtalk_sync_failed' | 'unassigned_mail';
   readonly body: string;
+  /** 通知的时刻（带时区的 ISO）；不给为服务端当前时间 */
+  readonly at?: string;
 }
 
 /** 示例通知的标题与对象，照原型 G10 的写法（钉钉同步失败原型没画，按渠道通知的写法） */
@@ -63,7 +65,13 @@ const SAMPLES = {
  */
 async function send(page: Page, sample: Sample): Promise<void> {
   const { title, object } = SAMPLES[sample.type];
-  const content = { type: sample.type, title, body: sample.body, object: object(sample.body) };
+  const content = {
+    type: sample.type,
+    title,
+    body: sample.body,
+    object: object(sample.body),
+    ...(sample.at ? { at: sample.at } : {}),
+  };
   await page.evaluate(async (body) => {
     const res = await fetch('/api/dev/notifications', {
       method: 'POST',
@@ -150,6 +158,41 @@ test('管理员点渠道连接异常跳到 P18；客服主管打不开 P18，点
   await expect(row).toHaveAttribute('data-read', 'true');
   await expect(panel(page)).toBeVisible();
   await expect(page).toHaveURL((url) => url.pathname === '/tickets');
+});
+
+/** 北京时间的日期（YYYY-MM-DD）：今天往前 daysAgo 天 */
+function beijingDate(daysAgo: number): string {
+  const day = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(day);
+}
+
+test('时间写法：当天只写「时:分」，前一天的写「月-日 时:分」（G10、PRD v2.22，同 P27）', async ({
+  page,
+}) => {
+  // 用管理员与只发给管理员的钉钉同步失败，在「未读」页签里看：下一条用例的「全部已读」会把它们标掉，
+  // 开发测试环境里通知越积越多也不会把这两条挤出最近 50 条
+  const tag = stamp();
+  const yesterday = beijingDate(1);
+  await loginAs(page, '刘洋');
+  await send(page, {
+    type: 'dingtalk_sync_failed',
+    body: `${tag} 前一天 · 连续 3 次失败`,
+    at: `${yesterday}T18:12:00+08:00`,
+  });
+  await send(page, { type: 'dingtalk_sync_failed', body: `${tag} 当天 · 连续 3 次失败` });
+  await page.reload();
+  await openPanel(page);
+  await panel(page).getByRole('tab', { name: /未读/ }).click();
+
+  // 前一天：「月-日 时:分」（跨年时写全年份）
+  const sameYear = yesterday.slice(0, 4) === beijingDate(0).slice(0, 4);
+  await expect(item(page, `${tag} 前一天`).getByTestId('notification-time')).toHaveText(
+    `${sameYear ? yesterday.slice(5) : yesterday} 18:12`,
+  );
+  // 当天：只写「时:分」
+  await expect(item(page, `${tag} 当天`).getByTestId('notification-time')).toHaveText(
+    /^\d{2}:\d{2}$/,
+  );
 });
 
 test('「未读」页签只列未读；全部已读后角标消失、未读页签为空、「全部已读」置灰并悬停说明', async ({

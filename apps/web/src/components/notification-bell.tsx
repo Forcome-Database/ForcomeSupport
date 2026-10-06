@@ -296,7 +296,10 @@ function NotificationItem({
           >
             {item.title}
           </span>
-          <span className="text-11 whitespace-nowrap text-subtle-foreground">
+          <span
+            data-testid="notification-time"
+            className="text-11 whitespace-nowrap text-subtle-foreground"
+          >
             {notificationTimeWords(item.createdAt, new Date(now))}
           </span>
         </span>

@@ -79,8 +79,8 @@ afterAll(async () => {
   await t.close();
 });
 
-/** 按 11.4 发一条（示例通知接口，与业务调用方同一个 notifyMembers），返回发给了谁（成员 ID） */
-async function notify(content: NotificationContent): Promise<string[]> {
+/** 按 11.4 发一条（示例通知接口，与业务调用方同一个 notifyMembers），返回发给了谁（成员 ID）；at 为示例通知的时刻 */
+async function notify(content: NotificationContent & { at?: string }): Promise<string[]> {
   const res = await t.api.post('/api/dev/notifications', content);
   expect(res.status).toBe(200);
   return ((await res.json()) as { recipients: string[] }).recipients;
@@ -354,6 +354,20 @@ describe('历史回放（待办 26；规格「历史导入与切换」：提醒�
 });
 
 describe('示例通知接口（开发登录环境；按 11.4 发的用例都经它）', () => {
+  it('可以指定时刻（演示与 e2e 造前一天的通知，G10 跨天写法）；不指定为服务端当前时间', async () => {
+    t.clock.set('2026-09-11T02:20:00Z');
+    const supervisor = await member(['supervisor']);
+    await notify({ ...GMAIL_DOWN, title: '前一天的', at: '2026-09-10T18:12:00+08:00' });
+    await notify({ ...GMAIL_DOWN, title: '当天的' });
+
+    const { items, now } = await list(supervisor);
+    expect(now).toBe('2026-09-11T02:20:00.000Z');
+    expect(items.map((i) => [i.title, i.createdAt])).toEqual([
+      ['当天的', '2026-09-11T02:20:00.000Z'],
+      ['前一天的', '2026-09-10T10:12:00.000Z'],
+    ]);
+  });
+
   it('第一期没有的类型 400', async () => {
     const res = await t.api.post('/api/dev/notifications', {
       type: 'approval_created',

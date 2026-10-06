@@ -333,6 +333,7 @@ export {
 export { currencies, currencySchema, formatMoney, type Currency } from './money';
 export { homeFor, navFor, navSections, navSectionSchema, type NavSection } from './navigation';
 export {
+  devNotificationRequestSchema,
   devNotificationResponseSchema,
   NOTIFICATION_LIST_LIMIT,
   notificationContentSchema,
@@ -349,6 +350,7 @@ export {
   notificationUnreadSchema,
   notificationViews,
   notificationViewSchema,
+  type DevNotificationRequest,
   type Notification,
   type NotificationContent,
   type NotificationList,
