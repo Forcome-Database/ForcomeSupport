@@ -112,3 +112,4 @@ status: accepted
 
 - **处理器知道是不是最后一次尝试**：`JobContext.lastAttempt`（pg-boss 的 `retryCount ≥ retryLimit`；worker 的 `work` 带 `includeMetadata` 取到这两个数，测试的 `runJobs` 取任务时本来就带）。用于「外部系统一直不可用时不能让业务对象就此丢下」的处理器：前几次照常抛错、按队列的重试策略重试，最后一次退而求其次把事情做完。第一个用法是按订单归并：补拉订单的外部调用失败时，「来信已接收」前 5 次重试（10 秒起指数退避，约 5 分钟），最后一次不再等这个订单号、按查不到处理，来信照常归并成工单（SLA 照常计时），只少了订单关联。以后的处理器遇到同类情形照此办理，不要靠调大重试次数无限等。
 - **重开也只经迁移表**：迁移表加「已关闭 + `inbound_reopen` → 待回复」（系统触发，关闭原因清空）；「30 天内」由归并按北京时间的日期判断（到达日不晚于关闭日之后第 30 天，`ticket/merge.ts`），关闭时刻取该工单最近一条状态变更记录的时刻（`ticket-status.ts` 的 `closedTimes`：状态变更记录仍只由这一个文件读写，lint 规则不变）。
+- **Gmail 同步也设并发**：`channel.gmail_sync` 每个 worker 同时 5 个（`GMAIL_SYNC_CONCURRENCY`；同一邮箱仍由 stately + `singletonKey` 只跑一个，跨邮箱的同一封邮件由 R-TK-07 的 Message-ID 锁去重），同待办 11 的订单同步。部署冒烟发现：开发测试环境累积了几十个冒烟店铺的邮箱，`--reset-inbound` 清掉游标后逐个同步（每个处理完等 2 秒轮询）一分多钟才同步完，P18 的 Gmail 卡这段时间是未连接。

@@ -52,13 +52,25 @@ import { loadSenderRules } from './sender-rules';
  */
 
 /** 同步一个邮箱：每个邮箱最多一个在排队、一个在跑（stately），通知再多也不会堆积 */
-export const gmailSyncJob = defineJob('channel.gmail_sync', z.object({ mailbox: z.string() }), {
-  policy: 'stately',
-  retryLimit: 5,
-  // 每次重试都算一次失败：60 秒起翻倍，持续约 3 分钟的故障才满 3 次（转连接异常）
-  retryDelay: 60,
-  retryBackoff: true,
-});
+/**
+ * 每个 worker 同时同步几个邮箱（同一邮箱仍由 stately + singletonKey 保证只跑一个）：邮箱多时（开发测试环境累积了几十个
+ * 冒烟店铺的邮箱）逐个同步要排很久，重放来信后几分钟都同步不完（待办 14 部署冒烟发现，同订单同步，ADR 0008 修订）
+ */
+export const GMAIL_SYNC_CONCURRENCY = 5;
+
+export const gmailSyncJob = defineJob(
+  'channel.gmail_sync',
+  z.object({ mailbox: z.string() }),
+  {
+    policy: 'stately',
+    retryLimit: 5,
+    // 每次重试都算一次失败：60 秒起翻倍，持续约 3 分钟的故障才满 3 次（转连接异常）
+    retryDelay: 60,
+    retryBackoff: true,
+  },
+  undefined,
+  GMAIL_SYNC_CONCURRENCY,
+);
 
 /** 每 5 分钟给每个已 watch 的邮箱排一次同步（history.list 兜底，ADR 0008）；worker 启动时也一次 */
 export const gmailPollJob = defineJob(
