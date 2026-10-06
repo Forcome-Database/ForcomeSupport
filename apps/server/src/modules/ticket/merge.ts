@@ -1,5 +1,10 @@
 import { addDays, businessDate } from '@forcome/calendar';
-import { isTicketSource, siteSchema, type Site } from '@forcome/contracts';
+import {
+  isTicketSource,
+  siteSchema,
+  unassignedNotificationCopy,
+  type Site,
+} from '@forcome/contracts';
 import { and, desc, eq, isNull, ne } from 'drizzle-orm';
 import { findInboundMessage, findOrderStore, type InboundMessage } from '../channel';
 import {
@@ -16,6 +21,7 @@ import {
   type Tx,
 } from '../core';
 import { ExternalServiceError, type IntegrationClients } from '../integration';
+import { notifyMembers } from '../org';
 import {
   findOrder,
   findOrdersByEmail,
@@ -46,7 +52,9 @@ import { applyTransition, closedTimes, createTicket } from './ticket-status';
  * 同一订单或同一客户的几封信同时归并只建一张工单。
  * 任务幂等：一封信只归并一次（工单消息按邮件 id 唯一），重跑结果不变。补拉的外部调用失败时任务失败、稍后重试；
  * 最后一次尝试仍失败就不再等这个候选（按查不到处理），照常归并——来信不能因订单平台连不上而一直不成工单。
- * 未归属店铺的来信进队列随 15。
+ * 未归属店铺的来信（E-13）由 channel 留在队列里、不发「来信已接收」；客服主管指定店铺或登记新店铺自动归位后（待办 15），channel
+ * 已按所归店铺重新识别并发出「来信已接收」，这里照常归并（R-ST-02），SLA 按来信原到达时间。自动归位的（autoPlaced）归并后在同一事务里
+ * 通知所归店铺范围内的客服主管（11.4「登记新店铺后来信自动归位」，只发站内），任务重跑时已归并的直接返回、不会重复通知。
  */
 
 /** R-TK-01、R-TK-05：关闭后 30 天内（按北京时间的日期，关闭日之后的第 30 天整天都算）同一订单来信重开，超过新建 */
@@ -213,7 +221,7 @@ const MERGED_LOG: Record<Target['kind'], string> = {
 /** 把一封来信归并成工单（「来信已接收」的处理器；系统操作，不受店铺范围限制） */
 export async function mergeInbound(
   clients: IntegrationClients,
-  { messageId }: { messageId: string },
+  { messageId, autoPlaced = false }: { messageId: string; autoPlaced?: boolean | undefined },
   context: JobContext,
 ): Promise<void> {
   const { runtime, logger } = context;
@@ -225,7 +233,7 @@ export async function mergeInbound(
   }
   const { storeId, recognition } = mail;
   if (!storeId || !recognition) {
-    // 未归属店铺的来信队列随 15 号待办
+    // 未归属店铺的来信留在队列里（channel 不会为它发「来信已接收」），指定店铺或自动归位后才归并
     logger.warn({ messageId }, '来信没有识别出店铺，暂不归并');
     return;
   }
@@ -330,6 +338,20 @@ export async function mergeInbound(
       createdAt: tx.now,
     });
     await retryWaitingReplies(tx, mail);
+    if (autoPlaced) {
+      const copy = unassignedNotificationCopy.placed;
+      await notifyMembers(tx, {
+        type: 'unassigned_mail_placed',
+        title: copy.title,
+        body: copy.body(
+          sender.name || sender.address,
+          mail.addressedTo ?? mail.mailbox,
+          store.name,
+        ),
+        object: { type: 'ticket', id: merged.number, label: merged.number },
+        storeId,
+      });
+    }
     logger.info(
       {
         messageId,

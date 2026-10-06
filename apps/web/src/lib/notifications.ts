@@ -70,8 +70,8 @@ export const notificationLooks: Readonly<
 };
 
 /**
- * 点一条跳到哪个页面（G10「点一条即跳到对象」）：按通知类型定。未归属店铺队列（待办 15）与 P13「负责人：待分配」筛选
- * （待办 23）上线后，在这里给 unassigned_mail、reassign_queue 带上进入队列或筛选的地址参数；自动归位的工单在 P05（17）上线后可改到详情。
+ * 点一条跳到哪个页面（G10「点一条即跳到对象」）：按通知类型定，要带的地址参数见 notificationSearch。P13「负责人：待分配」筛选
+ * （待办 23）上线后给 reassign_queue 带上筛选的地址参数；自动归位的工单在 P05（17）上线后改到详情。
  */
 export const notificationTargets: Readonly<Record<NotificationType, PageDefinition>> = {
   channel_disconnected: pages.settingsChannels,
@@ -81,6 +81,11 @@ export const notificationTargets: Readonly<Record<NotificationType, PageDefiniti
   unassigned_mail_placed: pages.tickets,
   reassign_queue: pages.aftersalesLedger,
 };
+
+/** 跳转时带的地址参数：「未归属店铺来信」直接打开 P04 的未归属店铺队列（I17，待办 15，协调者 2026-10-07 决定） */
+export const notificationSearch: Readonly<
+  Partial<Record<NotificationType, { view: 'unassigned' }>>
+> = { unassigned_mail: { view: 'unassigned' } };
 
 /**
  * 这一条能不能点进去（同 P27 v2.20「对象按查看者能否打开目标页决定可不可点」）：例如客服主管收到渠道连接异常，

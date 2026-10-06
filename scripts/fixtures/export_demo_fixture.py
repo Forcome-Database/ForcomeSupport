@@ -333,11 +333,26 @@ def auto_reply():
     return {'ticket': producer[0]['no'], 'from': a['from'], 'at': at(a['at']), 'headers': {name: value}, 'body': a['body']}
 
 
+# ---------------------------------------------------------------- 未归属店铺来信（I17，待办 15）
+def unassigned_mail():
+    """Fake Gmail 回放的未归属店铺来信：落在哪个同步的店铺邮箱、收件地址与它所在的头字段、发件域、到达时刻（演示当天）。"""
+    return [{
+        'customer': m['customer'],
+        'subject': m['subject'],
+        'mailbox': m['mailbox'],
+        'to': m['to'],
+        'toHeader': m['to_hdr'],
+        'fromDomain': m['from_domain'],
+        'at': at('%s %s' % (d.NOW[5:10], m['at'])),
+    } for m in d.UNASSIGNED_MAIL]
+
+
 # ---------------------------------------------------------------- 站内通知（G10）
-# 原型的图标 → 第一期的通知类型（contracts 的 notificationTypes）；不在表里的（新审批单 approve）是第二期的，不转换
-NOTIFICATION_TYPES = {'check_c': 'channel_recovered', 'alert': 'channel_disconnected', 'store': 'unassigned_mail'}
-# 原型的对象写法 → 关联对象（类型与 id）；未归属来信的 id 按说明派生（示例里没有对应的来信）
-NOTIFICATION_OBJECTS = {'P18 · Gmail': ('channel', 'gmail'), 'P04 · 未归属店铺': ('message', None)}
+# 原型的图标 → 第一期的通知类型（contracts 的 notificationTypes）；不在表里的不转换：新审批单（approve）是第二期的；
+# 未归属店铺来信（store）由回放的未归属来信进队列时真的发出（待办 15），不再预置
+NOTIFICATION_TYPES = {'check_c': 'channel_recovered', 'alert': 'channel_disconnected'}
+# 原型的对象写法 → 关联对象（类型与 id）
+NOTIFICATION_OBJECTS = {'P18 · Gmail': ('channel', 'gmail')}
 NOTIFICATION_RECIPIENT = 'zhoumin'  # data.py：周敏 · 客服主管的面板
 
 
@@ -354,7 +369,7 @@ def notifications():
             'type': kind,
             'title': title,
             'body': desc,
-            'object': {'type': object_type, 'id': object_id or entity_id('message', desc), 'label': obj},
+            'object': {'type': object_type, 'id': object_id, 'label': obj},
             # 当天的只写时:分，之前的写「月-日 时:分」（G10）
             'at': at(hhmm if len(hhmm) > 5 else '%s %s' % (d.NOW[5:10], hhmm)),
             'read': read,
@@ -387,6 +402,7 @@ def build():
         # 示例 Shopify 应用没开通 read_all_orders 时订单只回补 60 天（K19、K20，待办 13）
         'shopifyReadAllOrders': d.SHOPIFY_BACKFILL_DAYS >= d.AMZ_BACKFILL_DAYS,
         'amazonOrders': amazon_orders(),
+        'unassignedMail': unassigned_mail(),
         'notifications': notifications(),
     }
 

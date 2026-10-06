@@ -16,6 +16,8 @@ import { connectionStatusSchema, platformSchema, siteSchema } from './channel';
 import { financeField } from './finance';
 import { adapterModeSchema } from './integration';
 import { roleSchema } from './roles';
+import { ticketChannelSchema } from './ticket';
+import { recipientHeaderSchema } from './unassigned-mail';
 
 /**
  * 审计对象类型与中文名（PRD 11.1 AuditLog、P27 筛选「对象类型」）。
@@ -198,6 +200,20 @@ export const channelAuditSnapshotSchema = z.object({
     .nullable(),
 });
 
+/**
+ * 来信的店铺（待办 15；协调者 2026-10-07 决定）：未归属店铺的来信被客服主管「指定店铺」或登记新店铺后「自动归位」时记，
+ * 前后值为店铺（前值为空）、按所归店铺重新识别的站点与渠道（前值为未归属时的样子：站点为空，渠道按发件域暂定）、
+ * 识别依据（收件地址与它取自的头字段）与主题
+ */
+export const messageStoreAuditSnapshotSchema = z.object({
+  storeId: z.string().nullable(),
+  site: siteSchema.nullable(),
+  channel: ticketChannelSchema.nullable(),
+  recipient: z.string(),
+  recipientHeader: recipientHeaderSchema,
+  subject: z.string(),
+});
+
 /** 没有前后值的动作（如退出登录） */
 export const emptyAuditSnapshotSchema = z.object({});
 
@@ -210,6 +226,7 @@ export const auditSnapshotSchemas = {
   member: memberAuditSnapshotSchema,
   accessDenied: accessDeniedAuditSnapshotSchema,
   channel: channelAuditSnapshotSchema,
+  messageStore: messageStoreAuditSnapshotSchema,
   empty: emptyAuditSnapshotSchema,
 } as const;
 export type AuditSnapshotKind = keyof typeof auditSnapshotSchemas;
@@ -280,6 +297,9 @@ export const auditActions = {
   // 渠道连接（待办 09）：某个 Gmail 邮箱连续 3 次失败进入连接异常、之后同步成功恢复连接，操作人「系统」（2026-10-06 用户确认）
   'channel.disconnected': { label: '连接异常', objectType: 'channel', snapshot: 'channel' },
   'channel.recovered': { label: '恢复连接', objectType: 'channel', snapshot: 'channel' },
+  // 未归属店铺的来信（待办 15，协调者 2026-10-07 决定）：客服主管指定店铺；登记新店铺或进线邮箱后收件地址匹配的自动归位（操作人「系统」）
+  'message.assign_store': { label: '指定店铺', objectType: 'message', snapshot: 'messageStore' },
+  'message.auto_place': { label: '自动归位', objectType: 'message', snapshot: 'messageStore' },
 } as const satisfies Record<string, AuditActionDefinition>;
 
 export type AuditAction = keyof typeof auditActions;

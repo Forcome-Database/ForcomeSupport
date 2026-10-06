@@ -19,6 +19,7 @@ import {
   notificationListQuery,
   notificationLooks,
   notificationsKey,
+  notificationSearch,
   notificationTarget,
   submitRead,
   unreadBadge,
@@ -321,6 +322,7 @@ function NotificationItem({
     return (
       <Link
         to={target.path}
+        search={notificationSearch[item.type] ?? {}}
         data-testid="notification-item"
         data-read={item.read}
         className={className}

@@ -381,7 +381,8 @@ describe('示例通知接口（开发登录环境；按 11.4 发的用例都经�
 });
 
 describe('示例数据（原型 G10 周敏的面板，第一期的类型）', () => {
-  it('灌示例数据后周敏有 4 条通知、3 条未读；重复灌不重复、不重置已读', async () => {
+  // 原型面板里的两条「未归属店铺来信」由 Fake Gmail 回放的未归属来信进队列时真的发出（待办 15），不再预置
+  it('灌示例数据后周敏有 2 条渠道通知、都是未读；重复灌不重复、不重置已读', async () => {
     const zhoumin = getDemoFixture().members.find((m) => m.key === 'zhoumin')!;
     await t.loadFixtures();
     const client = await t.loginAs({ memberId: zhoumin.id });
@@ -393,16 +394,14 @@ describe('示例数据（原型 G10 周敏的面板，第一期的类型）', ()
     expect((await fixtureItems()).map((i) => [i.title, i.body, i.object.label, i.read])).toEqual([
       ['Gmail 已恢复', 'support@forcome.mx 已重新连接，补拉 3 封来信', 'P18 · Gmail', false],
       ['Gmail 连接异常', 'support@forcome.mx 连续 3 次失败，来信暂存', 'P18 · Gmail', false],
-      ['未归属店铺来信', 'Tom Harris · amz-ca2@forcome.com 未登记', 'P04 · 未归属店铺', false],
-      ['未归属店铺来信', 'Lucía Herrera · info@forcome.mx 未登记', 'P04 · 未归属店铺', true],
     ]);
 
-    const tom = (await list(client)).items.find((i) => i.body.startsWith('Tom Harris'))!;
-    await client.post(`/api/notifications/${tom.id}/read`);
+    const recovered = (await fixtureItems()).find((i) => i.title === 'Gmail 已恢复')!;
+    await client.post(`/api/notifications/${recovered.id}/read`);
     await t.loadFixtures();
     const again = await fixtureItems();
-    expect(again).toHaveLength(4);
-    expect(again.find((i) => i.id === tom.id)?.read).toBe(true);
+    expect(again).toHaveLength(2);
+    expect(again.find((i) => i.id === recovered.id)?.read).toBe(true);
   });
 });
 

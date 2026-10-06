@@ -129,7 +129,10 @@ test('铃铛未读数 → 打开面板 → 点一条跳到对象并变为已读�
   await expect(panel(page)).toContainText('点一条即跳到对应对象并标为已读');
 
   await row.click();
-  await expect(page).toHaveURL((url) => url.pathname === '/tickets');
+  // 「未归属店铺来信」直接打开 P04 的未归属店铺队列（待办 15）
+  await expect(page).toHaveURL(
+    (url) => url.pathname === '/tickets' && url.searchParams.get('view') === 'unassigned',
+  );
   await expect(panel(page)).toBeHidden();
   await expect(bell(page)).toHaveAccessibleName(bellName(before));
 

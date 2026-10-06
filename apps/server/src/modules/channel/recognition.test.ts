@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addressesInHeader,
+  provisionalStore,
+  recipientsOf,
   recognizeInbound,
+  storeOfRecipients,
   type InboundMailFacts,
   type SenderRule,
   type StoreFacts,
@@ -355,5 +359,78 @@ describe('来源规则匹配（规格 channel「来源识别」，PRD 1.4）', (
       source: 'customer',
       sender: { address: '', name: '' },
     });
+  });
+});
+
+describe('按收件地址识别店铺（R-ST-02、E-13，待办 15）', () => {
+  const h = (key: string, value: string) => ({ key, value });
+
+  it('收件地址按 Delivered-To（可能几个）、To、Cc 依次，去重、转小写，各记取自哪个头字段；地址组的成员也算', () => {
+    expect(
+      recipientsOf([
+        h('delivered-to', 'Amz-CA2@forcome.com'),
+        h('from', 'tom@marketplace.amazon.ca'),
+        h('to', '"Forcome CA" <amz-ca2@forcome.com>, team: a@forcome.com, b@forcome.com;'),
+        h('cc', '=?UTF-8?B?THVjw61h?= <info@forcome.mx>'),
+        h('delivered-to', '<support@forcome.mx>'),
+      ]),
+    ).toEqual([
+      { header: 'delivered-to', address: 'amz-ca2@forcome.com' },
+      { header: 'delivered-to', address: 'support@forcome.mx' },
+      { header: 'to', address: 'a@forcome.com' },
+      { header: 'to', address: 'b@forcome.com' },
+      { header: 'cc', address: 'info@forcome.mx' },
+    ]);
+    expect(recipientsOf([h('subject', 'hi')])).toEqual([]);
+  });
+
+  it('店铺取第一个登记为进线邮箱的收件地址所属的店铺；都没登记为空（未归属店铺）', () => {
+    const mailboxes = new Map([
+      ['amz-direct@forcome.com', 'Forcome Direct'],
+      ['support@forcome.mx', 'forcome.mx'],
+    ]);
+    const recipients = recipientsOf([
+      h('delivered-to', 'amz-ca2@forcome.com'),
+      h('to', 'support@forcome.mx, amz-direct@forcome.com'),
+    ]);
+    expect(storeOfRecipients(recipients, mailboxes)).toEqual({
+      store: 'forcome.mx',
+      address: 'support@forcome.mx',
+    });
+    expect(storeOfRecipients(recipients.slice(0, 1), mailboxes)).toBeNull();
+  });
+
+  it('Reply-To 等地址头解析出地址与解码后的显示名，解析不出地址的跳过', () => {
+    expect(
+      addressesInHeader(
+        [h('reply-to', '=?UTF-8?B?THVjw61h?= <Lucia@Gmail.com>'), h('reply-to', 'undisclosed')],
+        'reply-to',
+      ),
+    ).toEqual([{ address: 'lucia@gmail.com', name: 'Lucía' }]);
+  });
+
+  it('未归属来信暂按发件域定平台（E-13）：亚马逊的域按亚马逊店铺识别（买家消息中转为亚马逊渠道），其余按 Shopify 店铺（联系表单认得出客户）', () => {
+    const relay = mail({ from: { address: 'tom.x7@marketplace.amazon.ca', name: 'Tom' } });
+    expect(provisionalStore(relay.from).platform).toBe('amazon');
+    expect(recognizeInbound(relay, provisionalStore(relay.from), RULES)).toMatchObject({
+      channel: 'amazon',
+      source: 'customer',
+    });
+    const form = contactForm();
+    expect(recognizeInbound(form, provisionalStore(form.from), RULES)).toMatchObject({
+      channel: 'shopify',
+      source: 'customer',
+      sender: { address: 'emily.chen@example.com' },
+    });
+    const direct = mail({ from: { address: 'lucia@gmail.com', name: 'Lucía' } });
+    expect(recognizeInbound(direct, provisionalStore(direct.from), RULES)).toMatchObject({
+      channel: 'email',
+      source: 'customer',
+    });
+    // 平台通知照样识别为平台通知（归档、不进队列）
+    const notice = mail({ from: { address: 'seller-notification@amazon.ca', name: '' } });
+    expect(recognizeInbound(notice, provisionalStore(notice.from), RULES).source).toBe(
+      'platform_notification',
+    );
   });
 });

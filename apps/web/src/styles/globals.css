@@ -36,6 +36,8 @@
   --primary-text: #4338ca; /* accent_ink */
   --primary-soft: #f0effd; /* accent_bg */
   --primary-line: #d3d1f9; /* accent_line */
+  --primary-soft-hover: #e6e4fb; /* 浅色强调按钮悬停（ui.BTN_HOVER accent_outline） */
+  --primary-soft-active: #dcd9f9; /* 浅色强调按钮按下 */
   --primary-active: #3730a3; /* 主按钮按下（ui.BTN_HOVER） */
   --ring: #4f46e5;
   --brand-2: #06b6d4; /* cyan，渐变第二色 */
@@ -136,6 +138,8 @@
   --color-primary-text: var(--primary-text);
   --color-primary-soft: var(--primary-soft);
   --color-primary-line: var(--primary-line);
+  --color-primary-soft-hover: var(--primary-soft-hover);
+  --color-primary-soft-active: var(--primary-soft-active);
   --color-primary-active: var(--primary-active);
   --color-ring: var(--ring);
   --color-brand-2: var(--brand-2);

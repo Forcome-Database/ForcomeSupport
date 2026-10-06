@@ -30,6 +30,9 @@ const buttonVariants = cva(
           'border-destructive bg-destructive font-semibold text-primary-foreground active:border-destructive-active active:bg-destructive-active active:shadow-press',
         'text-link':
           'border-0 bg-transparent font-medium text-primary underline-offset-3 hover:underline',
+        /** 浅色强调（原型 accent_outline）：切换按钮的选中态，如 P04「未归属店铺 N」打开队列时（I17 ③，待办 15） */
+        'accent-outline':
+          'border-primary-line bg-primary-soft font-semibold text-primary-text hover:bg-primary-soft-hover active:bg-primary-soft-active active:shadow-press',
         'destructive-outline':
           'border-destructive-line bg-card font-medium text-destructive-text shadow-xs hover:bg-destructive-soft active:bg-destructive-soft-active active:shadow-press',
       },

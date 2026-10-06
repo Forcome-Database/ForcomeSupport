@@ -30,6 +30,8 @@ OUT_PNG = os.path.join(HERE, 'shots', 'phase1')
 PAGES = [
     ('P04_Tickets', 'P04 工单列表 · 周敏（客服主管）', lambda: TK.p04_p1()),
     ('P04_Tickets_drill', 'P04 工单列表 · 从 P17 下钻（来自报表芯片）', lambda: TK.p04_p1(drill=True)),
+    ('P04_Tickets_unassigned', 'P04 工单列表 · 打开未归属店铺队列（I17，待办 15）', lambda: TK.p04_p1(view='unassigned')),
+    ('P04_Tickets_unassigned_empty', 'P04 工单列表 · 未归属店铺队列为空（I17 ④）', lambda: TK.p04_p1(view='unassigned_empty')),
     ('P05_TicketDetail', 'P05 工单详情 · 李婷（坐席）', TK.p05_p1),
     ('P13_AfterSalesLog', 'P13 登记台账 · 王磊（售后负责人）', BL.p13_p1),
     ('P13_AfterSalesLog_agent', 'P13 登记台账 · 李婷（坐席，只读、不含金额列）', lambda: BL.p13_p1('liting')),

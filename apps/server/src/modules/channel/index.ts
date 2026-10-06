@@ -24,6 +24,7 @@ export {
 export { type MailAddress, type Recognition, type SenderRule } from './recognition';
 export { clearInboundMail } from './reset';
 export { createChannelRoutes } from './routes';
+export { assignStore, listUnassignedMail, placeMatchingMail } from './unassigned';
 export { registerSenderRule } from './sender-rules';
 export {
   findOrderStore,

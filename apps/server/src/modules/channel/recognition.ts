@@ -1,19 +1,25 @@
 import {
   amazonDomains,
+  isAmazonDomain,
   isTicketSource,
+  recipientHeaders,
   SHOPIFY_CONTACT_FORM_SENDER,
   sites,
   type MessageSource,
   type Platform,
+  type Recipient,
   type Site,
   type TicketChannel,
 } from '@forcome/contracts';
+import { addressParser, decodeWords, type Address } from 'postal-mime';
 
 /*
  * 来信的渠道、站点、来源识别（规格 channel「渠道识别」「来源识别」「店铺与站点识别」，PRD R-TK-08、R-ST-02、
  * 1.4「来源」，待办 10）。纯函数：输入一封来信的发件人、Reply-To、正文与头字段，收到它的店铺，来源规则表；
  * 输出渠道、站点、来源与客户渠道身份。店铺按收件邮箱识别（gmail-sync.ts），不在这里。
  *
+ * 0. 店铺（R-ST-02、E-13，待办 15）：按收件地址——Delivered-To、To、Cc 依次（recipientsOf），第一个登记为进线邮箱的地址所属的店铺
+ *    （storeOfRecipients）；都没登记即未归属店铺，进队列，平台暂按发件域定（provisionalStore，E-13），指定店铺或自动归位后按所归店铺重新识别。
  * 1. 渠道与客户渠道身份（R-TK-08）：
  *    - 亚马逊店铺邮箱收到亚马逊买家消息中转来信（发件域 marketplace.amazon.com / .ca / .com.mx）→ 亚马逊，身份是中转地址；
  *    - Shopify 店铺邮箱收到 Shopify 联系表单通知（mailer@shopify.com 代发，能找到填表客户的邮箱）→ Shopify，
@@ -192,6 +198,73 @@ function sourceOf(
     )[0];
   return hit?.source ?? 'customer';
 }
+
+// ---------------------------------------------------------------- 店铺（按收件地址）
+
+type Headers = InboundMailFacts['headers'];
+
+function flatten(list: readonly Address[]): MailAddress[] {
+  return list
+    .flatMap((a) => ('group' in a && a.group ? a.group : [a]))
+    .map((m) => ({
+      address: m.address.trim().toLowerCase(),
+      name: decodeWords(m.name).trim(),
+    }));
+}
+
+/** 某个头字段（可能出现几次，按出现顺序）里的全部地址，含地址组的成员；解析不出地址的跳过 */
+export function addressesInHeader(headers: Headers, key: string): MailAddress[] {
+  return headers
+    .filter((h) => h.key.toLowerCase() === key)
+    .flatMap((h) => flatten(addressParser(h.value)))
+    .filter((m) => m.address.includes('@'));
+}
+
+/**
+ * 一封来信的收件地址（店铺识别的依据）：Delivered-To（Gmail 写实际投递到的地址，在最上面；转进来的信可能没有）、To、Cc 依次，
+ * 去重、小写，各记取自哪个头字段
+ */
+export function recipientsOf(headers: Headers): Recipient[] {
+  const seen = new Set<string>();
+  const out: Recipient[] = [];
+  for (const header of recipientHeaders) {
+    for (const { address } of addressesInHeader(headers, header)) {
+      if (seen.has(address)) continue;
+      seen.add(address);
+      out.push({ header, address });
+    }
+  }
+  return out;
+}
+
+/**
+ * 按收件地址识别店铺（R-ST-02「按收件邮箱识别店铺」）：第一个登记为进线邮箱（含别名）的收件地址所属的店铺；
+ * 都没登记为 null（未归属店铺，E-13）。mailboxes 是全部进线邮箱（地址小写）→ 店铺
+ */
+export function storeOfRecipients<T>(
+  recipients: readonly Recipient[],
+  mailboxes: ReadonlyMap<string, T>,
+): { readonly store: T; readonly address: string } | null {
+  for (const { address } of recipients) {
+    const store = mailboxes.get(address);
+    if (store !== undefined) return { store, address };
+  }
+  return null;
+}
+
+/**
+ * 未归属来信识别渠道与来源时暂用的店铺（E-13「平台按发件域判断」）：发件域是亚马逊的域按亚马逊店铺（买家消息中转为亚马逊渠道），
+ * 其余按 Shopify 店铺（mailer@shopify.com 代发的联系表单认得出客户、找不到客户的按 Shopify 系统邮件归档；其余为邮件）。
+ * 站点要等有了店铺再定，不用这里的默认站点
+ */
+export function provisionalStore(from: MailAddress): StoreFacts {
+  return {
+    platform: isAmazonDomain(domainOf(from.address.trim().toLowerCase())) ? 'amazon' : 'shopify',
+    defaultSite: 'US',
+  };
+}
+
+// ---------------------------------------------------------------- 渠道、站点、来源
 
 /** 识别一封来信的渠道、站点、来源与客户渠道身份 */
 export function recognizeInbound(

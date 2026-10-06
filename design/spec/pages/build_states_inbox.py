@@ -10,6 +10,7 @@ from common import mtable, cbox, table_empty, scaled
 from as_common import sec_head
 import build_inbox
 import build_tickets
+from build_tickets import unassigned_head, unassigned_note, i17_table
 import build_ledger as BL  # 只复用右侧抽屉 drawer / drawer_over 与 fold_line、lbl_note
 
 VW = 880  # 变体画面宽度（两列）
@@ -261,14 +262,6 @@ def i14():
                    frame, VW, trigger='收件地址或卖家 ID 未登记（E-13、AC-TK-09、AC-TK-11）。')
 
 
-def unassigned_head(n, hint=True):
-    """未归属店铺队列标题行（I14、I17 共用）：标题 + 计数 · 仅客服主管可见、不受店铺数据范围限制 | 自动归位提示（D-24，不设「去登记店铺」入口）。
-    hint=False：提示已写在下方横幅里时不重复（I17）。"""
-    left = row(text('未归属店铺', 16, T['ink'], 700) + chip(str(n), 'warning', 11) + nowrap('仅客服主管可见 · 不受店铺数据范围限制', 12, T['ink3']), 8)
-    right = row(icon('info', 13, T['ink4']) + nowrap('管理员登记新店铺后，收件地址匹配的来信会自动归位', 12, T['ink3']), 5)
-    return between(left, right if hint else '')
-
-
 # ---------------------------------------------------------------- I15 已达 5 版上限
 def i15():
     vers = SARAH_VERSIONS + [('D', 'D 先退运费', ''), ('E', 'E 延期说明', '')]
@@ -308,30 +301,34 @@ def i16():
 
 
 # ---------------------------------------------------------------- I17 第一阶段未归属店铺来信队列
-def i17_table(mails, picked=None):
-    """没有 ✦ 推荐列；识别依据 = 收件头字段名 + 收件地址 +「未登记」（发件域作补充）；指定店铺下拉未预选，只列当前客服主管的授权店铺。"""
-    cols = [('来信', 'left'), ('识别依据', 'left'), ('到达', 'left'), ('SLA', 'left'), ('指定店铺（只列你的授权店铺）', 'left')]
-    rows = [[col(text(m['customer'], 13, T['ink'], 600) + ellipsis(m['subject'], 12, T['ink3']), 1),
-             col(nowrap(m['to_hdr'], 11, T['ink4']) + row(nowrap(m['to'], 12, T['ink'], 600) + chip('未登记', 'warning', 10), 6) + nowrap('发件域 ' + m['from_domain'], 11, T['ink4']), 2),
-             nowrap(m['at'], 12, T['ink2']),
-             col(sla(m['sla'], 'normal') + nowrap(m['sla_kind'], 11, T['ink4']), 3),
-             row(select_box(None, '选择店铺', width='164px', h=28) + btn('指定', 'primary', 'sm'), 6)] for m in mails]
-    return mtable(cols, rows, 'minmax(0, 1fr) minmax(0, 1.3fr) 44px 132px 222px', py=10)
-
-
 def i17():
-    def note(n):
-        return banner('warning', '%d 封来信识别不出店铺' % n, 'SLA 按原到达时间照常计时 · 管理员登记新店铺后，收件地址匹配的来信会自动归位')
+    note = unassigned_note
     mails = UNASSIGNED_MAIL
     tail = row(icon('info', 13, T['ink4']) + nowrap('点「指定」后本行移出；5 秒撤销窗口结束才归并成工单，撤销则来信回到队列、不产生工单。', 12, T['ink3']), 6)
     a = mini(col(unassigned_head(len(mails), False) + note(len(mails)) + i17_table(mails) + tail, 12), VW, 380, pad='20px')
     rest = [m for m in mails if m['store'] != 'forcome.mx']  # Lucía Herrera 已指定到 forcome.mx，移出队列
     ts = '<div style="position: absolute; right: 20px; bottom: 16px;">%s</div>' % toast('success', '已归入 forcome.mx', '5 秒后归并成工单', undo=5, remain=5)
     b = mini(col(unassigned_head(len(rest), False) + note(len(rest)) + i17_table(rest), 12) + ts, VW, 344, pad='20px')
-    frame = stack(('① 周敏打开 P04「未归属店铺 2」', a), ('② Lucía Herrera 选 forcome.mx 后点「指定」：本行移出，撤销浮层倒计时', b))
+    # 补充小样（待办 15，协调者 2026-10-07 决定）：P04 打开队列的整页、队列为空
+    page = build_inbox_scaled(build_tickets.p04_p1(view='unassigned'))
+    blank = build_inbox_scaled(build_tickets.p04_p1(view='unassigned_empty'))
+    # 补充小样⑤⑥：窗口结束提交「指定」失败（协调者 2026-10-07 决定 Q8）——断网或服务器出错时行回到队列、可重试；别人已先指定或已自动归位时行随刷新移出
+    retry = btn('立即重试', 'link', 'sm')
+    fail_net = '<div style="position: absolute; right: 20px; top: 16px;">%s</div>' % toast('error', '指定店铺失败：网络不可用', '来信仍在未归属店铺队列里', action=retry)
+    c = mini(col(unassigned_head(len(mails), False) + note(len(mails)) + i17_table(mails), 12) + fail_net, VW, 380, pad='20px')
+    fail_taken = '<div style="position: absolute; right: 20px; top: 16px;">%s</div>' % toast('error', '指定店铺失败：这封来信已被指定或已自动归位', '已归入 forcome.mx')
+    d = mini(col(unassigned_head(len(rest), False) + note(len(rest)) + i17_table(rest), 12) + fail_taken, VW, 344, pad='20px')
+    frame = stack(('① 周敏打开 P04「未归属店铺 2」', a), ('② Lucía Herrera 选 forcome.mx 后点「指定」：本行移出，撤销浮层倒计时', b),
+                  ('③ 补充小样：P04 打开队列的整页（入口为选中态，列表区换成队列）', page), ('④ 补充小样：队列为空（入口计数 0 用中性色，没有提示条）', blank),
+                  ('⑤ 补充小样：窗口结束提交时断网——Lucía Herrera 回到队列，失败浮层可重试', c),
+                  ('⑥ 补充小样：提交时别人已先指定（或已自动归位）——这一行随刷新移出，失败浮层写已归入的店铺', d))
     return variant('I17 第一阶段未归属店铺来信队列',
                    '与 I14 同一入口与位置（仅客服主管可见，不受店铺数据范围限制），但没有 ✦ 推荐列：列为 来信（客户 + 主题）· 识别依据（收件地址 To / Delivered-To +「未登记」）· 到达 · SLA · 指定店铺（下拉未预选，只列周敏的授权店铺）+「指定」。'
-                   '② 点「指定」后该行移出，浮层「已归入 forcome.mx · 5 秒后归并成工单 · 撤销」带倒计时；窗口结束才提交归并，撤销后来信回到队列、不产生工单。',
+                   '② 点「指定」后该行移出，浮层「已归入 forcome.mx · 5 秒后归并成工单 · 撤销」带倒计时；窗口结束才提交归并，撤销后来信回到队列、不产生工单。'
+                   '③ 入口是切换按钮（地址栏 ?view=unassigned）：打开时为选中态（主色浅底，同「最近来信」芯片），P04 页头不变，筛选行只留右侧入口，列表区换成队列；再点入口回到工单列表；站内通知「未归属店铺来信」点进来直接打开队列。'
+                   '④ 队列为空：入口照常显示，计数 0 用中性色；标题计数同为中性色，不显示提示条，表格保留表头、表体为空状态「没有识别不出店铺的来信」（同 I10 的空状态组件，没有按钮）。'
+                   '⑤ 窗口结束提交失败（断网或服务器出错，来信仍未指定）：行回到队列，G5 失败浮层「指定店铺失败：<原因>」，说明「来信仍在未归属店铺队列里」，带「立即重试」；'
+                   '⑥ 别人已先指定或已自动归位：失败浮层「指定店铺失败：这封来信已被指定或已自动归位」，说明「已归入 <店铺>」，不带重试，这一行随刷新移出。',
                    frame, VW, trigger='第一阶段店铺识别失败（E-13）：收件地址未登记。')
 
 

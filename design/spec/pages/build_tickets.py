@@ -276,18 +276,74 @@ def drill_chip(lbl):
         T['ink3'], T['accent_bg'], T['accent_line'], icon('chart', 13, T['accent_ink']), T['accent_ink'], lbl, icon('x', 12, T['accent_ink'], 2))
 
 
-def p1_filters(drill=False):
-    """第一阶段筛选行：状态 · 渠道 · 店铺 · 站点 · 来源 · 最近来信（近 30 天）；右侧客服主管专用「未归属店铺 N」入口（I17）。"""
+# ---------------------------------------------------------------- 第一阶段未归属店铺来信队列（I17；P04 打开队列的整页为待办 15 的补充，协调者 2026-10-07 决定）
+UNASSIGNED_EMPTY = '没有识别不出店铺的来信'
+
+
+def unassigned_entry(n, active=False):
+    """筛选行右侧的客服主管专用入口「未归属店铺 N」：切换按钮（地址栏 ?view=unassigned），打开队列时为选中态（主色浅底，同「最近来信」芯片），
+    再点回到工单列表；N 为 0 时照常显示，计数用中性色（没有待处理时不吸引注意）。"""
+    return row(nowrap('仅客服主管可见', 11, T['ink4']) +
+               btn('未归属店铺 ' + chip(str(n), 'warning' if n else 'neutral', 11), 'accent_outline' if active else 'secondary', 'sm', 'inbox'), 8)
+
+
+def unassigned_head(n, hint=True):
+    """未归属店铺队列标题行（I14、I17 共用）：标题 + 计数 · 仅客服主管可见、不受店铺数据范围限制 | 自动归位提示（D-24，不设「去登记店铺」入口）。
+    hint=False：提示已写在下方横幅里时不重复（I17）。计数为 0 时用中性色（同入口）。"""
+    left = row(text('未归属店铺', 16, T['ink'], 700) + chip(str(n), 'warning' if n else 'neutral', 11) + nowrap('仅客服主管可见 · 不受店铺数据范围限制', 12, T['ink3']), 8)
+    right = row(icon('info', 13, T['ink4']) + nowrap('管理员登记新店铺后，收件地址匹配的来信会自动归位', 12, T['ink3']), 5)
+    return between(left, right if hint else '')
+
+
+def unassigned_note(n):
+    """I17 的提示条：几封来信识别不出店铺；队列为空时不显示。"""
+    return banner('warning', '%d 封来信识别不出店铺' % n, 'SLA 按原到达时间照常计时 · 管理员登记新店铺后，收件地址匹配的来信会自动归位')
+
+
+I17_COLS = [('来信', 'left'), ('识别依据', 'left'), ('到达', 'left'), ('SLA', 'left'), ('指定店铺（只列你的授权店铺）', 'left')]
+I17_TPL = 'minmax(0, 1fr) minmax(0, 1.3fr) 44px 132px 222px'
+
+
+def i17_table(mails, template=I17_TPL):
+    """没有 ✦ 推荐列；识别依据 = 收件头字段名 + 收件地址 +「未登记」（发件域作补充）；指定店铺下拉未预选，只列当前客服主管的授权店铺。
+    队列为空时保留表头，表体为空状态（同 I10 的空状态组件，没有按钮）。"""
+    if not mails:
+        return table_empty(I17_COLS, template, empty('inbox', UNASSIGNED_EMPTY))
+    rows = [[col(text(m['customer'], 13, T['ink'], 600) + ellipsis(m['subject'], 12, T['ink3']), 1),
+             col(nowrap(m['to_hdr'], 11, T['ink4']) + row(nowrap(m['to'], 12, T['ink'], 600) + chip('未登记', 'warning', 10), 6) + nowrap('发件域 ' + m['from_domain'], 11, T['ink4']), 2),
+             nowrap(m['at'], 12, T['ink2']),
+             col(sla(m['sla'], 'normal') + nowrap(m['sla_kind'], 11, T['ink4']), 3),
+             row(select_box(None, '选择店铺', width='164px', h=28) + btn('指定', 'primary', 'sm'), 6)] for m in mails]
+    return mtable(I17_COLS, rows, template, py=10)
+
+
+def unassigned_queue(mails):
+    """P04 打开「未归属店铺 N」后的列表区（I17）：标题行、提示条（队列为空时不显示）与表格。"""
+    n = len(mails)
+    return col(unassigned_head(n, False) + (unassigned_note(n) if n else '') + i17_table(mails), 12)
+
+
+def p1_filters(drill=False, view=None):
+    """第一阶段筛选行：状态 · 渠道 · 店铺 · 站点 · 来源 · 最近来信（近 30 天）；右侧客服主管专用「未归属店铺 N」入口（I17）。
+    view：'unassigned' 打开队列、'unassigned_empty' 打开空队列——入口为选中态，左侧的工单筛选不显示（它们只作用于工单列表）。"""
     names = [('状态', None), ('渠道', None), ('店铺', None), ('站点', None), ('来源', None), ('最近来信', '近 30 天')]
     chips = ''.join(filter_chip(n, v, v is not None) for n, v in names)
     if drill:
         chips = drill_chip(P1_DRILL['label']) + divider(True, 20) + chips
-    entry = row(nowrap('仅客服主管可见', 11, T['ink4']) + btn('未归属店铺 ' + chip(str(len(UNASSIGNED_MAIL)), 'warning', 11), 'secondary', 'sm', 'inbox'), 8)
-    return between(row(chips, 6, wrap=True), entry)
+    n = 0 if view == 'unassigned_empty' else len(UNASSIGNED_MAIL)
+    entry = unassigned_entry(n, active=view is not None)
+    return between(row('' if view else chips, 6, wrap=True), entry, extra='min-height: 28px;')
 
 
-def p04_p1(drill=False, h=900):
-    """drill=True：从 P17「每日工单量」09-10 的柱下钻进入（局部画面，只列示例数据里 09-10 新建的客户来信工单；总数取 P1_DRILL）。"""
+def p04_p1(drill=False, h=900, view=None):
+    """drill=True：从 P17「每日工单量」09-10 的柱下钻进入（局部画面，只列示例数据里 09-10 新建的客户来信工单；总数取 P1_DRILL）。
+    view='unassigned'：客服主管点「未归属店铺 2」打开队列（I17）；'unassigned_empty'：队列为空（N = 0）。页头不变，列表区换成队列。"""
+    if view:
+        note = row(icon('refresh', 14, T['ink4']) + nowrap('只读 · 数据变化时自动刷新', 12, T['ink3']), 6)
+        head = page_head('工单', '全部渠道 · 全部店铺', note)
+        mails = [] if view == 'unassigned_empty' else UNASSIGNED_MAIL
+        inner = p1_filters(view=view) + unassigned_queue(mails)
+        return app('zhoumin', '工单', ['工单'], head + content(inner, '14px 24px 12px 24px', 12), phase1=True, h=h)
     rows = p1_tickets()
     if drill:
         rows = [t for t in rows if t['no'].startswith('T-' + NOW[:4] + '0910') and t['source'] == '客户']

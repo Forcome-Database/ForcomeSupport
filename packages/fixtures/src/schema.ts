@@ -208,6 +208,21 @@ export const fixtureAmazonOrderSchema = z.object({
   tracking: z.object({ carrier: z.string(), number: z.string() }).nullable(),
 });
 
+/**
+ * 未归属店铺来信（I17，待办 15，data.py 的 UNASSIGNED_MAIL）：Fake Gmail 回放它们。信落在同步的店铺邮箱 mailbox 里，
+ * 收件地址 to 没有登记在任何店铺（它是该邮箱的别名或转发）；toHeader 为识别依据取自的头字段——Delivered-To 时这个头写 to，
+ * To 时信里没有 Delivered-To 头
+ */
+export const fixtureUnassignedMailSchema = z.object({
+  customer: z.string(),
+  subject: z.string(),
+  mailbox: z.string(),
+  to: z.string(),
+  toHeader: z.enum(['Delivered-To', 'To']),
+  fromDomain: z.string(),
+  at: instant,
+});
+
 /** 站内通知（G10 周敏的面板，第一期的类型）：类型取值同 contracts 的 notificationTypes，加载时再按枚举校验 */
 export const fixtureNotificationSchema = z.object({
   id: uuid,
@@ -262,6 +277,7 @@ export const demoFixtureSchema = z.object({
   /** 示例 Shopify 应用开通了 read_all_orders 没有（K19、K20 的示例没开通：Shopify 订单只回补 60 天，待办 13） */
   shopifyReadAllOrders: z.boolean(),
   amazonOrders: z.array(fixtureAmazonOrderSchema),
+  unassignedMail: z.array(fixtureUnassignedMailSchema),
 });
 
 export type DemoFixture = z.infer<typeof demoFixtureSchema>;
@@ -273,3 +289,4 @@ export type FixtureFee = z.infer<typeof fixtureFeeSchema>;
 export type FixtureNotification = z.infer<typeof fixtureNotificationSchema>;
 export type FixtureShopifyOrder = z.infer<typeof fixtureShopifyOrderSchema>;
 export type FixtureAmazonOrder = z.infer<typeof fixtureAmazonOrderSchema>;
+export type FixtureUnassignedMail = z.infer<typeof fixtureUnassignedMailSchema>;

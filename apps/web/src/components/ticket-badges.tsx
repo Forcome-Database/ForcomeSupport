@@ -1,14 +1,18 @@
 import {
   messageSourceLabels,
+  slaRemainingWords,
   ticketChannelLabels,
   ticketStatusLabels,
   type Site,
+  type SlaTarget,
+  type SlaTone,
   type TicketChannel,
   type TicketSource,
   type TicketStatus,
 } from '@forcome/contracts';
-import { Factory, Truck } from 'lucide-react';
+import { Clock, Factory, Truck } from 'lucide-react';
 import { Badge, ChannelBadge, type BadgeTone } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 /*
  * 工单的状态、渠道与来源徽标（原型 state()、channel() 与 source_badge()，P04、P05 共用）：状态一律带点，颜色由原型
@@ -76,5 +80,33 @@ export function TicketSourceLabel({ source }: { source: TicketSource }) {
       <Icon aria-hidden className="size-3" strokeWidth={2} />
       {messageSourceLabels[source]}
     </Badge>
+  );
+}
+
+/** SLA 剩余的颜色（R-SL-03，原型 sla()）：≤ 2 小时与已超时红、≤ 6 小时黄，其余灰底 */
+const SLA_TONE: Record<SlaTone, string> = {
+  danger: 'bg-destructive-soft text-destructive-text',
+  warning: 'bg-warning-soft text-warning-text',
+  normal: 'bg-secondary text-ink-2',
+};
+
+/**
+ * SLA 剩余胶囊（原型 sla()）：11 / 600、6 圆角、左右 7、行高 20，前面 11 的时钟；写法与颜色按 contracts 的 slaRemainingWords
+ * （剩余「23h 42m」、已超时「已超时 2h 05m」，内部目标加「· 内部」）。未归属店铺队列（I17，待办 15）起用，P04 的 SLA 列（18）、P05（17）同用
+ */
+export function SlaBadge({ dueAt, now, target }: { dueAt: string; now: Date; target: SlaTarget }) {
+  const { text, tone } = slaRemainingWords({ dueAt: new Date(dueAt), now, target });
+  return (
+    <span
+      data-testid="sla-badge"
+      data-tone={tone}
+      className={cn(
+        'inline-flex items-center gap-1 rounded-sm px-1.75 text-11 leading-5 font-semibold whitespace-nowrap tabular-nums',
+        SLA_TONE[tone],
+      )}
+    >
+      <Clock className="size-2.75 shrink-0" strokeWidth={2} />
+      {text}
+    </span>
   );
 }

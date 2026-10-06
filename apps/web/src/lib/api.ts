@@ -2,6 +2,7 @@ import {
   adminContactsSchema,
   aftersalesDetailSchema,
   apiErrorSchema,
+  assignStoreResultSchema,
   auditLogOptionsSchema,
   auditLogSchema,
   BACKGROUND_REQUEST_HEADER,
@@ -29,8 +30,10 @@ import {
   teamMemberSchema,
   teamSchema,
   ticketListSchema,
+  unassignedMailListSchema,
   type AdminContacts,
   type AftersalesDetail,
+  type AssignStoreResult,
   type AuditLog,
   type AuditLogFilter,
   type AuditLogOptions,
@@ -70,6 +73,7 @@ import {
   type TeamMember,
   type TeamMemberAdd,
   type TicketListItem,
+  type UnassignedMailList,
 } from '@forcome/contracts';
 import type { z } from 'zod';
 
@@ -317,6 +321,21 @@ export const api = {
   /** P04 工单列表（店铺范围内） */
   tickets: async (): Promise<TicketListItem[]> =>
     (await call('/api/tickets', ticketListSchema)).tickets,
+
+  /** P04 未归属店铺来信队列（I17，只给客服主管；不受店铺范围限制）与服务端当前时刻 */
+  unassignedMail: (): Promise<UnassignedMailList> =>
+    call('/api/channel/unassigned-mail', unassignedMailListSchema),
+
+  /**
+   * 指定店铺（I17，5 秒撤销窗口结束后才调用）：来信已不在队列里（别人先指定或已自动归位）抛 409 not_in_queue，
+   * message 写已归入的店铺；店铺不在范围内抛 403
+   */
+  assignStore: (mailId: string, storeId: string): Promise<AssignStoreResult> =>
+    call(
+      `/api/channel/unassigned-mail/${encodeURIComponent(mailId)}/store`,
+      assignStoreResultSchema,
+      jsonBody('POST', { storeId }),
+    ),
 
   /** P13 登记台账（店铺范围内；坐席拿到的没有财务字段） */
   ledger: (query: LedgerQuery = {}): Promise<Ledger> =>

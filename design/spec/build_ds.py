@@ -439,7 +439,13 @@ g10_d = col(cap('④ 钉钉同步失败 · 只提醒管理员（刘洋）') +
             '<div style="width: 360px; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; box-shadow: %s; padding: 6px; display: flex; flex-direction: column; gap: 2px;">%s</div>' % (
                 T['line'], SHADOW_MD, ''.join(notif_item(n) for n in DINGTALK_NOTIFICATIONS)) +
             muted('通讯录每个整点全量对账一次，失败不重试。连续失败的第 1 次发「钉钉同步失败」，第 3 次（P18 钉钉卡转「连接异常」）发「钉钉连接异常」，之后不重复；恢复后不发。只发站内，不发钉钉工作通知，不出全站横幅（G4）。', 12, 'width: 360px;'), 8)
-g10_frame = '<div style="width: 1510px; box-sizing: border-box; padding: 20px; background: %s; display: flex; flex-direction: column; gap: 24px;"><div style="display: flex; gap: 24px; align-items: flex-start;">%s%s%s</div>%s</div>' % (T['canvas'], g10_a, g10_b, g10_c, g10_d)
+# ⑤ 登记新店铺后来信自动归位（11.4；待办 15，协调者 2026-10-07 决定）：周敏视角，只发站内、按店铺发，对象为归并成的工单号
+from data import PLACED_NOTIFICATIONS
+g10_e = col(cap('⑤ 登记新店铺后来信自动归位 · 按店铺发（周敏）') +
+            '<div style="width: 360px; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; box-shadow: %s; padding: 6px; display: flex; flex-direction: column; gap: 2px;">%s</div>' % (
+                T['line'], SHADOW_MD, ''.join(notif_item(n) for n in PLACED_NOTIFICATIONS)) +
+            muted('管理员新增店铺或给店铺加进线邮箱（含别名）后，未归属店铺队列里收件地址匹配的来信自动归位、归并成工单；每封一条，只发给店铺范围包含该店铺的客服主管，只发站内。说明写「客户 · 收件地址 已归入 店铺」，对象为归并成的工单号，点进 P04。', 12, 'width: 360px;'), 8)
+g10_frame = '<div style="width: 1510px; box-sizing: border-box; padding: 20px; background: %s; display: flex; flex-direction: column; gap: 24px;"><div style="display: flex; gap: 24px; align-items: flex-start;">%s%s%s</div><div style="display: flex; gap: 24px; align-items: flex-start;">%s%s</div></div>' % (T['canvas'], g10_a, g10_b, g10_c, g10_d, g10_e)
 
 
 # ---------------------------------------------------------------- G11 登录 · G12 登录被拒
@@ -529,8 +535,8 @@ gs_body = col(
          variant('G8 未保存离开', '草稿类（回复框、内部备注）自动保存，离开时只弹「草稿已保存」浮层，不拦截。表单类（设置页）有未保存修改时弹窗：继续编辑 · 放弃修改 · 保存并离开，默认焦点在「继续编辑」。', unsaved_frame, 700), 2, 32) +
     variant('G9 密度切换', '第一期提供舒适（默认）与紧凑两档（Q-24）。顶栏「密度」按钮切换，按用户保存；只改字号、行距与内边距，不改布局和信息量。紧凑：正文 12、次要 11（中文最小 11）、队列行内边距 6、行距 2、表格行高 32。两档一致：队列卡片左侧色条只表示风险（转人工红），选中用浅底 + 描边。', dens_frame, 1500,
             trigger='点顶栏「密度」按钮（图标：三条横线）。') +
-    variant('G10 站内通知', '顶栏铃铛带未读数（本例 %d）；点开 360px 面板，页签「全部 · 未读」，每条写类型图标、标题、说明、对象编号与时间（当天只写时:分，之前的写「月-日 时:分」，不在今年的写全年份，同 P27），未读带圆点并用浅底；点一条即跳到对象并标为已读——查看者打不开目标页的（如客服主管收到的渠道通知，P18 只对管理员开放）只标为已读、不跳转，对象编号为灰字（同 P27）；右上「全部已读」，没有未读时置灰、悬停写「没有未读通知」；没有通知时显示空状态（第一阶段说明不写「审批、」，第二阶段起写「审批、渠道异常、未归属店铺来信等……」）。头像菜单：姓名、角色与部门（来自钉钉），「审计日志」所有角色可见（P27，按 10.2 过滤），「密度」同 G9，「退出登录」。示例为完整版；第一阶段只有 11.4 中阶段为「一起」的通知类型。④ 钉钉同步失败只提醒管理员（刘洋视角，待办 05，10-06 用户确认）：连续失败的第 1 次「钉钉同步失败」、第 3 次「钉钉连接异常」，对象「P18 · 钉钉」，之后不重复，恢复后不发。' % UNREAD,
-            g10_frame, 1510, trigger='点顶栏铃铛；点顶栏头像。示例为周敏 · 客服主管（data.NOTIFICATIONS）；④ 为刘洋 · 管理员（data.DINGTALK_NOTIFICATIONS）。') +
+    variant('G10 站内通知', '顶栏铃铛带未读数（本例 %d）；点开 360px 面板，页签「全部 · 未读」，每条写类型图标、标题、说明、对象编号与时间（当天只写时:分，之前的写「月-日 时:分」，不在今年的写全年份，同 P27），未读带圆点并用浅底；点一条即跳到对象并标为已读——查看者打不开目标页的（如客服主管收到的渠道通知，P18 只对管理员开放）只标为已读、不跳转，对象编号为灰字（同 P27）；右上「全部已读」，没有未读时置灰、悬停写「没有未读通知」；没有通知时显示空状态（第一阶段说明不写「审批、」，第二阶段起写「审批、渠道异常、未归属店铺来信等……」）。头像菜单：姓名、角色与部门（来自钉钉），「审计日志」所有角色可见（P27，按 10.2 过滤），「密度」同 G9，「退出登录」。示例为完整版；第一阶段只有 11.4 中阶段为「一起」的通知类型。④ 钉钉同步失败只提醒管理员（刘洋视角，待办 05，10-06 用户确认）：连续失败的第 1 次「钉钉同步失败」、第 3 次「钉钉连接异常」，对象「P18 · 钉钉」，之后不重复，恢复后不发。⑤ 登记新店铺后来信自动归位（待办 15，协调者 2026-10-07 决定）：标题「未归属店铺来信已自动归位」，说明「Tom Harris · amz-ca2@forcome.com 已归入 Forcome Direct CA」，对象为归并成的工单号，点进 P04；按店铺发、只发站内。' % UNREAD,
+            g10_frame, 1510, trigger='点顶栏铃铛；点顶栏头像。示例为周敏 · 客服主管（data.NOTIFICATIONS）；④ 为刘洋 · 管理员（data.DINGTALK_NOTIFICATIONS）；⑤ 为周敏（data.PLACED_NOTIFICATIONS）。') +
     grid(variant('G11 登录', '居中卡片：产品名、「用钉钉扫码登录」二维码（2 分钟过期，过期后二维码上加蒙层与「刷新」），下方说明「成员与部门来自钉钉通讯录，由管理员在本系统分配角色后才能进入」。在钉钉内打开时免登（第二阶段）。会话 7 天无操作过期（G12）。', g11_frame, 880,
                  trigger='未登录或会话过期后访问任意页面。') +
          variant('G12 登录被拒', '同一张登录卡片换成被拒说明，三种：未分配角色、账号已停用、会话过期（「重新扫码登录」）。第一阶段不分配「生产厂对接人」角色，已分配者扫码后看到「工厂工作台第二阶段上线，目前无法进入」（4.1）。', g12_frame, 880,

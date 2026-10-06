@@ -1,6 +1,8 @@
-import type { TicketListItem } from '@forcome/contracts';
+import { can, type TicketListItem } from '@forcome/contracts';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { Search } from 'lucide-react';
+import { z } from 'zod';
 import { EmptyState } from '@/components/empty-state';
 import { LoadError } from '@/components/load-error';
 import { PageHead } from '@/components/page-head';
@@ -18,15 +20,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useCurrentMember } from '@/lib/current-member';
+import { pages } from '@/lib/pages';
 import { formatLastInbound, ticketListQuery } from '@/lib/tickets';
 import { cn } from '@/lib/utils';
 import { A11Y, COLUMNS, EMPTY_TITLE, EMPTY_VALUE, PAGE_DESCRIPTION, PAGE_TITLE } from './p04-copy';
+import { UnassignedEntry, UnassignedQueue, useUnassignedCount } from './unassigned-queue';
 
 /*
  * P04 工单列表（第一阶段，PRD P04「第一阶段」、I16；参照图 design/spec/shots/phase1/P04_Tickets.png）。
  * 现在是最简列表：页头 + 表格（工单号 · 主题 · 来源 · 渠道与店铺 · 客户 · 订单号 · 状态 · 最近来信，来源列自待办 10、
  * 订单号列自待办 14），按待回复 → 等客户 → 已解决 → 已关闭、组内最近来信倒序（后端排好）。筛选行与「未归属店铺」入口、
- * SLA 剩余列、SLA 排序与分页、「只读 · 数据变化时自动刷新」与 SSE、点击行进入 P05 随 15、16、17、18 号待办。
+ * SLA 剩余列、SLA 排序与分页、「只读 · 数据变化时自动刷新」与 SSE、点击行进入 P05 随 16、17、18 号待办。
+ * 筛选行右侧的「未归属店铺 N」入口只对客服主管显示（I17，待办 15）：切换按钮，条件写在地址栏（?view=unassigned），
+ * 打开时列表区换成队列、筛选行只留入口（工单的筛选随 18 加在左侧，不作用于队列）。
  * 表格照原型 tk_table()：外框圆角 8、表头 11 / 700 次要色、行上下 7；列宽照 P1_TPL 换算（含单元格内边距）。
  */
 
@@ -128,17 +135,46 @@ function TicketsTable({ tickets }: { tickets: readonly TicketListItem[] | null }
   );
 }
 
-export function TicketsPage() {
+/** P04 的地址参数：view=unassigned 打开未归属店铺队列（只对客服主管有效，其余成员照常看工单列表） */
+export const ticketsSearchSchema = z.object({
+  view: z.literal('unassigned').optional().catch(undefined),
+});
+
+function TicketList() {
   const tickets = useQuery(ticketListQuery);
+  return tickets.isError ? (
+    <LoadError onRetry={() => void tickets.refetch()} />
+  ) : (
+    <TicketsTable tickets={tickets.isPending ? null : tickets.data} />
+  );
+}
+
+export function TicketsPage() {
+  const member = useCurrentMember();
+  const navigate = useNavigate();
+  const search = ticketsSearchSchema.parse(useSearch({ strict: false }));
+  const supervisor = can(member.roles, 'ticket.assign_store');
+  const queueOpen = supervisor && search.view === 'unassigned';
+  const count = useUnassignedCount(supervisor);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHead title={PAGE_TITLE} description={PAGE_DESCRIPTION} />
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pt-3.5 pb-3">
-        {tickets.isError ? (
-          <LoadError onRetry={() => void tickets.refetch()} />
-        ) : (
-          <TicketsTable tickets={tickets.isPending ? null : tickets.data} />
+        {supervisor && (
+          <div className="flex min-h-7 items-center justify-end gap-3">
+            <UnassignedEntry
+              count={count}
+              open={queueOpen}
+              onToggle={() =>
+                void navigate({
+                  to: pages.tickets.path,
+                  search: queueOpen ? {} : { view: 'unassigned' },
+                })
+              }
+            />
+          </div>
         )}
+        {queueOpen ? <UnassignedQueue /> : <TicketList />}
       </div>
     </div>
   );

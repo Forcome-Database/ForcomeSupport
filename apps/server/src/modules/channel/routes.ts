@@ -1,5 +1,8 @@
 import {
   apiErrorSchema,
+  assignStoreInputSchema,
+  assignStoreMessages,
+  assignStoreResultSchema,
   channelAlertsSchema,
   channelSettingsSchema,
   connectionTestKindSchema,
@@ -9,6 +12,7 @@ import {
   storeOptionsSchema,
   storeSchema,
   storeUpdateSchema,
+  unassignedMailListSchema,
 } from '@forcome/contracts';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { AppEnv, Logger, Runtime } from '../core';
@@ -31,6 +35,7 @@ import {
   toStore,
   updateStore,
 } from './stores';
+import { assignStore, listUnassignedMail } from './unassigned';
 
 const json = <T extends z.ZodType>(schema: T, description: string) => ({
   description,
@@ -125,7 +130,45 @@ const connectionTestRoute = createRoute({
   },
 });
 
-/** channel 的接口：P18 渠道与店铺（管理员）与店铺选项、全站横幅（所有登录成员） */
+const notSupervisor = json(
+  apiErrorSchema,
+  '没有「为未归属店铺的来信指定店铺」能力（PRD 10.1：只有客服主管），或指定的店铺不在店铺范围内（E-24，记审计）',
+);
+
+const unassignedListRoute = createRoute({
+  method: 'get',
+  path: '/api/channel/unassigned-mail',
+  summary:
+    'P04 未归属店铺来信队列（I17）：收件地址没登记在任何店铺的来信；只给客服主管，不受店铺数据范围限制（来信还没有店铺）',
+  responses: {
+    200: json(unassignedMailListSchema, '队列（按到达时间倒序）与服务端当前时刻'),
+    401: unauthenticated,
+    403: notSupervisor,
+  },
+});
+
+const assignStoreRoute = createRoute({
+  method: 'post',
+  path: '/api/channel/unassigned-mail/{id}/store',
+  summary:
+    '指定店铺（I17，5 秒撤销窗口结束后才调用）：按所归店铺重新识别并交 ticket 关联订单、归并成工单（R-ST-02），SLA 按原到达时间；记审计',
+  request: {
+    params: z.object({ id: z.uuid() }),
+    body: { content: { 'application/json': { schema: assignStoreInputSchema } }, required: true },
+  },
+  responses: {
+    200: json(assignStoreResultSchema, '已归入店铺'),
+    400: json(apiErrorSchema, '没有这个店铺'),
+    401: unauthenticated,
+    403: notSupervisor,
+    409: json(
+      apiErrorSchema,
+      '来信已不在队列里（别人先指定了、已自动归位，或没有这封来信）：message 写已归入的店铺「已归入 forcome.mx」',
+    ),
+  },
+});
+
+/** channel 的接口：P18 渠道与店铺（管理员）与店铺选项、全站横幅（所有登录成员）、未归属店铺来信队列（客服主管） */
 export function createChannelRoutes(deps: {
   runtime: Runtime;
   appEnv: AppEnv;
@@ -137,6 +180,8 @@ export function createChannelRoutes(deps: {
   const session = requireSession(runtime, appEnv);
   const admin = requireCapability('settings.channels_team');
   routes.use('/api/channel/*', session);
+  routes.use('/api/channel/unassigned-mail', requireCapability('ticket.assign_store'));
+  routes.use('/api/channel/unassigned-mail/*', requireCapability('ticket.assign_store'));
   for (const path of [
     '/api/channel/settings',
     '/api/channel/stores',
@@ -186,6 +231,39 @@ export function createChannelRoutes(deps: {
   routes.openapi(storeOptionsRoute, async (c) =>
     c.json({ stores: await listStoreOptions(runtime.db, c.get('access').stores) }, 200),
   );
+
+  routes.openapi(unassignedListRoute, async (c) =>
+    c.json(
+      {
+        mails: await listUnassignedMail(runtime.db),
+        now: runtime.clock.now().toISOString(),
+      },
+      200,
+    ),
+  );
+
+  routes.openapi(assignStoreRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { storeId } = c.req.valid('json');
+    const access = c.get('access');
+    // 下拉只列授权店铺；越过界面指定范围外的店铺：记「越权访问被拒」并 403（E-24）
+    await access.requireStores({ storeIds: [storeId], objectType: 'message', objectId: id });
+    const outcome = await assignStore(
+      runtime,
+      { actor: access.actor, messageId: id, storeId },
+      logger,
+    );
+    if (outcome.kind === 'unknown_store') {
+      return c.json({ error: 'invalid_request', message: assignStoreMessages.unknownStore }, 400);
+    }
+    if (outcome.kind === 'not_in_queue') {
+      const message = outcome.storeName
+        ? assignStoreMessages.placedIn(outcome.storeName)
+        : assignStoreMessages.notInQueue;
+      return c.json({ error: 'not_in_queue', message }, 409);
+    }
+    return c.json({ id, store: { id: outcome.store.id, name: outcome.store.name } }, 200);
+  });
 
   routes.openapi(alertsRoute, async (c) => {
     // 横幅是系统状态（哪个渠道断了），对所有登录成员一样，不按成员的店铺范围过滤（ADR 0010 修订登记的例外）

@@ -6,8 +6,17 @@
 
 /** 放进 Fake Gmail 的一封信 */
 export interface FakeMailInput {
-  /** 收件的店铺邮箱；发给几个邮箱时每个邮箱各收到一份（同一个 Message-ID） */
+  /** 收件地址（To 头）：通常是店铺邮箱，发给几个店铺邮箱时每个邮箱各收到一份（同一个 Message-ID） */
   readonly to: string | readonly string[];
+  /**
+   * 信落在哪个同步的邮箱（只有一份）：寄到别名、群组或转发地址的信落在它所属的店铺邮箱，To 写的是那个地址（未归属店铺，待办 15）。
+   * 不给时落在 to 里的每个地址
+   */
+  readonly mailbox?: string;
+  /**
+   * Delivered-To 头（Gmail 在最上面写实际投递到的地址）：不给时为信落到的邮箱；null 为不写这个头（例如转进来的信只有 To）
+   */
+  readonly deliveredTo?: string | null;
   readonly from: { readonly name?: string; readonly address: string };
   readonly subject: string;
   readonly text: string;
@@ -52,12 +61,18 @@ export interface BuiltFakeMail {
   readonly raw: Uint8Array;
 }
 
-export function buildFakeMail(mail: FakeMailInput, defaultMessageId: string): BuiltFakeMail {
+/** 拼出一封信的原文；deliveredTo 为这一份的 Delivered-To 头（null 不写，「已发送」里我方发出的信没有它） */
+export function buildFakeMail(
+  mail: FakeMailInput,
+  defaultMessageId: string,
+  deliveredTo: string | null = null,
+): BuiltFakeMail {
   const internalDate = new Date(mail.at);
   if (Number.isNaN(internalDate.getTime()))
     throw new RangeError(`到达时间无效：${String(mail.at)}`);
   const to: readonly string[] = typeof mail.to === 'string' ? [mail.to] : mail.to;
   const lines = [
+    ...(deliveredTo ? [`Delivered-To: ${deliveredTo}`] : []),
     ...(mail.messageId === null ? [] : [`Message-ID: ${mail.messageId ?? defaultMessageId}`]),
     `Date: ${internalDate.toUTCString()}`,
     `From: ${mailbox(mail.from)}`,

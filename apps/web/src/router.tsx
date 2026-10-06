@@ -34,7 +34,7 @@ import { LoginCallbackPage } from '@/pages/login/login-callback';
 import { LoginPage, loginSearchSchema } from '@/pages/login/login-page';
 import { ChannelsPage, channelsSearchSchema } from '@/pages/settings/channels-page';
 import { TeamPage, teamSearchSchema } from '@/pages/settings/team-page';
-import { TicketsPage } from '@/pages/tickets/tickets-page';
+import { TicketsPage, ticketsSearchSchema } from '@/pages/tickets/tickets-page';
 
 /*
  * 路由（ADR 0007：TanStack Router，代码定义）。登录后的页面都挂在 app 布局下：
@@ -174,6 +174,18 @@ function pageRoute<TPath extends string>(
   });
 }
 
+/** P04 工单列表：地址栏可带 view=unassigned 打开未归属店铺队列（I17，待办 15；筛选条件随 18） */
+const ticketsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: pages.tickets.path,
+  validateSearch: ticketsSearchSchema,
+  component: () => (
+    <PageGate page={pages.tickets}>
+      <TicketsPage />
+    </PageGate>
+  ),
+});
+
 /** P13 登记台账：筛选条件在地址栏（点完整率筛出缺字段的已完成单，待办 21） */
 const ledgerRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -245,7 +257,7 @@ const routeTree = rootRoute.addChildren([
   logoutRoute,
   appRoute.addChildren([
     homeRoute,
-    pageRoute(pages.tickets, TicketsPage),
+    ticketsRoute,
     aftersalesRoute,
     ledgerRoute,
     pageRoute(pages.reports),

@@ -16,6 +16,7 @@ export {
   type FixtureAmazonOrder,
   type FixtureStore,
   type FixtureTicket,
+  type FixtureUnassignedMail,
 } from './schema';
 
 let parsed: DemoFixture | undefined;

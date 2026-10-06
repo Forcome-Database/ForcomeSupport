@@ -639,13 +639,17 @@ MATEO = {'email': 'mateo.r.8k3p@marketplace.amazon.com.mx',
          'summary_basis': '09-10 11:16 生成 · 依据 1 笔订单与 2 封来信'}
 
 # ---------------------------------------------------------------- 未归属店铺队列（StatesInbox I14）：收件地址或卖家 ID 未登记的来信与 AI 推荐店铺
+# mailbox：信实际落在哪个同步的店铺邮箱（未登记的地址是它的别名或转发；第一期实现的 Fake Gmail 回放用，待办 15）；
+# to_hdr 为识别依据取自的头字段：Delivered-To 是 Gmail 写的实际投递地址，写 To 的那封没有 Delivered-To 头
 UNASSIGNED_MAIL = [
     {'customer': 'Tom Harris', 'subject': 'Where is my order? Tracking says delivered.', 'source': '买家消息 · amz-ca2@forcome.com 未登记',
      'store': 'Forcome Direct CA', 'basis': '收件地址前缀 amz-、买家历史订单', 'at': '10:02', 'sla': '23h 42m',
-     'to': 'amz-ca2@forcome.com', 'to_hdr': 'Delivered-To', 'from_domain': 'marketplace.amazon.ca', 'sla_kind': '亚马逊 24 小时'},
+     'to': 'amz-ca2@forcome.com', 'to_hdr': 'Delivered-To', 'from_domain': 'marketplace.amazon.ca', 'sla_kind': '亚马逊 24 小时',
+     'mailbox': 'amz-direct@forcome.com'},
     {'customer': 'Lucía Herrera', 'subject': 'El filtro no encaja en mi aspiradora.', 'source': '邮件 · info@forcome.mx 未登记',
      'store': 'forcome.mx', 'basis': '收件地址域名、买家历史订单', 'at': '09:47', 'sla': '23h 27m · 内部',
-     'to': 'info@forcome.mx', 'to_hdr': 'To', 'from_domain': 'gmail.com', 'sla_kind': '内部目标 24 小时'},
+     'to': 'info@forcome.mx', 'to_hdr': 'To', 'from_domain': 'gmail.com', 'sla_kind': '内部目标 24 小时',
+     'mailbox': 'support@forcome.mx'},
 ]
 
 # ---------------------------------------------------------------- 知识库示例
@@ -1052,6 +1056,13 @@ NOTIFICATIONS = [
 DINGTALK_NOTIFICATIONS = [
     ('09:00', 'danger', 'alert', '钉钉同步失败', '通讯录同步失败，成员与部门保持上次结果，登录与权限不受影响', 'P18 · 钉钉', False),
     ('09-08 13:00', 'danger', 'alert', '钉钉连接异常', '通讯录连续 3 次同步失败，成员与部门保持上次结果，登录与权限不受影响', 'P18 · 钉钉', True),
+]
+
+# G10 补充小样⑤（第一期实现，待办 15，协调者 2026-10-07 决定）：管理员登记新店铺（或给店铺加进线邮箱）后，队列里收件地址匹配的来信
+# 自动归位成工单，店铺范围包含该店铺的客服主管收到站内通知（只发站内，不发钉钉工作通知，11.4）；对象为归并成的工单号，点进 P04（P05 随待办 17）。
+# 本例：刘洋登记 Forcome Direct CA（进线邮箱 amz-ca2@forcome.com），Tom Harris 的来信归位成新工单。
+PLACED_NOTIFICATIONS = [
+    ('10:16', 'success', 'store', '未归属店铺来信已自动归位', 'Tom Harris · amz-ca2@forcome.com 已归入 Forcome Direct CA', 'T-20260911-0041', False),
 ]
 
 # ---------------------------------------------------------------- P25 模型（技术方案 9.1）：用途, 名称, 阶段, 主模型, 备用模型, 推理强度, 时限, 提示词版本, 状态, 近 24h 调用, 失败率, 成本

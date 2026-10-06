@@ -32,3 +32,39 @@ export const EMPTY_VALUE = '—';
 
 /** 只给读屏器的说明（原型不画、不核对） */
 export const A11Y = { table: '工单列表' } as const;
+
+/**
+ * 未归属店铺来信队列（I17 与补充小样③–⑥，第一期参照页 P04_Tickets_unassigned、P04_Tickets_unassigned_empty；
+ * 待办 15，协调者 2026-10-07 决定）。识别依据的头字段写法、SLA 目标的写法在 contracts 的 unassigned-mail.ts
+ */
+export const UNASSIGNED = {
+  /** 筛选行右侧的入口：说明与按钮（按钮后是计数） */
+  entryHint: '仅客服主管可见',
+  entry: '未归属店铺',
+  title: '未归属店铺',
+  scope: '仅客服主管可见 · 不受店铺数据范围限制',
+  noteTitle: (n: number) => `${n} 封来信识别不出店铺`,
+  noteDescription: 'SLA 按原到达时间照常计时 · 管理员登记新店铺后，收件地址匹配的来信会自动归位',
+  columns: {
+    mail: '来信',
+    basis: '识别依据',
+    arrivedAt: '到达',
+    sla: 'SLA',
+    store: '指定店铺（只列你的授权店铺）',
+  },
+  unregistered: '未登记',
+  fromDomain: (domain: string) => `发件域 ${domain}`,
+  storePlaceholder: '选择店铺',
+  assign: '指定',
+  /** 「指定」在还没选店铺时置灰，悬停写原因（Q7） */
+  assignDisabled: '先选择店铺',
+  /** 队列为空（④） */
+  empty: '没有识别不出店铺的来信',
+  /** 点「指定」后的撤销浮层（②） */
+  undoTitle: (store: string) => `已归入 ${store}`,
+  undoDescription: '5 秒后归并成工单',
+  /** 窗口结束提交失败（⑤⑥，Q8）：标题「指定店铺失败：原因」 */
+  failedAction: '指定店铺',
+  stillQueued: '来信仍在未归属店铺队列里',
+  taken: '这封来信已被指定或已自动归位',
+} as const;

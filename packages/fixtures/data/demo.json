@@ -2037,6 +2037,26 @@
       }
     }
   ],
+  "unassignedMail": [
+    {
+      "customer": "Tom Harris",
+      "subject": "Where is my order? Tracking says delivered.",
+      "mailbox": "amz-direct@forcome.com",
+      "to": "amz-ca2@forcome.com",
+      "toHeader": "Delivered-To",
+      "fromDomain": "marketplace.amazon.ca",
+      "at": "2026-09-11T10:02:00+08:00"
+    },
+    {
+      "customer": "Lucía Herrera",
+      "subject": "El filtro no encaja en mi aspiradora.",
+      "mailbox": "support@forcome.mx",
+      "to": "info@forcome.mx",
+      "toHeader": "To",
+      "fromDomain": "gmail.com",
+      "at": "2026-09-11T09:47:00+08:00"
+    }
+  ],
   "notifications": [
     {
       "id": "80aac85d-6783-5994-8248-50ed9300ea36",
@@ -2065,34 +2085,6 @@
       },
       "at": "2026-09-11T10:05:00+08:00",
       "read": false
-    },
-    {
-      "id": "ec9f5802-90bb-57c9-80ac-bcc53dcdbeb1",
-      "recipientKey": "zhoumin",
-      "type": "unassigned_mail",
-      "title": "未归属店铺来信",
-      "body": "Tom Harris · amz-ca2@forcome.com 未登记",
-      "object": {
-        "type": "message",
-        "id": "dbce5184-e52f-5999-9bc2-84fd423193d1",
-        "label": "P04 · 未归属店铺"
-      },
-      "at": "2026-09-11T10:02:00+08:00",
-      "read": false
-    },
-    {
-      "id": "84560df6-9d37-5044-8182-cf93fa0f29f3",
-      "recipientKey": "zhoumin",
-      "type": "unassigned_mail",
-      "title": "未归属店铺来信",
-      "body": "Lucía Herrera · info@forcome.mx 未登记",
-      "object": {
-        "type": "message",
-        "id": "c9d3c77b-219a-57b7-9ebb-69d9fe30ce82",
-        "label": "P04 · 未归属店铺"
-      },
-      "at": "2026-09-11T09:47:00+08:00",
-      "read": true
     }
   ]
 }

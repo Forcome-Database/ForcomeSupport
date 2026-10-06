@@ -13,6 +13,8 @@ import type { FakeMailInput } from './gmail-mime';
  *   P04 显示「已回复」，客户未回复的那张 7 天后按时关闭）；
  * - 那张生产厂工单的来信 1 分钟后有一封自动回复（I18 的 P1_AUTO_REPLY，带 Auto-Submitted，不算回复）。
  * 标记无需回复（已解决的两张）随 17 补上。
+ * 未归属店铺来信（I17，待办 15）：data.py 的 UNASSIGNED_MAIL 两封，落在同步的店铺邮箱里，收件地址是没登记的别名或转发地址
+ * （Tom Harris 的 Delivered-To 与 To 都是 amz-ca2@forcome.com；Lucía Herrera 只有 To: info@forcome.mx），进未归属店铺队列。
  * 夹具里没有客户邮箱：亚马逊来信用按站点的买家消息中转域名、其余用 example.com，地址由客户名推出（fixture-customers.ts，
  * 与 Fake Shopify 订单上的邮箱一致）；夹具写明发件地址的（如生产厂来信）照用。渠道为 Shopify 的来信做成 Shopify 联系表单通知的
  * 样子（R-TK-08，待办 10）：mailer@shopify.com 代发、Reply-To 是客户邮箱、正文是表单各栏；主题沿用原型的主题。
@@ -50,7 +52,30 @@ function repliedOf(ticket: FixtureTicket): boolean {
   return ticket.status === '等客户' || ticket.closeReason === '客户未回复';
 }
 
+/** 未归属店铺来信：落在 mailbox 里，收件地址 to 没登记；识别依据是 Delivered-To 时这个头写 to，是 To 时信里没有 Delivered-To */
+function unassignedMails(fixture: DemoFixture): ReplayMail[] {
+  return fixture.unassignedMail.map((m, index) => ({
+    mailbox: m.mailbox,
+    sent: false,
+    mail: {
+      to: m.to,
+      mailbox: m.mailbox,
+      deliveredTo: m.toHeader === 'Delivered-To' ? m.to : null,
+      from: { name: m.customer, address: fixtureCustomerAddress(m.customer, m.fromDomain) },
+      subject: m.subject,
+      text: m.subject,
+      at: m.at,
+      messageId: `<unassigned-${index + 1}@demo.forcome.invalid>`,
+      gmailId: `demo-unassigned-${index + 1}`,
+    },
+  }));
+}
+
 export function fixtureMails(fixture: DemoFixture): ReplayMail[] {
+  return [...ticketMails(fixture), ...unassignedMails(fixture)];
+}
+
+function ticketMails(fixture: DemoFixture): ReplayMail[] {
   const storeOf = new Map(fixture.stores.map((s) => [s.key, s]));
   const timeline = fixture.ticketTimeline;
   return fixture.tickets.flatMap((ticket) => {

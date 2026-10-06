@@ -43,6 +43,8 @@ import { adapterModeLabels } from './integration';
 import { formatMoney } from './money';
 import { roleLabels, roles } from './roles';
 import { storeScopeWords } from './team';
+import { ticketChannelLabels } from './ticket';
+import { recipientHeaderLabels } from './unassigned-mail';
 
 /*
  * 一条审计记录怎么写成 P27 的一行（PRD P27「第一阶段」v2.20、10.2、K18 与补充小样）：操作人、对象、动作、变更摘要与
@@ -186,6 +188,15 @@ const snapshotFields: Record<AuditSnapshotKind, readonly FieldDefinition[]> = {
     field('lastSuccessAt', '最近同步成功', 'sameDayTime'),
     field('backfilled', '补拉', 'backfill'),
     field('trigger', '触发', 'trigger'),
+  ],
+  // 来信的店铺（待办 15，协调者 2026-10-07 决定）：店铺在前（摘要「店铺：— → forcome.mx」），其后是按所归店铺重新识别的结果与识别依据
+  messageStore: [
+    field('storeId', '店铺', 'store'),
+    field('site', '站点'),
+    field('channel', '渠道', 'text', ticketChannelLabels),
+    field('recipient', '收件地址'),
+    field('recipientHeader', '识别依据', 'text', recipientHeaderLabels),
+    field('subject', '主题'),
   ],
   accessDenied: [
     field('reason', '原因', 'text', { store_scope: '店铺不在授权范围内' }),

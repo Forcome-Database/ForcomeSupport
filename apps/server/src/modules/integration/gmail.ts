@@ -196,12 +196,18 @@ export class FakeGmail implements FakeClient<GmailClient> {
 
   /**
    * 一封邮件到达：发给几个店铺邮箱，每个邮箱各收到一份（Gmail 消息 ID 各不相同，Message-ID 相同），
-   * 返回各邮箱里的 Gmail 消息 ID（与 to 同序）
+   * 返回各邮箱里的 Gmail 消息 ID（与 to 同序）。给了 mailbox 时只落在那一个邮箱（寄到它的别名或转发地址）。
+   * 每一份像真实 Gmail 一样在最上面写 Delivered-To（实际投递到的地址，见 FakeMailInput.deliveredTo）
    */
   deliver(mail: FakeMailInput): string[] {
-    const recipients = recipientsOf(mail);
-    const built = buildFakeMail(mail, `<fake-${this.#nextId}@mail.example.com>`);
+    const recipients = mail.mailbox ? [mail.mailbox] : recipientsOf(mail);
+    const messageId = `<fake-${this.#nextId}@mail.example.com>`;
     return recipients.map((address) => {
+      const built = buildFakeMail(
+        mail,
+        messageId,
+        mail.deliveredTo === undefined ? address : mail.deliveredTo,
+      );
       const id = mail.gmailId && recipients.length === 1 ? mail.gmailId : this.#newId();
       this.#append(address, {
         id,
@@ -309,12 +315,12 @@ export class FakeGmail implements FakeClient<GmailClient> {
     this.faults.reset();
   }
 
-  /** 回放的一封：来信送到店铺邮箱，我方邮件放进发件邮箱的「已发送」 */
+  /** 回放的一封：来信送到店铺邮箱（寄到别名的落在它所属的邮箱，mail.mailbox），我方邮件放进发件邮箱的「已发送」 */
   #replayOne({ mailbox, sent, mail }: ReplayMail): void {
     if (sent) {
       this.send({ ...mail, from: mailbox, to: recipientsOf(mail)[0]! });
     } else {
-      this.deliver({ ...mail, to: mailbox });
+      this.deliver(mail.mailbox ? mail : { ...mail, to: mailbox });
     }
   }
 
