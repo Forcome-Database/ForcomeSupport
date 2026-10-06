@@ -129,6 +129,8 @@ describe('亚马逊订单镜像', () => {
       lastSyncAt: null,
       issues: [],
       queue: { status: 'not_connected', backlog: null },
+      // 没有连接上的店铺：没有订单回补行（待办 13）
+      backfill: null,
     });
     expect(await storeOrdersStatus(DIRECT.name)).toBe('not_connected');
 
@@ -667,6 +669,7 @@ describe('生产环境没有配置 SP-API 与 SQS（用户 2026-10-04 口径：�
       lastSyncAt: null,
       issues: [],
       queue: { status: 'not_connected', backlog: null },
+      backfill: null,
     });
     expect(data.stores[0]?.connections.find((c) => c.kind === 'orders')?.status).toBe(
       'not_connected',

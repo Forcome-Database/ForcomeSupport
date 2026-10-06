@@ -10,6 +10,7 @@ import {
 } from '@forcome/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  Check,
   Link2,
   MessageSquare,
   Package,
@@ -29,7 +30,12 @@ import { api, ApiRequestError } from '@/lib/api';
 import { CHANNEL_QUERY_KEY, formatClock } from '@/lib/channel';
 import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { cn } from '@/lib/utils';
-import { channelCardLines, needsRecheck } from './channel-card-lines';
+import {
+  channelCardLines,
+  needsRecheck,
+  orderBackfillLine,
+  type OrderBackfillLine,
+} from './channel-card-lines';
 import {
   A11Y,
   CHANNEL_CARDS,
@@ -50,7 +56,7 @@ import {
  * 有同步记录时副标题写「最近同步 hh:mm」，未连接写「尚未授权」；说明行按连接状态写（channel-card-lines.ts）；亚马逊卡另有
  * 「订单通知队列（SQS）」一行带状态标签（原型 sqs_line()，待办 12 Q7，各状态下都照写）；四张卡头都有「测试连接」，Gmail、Shopify、
  * 亚马逊卡有连接异常的邮箱或店铺时卡底另有「重新检测」（同一个测试，K7，待办 09、11、12）；积加、易仓为灰色虚线卡「第二阶段接入」，
- * 没有同步时间与测试连接。订单回补行与 Shopify 的回补窗口行随 13。
+ * 没有同步时间与测试连接。亚马逊卡（SQS 行之后）与 Shopify 卡（店铺行之后）另有订单回补行（原型 backfill_line()，待办 13 Q2）。
  */
 
 /** 连接状态 → 徽标色调（原型 STATE_TONE 的渠道连接一组） */
@@ -234,6 +240,7 @@ function ConnectedCard({
           </div>
         ))}
         {card.queue && <OrderQueueLine queue={card.queue} />}
+        <OrderBackfillRow line={orderBackfillLine(card)} />
       </div>
       {needsRecheck(card) && (
         <div className="mt-auto flex items-center gap-1.5">
@@ -274,6 +281,20 @@ function OrderQueueLine({ queue }: { queue: OrderQueue }) {
       </span>
       <Badge tone={badge.tone} dot>
         {badge.text}
+      </Badge>
+    </div>
+  );
+}
+
+/** 亚马逊、Shopify 卡的订单回补行（K20 补充小样，待办 13 Q2；原型 backfill_line()：已完成带勾，其余不带圆点） */
+function OrderBackfillRow({ line }: { line: OrderBackfillLine | null }) {
+  if (!line) return null;
+  return (
+    <div data-testid="order-backfill-line" className="flex items-center gap-1.5">
+      <span className="text-12 whitespace-nowrap text-muted-foreground">{line.label}</span>
+      <Badge tone={line.badge.tone}>
+        {line.badge.check && <Check aria-hidden className="size-3" strokeWidth={2} />}
+        {line.badge.text}
       </Badge>
     </div>
   );

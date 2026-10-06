@@ -2,8 +2,9 @@ import type { Currency } from '@forcome/contracts';
 import type { DemoFixture } from '@forcome/fixtures';
 import { createRealAmazonOrders } from './amazon-orders-real';
 import { defineClient, type FakeClient } from './definition';
+import { FakeQuota } from './fake-quota';
 import { FaultInjector } from './faults';
-import type { SpApiPriority } from './sp-api-quota';
+import type { CallPriority } from './call-priority';
 
 /*
  * 亚马逊订单（店铺级，规格 order「亚马逊：SP-API Orders v2026-01-01，只用非受限角色」、ADR 0011，待办 12）：只读——
@@ -72,20 +73,29 @@ export interface AmazonOrderPage {
   readonly nextToken: string | null;
 }
 
+/**
+ * 按什么时间搜订单：平台更新时间不早于 lastUpdatedAfter（增量与夜间对账）或下单时间不早于 createdAfter（回补，待办 13）；
+ * v2026-01-01 的 searchOrders 两者只能给一个
+ */
+export type AmazonOrderWindow =
+  | { readonly lastUpdatedAfter: Date; readonly createdAfter?: never }
+  | { readonly createdAfter: Date; readonly lastUpdatedAfter?: never };
+
 export interface AmazonOrdersClient {
   /**
-   * 平台更新时间不早于 lastUpdatedAfter 的订单（searchOrders），分页；paginationToken 为上一页的 nextToken。
-   * priority 决定配额排队的先后（默认 high）
+   * 按平台更新时间或下单时间搜订单（searchOrders），分页；paginationToken 为上一页的 nextToken（亚马逊的分页令牌 24 小时内有效）。
+   * priority 决定配额排队的先后（默认 high；回补与对账传 low）
    */
-  searchOrders(options: {
-    readonly lastUpdatedAfter: Date;
-    readonly paginationToken?: string | null;
-    readonly priority?: SpApiPriority;
-  }): Promise<AmazonOrderPage>;
+  searchOrders(
+    options: AmazonOrderWindow & {
+      readonly paginationToken?: string | null;
+      readonly priority?: CallPriority;
+    },
+  ): Promise<AmazonOrderPage>;
   /** 按订单号取一笔（getOrder）；没有为 null */
   getOrder(
     orderId: string,
-    options?: { readonly priority?: SpApiPriority },
+    options?: { readonly priority?: CallPriority },
   ): Promise<AmazonOrder | null>;
   /** 卖家参与的站点（Sellers API getMarketplaceParticipations）：「测试连接」用，不占订单接口的配额 */
   marketplaceParticipations(): Promise<{ readonly marketplaceIds: readonly string[] }>;
@@ -130,13 +140,20 @@ function byUpdatedAt(a: AmazonOrder, b: AmazonOrder): number {
   return a.updatedAt.getTime() - b.updatedAt.getTime() || a.orderId.localeCompare(b.orderId);
 }
 
+/** 按下单时间、再按订单号排序（回补按下单时间分页：订单之后再变也不挪位置） */
+function byCreatedAt(a: AmazonOrder, b: AmazonOrder): number {
+  return a.createdAt.getTime() - b.createdAt.getTime() || a.orderId.localeCompare(b.orderId);
+}
+
 /**
  * Fake SP-API 订单：按店铺存订单（键为订单号），put 放入或改写一笔（改写时更新时间由测试给出）。
- * 分页令牌是「已取过几笔」，与真实的不透明令牌同样只在同一次遍历里有效
+ * 分页令牌是「已取过几笔」，与真实的不透明令牌同样只在同一次遍历里有效。
+ * 订单接口（searchOrders、getOrder）先过配额（quota，所有店铺共用一个；默认不限，测试用它模拟配额用完时按优先级排队，待办 13）
  */
 export class FakeAmazonOrders implements FakeClient<AmazonOrdersClient> {
   /** 对全部店铺生效的故障 */
   readonly faults = new FaultInjector('sp_api');
+  readonly quota = new FakeQuota();
   readonly #storeFaults = new Map<string, FaultInjector>();
   readonly #stores = new Map<string, Map<string, AmazonOrder>>();
 
@@ -179,9 +196,16 @@ export class FakeAmazonOrders implements FakeClient<AmazonOrdersClient> {
   client(storeId?: string): AmazonOrdersClient {
     if (!storeId) throw new Error('SP-API 订单是店铺级客户端，要给出店铺');
     return {
-      searchOrders: async ({ lastUpdatedAfter, paginationToken }) => {
+      searchOrders: async (options) => {
+        await this.quota.acquire(options.priority ?? 'high');
         await this.#check(storeId, 'searchOrders');
-        const all = this.orders(storeId).filter((o) => o.updatedAt >= lastUpdatedAfter);
+        const all =
+          options.createdAfter !== undefined
+            ? [...this.#orders(storeId).values()]
+                .filter((o) => o.createdAt >= options.createdAfter)
+                .sort(byCreatedAt)
+            : this.orders(storeId).filter((o) => o.updatedAt >= options.lastUpdatedAfter);
+        const paginationToken = options.paginationToken;
         const start = paginationToken ? Number(paginationToken) : 0;
         const end = start + FAKE_PAGE_SIZE;
         return {
@@ -189,7 +213,8 @@ export class FakeAmazonOrders implements FakeClient<AmazonOrdersClient> {
           nextToken: end < all.length ? String(end) : null,
         };
       },
-      getOrder: async (orderId) => {
+      getOrder: async (orderId, options) => {
+        await this.quota.acquire(options?.priority ?? 'high');
         await this.#check(storeId, 'getOrder');
         return this.#orders(storeId).get(orderId) ?? null;
       },
@@ -228,6 +253,7 @@ export class FakeAmazonOrders implements FakeClient<AmazonOrdersClient> {
 
   reset(): void {
     this.#stores.clear();
+    this.quota.reset();
     this.faults.reset();
     this.#storeFaults.clear();
   }

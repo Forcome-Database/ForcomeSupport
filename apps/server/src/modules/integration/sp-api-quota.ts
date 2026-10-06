@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { Clock } from '../core';
+import type { CallPriority } from './call-priority';
 
 /*
  * SP-API 的配额（规格 order「每个『卖家 × 接口』共享令牌桶，增量优先、回补与对账让路，配额以响应头为准」、ADR 0008 修订，待办 12）：
@@ -12,9 +13,6 @@ import type { Clock } from '../core';
  * - 只在本进程内共享：订单同步的调用都在 worker 里（一个 worker 进程），api 进程只有「测试连接」偶尔用一次。
  * 等待用注入的 wait（测试里推进手动时钟），时间按注入的时钟算。
  */
-
-/** 排队取令牌的优先级：high 为增量同步、通知触发的拉取与按订单号补拉，low 为回补与夜间对账（13） */
-export type SpApiPriority = 'high' | 'low';
 
 /** 一个接口的用量计划：每秒恢复几个令牌、桶里最多几个（突发） */
 export interface UsagePlan {
@@ -31,7 +29,7 @@ export const SP_API_USAGE_PLANS = {
 export type SpApiOperation = keyof typeof SP_API_USAGE_PLANS;
 
 interface Waiter {
-  readonly priority: SpApiPriority;
+  readonly priority: CallPriority;
   readonly resolve: () => void;
 }
 
@@ -105,7 +103,7 @@ export class SpApiQuota {
   }
 
   /** 取一个令牌：有就立即返回，没有就排队等（不报错） */
-  acquire(sellerId: string, operation: SpApiOperation, priority: SpApiPriority): Promise<void> {
+  acquire(sellerId: string, operation: SpApiOperation, priority: CallPriority): Promise<void> {
     const bucket = this.#bucket(sellerId, operation);
     return new Promise((resolve) => {
       bucket.queue.push({ priority, resolve });

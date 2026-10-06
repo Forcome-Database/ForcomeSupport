@@ -17,6 +17,9 @@
 //   node deploy/deploy.mjs staging sp-api-token --seller <卖家 ID> < <放刷新令牌的文件>
 //                                               用当前部署的版本录入某卖家的 SP-API 授权（待办 12；令牌从标准输入读、
 //                                               加密存库，docs/部署说明.md 第 14 节）
+//   node deploy/deploy.mjs staging order-backfill [--store <店铺名>]… [--again]
+//                                               用当前部署的版本开始订单回补（待办 13；近 90 天，worker 在后台逐页做，
+//                                               上线前、选定 T0 之前执行，docs/部署说明.md 第 15 节）
 //
 // 只依赖 Node（≥ 22）、git 与 Docker（含 compose），不需要 pnpm install；Linux 服务器与 Windows 本机通用。
 // 环境文件默认 deploy/.env.<环境>，可用 FORCOME_ENV_FILE 指到别处；部署产物（根证书、报告）在 deploy/.state/<环境>/。
@@ -36,13 +39,14 @@ import { createEnvFile, readDeployEnv } from './lib/env-file.mjs';
 import { ENVIRONMENTS } from './lib/environments.mjs';
 import { httpsGet, verifyCertificate } from './lib/https-check.mjs';
 import { IMPORT_AFTERSALES_SYNOPSIS, importAftersalesRun } from './lib/import-aftersales.mjs';
+import { ORDER_BACKFILL_SYNOPSIS, orderBackfillRun } from './lib/order-backfill.mjs';
 import { capture, mustRun, run } from './lib/process.mjs';
 import { SP_API_TOKEN_SYNOPSIS, spApiTokenRun } from './lib/sp-api-token.mjs';
 import { formatReport, summarizePlaywright } from './lib/report.mjs';
 
 const ROOT_CERT_IN_CADDY = '/data/caddy/pki/authorities/local/root.crt';
 const USAGE = `用法：node deploy/deploy.mjs <环境> [deploy [--reset-inbound] | smoke | cert | compose <参数…> | down | reset-inbound
-  | ${IMPORT_AFTERSALES_SYNOPSIS} | ${SP_API_TOKEN_SYNOPSIS}]
+  | ${IMPORT_AFTERSALES_SYNOPSIS} | ${SP_API_TOKEN_SYNOPSIS} | ${ORDER_BACKFILL_SYNOPSIS}]
 环境：${Object.keys(ENVIRONMENTS).join('、')}`;
 
 // 命令行里给的文件（售后登记表导入）按调用者所在的目录解析：pnpm 运行脚本时把它放在 INIT_CWD
@@ -376,6 +380,16 @@ async function main() {
       }
       const compose = composeFor(loadDeployEnv(), deployedRelease());
       return compose.status('run', '--rm', '--no-deps', '-T', 'migrate', ...planned.command) === 0;
+    }
+    case 'order-backfill': {
+      // 开始订单回补（待办 13）：一次性容器只登记并排上第一页，worker 在后台逐页做
+      const planned = orderBackfillRun(commandArgs);
+      if ('error' in planned) {
+        console.error(planned.error);
+        return false;
+      }
+      const compose = composeFor(loadDeployEnv(), deployedRelease());
+      return compose.status('run', '--rm', '--no-deps', 'migrate', ...planned.command) === 0;
     }
     default:
       console.error(USAGE);

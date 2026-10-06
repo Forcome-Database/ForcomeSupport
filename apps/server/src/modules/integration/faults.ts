@@ -88,6 +88,21 @@ export class ClientNotConfiguredError extends ExternalServiceError {
   }
 }
 
+/**
+ * 平台只让读近一段时间的订单（待办 13）：Shopify 没有 read_all_orders 时只能读近 60 天的订单。不是连接故障，
+ * 调用方（订单回补）把回补窗口缩短到 days 天后重来；原样重试没用
+ */
+export class HistoryLimitedError extends ExternalServiceError {
+  override name = 'HistoryLimitedError';
+  /** 平台允许读的天数 */
+  readonly days: number;
+
+  constructor(system: string, operation: string, days: number, message: string) {
+    super(system, operation, message, false);
+    this.days = days;
+  }
+}
+
 /** 连接断开（长连接掉线、网络不通），恢复后再继续 */
 export class ConnectionLostError extends ExternalServiceError {
   override name = 'ConnectionLostError';

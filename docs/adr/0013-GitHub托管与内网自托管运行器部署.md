@@ -86,3 +86,8 @@ status: accepted
 
 - **SP-API 刷新令牌是第二个动态凭据**：按店铺加密存 `integration.credential`（系统名 `sp_api`，附加数据「sp_api:店铺」）；平台不给过期时间，库里的过期时间按录入后一年记，只作提醒、不据此拒用（被撤销时换访问令牌失败，记连接失败）。主密钥换了时刷新令牌解不开、该店铺为「未连接」，要用子命令重新录入（Shopify 的访问令牌则会自动重新换）。
 - **部署子命令 `sp-api-token`**：`node deploy/deploy.mjs <环境> sp-api-token --seller <卖家 ID> < <放刷新令牌的文件>`（不用 echo：echo 的参数会进 shell 历史），用当前部署的镜像起一次性容器（`docker compose run --rm --no-deps -T migrate node dist/sp-api-token.mjs --seller …`），令牌经标准输入传入，不出现在参数、shell 历史与输出里；卖家 ID 对不上亚马逊店铺时退出码为 1。环境变量 `SP_API_CLIENT_ID` / `_SECRET`、`AMAZON_SQS_QUEUE_URL` / `_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY`、`CLIENT_MODE_AMAZON_SQS` 进 `deploy/compose.yml` 与 `.env.example`（`docs/部署说明.md` 第 14 节）；填了 SP-API 凭据就要有主密钥。
+
+## 修订（2026-10-07，待办 13 落地）
+
+- **部署子命令 `order-backfill`**：`node deploy/deploy.mjs <环境> order-backfill [--store <店铺名>]… [--again]`，用当前部署的镜像起一次性容器执行 `dist/order-backfill.mjs`：给选中的店铺（不给为全部订单店铺）开始近 90 天的订单回补，只登记并排上第一页，worker 在后台逐页做，进度见 P18；已完成的跳过（`--again` 从头重来），没做完的接着做。上线前、选定 T0 与回放邮件之前执行（待办 26 的顺序），上线后新加的店铺再执行一次（`docs/部署说明.md` 第 15 节）。没配置平台凭据的店铺照常登记、先不取，配好后由每 10 分钟的续跑接着做。
+- **示例环境模拟「上线前已回补」**：`seedDemoData`（`pnpm db:seed`、开发测试环境的 seed 步骤、Playwright 的 e2e api）灌完示例数据后调同一个函数开始回补，P18 两张卡的回补行与原型一致（亚马逊 90 天已完成、Shopify 没开通 read_all_orders 只回补 60 天）。不放进示例数据的加载步骤：集成测试灌示例数据后自己决定回补与否。

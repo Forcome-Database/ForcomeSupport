@@ -190,7 +190,7 @@ export class IntegrationClients {
     const key = definition as unknown as AnyClientDefinition;
     let fake = this.#fakes.get(key);
     if (!fake) {
-      fake = definition.createFake({ fake: (other) => this.fake(other) });
+      fake = definition.createFake({ fake: (other) => this.fake(other), clock: this.#clock });
       this.#fakes.set(key, fake);
     }
     return fake as F;

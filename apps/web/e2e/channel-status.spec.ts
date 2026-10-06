@@ -14,6 +14,8 @@ import { expect, test, type Page } from '@playwright/test';
  *   Shopify 同步延迟、连接异常（按店铺，卡底「重新检测」与失败浮层，店铺表「Admin API 连接异常」）（待办 11）；
  *   亚马逊同步延迟、连接异常（按店铺，同 Shopify）与「订单通知队列（SQS）」一行的四种写法（只影响这一行），测试连接失败按访问不了的
  *   第一个写怎么查（待办 12）；
+ *   订单回补行（待办 13 Q2）：示例环境灌完数据即开始回补（同部署子命令 order-backfill），真实接口上亚马逊「90 天 · 已完成」、
+ *   Shopify「60 天 · 未开通 read_all_orders」；未开始、进行中用接口桩；同步延迟照写、连接异常与未连接不显示；
  *   横幅对所有角色显示、「查看渠道状态」只对管理员，恢复后自动消失；几个渠道同时异常时各一条，从上到下 Gmail、亚马逊、Shopify。
  * 时刻按北京时间写（playwright.config 的 timezoneId）。
  */
@@ -129,6 +131,7 @@ test('亚马逊卡同步延迟：每个延迟的店铺一行，其余说明行�
           }),
         ],
         queue: { status: 'normal', backlog: 0 },
+        backfill: { days: 90, state: 'completed', orders: 12, limited: false },
       },
     },
     { 'Forcome Auto': 'delayed' },
@@ -142,6 +145,7 @@ test('亚马逊卡同步延迟：每个延迟的店铺一行，其余说明行�
     'Forcome Auto 10:05 后未同步成功，超过 10 分钟',
     /^\d+ 个店铺 · 订单经 SP-API 准实时同步$/,
     '订单通知队列（SQS）正常 · 积压 0',
+    '订单回补 90 天已完成',
   ]);
   await expect(amazon.getByRole('button', { name: '重新检测' })).toHaveCount(0);
   await expect(page.getByRole('row').filter({ hasText: 'A3KA8V1T6RW2NB' })).toContainText(
@@ -163,6 +167,7 @@ test('亚马逊卡连接异常：每个异常的店铺一行原因与恢复指�
           issue({ target: 'Forcome Direct', status: 'delayed', failingSince: null, failures: 0 }),
         ],
         queue: { status: 'normal', backlog: 0 },
+        backfill: { days: 90, state: 'completed', orders: 12, limited: false },
       },
     },
     { 'Forcome Auto': 'error' },
@@ -181,6 +186,8 @@ test('亚马逊卡连接异常：每个异常的店铺一行原因与恢复指�
     'Forcome Direct 10:04 后未同步成功，超过 10 分钟',
     '订单通知队列（SQS）正常 · 积压 0',
   ]);
+  // 连接异常的卡不显示订单回补行（待办 13 Q2 f）
+  await expect(amazon.getByTestId('order-backfill-line')).toHaveCount(0);
   // 第一阶段没有「重新授权」与错误日志页
   await expect(amazon.getByRole('button', { name: '重新授权' })).toHaveCount(0);
   await expect(amazon.getByRole('button', { name: '查看错误日志' })).toHaveCount(0);
@@ -238,6 +245,81 @@ test('订单通知队列（SQS）一行的四种写法：正常 · 积压 N、�
   }
 });
 
+/**
+ * 真实接口上 Shopify 回补行的样子：示例店铺回补完是「60 天 · 未开通 read_all_orders」；但别的用例（stores、audit-log）在灌完示例数据之后
+ * 新建或改了 Shopify 店铺的平台标识，这些店铺还没回补，按 Q2 d 回补行回到「未开始」（提示管理员再执行一次）——两种都对，天数都是 60
+ * （示例店铺按没开通 read_all_orders 回补过）。精确的「未开通 read_all_orders」画面由下面的接口桩用例与截图覆盖
+ */
+const SHOPIFY_BACKFILLED = /^订单回补 60 天(未开通 read_all_orders|未开始)$/;
+
+test('订单回补行（真实接口）：示例环境上线前已回补——亚马逊「订单回补 90 天 ✓已完成」在 SQS 行之后，Shopify 没开通 read_all_orders「订单回补 60 天」在店铺行之后（待办 13）', async ({
+  page,
+}) => {
+  await loginAs(page, '刘洋');
+  await page.goto('/settings/channels');
+  // 灌完示例数据即开始回补，worker 起来后逐页做完（几秒）
+  await expect(async () => {
+    await page.reload();
+    await expect(card(page, 'amazon').getByTestId('order-backfill-line')).toHaveText(
+      '订单回补 90 天已完成',
+      { timeout: 1_000 },
+    );
+    await expect(card(page, 'shopify').getByTestId('order-backfill-line')).toHaveText(
+      SHOPIFY_BACKFILLED,
+      { timeout: 1_000 },
+    );
+  }).toPass({ timeout: 60_000 });
+  const amazonLines = card(page, 'amazon').getByTestId('channel-card-lines').locator('> div');
+  await expect(amazonLines.last()).toHaveText('订单回补 90 天已完成');
+  await expect(amazonLines.nth(-2)).toHaveText(/^订单通知队列（SQS）/);
+  const shopifyLines = card(page, 'shopify').getByTestId('channel-card-lines').locator('> div');
+  await expect(shopifyLines).toHaveText([
+    /^\d+ 个店铺 · 订单经 Admin API 准实时同步$/,
+    SHOPIFY_BACKFILLED,
+  ]);
+});
+
+test('订单回补行的未开始与进行中：「未开始」、「进行中 · 已回补 N 笔」（千分位）；Shopify 60 天还在回补时也写进行中（待办 13 Q2）', async ({
+  page,
+}) => {
+  let amazonBackfill: ChannelCard['backfill'] = {
+    days: 90,
+    state: 'not_started',
+    orders: 0,
+    limited: false,
+  };
+  await page.route('**/api/channel/settings', async (route) => {
+    const real = channelSettingsSchema.parse(await (await route.fetch()).json());
+    const channels = real.channels.map((c) => {
+      if (c.kind === 'amazon') {
+        return { ...c, status: 'connected' as const, issues: [], backfill: amazonBackfill };
+      }
+      if (c.kind === 'shopify') {
+        return {
+          ...c,
+          status: 'connected' as const,
+          issues: [],
+          backfill: { days: 60, state: 'running' as const, orders: 8, limited: true },
+        };
+      }
+      return c;
+    });
+    await route.fulfill({ json: { ...real, channels } });
+  });
+  await loginAs(page, '刘洋');
+  await page.goto('/settings/channels');
+  const amazonLine = card(page, 'amazon').getByTestId('order-backfill-line');
+  await expect(amazonLine).toHaveText('订单回补 90 天未开始');
+  await expect(card(page, 'shopify').getByTestId('order-backfill-line')).toHaveText(
+    '订单回补 60 天进行中 · 已回补 8 笔',
+  );
+  amazonBackfill = { days: 90, state: 'running', orders: 1284, limited: false };
+  await page.reload();
+  await expect(amazonLine).toHaveText('订单回补 90 天进行中 · 已回补 1,284 笔');
+  // 只影响这一行：卡片仍是已连接
+  await expect(card(page, 'amazon')).toContainText('已连接');
+});
+
 test('Shopify 卡同步延迟：每个延迟的店铺一行，其余说明行照常；店铺表「Admin API 同步延迟」（待办 11）', async ({
   page,
 }) => {
@@ -256,6 +338,7 @@ test('Shopify 卡同步延迟：每个延迟的店铺一行，其余说明行照
             lastSuccessAt: '2026-09-11T02:05:00.000Z',
           }),
         ],
+        backfill: { days: 60, state: 'completed', orders: 4, limited: true },
       },
     },
     { 'forcome.mx': 'delayed' },
@@ -268,6 +351,8 @@ test('Shopify 卡同步延迟：每个延迟的店铺一行，其余说明行照
   const lines = shopify.getByTestId('channel-card-lines').locator('> div');
   await expect(lines.first()).toHaveText('forcome.mx 10:05 后未同步成功，超过 10 分钟');
   await expect(lines.nth(1)).toHaveText(/^\d+ 个店铺 · 订单经 Admin API 准实时同步$/);
+  await expect(lines.nth(2)).toHaveText('订单回补 60 天未开通 read_all_orders');
+  await expect(lines).toHaveCount(3);
   await expect(shopify.getByRole('button', { name: '重新检测' })).toHaveCount(0);
   await expect(page.getByRole('row').filter({ hasText: 'forcome-mx.myshopify.com' })).toContainText(
     'Admin API 同步延迟',
@@ -287,6 +372,7 @@ test('Shopify 卡连接异常：每个异常的店铺一行原因与恢复指引
           issue({ target: 'forcome.com', status: 'delayed', failingSince: null, failures: 0 }),
           issue({ target: 'forcome.mx', failures: 4 }),
         ],
+        backfill: { days: 60, state: 'completed', orders: 4, limited: true },
       },
     },
     { 'forcome.mx': 'error' },
@@ -318,6 +404,8 @@ test('Shopify 卡连接异常：每个异常的店铺一行原因与恢复指引
   await expect(
     page.getByText('请检查 Admin API 应用凭据与授权范围', { exact: true }),
   ).toBeVisible();
+  // 连接异常的卡不显示订单回补行（待办 13 Q2 f）
+  await expect(shopify.getByTestId('order-backfill-line')).toHaveCount(0);
 });
 
 test('Gmail 卡同步延迟：每个延迟的邮箱一行，其余说明行照常；钉钉卡同步延迟（K20、Q3）', async ({
@@ -555,7 +643,7 @@ test('Shopify 卡未连接（生产环境还没配置 Shopify 凭据，或从没
 }) => {
   await stubCards(
     page,
-    { shopify: { status: 'not_connected', lastSyncAt: null, issues: [] } },
+    { shopify: { status: 'not_connected', lastSyncAt: null, issues: [], backfill: null } },
     {
       'forcome.mx': 'not_connected',
       'forcome.com': 'not_connected',
@@ -587,6 +675,7 @@ test('亚马逊卡未连接（生产环境还没配置 SP-API 与 SQS）：「�
         lastSyncAt: null,
         issues: [],
         queue: { status: 'not_connected', backlog: null },
+        backfill: null,
       },
     },
     { 'Forcome Direct': 'not_connected', 'Forcome Auto': 'not_connected' },

@@ -371,6 +371,8 @@ def build():
         'aftersalesLastSequence': max(int(a['no'][-4:]) for a in d.AFTERSALES),
         'ticketTimeline': ticket_timeline(),
         'shopifyOrders': shopify_orders(),
+        # 示例 Shopify 应用没开通 read_all_orders 时订单只回补 60 天（K19、K20，待办 13）
+        'shopifyReadAllOrders': d.SHOPIFY_BACKFILL_DAYS >= d.AMZ_BACKFILL_DAYS,
         'amazonOrders': amazon_orders(),
         'notifications': notifications(),
     }

@@ -88,7 +88,8 @@ export const amazonOrderChangedJob = defineJob(
   AMAZON_JOB_CONCURRENCY,
 );
 
-function amazonFor(clients: IntegrationClients, store: OrderStore): AmazonOrdersClient {
+/** 某亚马逊店铺的 SP-API 订单客户端（回补与对账 sweep.ts 也用） */
+export function amazonFor(clients: IntegrationClients, store: OrderStore): AmazonOrdersClient {
   return clients.forStore(amazonOrdersClient, {
     id: store.id,
     adapterMode: store.adapterMode,

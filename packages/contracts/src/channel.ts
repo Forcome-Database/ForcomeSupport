@@ -301,6 +301,60 @@ export function orderQueueStatus(health: OrderQueueHealth): OrderQueue {
   return { status: backlogged ? 'backlog' : 'normal', backlog: health.backlog };
 }
 
+/** 订单回补的天数（规格「回补 90 天」，待办 13）；Shopify 没开通 read_all_orders 时只能回补 60 天 */
+export const ORDER_BACKFILL_DAYS = 90;
+/** 订单回补的状态（P18 回补行，待办 13）：未开始 / 进行中 / 已完成 */
+export const orderBackfillStates = ['not_started', 'running', 'completed'] as const;
+/**
+ * 渠道卡上的订单回补（亚马逊、Shopify 卡的「订单回补 90 天」一行，待办 13，协调者 2026-10-06 决定 Q2）：
+ * 该平台连接上的店铺的汇总（orderBackfillSummary）
+ */
+export const orderBackfillSchema = z.object({
+  /** 回补窗口天数：各店铺中最短的（还没开始的按 90 天） */
+  days: z.int().positive(),
+  state: z.enum(orderBackfillStates),
+  /** 已回补的订单数（各店铺合计）：进行中写「已回补 N 笔」 */
+  orders: z.int().nonnegative(),
+  /** 有店铺因没开通 read_all_orders 只回补了 60 天（Shopify）：完成后写「未开通 read_all_orders」 */
+  limited: z.boolean(),
+});
+export type OrderBackfillSummary = z.infer<typeof orderBackfillSchema>;
+
+/** 一个店铺的订单连接状态与回补（还没开始过为 null） */
+export interface StoreBackfill {
+  readonly status: ConnectionStatus;
+  readonly backfill: {
+    readonly windowDays: number;
+    readonly limited: boolean;
+    readonly orders: number;
+    readonly completed: boolean;
+  } | null;
+}
+
+/**
+ * 汇总一个平台各店铺的订单回补（协调者 2026-10-06 决定 Q2 d）：只计连接上的店铺（未连接的——没配置凭据、没录入卖家授权——不计），
+ * 都没连接上时没有回补行（null）。有进行中的为进行中；否则有还没开始的为未开始（上线后新加的店铺提示管理员再执行一次）；
+ * 全部完成为已完成。天数取各店铺回补窗口中最短的，已回补笔数为合计
+ */
+export function orderBackfillSummary(
+  stores: readonly StoreBackfill[],
+): OrderBackfillSummary | null {
+  const counted = stores.filter((store) => store.status !== 'not_connected');
+  if (counted.length === 0) return null;
+  const started = counted.flatMap((store) => (store.backfill ? [store.backfill] : []));
+  const state = started.some((b) => !b.completed)
+    ? 'running'
+    : started.length < counted.length
+      ? 'not_started'
+      : 'completed';
+  return {
+    days: Math.min(ORDER_BACKFILL_DAYS, ...started.map((b) => b.windowDays)),
+    state,
+    orders: started.reduce((sum, b) => sum + b.orders, 0),
+    limited: started.some((b) => b.limited),
+  };
+}
+
 export const channelCardSchema = z.object({
   kind: channelKindSchema,
   /** 该渠道下最差的状态（6.9） */
@@ -315,6 +369,8 @@ export const channelCardSchema = z.object({
   issues: z.array(channelIssueSchema),
   /** 订单通知队列（SQS）：只有亚马逊卡有（待办 12），其余为 null */
   queue: orderQueueSchema.nullable(),
+  /** 订单回补：只有亚马逊与 Shopify 卡有，且只在有连接上的店铺时有（待办 13）；其余为 null */
+  backfill: orderBackfillSchema.nullable(),
 });
 export type ChannelCard = z.infer<typeof channelCardSchema>;
 

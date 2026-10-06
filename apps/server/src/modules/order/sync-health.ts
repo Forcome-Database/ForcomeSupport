@@ -17,7 +17,7 @@ import {
 import { notifyMembers } from '../org';
 import type { MirrorWrites } from './mirror';
 import { AMAZON_CONNECTION_NOTICES, amazonAuditObject } from './amazon-copy';
-import { orderSync, type OrderSource } from './schema';
+import { orderSweep, orderSync, type OrderSource } from './schema';
 import { SHOPIFY_CONNECTION_NOTICES, shopifyAuditObject } from './shopify-copy';
 
 /*
@@ -248,6 +248,8 @@ export async function recordOrderSyncSuccess(
  */
 export async function resetOrderSync(tx: Tx, storeId: string): Promise<void> {
   await tx.db.delete(orderSync).where(eq(orderSync.storeId, storeId));
+  // 回补与对账也按新配置从头算：回补回到「未开始」，管理员再执行一次（待办 13）
+  await tx.db.delete(orderSweep).where(eq(orderSweep.storeId, storeId));
 }
 
 /** 水位（还没同步过为 null） */

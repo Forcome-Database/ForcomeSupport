@@ -1654,6 +1654,7 @@
       }
     }
   ],
+  "shopifyReadAllOrders": false,
   "amazonOrders": [
     {
       "orderId": "113-4567890-1234567",

@@ -355,6 +355,19 @@ describe('SP-API 订单', () => {
     });
   });
 
+  it('searchOrders 按下单时间（回补，待办 13）：只带 createdAfter，不带 lastUpdatedAfter', async () => {
+    const c = client();
+    tokenGrant('Atza|access');
+    searchReply();
+    await c.searchOrders({ createdAfter: new Date('2026-06-13T02:20:00Z'), priority: 'low' });
+    const first = new URL(`${SP_API_ENDPOINT}${requests[0]!.path}`);
+    expect(Object.fromEntries(first.searchParams)).toEqual({
+      createdAfter: '2026-06-13T02:20:00.000Z',
+      includedData: 'FULFILLMENT,PROCEEDS,RECIPIENT,PACKAGES',
+      maxResultsPerPage: '100',
+    });
+  });
+
   it('待付款订单没有金额、别的币种不认：金额为 null；没有履约信息时状态记 PENDING', async () => {
     const c = client();
     tokenGrant('Atza|access');

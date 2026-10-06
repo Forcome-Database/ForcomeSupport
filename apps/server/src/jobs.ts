@@ -35,6 +35,9 @@ import {
   amazonSyncJob,
   createOrderFeeds,
   createOrderJobHandlers,
+  orderReconcileJob,
+  orderSweepPageJob,
+  orderSweepResumeJob,
   shopifyPollJob,
   shopifySyncJob,
 } from './modules/order';
@@ -55,6 +58,9 @@ export const jobDefinitions: readonly AnyJobDefinition[] = [
   amazonPollJob,
   amazonSyncJob,
   amazonOrderChangedJob,
+  orderSweepPageJob,
+  orderSweepResumeJob,
+  orderReconcileJob,
 ];
 
 export function createJobHandlers(deps: ServerDeps): readonly AnyJobHandler[] {

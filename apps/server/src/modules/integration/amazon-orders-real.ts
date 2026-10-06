@@ -6,7 +6,8 @@ import type { CredentialVault } from './credential-vault';
 import type { RealClientContext } from './definition';
 import { ClientNotConfiguredError, ExternalCallFailedError } from './faults';
 import { createHttpClient, type HttpClient } from './http';
-import { SpApiQuota, type SpApiOperation, type SpApiPriority } from './sp-api-quota';
+import type { CallPriority } from './call-priority';
+import { SpApiQuota, type SpApiOperation } from './sp-api-quota';
 
 /*
  * SP-API 订单的真实现（规格 order「亚马逊」、ADR 0011、0013，待办 12）：
@@ -14,7 +15,8 @@ import { SpApiQuota, type SpApiOperation, type SpApiPriority } from './sp-api-qu
  *   （storeSpApiRefreshToken）；没录入的店铺以「未配置」失败（ClientNotConfiguredError，不算连接失败，店铺为未连接）；
  * - 访问令牌：POST https://api.amazon.com/auth/o2/token（grant_type=refresh_token + LWA 应用的 client_id / client_secret），
  *   1 小时过期，本进程按店铺缓存、到期前 1 分钟换新；被拒（401 / 403）时换新再试一次；
- * - 订单：北美端点 https://sellingpartnerapi-na.amazon.com，Orders v2026-01-01 的 searchOrders（lastUpdatedAfter，每页 100）与
+ * - 订单：北美端点 https://sellingpartnerapi-na.amazon.com，Orders v2026-01-01 的 searchOrders（lastUpdatedAfter；回补按 createdAfter，
+ *   待办 13；每页 100）与
  *   getOrder，includedData=FULFILLMENT,PROCEEDS,RECIPIENT,PACKAGES（非受限角色能读的部分），请求头 x-amz-access-token；
  *   「测试连接」读 Sellers API 的 getMarketplaceParticipations；
  * - 配额：调用前从「卖家 × 接口」的令牌桶取令牌（sp-api-quota.ts），响应头 x-amzn-RateLimit-Limit 更新 rate，429 清空桶；
@@ -233,7 +235,7 @@ export function createRealAmazonOrdersClient(
     operation: SpApiOperation,
     path: string,
     query: Record<string, string>,
-    priority: SpApiPriority,
+    priority: CallPriority,
   ): Promise<unknown> {
     const search = new URLSearchParams(query).toString();
     const url = `${SP_API_ENDPOINT}${path}${search ? `?${search}` : ''}`;
@@ -263,14 +265,16 @@ export function createRealAmazonOrdersClient(
   }
 
   return {
-    async searchOrders({ lastUpdatedAfter, paginationToken, priority }) {
+    async searchOrders(options) {
+      const { paginationToken, priority } = options;
+      // 按下单时间（回补）或平台更新时间（增量、对账）：两者只能给一个；带分页令牌时其余条件都由令牌带着
+      const window: Record<string, string> =
+        options.createdAfter !== undefined
+          ? { createdAfter: options.createdAfter.toISOString() }
+          : { lastUpdatedAfter: options.lastUpdatedAfter.toISOString() };
       const query: Record<string, string> = paginationToken
         ? { paginationToken, includedData: INCLUDED_DATA }
-        : {
-            lastUpdatedAfter: lastUpdatedAfter.toISOString(),
-            includedData: INCLUDED_DATA,
-            maxResultsPerPage: String(PAGE_SIZE),
-          };
+        : { ...window, includedData: INCLUDED_DATA, maxResultsPerPage: String(PAGE_SIZE) };
       const parsed = searchSchema.safeParse(
         await get('searchOrders', ORDERS_PATH, query, priority ?? 'high'),
       );

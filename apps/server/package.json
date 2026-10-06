@@ -17,6 +17,7 @@
     "db:reset-inbound": "tsx --env-file=dev.env src/reset-inbound.ts",
     "import:aftersales": "tsx --env-file=dev.env src/import-aftersales.ts",
     "sp-api-token": "tsx --env-file=dev.env src/sp-api-token.ts",
+    "order-backfill": "tsx --env-file=dev.env src/order-backfill.ts",
     "history:sample": "tsx scripts/history-import-sample.ts"
   },
   "dependencies": {

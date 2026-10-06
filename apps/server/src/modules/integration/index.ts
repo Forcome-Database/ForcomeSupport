@@ -91,7 +91,8 @@ export {
   type OrderChangeNotification,
   type QueueMessage,
 } from './amazon-sqs';
-export { type SpApiPriority } from './sp-api-quota';
+export { type CallPriority } from './call-priority';
+export { FakeQuota } from './fake-quota';
 export {
   ClientNotConfiguredError,
   ConnectionLostError,
@@ -100,5 +101,6 @@ export {
   ExternalServiceError,
   ExternalTimeoutError,
   FaultInjector,
+  HistoryLimitedError,
   type FaultSpec,
 } from './faults';

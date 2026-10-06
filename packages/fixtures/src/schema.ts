@@ -245,6 +245,8 @@ export const demoFixtureSchema = z.object({
   ticketTimeline: fixtureTicketTimelineSchema,
   notifications: z.array(fixtureNotificationSchema),
   shopifyOrders: z.array(fixtureShopifyOrderSchema),
+  /** 示例 Shopify 应用开通了 read_all_orders 没有（K19、K20 的示例没开通：Shopify 订单只回补 60 天，待办 13） */
+  shopifyReadAllOrders: z.boolean(),
   amazonOrders: z.array(fixtureAmazonOrderSchema),
 });
 

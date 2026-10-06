@@ -1,6 +1,6 @@
 // order：本地订单镜像：平台订单、发货与单号快照；镜像缺失时按订单号补拉（ADR 0011）（ADR 0005；第一期起）。
 // 其他模块只能经本文件调用本模块，不能引用内部文件或读写本模块的表。
-// 第一期：Shopify 订单镜像（待办 11）、亚马逊订单镜像（待办 12）；回补与夜间对账随 13。order 不依赖 channel：店铺由调用方或组装根给出。
+// 第一期：Shopify 订单镜像（待办 11）、亚马逊订单镜像（待办 12）、回补与夜间对账（待办 13）。order 不依赖 channel：店铺由调用方或组装根给出。
 import { handleJob, type AnyJobHandler, type Feed } from '../core';
 import type { IntegrationClients } from '../integration';
 import {
@@ -19,6 +19,14 @@ import {
   shopifySyncJob,
   syncShopifyStore,
 } from './shopify-sync';
+import {
+  orderReconcileJob,
+  orderSweepPageJob,
+  orderSweepResumeJob,
+  resumeOrderSweeps,
+  runOrderSweepPage,
+  startOrderReconcile,
+} from './sweep';
 
 export {
   amazonOrderChangedJob,
@@ -37,6 +45,16 @@ export {
   shopifySyncJob,
   testShopifyConnection,
 } from './shopify-sync';
+export {
+  BACKFILL_DAYS,
+  orderBackfills,
+  orderReconcileJob,
+  orderSweepPageJob,
+  orderSweepResumeJob,
+  startOrderBackfill,
+  type BackfillStart,
+  type OrderBackfill,
+} from './sweep';
 export {
   orderSyncHealths,
   orderSyncStatus,
@@ -64,6 +82,13 @@ export function createOrderJobHandlers(deps: {
     ),
     handleJob(amazonOrderChangedJob, (payload, context) =>
       fetchChangedOrder(deps.clients, deps.stores, payload, context),
+    ),
+    handleJob(orderSweepPageJob, (payload, context) =>
+      runOrderSweepPage(deps.clients, deps.stores, payload, context),
+    ),
+    handleJob(orderSweepResumeJob, (_payload, { runtime }) => resumeOrderSweeps(runtime)),
+    handleJob(orderReconcileJob, (_payload, { runtime, logger }) =>
+      startOrderReconcile(runtime, deps.stores, logger),
     ),
   ];
 }

@@ -68,6 +68,8 @@ export interface ClientDefinition<C, F extends FakeClient<C> = FakeClient<C>> {
 /** 建 Fake 时可用的上下文：取同一个 IntegrationClients 里别的 Fake（按需创建） */
 export interface FakeContext {
   readonly fake: <C2, F2 extends FakeClient<C2>>(definition: ClientDefinition<C2, F2>) => F2;
+  /** 当前时间（Fake 按「近 N 天」判断时用；测试里是手动时钟，待办 13） */
+  readonly clock: Clock;
 }
 
 export type AnyClientDefinition = ClientDefinition<unknown, FakeClient<unknown>>;

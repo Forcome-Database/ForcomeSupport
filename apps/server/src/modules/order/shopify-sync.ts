@@ -60,7 +60,8 @@ export const shopifyPollJob = defineJob(
   { cron: '* * * * *', tz: 'Asia/Shanghai', runAtStartup: true },
 );
 
-function shopifyFor(clients: IntegrationClients, store: OrderStore): ShopifyClient {
+/** 某 Shopify 店铺的 Admin API 客户端（回补与对账 sweep.ts 也用） */
+export function shopifyFor(clients: IntegrationClients, store: OrderStore): ShopifyClient {
   return clients.forStore(shopifyClient, {
     id: store.id,
     adapterMode: store.adapterMode,

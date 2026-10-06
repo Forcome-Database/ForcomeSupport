@@ -112,6 +112,19 @@ export const ORDER_QUEUE_LINE = {
 } as const;
 
 /**
+ * 亚马逊、Shopify 卡的订单回补行（K20 补充小样，待办 13，协调者 2026-10-06 决定 Q2）：「订单回补 90 天」+ 小标签——
+ * 未开始（灰）、进行中 · 已回补 N 笔（蓝，各店铺合计，千分位）、已完成（绿勾）、Shopify 没开通 read_all_orders 只回补 60 天，
+ * 完成后写「未开通 read_all_orders」（黄）
+ */
+export const ORDER_BACKFILL_LINE = {
+  label: (days: number) => `订单回补 ${days} 天`,
+  notStarted: '未开始',
+  running: (orders: number) => `进行中 · 已回补 ${orders.toLocaleString('en-US')} 笔`,
+  completed: '已完成',
+  limited: '未开通 read_all_orders',
+} as const;
+
+/**
  * 钉钉卡同步延迟与连接异常时的说明行（K20；连接异常为待办 09 Q6 用户确认，从没同步成功过为 E4 协调者决定）：
  * 第一行换成未同步成功的说明，其后两行固定
  */

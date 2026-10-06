@@ -14,7 +14,7 @@ import {
 /*
  * 订单镜像的写入与查询（规格 order「本地订单镜像」，待办 11；亚马逊订单待办 12）：
  * - 写入按「店铺 + 平台订单号」upsert，只进不退：拉到的版本的平台更新时间不比镜像里的新就不改（重复拉取、回补与增量交错都不产生
- *   重复行，也不会用旧版本盖掉新版本）；
+ *   重复行，也不会用旧版本盖掉新版本）；同一版本（平台更新时间相同）而内容不一样时以平台为准改正（夜间对账靠它改正镜像，待办 13）；
  * - 查询都带店铺范围（ADR 0010）：系统操作（同步、归并）用 SYSTEM_STORE_SCOPE，接口里用成员的范围。
  */
 
@@ -92,6 +92,48 @@ export const noWrites = (): MirrorWrites => ({ count: 0, from: null, to: null })
 const excluded = (column: AnyPgColumn) => sql.raw(`excluded.${column.name}`);
 
 /**
+ * 什么时候用拉到的版本改镜像：平台更新时间更新的；或同一版本、但这些列与镜像里的不一样的（以平台为准，待办 13 的夜间对账）。
+ * 更旧的版本一律不改（只进不退）
+ */
+function newerOrDifferent(columns: readonly AnyPgColumn[]) {
+  return sql`${platformOrder.platformUpdatedAt} < excluded.platform_updated_at or (
+    ${platformOrder.platformUpdatedAt} = excluded.platform_updated_at
+    and (${sql.join([...columns], sql`, `)}) is distinct from (${sql.join(columns.map(excluded), sql`, `)})
+  )`;
+}
+
+/** Shopify 订单要与平台一致的列（不含写入时间） */
+const SHOPIFY_COLUMNS = [
+  platformOrder.name,
+  platformOrder.status,
+  platformOrder.financialStatus,
+  platformOrder.cancelledAt,
+  platformOrder.lineItems,
+  platformOrder.totalAmount,
+  platformOrder.totalCurrency,
+  platformOrder.customerEmail,
+  platformOrder.shipCountry,
+  platformOrder.shipAddress,
+  platformOrder.tracking,
+  platformOrder.placedAt,
+];
+
+/** 亚马逊订单要与平台一致的列（不含写入时间） */
+const AMAZON_COLUMNS = [
+  platformOrder.status,
+  platformOrder.lineItems,
+  platformOrder.totalAmount,
+  platformOrder.totalCurrency,
+  platformOrder.shipCountry,
+  platformOrder.shipAddress,
+  platformOrder.tracking,
+  platformOrder.fulfillmentChannel,
+  platformOrder.promisedShipBy,
+  platformOrder.promisedDeliveryBy,
+  platformOrder.placedAt,
+];
+
+/**
  * 把一笔 Shopify 订单写进镜像（只进不退）；返回是否新增或改了。邮箱存小写（R-ST-03 反查不分大小写）
  */
 export async function upsertShopifyOrder(
@@ -140,8 +182,8 @@ export async function upsertShopifyOrder(
         platformUpdatedAt: excluded(platformOrder.platformUpdatedAt),
         syncedAt: excluded(platformOrder.syncedAt),
       },
-      // 只进不退：同一版本（平台更新时间相同）或更旧的版本不改
-      setWhere: sql`${platformOrder.platformUpdatedAt} < excluded.platform_updated_at`,
+      // 只进不退：更旧的版本不改；同一版本内容一样也不改
+      setWhere: newerOrDifferent(SHOPIFY_COLUMNS),
     })
     .returning({ id: platformOrder.id });
   return rows.length > 0;
@@ -236,8 +278,8 @@ export async function upsertAmazonOrder(
         platformUpdatedAt: excluded(platformOrder.platformUpdatedAt),
         syncedAt: excluded(platformOrder.syncedAt),
       },
-      // 只进不退：同一版本（平台更新时间相同）或更旧的版本不改
-      setWhere: sql`${platformOrder.platformUpdatedAt} < excluded.platform_updated_at`,
+      // 只进不退：更旧的版本不改；同一版本内容一样也不改
+      setWhere: newerOrDifferent(AMAZON_COLUMNS),
     })
     .returning({ id: platformOrder.id });
   return rows.length > 0;

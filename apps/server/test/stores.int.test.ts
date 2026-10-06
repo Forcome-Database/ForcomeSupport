@@ -134,8 +134,14 @@ describe('P18 店铺表（非生产环境）', () => {
       expect(store.updatedBy).toBeNull();
     }
     // 渠道卡：亚马逊 SP-API、Shopify Admin API、Gmail、钉钉，都按同步记录（待办 12、11、09、05），这里都还没同步过，为未连接；
-    // 亚马逊卡另有订单通知队列（SQS）一行，还没拉过也是未连接
-    const empty = { status: 'not_connected', simulated: true, lastSyncAt: null, issues: [] };
+    // 亚马逊卡另有订单通知队列（SQS）一行，还没拉过也是未连接；没有连接上的店铺，没有订单回补行（待办 13）
+    const empty = {
+      status: 'not_connected',
+      simulated: true,
+      lastSyncAt: null,
+      issues: [],
+      backfill: null,
+    };
     expect(data.channels).toEqual([
       { kind: 'amazon', ...empty, queue: { status: 'not_connected', backlog: null } },
       { kind: 'shopify', ...empty, queue: null },

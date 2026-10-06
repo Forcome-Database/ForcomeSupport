@@ -1,6 +1,7 @@
 import { platforms } from '@forcome/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   index,
   integer,
@@ -139,6 +140,46 @@ export const orderSync = orderSchema.table(
     updatedAt: timestamptz('updated_at').notNull(),
   },
   (t) => [unique('order_sync_store_source_key').on(t.storeId, t.source)],
+);
+
+/** 订单回补（按下单时间取近 90 天）与夜间对账（按平台更新时间取近 7 天），待办 13 */
+export const orderSweepKinds = ['backfill', 'reconcile'] as const;
+export type OrderSweepKind = (typeof orderSweepKinds)[number];
+
+/**
+ * 订单回补与夜间对账的进度（规格 order「回补 90 天…每天夜间对账近 7 天」，待办 13）：每个店铺 × 种类一行。
+ * 回补按下单时间从 since 起分页取（90 天；Shopify 没开通 read_all_orders 时 60 天，limited），对账按平台更新时间从 since 起
+ * 分页取（近 7 天，每晚重来一次）；每取到一页，写进镜像与推进游标在同一个事务里——中断后从游标接着取，不重不漏。
+ * completedAt 有值为已完成。按店铺 ID 关联、不设外键（同订单同步记录）；店铺换了数据源时清掉（resetOrderSync）。
+ */
+export const orderSweep = orderSchema.table(
+  'order_sweep',
+  {
+    id: primaryId(),
+    storeId: uuid('store_id').notNull(),
+    kind: text('kind', { enum: orderSweepKinds }).notNull(),
+    /** 窗口天数：回补 90（Shopify 没开通 read_all_orders 时 60），对账 7 */
+    windowDays: integer('window_days').notNull(),
+    /** 回补窗口因平台权限缩短了（Shopify 没开通 read_all_orders）：P18 写「未开通 read_all_orders」，报表注明（24） */
+    limited: boolean('limited').notNull().default(false),
+    /** 从哪个时刻起取：回补为下单时间，对账为平台更新时间 */
+    since: timestamptz('since').notNull(),
+    /** 下一页的游标（平台的分页令牌）；null 为从第一页起 */
+    cursor: text('cursor'),
+    /** 拿到游标的时刻（亚马逊的分页令牌 24 小时过期，过期了从第一页重来） */
+    cursorAt: timestamptz('cursor_at'),
+    pages: integer('pages').notNull().default(0),
+    /** 取到并写进镜像（只进不退）的订单数：P18「已回补 N 笔」 */
+    orders: integer('orders').notNull().default(0),
+    /** 镜像因此新增或改正的订单数（对账：镜像里漏了的、与平台不一致的） */
+    corrected: integer('corrected').notNull().default(0),
+    startedAt: timestamptz('started_at').notNull(),
+    completedAt: timestamptz('completed_at'),
+    /** 最近一次失败的原因（排错用；不算进连接状态） */
+    lastError: text('last_error'),
+    updatedAt: timestamptz('updated_at').notNull(),
+  },
+  (t) => [unique('order_sweep_store_kind_key').on(t.storeId, t.kind)],
 );
 
 /** 订单通知队列：亚马逊 ORDER_CHANGE 经 SQS（待办 12） */

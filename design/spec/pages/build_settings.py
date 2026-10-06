@@ -185,11 +185,27 @@ def gmail_card_p1(st='已连接'):
     return ch_card('message', 'Gmail', state('已连接'), GMAIL_LINES_P1, '', 'ok', sync=CHANNEL_SYNC['Gmail'])
 
 
-SHOPIFY_LINES_P1 = ['2 个店铺 · 订单经 Admin API 准实时同步']  # 第一阶段 Shopify 卡的店铺行（回补窗口行另画，随待办 13）
+SHOPIFY_LINES_P1 = ['2 个店铺 · 订单经 Admin API 准实时同步']  # 第一阶段 Shopify 卡的店铺行（回补窗口行另画）
+
+
+def backfill_line(st):
+    """亚马逊、Shopify 卡的订单回补行（K20；四种写法为待办 13 · 协调者 10-06 决定 Q2，见 data.BACKFILL_STATES）：未开始（灰）、
+    进行中 · 已回补 N 笔（蓝）、已完成（绿勾）、Shopify 没开通 read_all_orders 只回补 60 天、完成后为「未开通 read_all_orders」（黄）。
+    亚马逊卡在订单通知队列行之后、Shopify 卡在店铺行之后；卡片连接异常时不显示这一行。"""
+    s, days, n = st
+    if s == '未开始':
+        c = chip('未开始', 'muted', 11)
+    elif s == '进行中':
+        c = chip('进行中 · 已回补 {:,} 笔'.format(n), 'info', 11)
+    elif s == '已完成':
+        c = chip('已完成', 'success', 11, 'check')
+    else:
+        c = chip('未开通 read_all_orders', 'warning', 11)
+    return row(nowrap('订单回补 %d 天' % days, 12, T['ink3']) + c, 6)
 
 
 def shopify_backfill_line():
-    return row(nowrap('订单回补 %d 天' % SHOPIFY_BACKFILL_DAYS, 12, T['ink3']) + chip('未开通 read_all_orders', 'warning', 11), 6)
+    return backfill_line(('未开通', SHOPIFY_BACKFILL_DAYS, None))
 
 
 def shopify_card_p1(st='已连接'):
@@ -209,11 +225,11 @@ def shopify_card_p1(st='已连接'):
     return ch_card('store', 'Shopify Admin API', state('已连接'), SHOPIFY_LINES_P1 + [shopify_backfill_line()], '', 'ok', sync=CHANNEL_SYNC['Shopify'])
 
 
-AMAZON_LINES_P1 = ['2 个店铺 · 订单经 SP-API 准实时同步']  # 第一阶段亚马逊卡的店铺行（SQS 行另画；回补行随待办 13）
+AMAZON_LINES_P1 = ['2 个店铺 · 订单经 SP-API 准实时同步']  # 第一阶段亚马逊卡的店铺行（SQS 行、回补行另画）
 
 
 def amazon_backfill_line():
-    return row(nowrap('订单回补 %d 天' % AMZ_BACKFILL_DAYS, 12, T['ink3']) + chip('已完成', 'success', 11, 'check'), 6)
+    return backfill_line(('已完成', AMZ_BACKFILL_DAYS, None))
 
 
 def amazon_card_p1(st='已连接', sqs=SQS_STATE):

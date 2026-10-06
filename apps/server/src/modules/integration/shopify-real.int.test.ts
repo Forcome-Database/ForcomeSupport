@@ -8,10 +8,11 @@ import {
   type TestRuntime,
 } from '../../../test/database';
 import { databaseCredentialVault, openSecret } from './credential-vault';
-import { ExternalCallFailedError } from './faults';
+import { ExternalCallFailedError, HistoryLimitedError } from './faults';
 import { createHttpClient } from './http';
 import { credential } from './schema';
 import { createRealShopifyClient, createShopifyTokens, SHOPIFY_API_VERSION } from './shopify-real';
+import type { ShopifyQuota } from './shopify-quota';
 
 /*
  * Shopify 的访问令牌与 Admin GraphQL 真实现（待办 11；规格 order「令牌 24 小时过期、每 20 小时提前刷新（动态凭据用主密钥 AES-GCM 加密存库）」、
@@ -95,7 +96,10 @@ function emptyOrders(status = 200) {
     });
 }
 
-function client() {
+/** 不限查询成本（配额另有用例：shopify-quota.test.ts 与下面「查询成本」） */
+const UNLIMITED = { acquire: () => Promise.resolve(), observe: () => undefined };
+
+function client(quota: Pick<ShopifyQuota, 'acquire' | 'observe'> = UNLIMITED) {
   const http = createHttpClient('shopify', { dispatcher: agent, storeId: STORE_ID });
   const tokens = createShopifyTokens(http, {
     shop: SHOP,
@@ -104,7 +108,7 @@ function client() {
     vault: databaseCredentialVault(t.runtime, MASTER_KEY)!,
     clock: t.clock,
   });
-  return createRealShopifyClient(http, tokens, SHOP);
+  return createRealShopifyClient(http, tokens, SHOP, { clock: t.clock, quota });
 }
 
 /** 库里这个店铺的 Shopify 凭据行（密文、IV、认证标签与时间） */
@@ -305,5 +309,99 @@ describe('Admin GraphQL 订单查询', () => {
       .catch((e: unknown) => e);
     expect((denied as ExternalCallFailedError).retryable).toBe(false);
     expect((denied as Error).message).toContain('Access denied for orders field.');
+  });
+});
+
+describe('回补按下单时间取、read_all_orders 与查询成本（待办 13）', () => {
+  /** 记下每次 GraphQL 请求的查询与变量，按给出的 data 依次回放 */
+  function graphqlReplies(...replies: unknown[]) {
+    type Body = { query: string; variables: Record<string, unknown> };
+    const bodies: Body[] = [];
+    for (const reply of replies) {
+      shop()
+        .intercept({ path: GRAPHQL, method: 'POST' })
+        .reply(200, (options) => {
+          bodies.push(JSON.parse(typeof options.body === 'string' ? options.body : '{}') as Body);
+          return reply;
+        });
+    }
+    return bodies;
+  }
+  const noOrders = {
+    data: { orders: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } },
+  };
+  const scopes = (...handles: string[]) => ({
+    data: { currentAppInstallation: { accessScopes: handles.map((handle) => ({ handle })) } },
+  });
+  const daysAgo = (days: number) => new Date(t.clock.now().getTime() - days * 24 * 60 * 60_000);
+
+  it('按下单时间：created_at 过滤、sortKey CREATED_AT；60 天以内不查权限', async () => {
+    t.clock.advance({ days: 2 });
+    tokenGrant('shpat_backfill_token');
+    const bodies = graphqlReplies(noOrders);
+    const since = daysAgo(30);
+    await client().listOrders({ createdSince: since });
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]?.query).toContain('sortKey: CREATED_AT');
+    expect(bodies[0]?.variables.query).toBe(
+      `created_at:>='${since.toISOString().replace(/\.\d{3}Z$/, 'Z')}'`,
+    );
+  });
+
+  it('从 60 天以前取：没有 read_all_orders 以 HistoryLimitedError（60 天）失败，不发订单查询；同一店铺 1 小时内不再问权限', async () => {
+    const bodies = graphqlReplies(scopes('read_orders', 'read_customers'));
+    const error = await client()
+      .listOrders({ createdSince: daysAgo(90) })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(HistoryLimitedError);
+    expect(error).toMatchObject({ days: 60, retryable: false });
+    expect(bodies.map((b) => b.query)).toEqual([expect.stringContaining('accessScopes')]);
+    await expect(client().listOrders({ createdSince: daysAgo(90) })).rejects.toBeInstanceOf(
+      HistoryLimitedError,
+    );
+    expect(bodies).toHaveLength(1);
+    // 之后的页沿用第一页的查询：带游标时不再检查
+    graphqlReplies(noOrders);
+    await client().listOrders({ createdSince: daysAgo(90), after: 'cursor-2' });
+  });
+
+  it('有 read_all_orders：照常按 90 天取（权限过了 1 小时重新查）', async () => {
+    t.clock.advance({ hours: 2 });
+    const bodies = graphqlReplies(scopes('read_orders', 'read_all_orders'), noOrders);
+    await client().listOrders({ createdSince: daysAgo(90) });
+    expect(bodies.map((b) => b.query)).toEqual([
+      expect.stringContaining('accessScopes'),
+      expect.stringContaining('sortKey: CREATED_AT'),
+    ]);
+  });
+
+  it('发出前按优先级扣查询成本，响应的 extensions.cost 交给配额校准', async () => {
+    const acquired: string[] = [];
+    const observed: unknown[] = [];
+    const recording = {
+      acquire: (_shop: string, operation: string, priority: string) => {
+        acquired.push(`${operation}:${priority}`);
+        return Promise.resolve();
+      },
+      observe: (_shop: string, _operation: string, cost: unknown) => {
+        observed.push(cost);
+      },
+    };
+    const cost = {
+      requestedQueryCost: 752,
+      actualQueryCost: 12,
+      throttleStatus: { maximumAvailable: 2000, currentlyAvailable: 1988, restoreRate: 100 },
+    };
+    graphqlReplies({ ...noOrders, extensions: { cost } }, noOrders);
+    await client(recording).listOrders({ updatedSince: daysAgo(1), priority: 'low' });
+    await client(recording).listOrders({ updatedSince: daysAgo(1) });
+    expect(acquired).toEqual(['orders:low', 'orders:high']);
+    expect(observed).toEqual([
+      {
+        requestedQueryCost: 752,
+        throttleStatus: { maximumAvailable: 2000, currentlyAvailable: 1988, restoreRate: 100 },
+      },
+      undefined,
+    ]);
   });
 });

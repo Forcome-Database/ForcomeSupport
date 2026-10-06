@@ -1,11 +1,13 @@
 import { currencySchema } from '@forcome/contracts';
 import { z } from 'zod';
 import type { Clock, ShopifyCredentials } from '../core';
+import type { CallPriority } from './call-priority';
 import type { CredentialVault } from './credential-vault';
 import type { RealClientContext } from './definition';
-import { ClientNotConfiguredError, ExternalCallFailedError } from './faults';
+import { ClientNotConfiguredError, ExternalCallFailedError, HistoryLimitedError } from './faults';
 import { createHttpClient, type HttpClient, type RateLimit } from './http';
-import type { ShopifyClient, ShopifyOrder } from './shopify';
+import { SHOPIFY_RECENT_ORDER_DAYS, type ShopifyClient, type ShopifyOrder } from './shopify';
+import { ShopifyQuota } from './shopify-quota';
 
 /*
  * Shopify Admin GraphQL 的真实现（规格 order「Shopify」、ADR 0011、0013，待办 11）：
@@ -13,7 +15,12 @@ import type { ShopifyClient, ShopifyOrder } from './shopify';
  *   （POST https://<店铺>/admin/oauth/access_token，expires_in 恒为 86399 秒）；令牌用主密钥加密存进 integration.credential，
  *   换到后满 20 小时就提前换新（24 小时过期），被拒（401）时立即换新再试一次；
  * - 订单：POST https://<店铺>/admin/api/<版本>/graphql.json，请求头 X-Shopify-Access-Token；orders 查询按 updated_at 过滤、
- *   sortKey UPDATED_AT，每页 100 笔；GraphQL 的 errors（含限流 THROTTLED）翻译成 faults.ts 的错误；
+ *   sortKey UPDATED_AT（回补按 created_at、sortKey CREATED_AT，待办 13），每页 100 笔；GraphQL 的 errors（含限流 THROTTLED）
+ *   翻译成 faults.ts 的错误；
+ * - 查询成本：发出前从本进程的店铺桶里扣点（shopify-quota.ts，增量优先、回补与对账让路），按响应的 extensions.cost 校准；
+ * - 历史订单：没开通 read_all_orders 的应用只能读近 60 天的订单（平台对更早的不报错、只是不返回）。按下单时间从 60 天以前取时，
+ *   第一页先查一次应用被授予的权限（currentAppInstallation.accessScopes，同一店铺 1 小时内沿用），没有 read_all_orders 就以
+ *   HistoryLimitedError 失败，回补据此改为 60 天并记下回补窗口（待办 13）；
  * - 都经出站 HTTP 客户端工厂（代理分流、时限、限流、调用记录；换令牌的响应体不记）。
  * 没有配置客户端凭据或主密钥时以「未配置」失败（ClientNotConfiguredError，不算连接失败，店铺为未连接，用户 2026-10-04 口径）。
  * 真实环境的验收（令牌、61–90 天历史订单、断线恢复）随待办 29 的验收矩阵；单元与集成测试用 undici MockAgent 回放。
@@ -44,13 +51,22 @@ const ORDER_FIELDS = `
   shippingAddress { name address1 address2 city provinceCode zip countryCodeV2 phone }
   fulfillments(first: 10) { trackingInfo(first: 10) { company number } }
 `;
-const ORDERS_QUERY = `query Orders($first: Int!, $after: String, $query: String!) {
-  orders(first: $first, after: $after, query: $query, sortKey: UPDATED_AT) {
+const ordersQuery = (sortKey: 'UPDATED_AT' | 'CREATED_AT') =>
+  `query Orders($first: Int!, $after: String, $query: String!) {
+  orders(first: $first, after: $after, query: $query, sortKey: ${sortKey}) {
     pageInfo { hasNextPage endCursor }
     nodes { ${ORDER_FIELDS} }
   }
 }`;
+const ORDERS_QUERY = ordersQuery('UPDATED_AT');
+const CREATED_ORDERS_QUERY = ordersQuery('CREATED_AT');
 const SHOP_QUERY = 'query Shop { shop { name } }';
+const SCOPES_QUERY = 'query Scopes { currentAppInstallation { accessScopes { handle } } }';
+/** 读得到 60 天以前的订单要的权限 */
+const READ_ALL_ORDERS = 'read_all_orders';
+/** 应用被授予的权限在本进程沿用多久 */
+const SCOPES_TTL_MS = 60 * 60_000;
+const DAY_MS = 24 * 60 * 60_000;
 
 const nullableString = z
   .string()
@@ -92,6 +108,22 @@ const orderSchema = z.object({
 });
 const graphqlSchema = z.object({
   data: z.unknown().optional(),
+  extensions: z
+    .object({
+      cost: z
+        .object({
+          requestedQueryCost: z.number(),
+          throttleStatus: z
+            .object({
+              maximumAvailable: z.number(),
+              currentlyAvailable: z.number(),
+              restoreRate: z.number(),
+            })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   errors: z
     .array(
       z.object({
@@ -108,6 +140,11 @@ const ordersDataSchema = z.object({
   }),
 });
 const shopDataSchema = z.object({ shop: z.object({ name: z.string() }) });
+const scopesDataSchema = z.object({
+  currentAppInstallation: z.object({
+    accessScopes: z.array(z.object({ handle: z.string() })),
+  }),
+});
 
 function contractError(operation: string): ExternalCallFailedError {
   return new ExternalCallFailedError(SYSTEM, operation, {
@@ -207,37 +244,53 @@ export function createShopifyTokens(
   };
 }
 
+/** 各店铺应用被授予的权限（按店铺缓存 1 小时） */
+const grantedScopes = new Map<
+  string,
+  { readonly handles: ReadonlySet<string>; readonly at: number }
+>();
+
 /** 一个店铺的 Admin GraphQL 客户端 */
 export function createRealShopifyClient(
   http: HttpClient,
   tokens: ShopifyTokens,
   shop: string,
+  options: { readonly clock: Clock; readonly quota: Pick<ShopifyQuota, 'acquire' | 'observe'> },
 ): ShopifyClient {
+  const { clock, quota } = options;
   const endpoint = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`;
 
-  async function post(operation: string, token: string, body: unknown): Promise<unknown> {
+  async function post(
+    operation: string,
+    token: string,
+    body: unknown,
+    priority: CallPriority,
+  ): Promise<unknown> {
+    await quota.acquire(shop, operation, priority);
     return http.postJson(endpoint, body, {
       operation,
       headers: { 'X-Shopify-Access-Token': token },
     });
   }
 
-  /** 发一次 GraphQL 请求；令牌被拒（401）换新再试一次；errors 翻译成 faults.ts 的错误 */
+  /** 发一次 GraphQL 请求（先扣查询成本）；令牌被拒（401）换新再试一次；errors 翻译成 faults.ts 的错误 */
   async function graphql(
     operation: string,
     query: string,
     variables: Record<string, unknown>,
+    priority: CallPriority = 'high',
   ): Promise<unknown> {
     const body = { query, variables };
     let response: unknown;
     try {
-      response = await post(operation, await tokens.get(), body);
+      response = await post(operation, await tokens.get(), body, priority);
     } catch (error) {
       if (!(error instanceof ExternalCallFailedError) || error.status !== 401) throw error;
-      response = await post(operation, await tokens.renew(), body);
+      response = await post(operation, await tokens.renew(), body, priority);
     }
     const parsed = graphqlSchema.safeParse(response);
     if (!parsed.success) throw contractError(operation);
+    quota.observe(shop, operation, parsed.data.extensions?.cost);
     const errors = parsed.data.errors ?? [];
     if (errors.length > 0) {
       // 超出查询成本（THROTTLED）稍后再试即可；其余（权限不够、查询写错）原样重试没用
@@ -250,21 +303,61 @@ export function createRealShopifyClient(
     return parsed.data.data;
   }
 
-  async function orders(operation: string, query: string, first: number, after: string | null) {
+  async function orders(
+    operation: string,
+    variables: { readonly query: string; readonly first: number; readonly after: string | null },
+    options: { readonly byCreated?: boolean; readonly priority?: CallPriority } = {},
+  ) {
     const data = ordersDataSchema.safeParse(
-      await graphql(operation, ORDERS_QUERY, { first, after, query }),
+      await graphql(
+        operation,
+        options.byCreated ? CREATED_ORDERS_QUERY : ORDERS_QUERY,
+        { ...variables },
+        options.priority,
+      ),
     );
     if (!data.success) throw contractError(operation);
     return data.data.orders;
   }
 
+  /** 应用有没有 read_all_orders（同一店铺 1 小时内沿用上次查到的） */
+  async function readsAllOrders(priority: CallPriority): Promise<boolean> {
+    const now = clock.now().getTime();
+    const cached = grantedScopes.get(shop);
+    if (cached && now - cached.at < SCOPES_TTL_MS) return cached.handles.has(READ_ALL_ORDERS);
+    const data = scopesDataSchema.safeParse(
+      await graphql('access_scopes', SCOPES_QUERY, {}, priority),
+    );
+    if (!data.success) throw contractError('access_scopes');
+    const handles = new Set(data.data.currentAppInstallation.accessScopes.map((s) => s.handle));
+    grantedScopes.set(shop, { handles, at: now });
+    return handles.has(READ_ALL_ORDERS);
+  }
+
   return {
-    async listOrders({ updatedSince, after, first }) {
+    async listOrders(options) {
+      const { after, first, priority } = options;
+      const byCreated = options.createdSince !== undefined;
+      if (options.createdSince !== undefined && !after) {
+        // 第一页从 60 天以前取：要有 read_all_orders（平台对更早的订单不报错、只是不返回，所以先问清楚）
+        const floor = clock.now().getTime() - SHOPIFY_RECENT_ORDER_DAYS * DAY_MS;
+        if (options.createdSince.getTime() < floor && !(await readsAllOrders(priority ?? 'high'))) {
+          throw new HistoryLimitedError(
+            SYSTEM,
+            'orders',
+            SHOPIFY_RECENT_ORDER_DAYS,
+            `应用没有 ${READ_ALL_ORDERS}，只能读近 ${SHOPIFY_RECENT_ORDER_DAYS} 天的订单`,
+          );
+        }
+      }
+      const filter =
+        options.createdSince !== undefined
+          ? `created_at:>=${searchTime(options.createdSince)}`
+          : `updated_at:>=${searchTime(options.updatedSince)}`;
       const page = await orders(
         'orders',
-        `updated_at:>=${searchTime(updatedSince)}`,
-        first ?? PAGE_SIZE,
-        after ?? null,
+        { query: filter, first: first ?? PAGE_SIZE, after: after ?? null },
+        { byCreated, priority },
       );
       return {
         orders: page.nodes.map(toOrder),
@@ -273,7 +366,11 @@ export function createRealShopifyClient(
     },
     async findOrderByName(name) {
       // 搜索按词匹配，可能带出相近的，只认名字完全一致的那笔
-      const page = await orders('order_by_name', `name:${JSON.stringify(name)}`, 5, null);
+      const page = await orders('order_by_name', {
+        query: `name:${JSON.stringify(name)}`,
+        first: 5,
+        after: null,
+      });
       const node = page.nodes.find((o) => o.name === name);
       return node ? toOrder(node) : null;
     },
@@ -294,6 +391,9 @@ function failing(error: (operation: string) => Error): ShopifyClient {
     shop: () => fail('shop'),
   };
 }
+
+/** 本进程共用的查询成本配额（所有店铺，按店铺分桶） */
+let sharedQuota: ShopifyQuota | undefined;
 
 /** 按运行配置建一个店铺的真实现（IntegrationClients.forStore 调用） */
 export function createRealShopify(context: RealClientContext): ShopifyClient {
@@ -331,5 +431,6 @@ export function createRealShopify(context: RealClientContext): ShopifyClient {
     vault: credentialVault,
     clock,
   });
-  return createRealShopifyClient(http, tokens, shop);
+  sharedQuota ??= new ShopifyQuota(clock);
+  return createRealShopifyClient(http, tokens, shop, { clock, quota: sharedQuota });
 }

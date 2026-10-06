@@ -27,6 +27,7 @@ import {
   MENU_NOTE,
   MENU_TITLE,
   NOT_AUTHORIZED,
+  ORDER_BACKFILL_LINE,
   ORDER_QUEUE_LINE,
   PAGE_DESCRIPTION,
   PAGE_TITLE,
@@ -272,6 +273,15 @@ describe('K20 补充小样：亚马逊卡（待办 12，协调者 2026-10-06 决
     expectIn(STATES_ADMIN, ORDER_QUEUE_LINE.backlog(12));
     expectIn(STATES_ADMIN, `>${ORDER_QUEUE_LINE.failed}<`);
     expectIn(STATES_ADMIN, `>${ORDER_QUEUE_LINE.notConnected}<`);
+  });
+
+  it('订单回补行的四种写法（第一期参照页为亚马逊「90 天 · 已完成」、Shopify「60 天 · 未开通 read_all_orders」，待办 13）', () => {
+    expectText(P18, ORDER_BACKFILL_LINE.label(90));
+    expectText(P18, ORDER_BACKFILL_LINE.label(60));
+    expectIn(P18, `${ORDER_BACKFILL_LINE.completed}<`);
+    expectIn(P18, `>${ORDER_BACKFILL_LINE.limited}<`);
+    expectIn(STATES_ADMIN, `>${ORDER_BACKFILL_LINE.notStarted}<`);
+    expectIn(STATES_ADMIN, `>${ORDER_BACKFILL_LINE.running(1284)}<`);
   });
 
   it('「测试连接」的结果浮层（店铺与订单通知队列）', () => {

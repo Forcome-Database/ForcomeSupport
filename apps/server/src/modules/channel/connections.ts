@@ -1,4 +1,5 @@
 import {
+  orderBackfillSummary,
   worstConnectionStatus,
   type AdapterMode,
   type ChannelAlert,
@@ -10,7 +11,14 @@ import {
   type StoreConnection,
 } from '@forcome/contracts';
 import type { DbExecutor } from '../core';
-import { orderQueueState, orderSyncHealths, orderSyncStatus, type OrderSyncHealth } from '../order';
+import {
+  orderBackfills,
+  orderQueueState,
+  orderSyncHealths,
+  orderSyncStatus,
+  type OrderBackfill,
+  type OrderSyncHealth,
+} from '../order';
 import { mailboxHealths, mailboxStatus, type MailboxHealth } from './mailbox-health';
 
 /*
@@ -20,6 +28,7 @@ import { mailboxHealths, mailboxStatus, type MailboxHealth } from './mailbox-hea
  * - Shopify（待办 11）与亚马逊（待办 12）：按每个店铺的订单同步记录（order 的 orderSyncHealths，按数据源）——口径同 Gmail
  *   （订单 10 分钟为同步延迟），卡片取该平台各店铺中最差的并列出延迟与异常的店铺（按店铺名），最近同步时间取各店铺中最旧的一次；
  *   亚马逊卡另有订单通知队列（SQS）一行（order 的 orderQueueState），只影响这一行，不进卡片与店铺的状态（待办 12 Q7）；
+ *   两张卡另有订单回补一行（order 的 orderBackfills，按连接上的店铺汇总：contracts 的 orderBackfillSummary，待办 13）；
  * - 钉钉卡按通讯录的同步记录（org 的 dingtalkConnection，待办 05）。
  * 接模拟数据（Fake）时卡头另标「模拟数据」。连接异常的渠道（钉钉除外）出全站横幅（channelAlerts），几个渠道同时异常时各一条。
  */
@@ -41,6 +50,8 @@ export interface ConnectionSnapshot {
   readonly mailboxes: ReadonlyMap<string, MailboxHealth>;
   readonly orders: Readonly<Record<Platform, ReadonlyMap<string, OrderSyncHealth>>>;
   readonly orderQueue: OrderQueue;
+  /** 各店铺的订单回补（还没开始过的店铺没有） */
+  readonly backfills: ReadonlyMap<string, OrderBackfill>;
 }
 
 export async function loadConnections(db: DbExecutor, now: Date): Promise<ConnectionSnapshot> {
@@ -53,6 +64,7 @@ export async function loadConnections(db: DbExecutor, now: Date): Promise<Connec
       amazon: await orderSyncHealths(db, 'amazon_orders'),
     },
     orderQueue: await orderQueueState(db),
+    backfills: await orderBackfills(db),
   };
 }
 
@@ -127,6 +139,12 @@ function ordersCard(
     lastSyncAt: oldest?.toISOString() ?? null,
     issues,
     queue: kind === 'amazon' ? snapshot.orderQueue : null,
+    backfill: orderBackfillSummary(
+      stores.map((store) => ({
+        status: ordersStatus(store, snapshot),
+        backfill: snapshot.backfills.get(store.id) ?? null,
+      })),
+    ),
   };
 }
 
@@ -161,6 +179,7 @@ function gmailCard(
     lastSyncAt: oldest?.toISOString() ?? null,
     issues,
     queue: null,
+    backfill: null,
   };
 }
 
@@ -199,6 +218,7 @@ export function channelCards(
       lastSyncAt: dingtalk.lastSyncAt?.toISOString() ?? null,
       issues: [],
       queue: null,
+      backfill: null,
     },
   ];
 }

@@ -1,6 +1,6 @@
 import type { ChannelCard, ChannelIssue, Store } from '@forcome/contracts';
 import { describe, expect, it } from 'vitest';
-import { channelCardLines, needsRecheck } from './channel-card-lines';
+import { channelCardLines, needsRecheck, orderBackfillLine } from './channel-card-lines';
 
 /*
  * 渠道卡的说明行（K20 补充小样，待办 09）：Gmail 卡已连接、同步延迟、连接异常、几个邮箱同时异常又有延迟；钉钉卡同步延迟、
@@ -35,6 +35,7 @@ const card = (overrides: Partial<ChannelCard>): ChannelCard => ({
   lastSyncAt: '2026-09-11T02:18:00.000Z',
   issues: [],
   queue: null,
+  backfill: null,
   ...overrides,
 });
 
@@ -244,5 +245,56 @@ describe('亚马逊卡（待办 12 Q1、Q2，套用 Shopify 的写法、按店�
     ]);
     expect(needsRecheck(failed)).toBe(true);
     expect(needsRecheck(amazon({ queue: { status: 'failed', backlog: 3 } }))).toBe(false);
+  });
+});
+
+describe('订单回补行（K20 补充小样，待办 13，协调者 2026-10-06 决定 Q2）', () => {
+  const backfill = (overrides: Partial<NonNullable<ChannelCard['backfill']>> = {}) => ({
+    days: 90,
+    state: 'completed' as const,
+    orders: 1284,
+    limited: false,
+    ...overrides,
+  });
+
+  it('四种写法：未开始（灰）、进行中 · 已回补 N 笔（蓝、千分位）、已完成（绿勾）、只回补 60 天的完成后为未开通 read_all_orders（黄）', () => {
+    expect(
+      orderBackfillLine(card({ kind: 'amazon', backfill: backfill({ state: 'not_started' }) })),
+    ).toEqual({ label: '订单回补 90 天', badge: { text: '未开始', tone: 'muted', check: false } });
+    expect(
+      orderBackfillLine(card({ kind: 'amazon', backfill: backfill({ state: 'running' }) })),
+    ).toEqual({
+      label: '订单回补 90 天',
+      badge: { text: '进行中 · 已回补 1,284 笔', tone: 'info', check: false },
+    });
+    expect(orderBackfillLine(card({ kind: 'amazon', backfill: backfill() }))).toEqual({
+      label: '订单回补 90 天',
+      badge: { text: '已完成', tone: 'success', check: true },
+    });
+    expect(
+      orderBackfillLine(card({ kind: 'shopify', backfill: backfill({ days: 60, limited: true }) })),
+    ).toEqual({
+      label: '订单回补 60 天',
+      badge: { text: '未开通 read_all_orders', tone: 'warning', check: false },
+    });
+    // 60 天还在回补时仍写进行中
+    expect(
+      orderBackfillLine(
+        card({
+          kind: 'shopify',
+          backfill: backfill({ days: 60, limited: true, state: 'running', orders: 8 }),
+        }),
+      )?.badge.text,
+    ).toBe('进行中 · 已回补 8 笔');
+  });
+
+  it('连接异常的卡不显示这一行，同步延迟照写；没有连接上的店铺（后端给 null）也没有这一行', () => {
+    expect(
+      orderBackfillLine(card({ kind: 'amazon', status: 'error', backfill: backfill() })),
+    ).toBeNull();
+    expect(
+      orderBackfillLine(card({ kind: 'amazon', status: 'delayed', backfill: backfill() })),
+    ).not.toBeNull();
+    expect(orderBackfillLine(card({ kind: 'amazon', status: 'not_connected' }))).toBeNull();
   });
 });
