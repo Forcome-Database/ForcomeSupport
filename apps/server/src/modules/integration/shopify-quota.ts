@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { Clock } from '../core';
-import type { CallPriority } from './call-priority';
+import { nextInQueue, type CallPriority } from './call-priority';
 
 /*
  * Shopify Admin GraphQL 的查询成本配额（规格 order「增量优先、回补与对账让路」，待办 13；ADR 0008 修订）：
@@ -9,7 +9,7 @@ import type { CallPriority } from './call-priority';
  *   给出此刻还剩几点；
  * - 我们在发出前先从本进程同名的桶里扣点：点不够时排队等恢复，不发出去挨 THROTTLED（增量被拒会记一次连接失败）；
  *   排队的高优先级（增量、按订单名补拉）先于低优先级（回补与夜间对账），低优先级还要给高优先级留出一次订单查询的点数——
- *   回补一页接一页地查也不会把桶抽干，每分钟的增量随时能立即发出；
+ *   回补一页接一页地查也不会把桶抽干，点数够时增量立即发出（不陪着排在前面、正等点数恢复的回补等）；
  * - 每种查询的成本取它上一次响应的 requestedQueryCost（第一次按 DEFAULT_COST 估），桶的大小与恢复速度以响应为准
  *   （第一次按标准版的默认值）；
  * - 只在本进程内共享：订单同步、回补与对账都在 worker 一个进程里。
@@ -17,12 +17,15 @@ import type { CallPriority } from './call-priority';
  * 平台不预告剩余，这边按点数计、每次响应都给出剩余。
  */
 
+/** 经配额发出的查询（shopify-real.ts 的操作名） */
+export type ShopifyOperation = 'orders' | 'order_by_name' | 'shop' | 'access_scopes';
+
 /** 桶的默认大小与恢复速度（Shopify 标准版；收到第一次响应后按它给的） */
 export const SHOPIFY_DEFAULT_BUCKET = { maximumAvailable: 2000, restoreRate: 100 } as const;
 /** 还没见过某种查询的响应时按多少点估它的成本（订单一页 100 笔的请求成本在 1000 点之内） */
 export const SHOPIFY_DEFAULT_COST = 1000;
 /** 低优先级要给高优先级留出的：一次订单查询（增量）的请求成本 */
-const RESERVED_OPERATION = 'orders';
+const RESERVED_OPERATION: ShopifyOperation = 'orders';
 
 /** 响应里的查询成本（extensions.cost） */
 export interface ShopifyQueryCost {
@@ -36,7 +39,7 @@ export interface ShopifyQueryCost {
 
 interface Waiter {
   readonly priority: CallPriority;
-  readonly operation: string;
+  readonly operation: ShopifyOperation;
   readonly resolve: () => void;
 }
 
@@ -47,11 +50,11 @@ interface Bucket {
   /** 上次补点的时刻（毫秒） */
   last: number;
   /** 各种查询上一次的请求成本 */
-  readonly costs: Map<string, number>;
+  readonly costs: Map<ShopifyOperation, number>;
   /** 按到达先后 */
   readonly queue: Waiter[];
-  /** 正在等点数恢复 */
-  waiting: boolean;
+  /** 已约好的最早一次醒来（毫秒）；没有为 null */
+  wakeAt: number | null;
 }
 
 export class ShopifyQuota {
@@ -74,7 +77,7 @@ export class ShopifyQuota {
         last: this.#clock.now().getTime(),
         costs: new Map(),
         queue: [],
-        waiting: false,
+        wakeAt: null,
       };
       this.#buckets.set(shop, bucket);
     }
@@ -88,7 +91,7 @@ export class ShopifyQuota {
     bucket.last = now;
   }
 
-  #cost(bucket: Bucket, operation: string): number {
+  #cost(bucket: Bucket, operation: ShopifyOperation): number {
     return bucket.costs.get(operation) ?? SHOPIFY_DEFAULT_COST;
   }
 
@@ -99,24 +102,23 @@ export class ShopifyQuota {
     return Math.min(bucket.max, own + reserve);
   }
 
-  /** 排在最前的：先高优先级，同一优先级先来先得 */
-  #head(bucket: Bucket): number {
-    const index = bucket.queue.findIndex((w) => w.priority === 'high');
-    return index === -1 ? 0 : index;
-  }
-
+  /**
+   * 放行点数够的：按「先高优先级、同一优先级先来先得」依次放，排在最前的不够就停。还有没放的时约好醒来的时刻——
+   * 已约的醒得更早就不再约（新来的高优先级要的少，可能约得更早；早醒的那次放不了时会再约）
+   */
   #pump(bucket: Bucket): void {
-    if (bucket.waiting) return;
     this.#refill(bucket);
     while (bucket.queue.length > 0) {
-      const index = this.#head(bucket);
+      const index = nextInQueue(bucket.queue);
       const waiter = bucket.queue[index]!;
       const need = this.#need(bucket, waiter);
       if (bucket.available < need) {
         const ms = Math.ceil(((need - bucket.available) / bucket.rate) * 1000);
-        bucket.waiting = true;
+        const at = this.#clock.now().getTime() + ms;
+        if (bucket.wakeAt !== null && bucket.wakeAt <= at) return;
+        bucket.wakeAt = at;
         void this.#wait(ms).then(() => {
-          bucket.waiting = false;
+          if (bucket.wakeAt === at) bucket.wakeAt = null;
           this.#pump(bucket);
         });
         return;
@@ -128,7 +130,7 @@ export class ShopifyQuota {
   }
 
   /** 发出一次查询前扣点：够就立即返回，不够就排队等恢复（不报错） */
-  acquire(shop: string, operation: string, priority: CallPriority): Promise<void> {
+  acquire(shop: string, operation: ShopifyOperation, priority: CallPriority): Promise<void> {
     const bucket = this.#bucket(shop);
     return new Promise((resolve) => {
       bucket.queue.push({ priority, operation, resolve });
@@ -137,7 +139,7 @@ export class ShopifyQuota {
   }
 
   /** 响应给出的查询成本：记下这种查询的请求成本，按 throttleStatus 校准桶（剩余、大小、恢复速度） */
-  observe(shop: string, operation: string, cost: ShopifyQueryCost | undefined): void {
+  observe(shop: string, operation: ShopifyOperation, cost: ShopifyQueryCost | undefined): void {
     if (!cost) return;
     const bucket = this.#bucket(shop);
     if (cost.requestedQueryCost > 0) bucket.costs.set(operation, cost.requestedQueryCost);

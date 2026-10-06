@@ -317,6 +317,7 @@ export {
   type ConnectionTestKind,
   type ConnectionTestResult,
   type FieldErrors,
+  type OrderBackfillProgress,
   type OrderBackfillSummary,
   type OrderQueue,
   type OrderQueueHealth,

@@ -176,9 +176,9 @@ describe('订单通知队列（SQS）的状态（待办 12，协调者 2026-10-0
 });
 
 describe('渠道卡的订单回补行（待办 13，协调者 2026-10-06 决定 Q2）', () => {
-  const done = { windowDays: 90, limited: false, orders: 120, completed: true };
-  const running = { windowDays: 90, limited: false, orders: 35, completed: false };
-  const shopify60 = { windowDays: 60, limited: true, orders: 8, completed: true };
+  const done = { windowDays: 90, historyLimited: false, orders: 120, completed: true };
+  const running = { windowDays: 90, historyLimited: false, orders: 35, completed: false };
+  const shopify60 = { windowDays: 60, historyLimited: true, orders: 8, completed: true };
 
   it('只汇总连接上的店铺：都未连接（或没有店铺）时没有回补行', () => {
     expect(orderBackfillSummary([])).toBeNull();
@@ -192,26 +192,26 @@ describe('渠道卡的订单回补行（待办 13，协调者 2026-10-06 决定 
         { status: 'delayed', backfill: running },
         { status: 'connected', backfill: null },
       ]),
-    ).toEqual({ days: 90, state: 'running', orders: 155, limited: false });
+    ).toEqual({ days: 90, state: 'running', orders: 155, historyLimited: false });
     // 上线后新加的店铺还没回补：回到未开始，提示管理员再执行一次
     expect(
       orderBackfillSummary([
         { status: 'connected', backfill: done },
         { status: 'connected', backfill: null },
       ]),
-    ).toEqual({ days: 90, state: 'not_started', orders: 120, limited: false });
+    ).toEqual({ days: 90, state: 'not_started', orders: 120, historyLimited: false });
     expect(orderBackfillSummary([{ status: 'connected', backfill: null }])).toEqual({
       days: 90,
       state: 'not_started',
       orders: 0,
-      limited: false,
+      historyLimited: false,
     });
     expect(
       orderBackfillSummary([
         { status: 'connected', backfill: done },
         { status: 'error', backfill: done },
       ]),
-    ).toEqual({ days: 90, state: 'completed', orders: 240, limited: false });
+    ).toEqual({ days: 90, state: 'completed', orders: 240, historyLimited: false });
   });
 
   it('未连接的店铺不计：它没回补也不影响已完成', () => {
@@ -221,7 +221,7 @@ describe('渠道卡的订单回补行（待办 13，协调者 2026-10-06 决定 
         { status: 'not_connected', backfill: null },
         { status: 'not_connected', backfill: running },
       ]),
-    ).toEqual({ days: 90, state: 'completed', orders: 120, limited: false });
+    ).toEqual({ days: 90, state: 'completed', orders: 120, historyLimited: false });
   });
 
   it('天数取各店铺回补窗口中最短的；有店铺没开通 read_all_orders 时注明', () => {
@@ -230,12 +230,12 @@ describe('渠道卡的订单回补行（待办 13，协调者 2026-10-06 决定 
         { status: 'connected', backfill: done },
         { status: 'connected', backfill: shopify60 },
       ]),
-    ).toEqual({ days: 60, state: 'completed', orders: 128, limited: true });
+    ).toEqual({ days: 60, state: 'completed', orders: 128, historyLimited: true });
     expect(
       orderBackfillSummary([
         { status: 'connected', backfill: { ...shopify60, completed: false } },
         { status: 'not_connected', backfill: null },
       ]),
-    ).toEqual({ days: 60, state: 'running', orders: 8, limited: true });
+    ).toEqual({ days: 60, state: 'running', orders: 8, historyLimited: true });
   });
 });

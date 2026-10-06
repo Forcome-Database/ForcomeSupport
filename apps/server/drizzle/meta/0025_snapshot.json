@@ -1,5 +1,5 @@
 {
-  "id": "10e61f5b-36b4-4bb4-b9f9-498780398363",
+  "id": "7e08c82d-6f23-4e98-b6dd-8f4559cfedea",
   "prevId": "5b94081f-bddb-4b35-b4a6-ae312a38f184",
   "version": "7",
   "dialect": "postgresql",
@@ -2217,8 +2217,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "limited": {
-          "name": "limited",
+        "history_limited": {
+          "name": "history_limited",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
@@ -2256,8 +2256,8 @@
           "notNull": true,
           "default": 0
         },
-        "corrected": {
-          "name": "corrected",
+        "changed": {
+          "name": "changed",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

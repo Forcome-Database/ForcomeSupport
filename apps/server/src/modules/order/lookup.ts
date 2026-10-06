@@ -1,9 +1,9 @@
 import { isStoreInScope, type Runtime, type StoreScope } from '../core';
 import { ClientNotConfiguredError, type IntegrationClients } from '../integration';
-import { AMAZON_ORDER_ID, backfillAmazonOrder } from './amazon-sync';
+import { AMAZON_ORDER_ID, pullAmazonOrder } from './amazon-sync';
 import type { OrderStore } from './incremental-sync';
 import { mirroredOrder, type MirroredOrder, type OrderRef } from './mirror';
-import { backfillShopifyOrder } from './shopify-sync';
+import { pullShopifyOrder } from './shopify-sync';
 
 /*
  * 在某店铺内查订单（规格 order 对外接口，ADR 0011 修订；Shopify 待办 11、亚马逊待办 12）：先查镜像，镜像没有时按需补拉并入库——
@@ -35,12 +35,12 @@ async function backfill(
   lookup: OrderRef,
 ): Promise<boolean> {
   if (store.platform === 'shopify') {
-    return 'name' in lookup && backfillShopifyOrder(runtime, clients, store, lookup.name);
+    return 'name' in lookup && pullShopifyOrder(runtime, clients, store, lookup.name);
   }
   return (
     'platformOrderId' in lookup &&
     AMAZON_ORDER_ID.test(lookup.platformOrderId) &&
-    backfillAmazonOrder(runtime, clients, store, lookup.platformOrderId)
+    pullAmazonOrder(runtime, clients, store, lookup.platformOrderId)
   );
 }
 

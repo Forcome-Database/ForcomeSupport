@@ -1,8 +1,9 @@
-import type { Platform } from '@forcome/contracts';
+import { ORDER_BACKFILL_DAYS, type OrderBackfillProgress, type Platform } from '@forcome/contracts';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   defineJob,
+  toMilliseconds,
   transaction,
   type DbExecutor,
   type JobContext,
@@ -26,7 +27,7 @@ import { shopifyFor } from './shopify-sync';
  * ADR 0008、0011 修订，待办 13）：
  * 1. 回补：管理员用部署子命令 order-backfill 开始（按店铺；已完成的跳过，--again 重来；协调者 2026-10-06 决定 Q1），按下单时间从
  *    90 天前起分页取订单写进镜像（只进不退，与增量交错不产生重复行、不回退）。Shopify 没开通 read_all_orders 时第一页被拒
- *    （HistoryLimitedError），窗口改为 60 天并记下（limited：P18 写「未开通 read_all_orders」，报表注明）；
+ *    （HistoryLimitedError），窗口改为 60 天并记下（historyLimited：P18 写「未开通 read_all_orders」，报表注明）；
  * 2. 夜间对账：每天 03:30（上海）给每个订单店铺从头开始一次，按平台更新时间取近 7 天的订单写进镜像——镜像漏了的补上，同一版本而
  *    内容不一致的以平台为准改正（mirror.ts）；
  * 3. 一页一个任务（order.sweep_page）：取一页、写镜像、推进游标、排下一页在同一个事务里，中断（失败、worker 重启、任务过期）后从游标
@@ -37,18 +38,24 @@ import { shopifyFor } from './shopify-sync';
  * 5. 没配置凭据或卖家授权（ClientNotConfiguredError）不算失败：这一页先不取，配好后 sweep_resume 接着排（P18 只汇总已连接的店铺）。
  */
 
-const DAY_MS = 24 * 60 * 60_000;
-/** 回补的天数（规格「回补 90 天」） */
-export const BACKFILL_DAYS = 90;
-/** 夜间对账取近几天（规格「夜间对账近 7 天」） */
-export const RECONCILE_DAYS = 7;
+/**
+ * 两种的不同之处：取近几天（规格「回补 90 天」「夜间对账近 7 天」）、按什么时间取（回补按下单时间，订单之后再变也不在分页里挪位置；
+ * 对账按平台更新时间，覆盖近 7 天下的单与近 7 天里变过的老订单）、做完时的日志
+ */
+const SWEEPS = {
+  backfill: { days: ORDER_BACKFILL_DAYS, by: 'created', done: '订单回补完成' },
+  reconcile: { days: 7, by: 'updated', done: '夜间订单对账完成' },
+} as const satisfies Record<
+  OrderSweepKind,
+  { days: number; by: 'created' | 'updated'; done: string }
+>;
 /**
  * 窗口因平台权限缩短时往里收一点：平台按「此刻往前 N 天」判断，回补从第一页重来时比那一刻晚了几毫秒也不会再被拒
  */
-const NARROW_MARGIN_MS = 60 * 60_000;
+const NARROW_MARGIN_MS = toMilliseconds({ hours: 1 });
 /** 分页游标多久以后不再用（亚马逊的分页令牌 24 小时过期，留 1 小时余量；Shopify 的游标不过期） */
 const CURSOR_TTL_MS: Readonly<Record<Platform, number | null>> = {
-  amazon: 23 * 60 * 60_000,
+  amazon: toMilliseconds({ hours: 23 }),
   shopify: null,
 };
 /** 每个 worker 同时取几页（不同店铺；回补与对账都是低优先级，同一卖家的调用本来就在令牌桶里排队） */
@@ -104,16 +111,16 @@ async function queueSweepPage(tx: Tx, storeId: string, kind: OrderSweepKind): Pr
 
 /** 从头开始一次（回补 90 天、对账 7 天）：覆盖这个店铺这一种以前的进度，排第一页 */
 async function restartSweep(tx: Tx, storeId: string, kind: OrderSweepKind): Promise<void> {
-  const days = kind === 'backfill' ? BACKFILL_DAYS : RECONCILE_DAYS;
+  const days = SWEEPS[kind].days;
   const fresh = {
     windowDays: days,
-    limited: false,
-    since: new Date(tx.now.getTime() - days * DAY_MS),
+    historyLimited: false,
+    since: new Date(tx.now.getTime() - toMilliseconds({ days })),
     cursor: null,
     cursorAt: null,
     pages: 0,
     orders: 0,
-    corrected: 0,
+    changed: 0,
     startedAt: tx.now,
     completedAt: null,
     lastError: null,
@@ -207,7 +214,7 @@ async function fetchPage(
   switch (store.platform) {
     case 'amazon': {
       const page = await amazonFor(clients, store).searchOrders({
-        ...(kind === 'backfill' ? { createdAfter: since } : { lastUpdatedAfter: since }),
+        ...(SWEEPS[kind].by === 'created' ? { createdAfter: since } : { lastUpdatedAfter: since }),
         paginationToken: cursor,
         priority: 'low',
       });
@@ -219,7 +226,7 @@ async function fetchPage(
     }
     case 'shopify': {
       const page = await shopifyFor(clients, store).listOrders({
-        ...(kind === 'backfill' ? { createdSince: since } : { updatedSince: since }),
+        ...(SWEEPS[kind].by === 'created' ? { createdSince: since } : { updatedSince: since }),
         after: cursor,
         priority: 'low',
       });
@@ -236,7 +243,7 @@ async function fetchPage(
 async function restartPaging(
   runtime: Runtime,
   row: SweepRow,
-  changes: Partial<Pick<SweepRow, 'windowDays' | 'limited' | 'since'>> = {},
+  changes: Partial<Pick<SweepRow, 'windowDays' | 'historyLimited' | 'since'>> = {},
 ): Promise<SweepRow> {
   const now = runtime.clock.now();
   const [updated] = await runtime.db
@@ -301,8 +308,10 @@ export async function runOrderSweepPage(
       }
       row = await restartPaging(runtime, row, {
         windowDays: Math.min(row.windowDays, error.days),
-        limited: true,
-        since: new Date(runtime.clock.now().getTime() - error.days * DAY_MS + NARROW_MARGIN_MS),
+        historyLimited: true,
+        since: new Date(
+          runtime.clock.now().getTime() - toMilliseconds({ days: error.days }) + NARROW_MARGIN_MS,
+        ),
       });
       logger.info(
         { store: store.name, days: error.days },
@@ -322,7 +331,7 @@ export async function runOrderSweepPage(
   const current = row;
   const writes = noWrites();
   await transaction(runtime, async (tx) => {
-    // 推进游标：只在游标还是这一页开始时的样子时（同一页被并发取了两次时只认一次）
+    // 推进游标：只在还是这一轮（没被夜间对账或 --again 从头重开）、游标还是这一页开始时的样子时（同一页被并发取了两次时只认一次）
     const [claimed] = await tx.db
       .update(orderSweep)
       .set({
@@ -337,6 +346,7 @@ export async function runOrderSweepPage(
       .where(
         and(
           eq(orderSweep.id, current.id),
+          eq(orderSweep.startedAt, current.startedAt),
           isNull(orderSweep.completedAt),
           current.cursor === null
             ? isNull(orderSweep.cursor)
@@ -352,29 +362,22 @@ export async function runOrderSweepPage(
     if (writes.count > 0) {
       await tx.db
         .update(orderSweep)
-        .set({ corrected: sql`${orderSweep.corrected} + ${writes.count}` })
+        .set({ changed: sql`${orderSweep.changed} + ${writes.count}` })
         .where(eq(orderSweep.id, current.id));
     }
     if (page.next) await queueSweepPage(tx, store.id, kind);
   });
   if (!page.next) {
     logger.info(
-      { store: store.name, kind, orders: current.orders + page.count, corrected: writes.count },
-      kind === 'backfill' ? '订单回补完成' : '夜间订单对账完成',
+      { store: store.name, kind, orders: current.orders + page.count, changed: writes.count },
+      SWEEPS[kind].done,
     );
   }
 }
 
 /** 一个店铺的订单回补（P18 回补行，contracts 的 orderBackfillSummary 汇总） */
-export interface OrderBackfill {
+export interface OrderBackfill extends OrderBackfillProgress {
   readonly storeId: string;
-  /** 回补窗口天数（90；Shopify 没开通 read_all_orders 时 60） */
-  readonly windowDays: number;
-  /** 窗口因平台权限缩短了（没开通 read_all_orders） */
-  readonly limited: boolean;
-  /** 已回补的订单数 */
-  readonly orders: number;
-  readonly completed: boolean;
 }
 
 /** 全部店铺的订单回补（还没开始过的店铺没有） */
@@ -383,7 +386,7 @@ export async function orderBackfills(db: DbExecutor): Promise<Map<string, OrderB
     .select({
       storeId: orderSweep.storeId,
       windowDays: orderSweep.windowDays,
-      limited: orderSweep.limited,
+      historyLimited: orderSweep.historyLimited,
       orders: orderSweep.orders,
       completedAt: orderSweep.completedAt,
     })
@@ -395,7 +398,7 @@ export async function orderBackfills(db: DbExecutor): Promise<Map<string, OrderB
       {
         storeId: row.storeId,
         windowDays: row.windowDays,
-        limited: row.limited,
+        historyLimited: row.historyLimited,
         orders: row.orders,
         completed: row.completedAt !== null,
       },

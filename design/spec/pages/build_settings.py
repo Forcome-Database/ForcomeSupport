@@ -191,7 +191,7 @@ SHOPIFY_LINES_P1 = ['2 个店铺 · 订单经 Admin API 准实时同步']  # 第
 def backfill_line(st):
     """亚马逊、Shopify 卡的订单回补行（K20；四种写法为待办 13 · 协调者 10-06 决定 Q2，见 data.BACKFILL_STATES）：未开始（灰）、
     进行中 · 已回补 N 笔（蓝）、已完成（绿勾）、Shopify 没开通 read_all_orders 只回补 60 天、完成后为「未开通 read_all_orders」（黄）。
-    亚马逊卡在订单通知队列行之后、Shopify 卡在店铺行之后；卡片连接异常时不显示这一行。"""
+    亚马逊卡在订单通知队列行之后、Shopify 卡在店铺行之后；该平台没有连接上的店铺、卡片连接异常时不显示这一行（部分店铺未连接时照写）。"""
     s, days, n = st
     if s == '未开始':
         c = chip('未开始', 'muted', 11)

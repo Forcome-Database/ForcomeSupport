@@ -15,7 +15,14 @@ export {
   type AuditRecord,
   type AuditVisibility,
 } from './audit';
-export { ManualClock, startingAt, systemClock, type Clock, type Duration } from './clock';
+export {
+  ManualClock,
+  startingAt,
+  systemClock,
+  toMilliseconds,
+  type Clock,
+  type Duration,
+} from './clock';
 export {
   amount,
   currency,

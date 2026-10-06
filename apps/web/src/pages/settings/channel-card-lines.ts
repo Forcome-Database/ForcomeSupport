@@ -15,7 +15,7 @@ import {
  * 渠道卡的说明行（K20 与补充小样，待办 09）：
  * - 亚马逊（待办 12）与 Shopify（待办 11）：写法同 Gmail，按店铺——有连接异常的店铺时，每个异常的店铺一行原因与恢复指引，
  *   再写一次订单暂停同步，同步延迟的店铺排在后面；只有同步延迟时，每个延迟的店铺一行，其余说明行照常；
- *   订单回补行（待办 13）带状态标签，也不在这里（orderBackfillLine，channel-cards.tsx 的 OrderBackfillLine）；
+ *   订单回补行（待办 13）带状态标签，文字与标签由本文件的 orderBackfillLine 给出，画在 channel-cards.tsx 的 OrderBackfillRow；
  *   亚马逊卡的「订单通知队列（SQS）」一行带状态标签，不在这里（channel-cards.tsx 的 OrderQueueLine），各状态下都照写；
  * - Gmail：都正常时写邮箱数与「已发送」；有连接异常的邮箱时，每个异常的邮箱一行原因与恢复指引（次数为实际的连续失败次数），
  *   再写一次来信暂存，同步延迟的邮箱排在后面；只有同步延迟时，每个延迟的邮箱一行，其余说明行照常；
@@ -116,8 +116,9 @@ export interface OrderBackfillLine {
 }
 
 /**
- * 亚马逊、Shopify 卡的订单回补行（K20 补充小样，待办 13，协调者 2026-10-06 决定 Q2）：后端只汇总连接上的店铺，没有连接上的店铺时
- * 没有这一行；卡片连接异常时也不显示（原型连接异常的卡没有这一行），同步延迟时照写。Shopify 只回补了 60 天（没开通 read_all_orders）
+ * 亚马逊、Shopify 卡的订单回补行（K20 补充小样，待办 13，协调者 2026-10-06 决定 Q2）：只在两种情况不显示——该平台没有连接上的店铺
+ * （后端只汇总连接上的店铺，这时给 null）；卡片连接异常（原型连接异常的卡没有这一行）。同步延迟照写；部分店铺未连接、卡片最差状态为
+ * 未连接时也照写（上线前逐个店铺录凭据、边录边回补，正是要看进度的时候）。Shopify 只回补了 60 天（没开通 read_all_orders）
  * 的，回补完成后写「未开通 read_all_orders」
  */
 export function orderBackfillLine(card: ChannelCard): OrderBackfillLine | null {
@@ -136,8 +137,11 @@ export function orderBackfillLine(card: ChannelCard): OrderBackfillLine | null {
         badge: { text: ORDER_BACKFILL_LINE.running(backfill.orders), tone: 'info', check: false },
       };
     case 'completed':
-      return backfill.limited
-        ? { label, badge: { text: ORDER_BACKFILL_LINE.limited, tone: 'warning', check: false } }
+      return backfill.historyLimited
+        ? {
+            label,
+            badge: { text: ORDER_BACKFILL_LINE.historyLimited, tone: 'warning', check: false },
+          }
         : { label, badge: { text: ORDER_BACKFILL_LINE.completed, tone: 'success', check: true } };
   }
 }

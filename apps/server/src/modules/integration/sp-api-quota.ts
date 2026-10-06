@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { Clock } from '../core';
-import type { CallPriority } from './call-priority';
+import { nextInQueue, type CallPriority } from './call-priority';
 
 /*
  * SP-API 的配额（规格 order「每个『卖家 × 接口』共享令牌桶，增量优先、回补与对账让路，配额以响应头为准」、ADR 0008 修订，待办 12）：
@@ -82,8 +82,7 @@ export class SpApiQuota {
 
   /** 发给排在最前的：先高优先级，同一优先级先来先得 */
   #next(bucket: Bucket): Waiter | undefined {
-    const index = bucket.queue.findIndex((w) => w.priority === 'high');
-    return bucket.queue.splice(index === -1 ? 0 : index, 1)[0];
+    return bucket.queue.splice(nextInQueue(bucket.queue), 1)[0];
   }
 
   #pump(bucket: Bucket): void {

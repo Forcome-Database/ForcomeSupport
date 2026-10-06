@@ -49,7 +49,7 @@ import {
  *    searchOrders 默认配额约 3 分钟 1 次，每 4 分钟一轮给回补与对账（13）留出余量，排队按优先级（增量为高）；
  * 4. 没配置 SP-API 凭据或该店铺还没录入卖家授权（ClientNotConfiguredError）不算失败，店铺为未连接；没配置 SQS 时拉取源安静跳过，
  *    SQS 行为未连接（用户 2026-10-04 口径）。
- * 镜像缺失时按订单号补拉（backfillAmazonOrder，经 lookup.ts 的 findOrder）；「测试连接」逐个店铺读卖家参与的站点、探一次 SQS，
+ * 镜像缺失时按订单号补拉（pullAmazonOrder，经 lookup.ts 的 findOrder）；「测试连接」逐个店铺读卖家参与的站点、探一次 SQS，
  * 测完排一次同步（testAmazonConnection）。
  */
 
@@ -157,7 +157,7 @@ export async function syncAmazonStore(
  * 按订单号从 SP-API 补拉一笔并写进镜像（通知触发的拉取，与镜像缺失时 lookup.ts 的 findOrder）；平台也没有返回 false。
  * 没配置凭据以 ClientNotConfiguredError 失败，其余外部调用失败照常抛出
  */
-export async function backfillAmazonOrder(
+export async function pullAmazonOrder(
   runtime: Runtime,
   clients: IntegrationClients,
   store: OrderStore,
@@ -179,7 +179,7 @@ export async function fetchChangedOrder(
   const store = (await amazonStores(runtime.db, stores)).find((s) => s.id === storeId);
   if (!store) return;
   try {
-    if (!(await backfillAmazonOrder(runtime, clients, store, orderId))) {
+    if (!(await pullAmazonOrder(runtime, clients, store, orderId))) {
       logger.info({ store: store.name, orderId }, '通知里的订单在平台上取不到，等增量兜底');
     }
   } catch (error) {

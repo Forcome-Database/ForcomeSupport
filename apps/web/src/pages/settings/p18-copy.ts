@@ -121,7 +121,7 @@ export const ORDER_BACKFILL_LINE = {
   notStarted: '未开始',
   running: (orders: number) => `进行中 · 已回补 ${orders.toLocaleString('en-US')} 笔`,
   completed: '已完成',
-  limited: '未开通 read_all_orders',
+  historyLimited: '未开通 read_all_orders',
 } as const;
 
 /**

@@ -32,7 +32,7 @@ import { mirrorShopifyOrders, upsertShopifyOrder } from './mirror';
  * 3. 外部调用失败记进同步记录（sync-health.ts）：连续 3 次为连接异常（通知、审计、全站横幅），之后同步成功即恢复；
  *    任务本身不重试，下一分钟的同步就是重试；
  * 4. 没配置 Shopify 凭据（ClientNotConfiguredError，用户 2026-10-04 口径）不算失败、什么也不记，店铺为未连接。
- * 镜像缺失时按订单名补拉（backfillShopifyOrder，经 lookup.ts 的 findOrder）；「测试连接」逐个店铺读店铺信息、测完排一次同步
+ * 镜像缺失时按订单名补拉（pullShopifyOrder，经 lookup.ts 的 findOrder）；「测试连接」逐个店铺读店铺信息、测完排一次同步
  * （testShopifyConnection）。增量的取法交给共用的 incremental-sync.ts。
  */
 
@@ -125,7 +125,7 @@ export async function syncShopifyStore(
  * 按订单名从 Shopify 补拉一笔并写进镜像（镜像缺失时，lookup.ts 的 findOrder 调用）；平台也没有返回 false。
  * 没配置凭据以 ClientNotConfiguredError 失败，其余外部调用失败照常抛出（调用方决定稍后重试）
  */
-export async function backfillShopifyOrder(
+export async function pullShopifyOrder(
   runtime: Runtime,
   clients: IntegrationClients,
   store: OrderStore,

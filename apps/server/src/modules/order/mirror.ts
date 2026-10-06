@@ -91,47 +91,59 @@ export const noWrites = (): MirrorWrites => ({ count: 0, from: null, to: null })
 /** upsert 时这一列换成拉到的版本（excluded 里同名的值；按列对象取列名，写错列编译不过） */
 const excluded = (column: AnyPgColumn) => sql.raw(`excluded.${column.name}`);
 
+type OrderField = keyof typeof platformOrder.$inferSelect;
+
 /**
- * 什么时候用拉到的版本改镜像：平台更新时间更新的；或同一版本、但这些列与镜像里的不一样的（以平台为准，待办 13 的夜间对账）。
- * 更旧的版本一律不改（只进不退）
+ * 一种平台的 upsert 规则：要与平台一致的字段（不含平台更新时间与写入时间）同时决定改哪些列与什么时候改——
+ * 平台更新时间更新的照改；同一版本、但这些列与镜像里的不一样的也改（以平台为准，待办 13 的夜间对账）；更旧的版本一律不改（只进不退），
+ * 同一版本内容一样也不改。一张清单生成两处，加列时不会只改了一边
  */
-function newerOrDifferent(columns: readonly AnyPgColumn[]) {
-  return sql`${platformOrder.platformUpdatedAt} < excluded.platform_updated_at or (
-    ${platformOrder.platformUpdatedAt} = excluded.platform_updated_at
-    and (${sql.join([...columns], sql`, `)}) is distinct from (${sql.join(columns.map(excluded), sql`, `)})
-  )`;
+function upsertRule(fields: readonly OrderField[]) {
+  const columns = fields.map((field) => platformOrder[field]);
+  return {
+    target: [platformOrder.storeId, platformOrder.platformOrderId],
+    set: {
+      ...Object.fromEntries(fields.map((field) => [field, excluded(platformOrder[field])])),
+      platformUpdatedAt: excluded(platformOrder.platformUpdatedAt),
+      syncedAt: excluded(platformOrder.syncedAt),
+    },
+    setWhere: sql`${platformOrder.platformUpdatedAt} < excluded.platform_updated_at or (
+      ${platformOrder.platformUpdatedAt} = excluded.platform_updated_at
+      and (${sql.join(columns, sql`, `)}) is distinct from (${sql.join(columns.map(excluded), sql`, `)})
+    )`,
+  };
 }
 
-/** Shopify 订单要与平台一致的列（不含写入时间） */
-const SHOPIFY_COLUMNS = [
-  platformOrder.name,
-  platformOrder.status,
-  platformOrder.financialStatus,
-  platformOrder.cancelledAt,
-  platformOrder.lineItems,
-  platformOrder.totalAmount,
-  platformOrder.totalCurrency,
-  platformOrder.customerEmail,
-  platformOrder.shipCountry,
-  platformOrder.shipAddress,
-  platformOrder.tracking,
-  platformOrder.placedAt,
-];
+/** Shopify 订单的 upsert：订单名、状态、付款、金额、邮箱、收件与单号 */
+const SHOPIFY_UPSERT = upsertRule([
+  'name',
+  'status',
+  'financialStatus',
+  'cancelledAt',
+  'lineItems',
+  'totalAmount',
+  'totalCurrency',
+  'customerEmail',
+  'shipCountry',
+  'shipAddress',
+  'tracking',
+  'placedAt',
+]);
 
-/** 亚马逊订单要与平台一致的列（不含写入时间） */
-const AMAZON_COLUMNS = [
-  platformOrder.status,
-  platformOrder.lineItems,
-  platformOrder.totalAmount,
-  platformOrder.totalCurrency,
-  platformOrder.shipCountry,
-  platformOrder.shipAddress,
-  platformOrder.tracking,
-  platformOrder.fulfillmentChannel,
-  platformOrder.promisedShipBy,
-  platformOrder.promisedDeliveryBy,
-  platformOrder.placedAt,
-];
+/** 亚马逊订单的 upsert：状态、金额、收件、单号、履约方与承诺时效 */
+const AMAZON_UPSERT = upsertRule([
+  'status',
+  'lineItems',
+  'totalAmount',
+  'totalCurrency',
+  'shipCountry',
+  'shipAddress',
+  'tracking',
+  'fulfillmentChannel',
+  'promisedShipBy',
+  'promisedDeliveryBy',
+  'placedAt',
+]);
 
 /**
  * 把一笔 Shopify 订单写进镜像（只进不退）；返回是否新增或改了。邮箱存小写（R-ST-03 反查不分大小写）
@@ -164,27 +176,7 @@ export async function upsertShopifyOrder(
       syncedAt: tx.now,
       createdAt: tx.now,
     })
-    .onConflictDoUpdate({
-      target: [platformOrder.storeId, platformOrder.platformOrderId],
-      set: {
-        name: excluded(platformOrder.name),
-        status: excluded(platformOrder.status),
-        financialStatus: excluded(platformOrder.financialStatus),
-        cancelledAt: excluded(platformOrder.cancelledAt),
-        lineItems: excluded(platformOrder.lineItems),
-        totalAmount: excluded(platformOrder.totalAmount),
-        totalCurrency: excluded(platformOrder.totalCurrency),
-        customerEmail: excluded(platformOrder.customerEmail),
-        shipCountry: excluded(platformOrder.shipCountry),
-        shipAddress: excluded(platformOrder.shipAddress),
-        tracking: excluded(platformOrder.tracking),
-        placedAt: excluded(platformOrder.placedAt),
-        platformUpdatedAt: excluded(platformOrder.platformUpdatedAt),
-        syncedAt: excluded(platformOrder.syncedAt),
-      },
-      // 只进不退：更旧的版本不改；同一版本内容一样也不改
-      setWhere: newerOrDifferent(SHOPIFY_COLUMNS),
-    })
+    .onConflictDoUpdate(SHOPIFY_UPSERT)
     .returning({ id: platformOrder.id });
   return rows.length > 0;
 }
@@ -261,26 +253,7 @@ export async function upsertAmazonOrder(
       syncedAt: tx.now,
       createdAt: tx.now,
     })
-    .onConflictDoUpdate({
-      target: [platformOrder.storeId, platformOrder.platformOrderId],
-      set: {
-        status: excluded(platformOrder.status),
-        lineItems: excluded(platformOrder.lineItems),
-        totalAmount: excluded(platformOrder.totalAmount),
-        totalCurrency: excluded(platformOrder.totalCurrency),
-        shipCountry: excluded(platformOrder.shipCountry),
-        shipAddress: excluded(platformOrder.shipAddress),
-        tracking: excluded(platformOrder.tracking),
-        fulfillmentChannel: excluded(platformOrder.fulfillmentChannel),
-        promisedShipBy: excluded(platformOrder.promisedShipBy),
-        promisedDeliveryBy: excluded(platformOrder.promisedDeliveryBy),
-        placedAt: excluded(platformOrder.placedAt),
-        platformUpdatedAt: excluded(platformOrder.platformUpdatedAt),
-        syncedAt: excluded(platformOrder.syncedAt),
-      },
-      // 只进不退：更旧的版本不改；同一版本内容一样也不改
-      setWhere: newerOrDifferent(AMAZON_COLUMNS),
-    })
+    .onConflictDoUpdate(AMAZON_UPSERT)
     .returning({ id: platformOrder.id });
   return rows.length > 0;
 }

@@ -131,7 +131,7 @@ test('亚马逊卡同步延迟：每个延迟的店铺一行，其余说明行�
           }),
         ],
         queue: { status: 'normal', backlog: 0 },
-        backfill: { days: 90, state: 'completed', orders: 12, limited: false },
+        backfill: { days: 90, state: 'completed', orders: 12, historyLimited: false },
       },
     },
     { 'Forcome Auto': 'delayed' },
@@ -167,7 +167,7 @@ test('亚马逊卡连接异常：每个异常的店铺一行原因与恢复指�
           issue({ target: 'Forcome Direct', status: 'delayed', failingSince: null, failures: 0 }),
         ],
         queue: { status: 'normal', backlog: 0 },
-        backfill: { days: 90, state: 'completed', orders: 12, limited: false },
+        backfill: { days: 90, state: 'completed', orders: 12, historyLimited: false },
       },
     },
     { 'Forcome Auto': 'error' },
@@ -286,7 +286,7 @@ test('订单回补行的未开始与进行中：「未开始」、「进行中 �
     days: 90,
     state: 'not_started',
     orders: 0,
-    limited: false,
+    historyLimited: false,
   };
   await page.route('**/api/channel/settings', async (route) => {
     const real = channelSettingsSchema.parse(await (await route.fetch()).json());
@@ -299,7 +299,7 @@ test('订单回补行的未开始与进行中：「未开始」、「进行中 �
           ...c,
           status: 'connected' as const,
           issues: [],
-          backfill: { days: 60, state: 'running' as const, orders: 8, limited: true },
+          backfill: { days: 60, state: 'running' as const, orders: 8, historyLimited: true },
         };
       }
       return c;
@@ -313,7 +313,7 @@ test('订单回补行的未开始与进行中：「未开始」、「进行中 �
   await expect(card(page, 'shopify').getByTestId('order-backfill-line')).toHaveText(
     '订单回补 60 天进行中 · 已回补 8 笔',
   );
-  amazonBackfill = { days: 90, state: 'running', orders: 1284, limited: false };
+  amazonBackfill = { days: 90, state: 'running', orders: 1284, historyLimited: false };
   await page.reload();
   await expect(amazonLine).toHaveText('订单回补 90 天进行中 · 已回补 1,284 笔');
   // 只影响这一行：卡片仍是已连接
@@ -338,7 +338,7 @@ test('Shopify 卡同步延迟：每个延迟的店铺一行，其余说明行照
             lastSuccessAt: '2026-09-11T02:05:00.000Z',
           }),
         ],
-        backfill: { days: 60, state: 'completed', orders: 4, limited: true },
+        backfill: { days: 60, state: 'completed', orders: 4, historyLimited: true },
       },
     },
     { 'forcome.mx': 'delayed' },
@@ -372,7 +372,7 @@ test('Shopify 卡连接异常：每个异常的店铺一行原因与恢复指引
           issue({ target: 'forcome.com', status: 'delayed', failingSince: null, failures: 0 }),
           issue({ target: 'forcome.mx', failures: 4 }),
         ],
-        backfill: { days: 60, state: 'completed', orders: 4, limited: true },
+        backfill: { days: 60, state: 'completed', orders: 4, historyLimited: true },
       },
     },
     { 'forcome.mx': 'error' },
@@ -691,6 +691,30 @@ test('亚马逊卡未连接（生产环境还没配置 SP-API 与 SQS）：「�
     '订单通知队列（SQS）未连接',
   ]);
   await expect(page.getByRole('row').filter({ hasText: 'A1FD7Q2M9XK3LC' })).toContainText(
+    'SP-API 未连接',
+  );
+});
+
+test('部分店铺未连接（例如还没录入卖家授权）：卡片最差状态为未连接，订单回补行照写、按连接上的店铺汇总（待办 13，协调者 2026-10-06 决定）', async ({
+  page,
+}) => {
+  await stubCards(
+    page,
+    {
+      amazon: {
+        status: 'not_connected',
+        issues: [],
+        backfill: { days: 90, state: 'completed', orders: 9, historyLimited: false },
+      },
+    },
+    { 'Forcome Auto': 'not_connected' },
+  );
+  await loginAs(page, '刘洋');
+  await page.goto('/settings/channels');
+  const amazon = card(page, 'amazon');
+  await expect(amazon).toContainText('未连接');
+  await expect(amazon.getByTestId('order-backfill-line')).toHaveText('订单回补 90 天已完成');
+  await expect(page.getByRole('row').filter({ hasText: 'A3KA8V1T6RW2NB' })).toContainText(
     'SP-API 未连接',
   );
 });

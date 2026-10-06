@@ -316,19 +316,25 @@ export const orderBackfillSchema = z.object({
   /** 已回补的订单数（各店铺合计）：进行中写「已回补 N 笔」 */
   orders: z.int().nonnegative(),
   /** 有店铺因没开通 read_all_orders 只回补了 60 天（Shopify）：完成后写「未开通 read_all_orders」 */
-  limited: z.boolean(),
+  historyLimited: z.boolean(),
 });
 export type OrderBackfillSummary = z.infer<typeof orderBackfillSchema>;
+
+/** 一个店铺的订单回补进度（order 的 orderBackfills） */
+export interface OrderBackfillProgress {
+  /** 回补窗口天数（90；Shopify 没开通 read_all_orders 时 60） */
+  readonly windowDays: number;
+  /** 窗口因平台权限缩短了（没开通 read_all_orders） */
+  readonly historyLimited: boolean;
+  /** 已回补的订单数 */
+  readonly orders: number;
+  readonly completed: boolean;
+}
 
 /** 一个店铺的订单连接状态与回补（还没开始过为 null） */
 export interface StoreBackfill {
   readonly status: ConnectionStatus;
-  readonly backfill: {
-    readonly windowDays: number;
-    readonly limited: boolean;
-    readonly orders: number;
-    readonly completed: boolean;
-  } | null;
+  readonly backfill: OrderBackfillProgress | null;
 }
 
 /**
@@ -351,7 +357,7 @@ export function orderBackfillSummary(
     days: Math.min(ORDER_BACKFILL_DAYS, ...started.map((b) => b.windowDays)),
     state,
     orders: started.reduce((sum, b) => sum + b.orders, 0),
-    limited: started.some((b) => b.limited),
+    historyLimited: started.some((b) => b.historyLimited),
   };
 }
 

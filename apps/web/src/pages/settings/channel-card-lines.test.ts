@@ -253,7 +253,7 @@ describe('订单回补行（K20 补充小样，待办 13，协调者 2026-10-06 
     days: 90,
     state: 'completed' as const,
     orders: 1284,
-    limited: false,
+    historyLimited: false,
     ...overrides,
   });
 
@@ -272,7 +272,9 @@ describe('订单回补行（K20 补充小样，待办 13，协调者 2026-10-06 
       badge: { text: '已完成', tone: 'success', check: true },
     });
     expect(
-      orderBackfillLine(card({ kind: 'shopify', backfill: backfill({ days: 60, limited: true }) })),
+      orderBackfillLine(
+        card({ kind: 'shopify', backfill: backfill({ days: 60, historyLimited: true }) }),
+      ),
     ).toEqual({
       label: '订单回补 60 天',
       badge: { text: '未开通 read_all_orders', tone: 'warning', check: false },
@@ -282,7 +284,7 @@ describe('订单回补行（K20 补充小样，待办 13，协调者 2026-10-06 
       orderBackfillLine(
         card({
           kind: 'shopify',
-          backfill: backfill({ days: 60, limited: true, state: 'running', orders: 8 }),
+          backfill: backfill({ days: 60, historyLimited: true, state: 'running', orders: 8 }),
         }),
       )?.badge.text,
     ).toBe('进行中 · 已回补 8 笔');
@@ -296,5 +298,14 @@ describe('订单回补行（K20 补充小样，待办 13，协调者 2026-10-06 
       orderBackfillLine(card({ kind: 'amazon', status: 'delayed', backfill: backfill() })),
     ).not.toBeNull();
     expect(orderBackfillLine(card({ kind: 'amazon', status: 'not_connected' }))).toBeNull();
+  });
+
+  it('部分店铺未连接（卡片最差状态为未连接）时照写，按连接上的店铺汇总（协调者 2026-10-06 决定）', () => {
+    expect(
+      orderBackfillLine(card({ kind: 'amazon', status: 'not_connected', backfill: backfill() })),
+    ).toEqual({
+      label: '订单回补 90 天',
+      badge: { text: '已完成', tone: 'success', check: true },
+    });
   });
 });

@@ -279,7 +279,7 @@ describe('K20 补充小样：亚马逊卡（待办 12，协调者 2026-10-06 决
     expectText(P18, ORDER_BACKFILL_LINE.label(90));
     expectText(P18, ORDER_BACKFILL_LINE.label(60));
     expectIn(P18, `${ORDER_BACKFILL_LINE.completed}<`);
-    expectIn(P18, `>${ORDER_BACKFILL_LINE.limited}<`);
+    expectIn(P18, `>${ORDER_BACKFILL_LINE.historyLimited}<`);
     expectIn(STATES_ADMIN, `>${ORDER_BACKFILL_LINE.notStarted}<`);
     expectIn(STATES_ADMIN, `>${ORDER_BACKFILL_LINE.running(1284)}<`);
   });

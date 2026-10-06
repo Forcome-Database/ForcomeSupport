@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ManualClock } from '../core';
-import { SHOPIFY_DEFAULT_COST, ShopifyQuota } from './shopify-quota';
+import { SHOPIFY_DEFAULT_COST, ShopifyQuota, type ShopifyOperation } from './shopify-quota';
 
 /*
  * Shopify 查询成本配额（待办 13；规格 order「增量优先、回补与对账让路」）：手动时钟 + 由测试放行的等待（放行时把时钟推进等待的时长）。
@@ -31,7 +31,7 @@ beforeEach(() => {
 });
 
 /** 一次响应：这种查询的请求成本与此刻桶里还剩几点（桶 1000 点、每秒恢复 50 点） */
-function respond(operation: string, requested: number, currentlyAvailable: number) {
+function respond(operation: ShopifyOperation, requested: number, currentlyAvailable: number) {
   quota.observe(SHOP, operation, {
     requestedQueryCost: requested,
     throttleStatus: { maximumAvailable: 1000, currentlyAvailable, restoreRate: 50 },
@@ -49,18 +49,19 @@ describe('Shopify 查询成本配额', () => {
     expect(waits).toEqual([]);
   });
 
-  it('低优先级要给增量留出一次订单查询：点数只够一次时低优先级等，高优先级立即发出', async () => {
+  it('低优先级要给增量留出一次订单查询：点数只够一次时低优先级等；高优先级点数够就立即发出，不陪着排在前面的低优先级等', async () => {
     respond('orders', 300, 500);
     // 低优先级要 300 + 留给增量的 300 = 600 点：等 100 点恢复（2 秒）
     const low = quota.acquire(SHOP, 'orders', 'low');
     await vi.waitFor(() => expect(waits.map((w) => w.ms)).toEqual([2000]));
     expect(quota.queued(SHOP)).toBe(1);
-    // 增量（高优先级）只要 300 点：插到前面，但 pump 正在等，等这一次结束后先发它
-    const high = quota.acquire(SHOP, 'orders', 'high');
+    // 增量（高优先级）只要 300 点：回补还在等，增量不陪着等，立即发出
+    await quota.acquire(SHOP, 'orders', 'high');
+    expect(quota.available(SHOP)).toBe(200);
+    expect(quota.queued(SHOP)).toBe(1);
+    // 约好的那次醒来时只有 300 点：低优先级接着等（还差 300 点，6 秒）
     waits.shift()!.release();
-    await high;
-    // 高优先级拿走 300 点后只剩 300：低优先级继续等
-    await vi.waitFor(() => expect(waits).toHaveLength(1));
+    await vi.waitFor(() => expect(waits.map((w) => w.ms)).toEqual([6000]));
     expect(quota.queued(SHOP)).toBe(1);
     waits.shift()!.release();
     await low;

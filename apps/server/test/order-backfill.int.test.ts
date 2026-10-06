@@ -138,7 +138,7 @@ describe('回补中断后续跑不重复、不遗漏', () => {
       days: 90,
       state: 'running',
       orders: 50,
-      limited: false,
+      historyLimited: false,
     });
 
     // 重试时平台出错一次：游标不动
@@ -157,7 +157,7 @@ describe('回补中断后续跑不重复、不遗漏', () => {
       days: 90,
       state: 'completed',
       orders: 130,
-      limited: false,
+      historyLimited: false,
     });
     // 130 笔都在镜像里（直接从镜像查到，没有按订单号补拉）
     for (const o of recent) {
@@ -253,7 +253,7 @@ describe('Shopify 拒绝 60 天以前的查询时，回补窗口记为 60 天', 
     expect((await orderBackfills(t.runtime.db)).get(SHOPIFY_COM.id)).toEqual({
       storeId: SHOPIFY_COM.id,
       windowDays: 60,
-      limited: true,
+      historyLimited: true,
       orders: 2,
       completed: true,
     });
@@ -262,7 +262,7 @@ describe('Shopify 拒绝 60 天以前的查询时，回补窗口记为 60 天', 
       days: 60,
       state: 'not_started',
       orders: 2,
-      limited: true,
+      historyLimited: true,
     });
   });
 
@@ -277,13 +277,13 @@ describe('Shopify 拒绝 60 天以前的查询时，回补窗口记为 60 天', 
     expect(await mirrored(SHOPIFY_MX.id, d95)).toEqual([]);
     expect((await orderBackfills(t.runtime.db)).get(SHOPIFY_MX.id)).toMatchObject({
       windowDays: 90,
-      limited: false,
+      historyLimited: false,
     });
     expect((await card(admin, 'shopify')).backfill).toEqual({
       days: 60,
       state: 'completed',
       orders: 3,
-      limited: true,
+      historyLimited: true,
     });
   });
 
@@ -490,7 +490,7 @@ describe('P18 回补行跟着进度变（汇总连接上的店铺）', () => {
       days: 90,
       state: 'not_started',
       orders: 0,
-      limited: false,
+      historyLimited: false,
     });
     expect((await card(admin, 'shopify')).backfill?.state).toBe('not_started');
     expect((await card(admin, 'gmail')).backfill).toBeNull();
@@ -507,14 +507,14 @@ describe('P18 回补行跟着进度变（汇总连接上的店铺）', () => {
       days: 90,
       state: 'running',
       orders: 51,
-      limited: false,
+      historyLimited: false,
     });
     await t.runJobs();
     expect((await card(admin, 'amazon')).backfill).toEqual({
       days: 90,
       state: 'completed',
       orders: 61,
-      limited: false,
+      historyLimited: false,
     });
 
     // 上线后新加一个亚马逊店铺：先同步一次（连接上），回补行回到未开始
@@ -555,6 +555,32 @@ describe('P18 回补行跟着进度变（汇总连接上的店铺）', () => {
     await t.runJobs();
     expect((await orderBackfills(t.runtime.db)).has(DIRECT.id)).toBe(false);
     expect((await card(admin, 'amazon')).backfill?.state).toBe('not_started');
+  });
+
+  it('部分店铺未连接（改成真实接口而没配置凭据）：卡片最差状态为未连接，回补行照常按连接上的店铺汇总（协调者 2026-10-06 决定）', async () => {
+    await backfill(t);
+    await t.runJobs();
+    expect((await card(admin, 'amazon')).backfill?.state).toBe('completed');
+    const res = await admin.get('/api/channel/settings');
+    const auto = channelSettingsSchema
+      .parse(await res.json())
+      .stores.find((s) => s.id === AUTO.id)!;
+    const saved = await admin.put(`/api/channel/stores/${AUTO.id}`, {
+      version: auto.version,
+      name: auto.name,
+      platform: auto.platform,
+      sites: auto.sites,
+      defaultSite: auto.defaultSite,
+      mailboxes: auto.mailboxes,
+      platformId: auto.platformId,
+      adapterMode: 'real',
+    });
+    expect(saved.status).toBe(200);
+    await t.runJobs();
+    const amazon = await card(admin, 'amazon');
+    expect(amazon.status).toBe('not_connected');
+    // Forcome Auto 未连接、它的回补按新配置清掉了，不计；其余连接上的店铺都回补完了
+    expect(amazon.backfill).toMatchObject({ days: 90, state: 'completed' });
   });
 });
 

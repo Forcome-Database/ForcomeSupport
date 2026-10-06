@@ -46,7 +46,6 @@ export {
   testShopifyConnection,
 } from './shopify-sync';
 export {
-  BACKFILL_DAYS,
   orderBackfills,
   orderReconcileJob,
   orderSweepPageJob,

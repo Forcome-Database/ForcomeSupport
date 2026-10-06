@@ -1,13 +1,13 @@
 import { currencySchema } from '@forcome/contracts';
 import { z } from 'zod';
-import type { Clock, ShopifyCredentials } from '../core';
+import { toMilliseconds, type Clock, type ShopifyCredentials } from '../core';
 import type { CallPriority } from './call-priority';
 import type { CredentialVault } from './credential-vault';
 import type { RealClientContext } from './definition';
 import { ClientNotConfiguredError, ExternalCallFailedError, HistoryLimitedError } from './faults';
 import { createHttpClient, type HttpClient, type RateLimit } from './http';
 import { SHOPIFY_RECENT_ORDER_DAYS, type ShopifyClient, type ShopifyOrder } from './shopify';
-import { ShopifyQuota } from './shopify-quota';
+import { ShopifyQuota, type ShopifyOperation } from './shopify-quota';
 
 /*
  * Shopify Admin GraphQL 的真实现（规格 order「Shopify」、ADR 0011、0013，待办 11）：
@@ -19,7 +19,7 @@ import { ShopifyQuota } from './shopify-quota';
  *   翻译成 faults.ts 的错误；
  * - 查询成本：发出前从本进程的店铺桶里扣点（shopify-quota.ts，增量优先、回补与对账让路），按响应的 extensions.cost 校准；
  * - 历史订单：没开通 read_all_orders 的应用只能读近 60 天的订单（平台对更早的不报错、只是不返回）。按下单时间从 60 天以前取时，
- *   第一页先查一次应用被授予的权限（currentAppInstallation.accessScopes，同一店铺 1 小时内沿用），没有 read_all_orders 就以
+ *   第一页先查一次应用被授予的权限（currentAppInstallation.accessScopes，不缓存），没有 read_all_orders 就以
  *   HistoryLimitedError 失败，回补据此改为 60 天并记下回补窗口（待办 13）；
  * - 都经出站 HTTP 客户端工厂（代理分流、时限、限流、调用记录；换令牌的响应体不记）。
  * 没有配置客户端凭据或主密钥时以「未配置」失败（ClientNotConfiguredError，不算连接失败，店铺为未连接，用户 2026-10-04 口径）。
@@ -64,9 +64,6 @@ const SHOP_QUERY = 'query Shop { shop { name } }';
 const SCOPES_QUERY = 'query Scopes { currentAppInstallation { accessScopes { handle } } }';
 /** 读得到 60 天以前的订单要的权限 */
 const READ_ALL_ORDERS = 'read_all_orders';
-/** 应用被授予的权限在本进程沿用多久 */
-const SCOPES_TTL_MS = 60 * 60_000;
-const DAY_MS = 24 * 60 * 60_000;
 
 const nullableString = z
   .string()
@@ -244,12 +241,6 @@ export function createShopifyTokens(
   };
 }
 
-/** 各店铺应用被授予的权限（按店铺缓存 1 小时） */
-const grantedScopes = new Map<
-  string,
-  { readonly handles: ReadonlySet<string>; readonly at: number }
->();
-
 /** 一个店铺的 Admin GraphQL 客户端 */
 export function createRealShopifyClient(
   http: HttpClient,
@@ -261,7 +252,7 @@ export function createRealShopifyClient(
   const endpoint = `https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`;
 
   async function post(
-    operation: string,
+    operation: ShopifyOperation,
     token: string,
     body: unknown,
     priority: CallPriority,
@@ -275,7 +266,7 @@ export function createRealShopifyClient(
 
   /** 发一次 GraphQL 请求（先扣查询成本）；令牌被拒（401）换新再试一次；errors 翻译成 faults.ts 的错误 */
   async function graphql(
-    operation: string,
+    operation: ShopifyOperation,
     query: string,
     variables: Record<string, unknown>,
     priority: CallPriority = 'high',
@@ -304,7 +295,7 @@ export function createRealShopifyClient(
   }
 
   async function orders(
-    operation: string,
+    operation: ShopifyOperation,
     variables: { readonly query: string; readonly first: number; readonly after: string | null },
     options: { readonly byCreated?: boolean; readonly priority?: CallPriority } = {},
   ) {
@@ -320,17 +311,16 @@ export function createRealShopifyClient(
     return data.data.orders;
   }
 
-  /** 应用有没有 read_all_orders（同一店铺 1 小时内沿用上次查到的） */
+  /**
+   * 应用有没有 read_all_orders：每次都问（只在按下单时间从 60 天以前取的第一页问，一次回补问一次）——不缓存，申请下来后
+   * 立即用 --again 重新回补就能按 90 天取
+   */
   async function readsAllOrders(priority: CallPriority): Promise<boolean> {
-    const now = clock.now().getTime();
-    const cached = grantedScopes.get(shop);
-    if (cached && now - cached.at < SCOPES_TTL_MS) return cached.handles.has(READ_ALL_ORDERS);
     const data = scopesDataSchema.safeParse(
       await graphql('access_scopes', SCOPES_QUERY, {}, priority),
     );
     if (!data.success) throw contractError('access_scopes');
     const handles = new Set(data.data.currentAppInstallation.accessScopes.map((s) => s.handle));
-    grantedScopes.set(shop, { handles, at: now });
     return handles.has(READ_ALL_ORDERS);
   }
 
@@ -340,7 +330,7 @@ export function createRealShopifyClient(
       const byCreated = options.createdSince !== undefined;
       if (options.createdSince !== undefined && !after) {
         // 第一页从 60 天以前取：要有 read_all_orders（平台对更早的订单不报错、只是不返回，所以先问清楚）
-        const floor = clock.now().getTime() - SHOPIFY_RECENT_ORDER_DAYS * DAY_MS;
+        const floor = clock.now().getTime() - toMilliseconds({ days: SHOPIFY_RECENT_ORDER_DAYS });
         if (options.createdSince.getTime() < floor && !(await readsAllOrders(priority ?? 'high'))) {
           throw new HistoryLimitedError(
             SYSTEM,

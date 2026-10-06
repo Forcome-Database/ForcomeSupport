@@ -1,7 +1,8 @@
 import { parseArgs } from 'node:util';
 import { listOrderStores } from './modules/channel';
 import type { Runtime } from './modules/core';
-import { BACKFILL_DAYS, startOrderBackfill, type BackfillStart } from './modules/order';
+import { ORDER_BACKFILL_DAYS } from '@forcome/contracts';
+import { startOrderBackfill, type BackfillStart } from './modules/order';
 
 /*
  * 「订单回补」命令（待办 13，协调者 2026-10-06 决定 Q1；ADR 0011 修订）：管理员上线前（选定 T0、回放邮件之前，待办 26）给亚马逊与
@@ -20,7 +21,7 @@ export interface OrderBackfillCommandIo {
 }
 
 const RESULT_TEXT: Record<BackfillStart['result'], string> = {
-  started: `开始回补近 ${BACKFILL_DAYS} 天的订单`,
+  started: `开始回补近 ${ORDER_BACKFILL_DAYS} 天的订单`,
   resumed: '上次的回补还没做完，接着回补',
   completed: '已回补完成，跳过（要从头重来加 --again）',
 };

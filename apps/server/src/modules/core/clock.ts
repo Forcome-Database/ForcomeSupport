@@ -18,7 +18,8 @@ export interface Duration {
   milliseconds?: number;
 }
 
-function toMilliseconds(d: Duration): number {
+/** 一段时长有多少毫秒 */
+export function toMilliseconds(d: Duration): number {
   return (
     (d.days ?? 0) * 86_400_000 +
     (d.hours ?? 0) * 3_600_000 +

@@ -1,6 +1,6 @@
 import type { Currency } from '@forcome/contracts';
 import type { DemoFixture } from '@forcome/fixtures';
-import type { Clock } from '../core';
+import { toMilliseconds, type Clock } from '../core';
 import type { CallPriority } from './call-priority';
 import { defineClient, type FakeClient } from './definition';
 import { FakeQuota } from './fake-quota';
@@ -141,8 +141,6 @@ function byCreatedAt(a: ShopifyOrder, b: ShopifyOrder): number {
   return a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
 }
 
-const DAY_MS = 24 * 60 * 60_000;
-
 /**
  * Fake Shopify：按店铺存订单（键为平台订单号），put 放入或改写一笔（改写时更新时间由测试给出）。
  * 分页游标是「已取过几笔」，与真实的不透明游标同样只在同一次遍历里有效。
@@ -223,7 +221,7 @@ export class FakeShopify implements FakeClient<ShopifyClient> {
           if (
             !after &&
             days !== null &&
-            options.createdSince.getTime() < this.#clock.now().getTime() - days * DAY_MS
+            options.createdSince.getTime() < this.#clock.now().getTime() - toMilliseconds({ days })
           ) {
             throw new HistoryLimitedError(
               'shopify',

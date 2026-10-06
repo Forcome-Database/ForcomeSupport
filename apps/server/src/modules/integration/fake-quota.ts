@@ -1,4 +1,4 @@
-import type { CallPriority } from './call-priority';
+import { nextInQueue, type CallPriority } from './call-priority';
 
 interface Waiter {
   readonly priority: CallPriority;
@@ -35,8 +35,7 @@ export class FakeQuota {
   grant(k = 1): void {
     let left = k;
     while (left > 0 && this.#queue.length > 0) {
-      const index = this.#queue.findIndex((w) => w.priority === 'high');
-      this.#queue.splice(index === -1 ? 0 : index, 1)[0]!.resolve();
+      this.#queue.splice(nextInQueue(this.#queue), 1)[0]!.resolve();
       left -= 1;
     }
     if (this.#remaining !== null) this.#remaining += left;

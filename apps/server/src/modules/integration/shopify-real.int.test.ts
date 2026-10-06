@@ -348,7 +348,7 @@ describe('回补按下单时间取、read_all_orders 与查询成本（待办 13
     );
   });
 
-  it('从 60 天以前取：没有 read_all_orders 以 HistoryLimitedError（60 天）失败，不发订单查询；同一店铺 1 小时内不再问权限', async () => {
+  it('从 60 天以前取：没有 read_all_orders 以 HistoryLimitedError（60 天）失败，不发订单查询；每次从第一页取都重新问权限（不缓存）', async () => {
     const bodies = graphqlReplies(scopes('read_orders', 'read_customers'));
     const error = await client()
       .listOrders({ createdSince: daysAgo(90) })
@@ -356,6 +356,8 @@ describe('回补按下单时间取、read_all_orders 与查询成本（待办 13
     expect(error).toBeInstanceOf(HistoryLimitedError);
     expect(error).toMatchObject({ days: 60, retryable: false });
     expect(bodies.map((b) => b.query)).toEqual([expect.stringContaining('accessScopes')]);
+    // 再从第一页取：重新问一次（申请下来后立即 --again 就能按 90 天取）
+    graphqlReplies(scopes('read_orders', 'read_customers'));
     await expect(client().listOrders({ createdSince: daysAgo(90) })).rejects.toBeInstanceOf(
       HistoryLimitedError,
     );
@@ -365,8 +367,7 @@ describe('回补按下单时间取、read_all_orders 与查询成本（待办 13
     await client().listOrders({ createdSince: daysAgo(90), after: 'cursor-2' });
   });
 
-  it('有 read_all_orders：照常按 90 天取（权限过了 1 小时重新查）', async () => {
-    t.clock.advance({ hours: 2 });
+  it('有 read_all_orders：照常按 90 天取', async () => {
     const bodies = graphqlReplies(scopes('read_orders', 'read_all_orders'), noOrders);
     await client().listOrders({ createdSince: daysAgo(90) });
     expect(bodies.map((b) => b.query)).toEqual([
