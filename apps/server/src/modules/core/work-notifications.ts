@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { defineJob, type JobContext } from './jobs';
 import type { Runtime, Tx } from './runtime';
 import { workNotification } from './schema';
+import { WORK_NOTIFICATION_COPY } from './work-notification-copy';
 
 /*
  * 钉钉工作通知（规格 core「钉钉工作通知发送」、ADR 0010「钉钉通知」，待办 05）：
@@ -22,7 +23,7 @@ export const WORK_NOTIFICATION_MERGE_MS = 5 * 60_000;
 export const WORK_NOTIFICATION_MAX_ATTEMPTS = 5;
 /** 钉钉文本消息的上限是 2048 字节 */
 const MAX_TEXT_BYTES = 2048;
-const BRAND = '【Forcome Support】';
+const { brand: BRAND, merged, more } = WORK_NOTIFICATION_COPY;
 
 /** 发工作通知的一方（integration 的钉钉客户端实现它） */
 export interface WorkNotificationSender {
@@ -96,14 +97,13 @@ export function workNotificationText(items: readonly WorkNotificationItem[]): st
       `${first.objectLabel} · ${shortTime(first.createdAt)}`,
     ].join('\n');
   }
-  const lines = [`${BRAND}${items.length} 条新通知`];
-  const rest = (count: number) => `· 另有 ${count} 条，请在系统里查看`;
+  const lines = [`${BRAND}${merged(items.length)}`];
   for (const [index, item] of items.entries()) {
     const line = `· ${item.title}${item.body ? `：${item.body}` : ''}（${item.objectLabel} · ${shortTime(item.createdAt)}）`;
     const remaining = items.length - index - 1;
-    const tail = remaining > 0 ? `\n${rest(remaining)}` : '';
+    const tail = remaining > 0 ? `\n${more(remaining)}` : '';
     if (bytes([...lines, line].join('\n') + tail) > MAX_TEXT_BYTES) {
-      lines.push(rest(items.length - index));
+      lines.push(more(items.length - index));
       break;
     }
     lines.push(line);

@@ -26,6 +26,7 @@ import {
   type DingtalkDepartment,
   type DingtalkUser,
 } from '../integration';
+import { DINGTALK_SYNC_FAILED } from './dingtalk-copy';
 import {
   applyDepartmentChanges,
   applyDirectory,
@@ -75,19 +76,6 @@ export const dingtalkEventJob = defineJob(
 /** 成员事件：取最新的成员（取不到即已离职）；部门事件：取最新的部门（取不到即已删除） */
 const USER_EVENTS: ReadonlySet<string> = new Set(dingtalkUserEvents);
 const DEPARTMENT_EVENTS: ReadonlySet<string> = new Set(dingtalkDepartmentEvents);
-
-/** 同步失败给管理员的站内提醒（11.4「钉钉同步失败」；对象是 P18 钉钉卡） */
-export const DINGTALK_SYNC_FAILED = {
-  first: {
-    title: '钉钉同步失败',
-    body: '通讯录同步失败，成员与部门保持上次结果，登录与权限不受影响',
-  },
-  disconnected: {
-    title: '钉钉连接异常',
-    body: `通讯录连续 ${CONNECTION_FAILURE_LIMIT} 次同步失败，成员与部门保持上次结果，登录与权限不受影响`,
-  },
-  object: { type: 'channel', id: 'dingtalk', label: 'P18 · 钉钉' },
-} as const;
 
 const SYNC_ROW = 'directory';
 

@@ -86,6 +86,19 @@ describe('同一人 5 分钟内的工作通知合并为一条', () => {
     // 发过的不再发
     await sendAt('2026-09-11T10:40:00+08:00');
     expect(dingtalk().sent).toHaveLength(2);
+
+    // 窗口发出之后再来的一条另开一个 5 分钟窗口：第一条进来时开始计时，到点合成发出（2026-10-06 用户确认）
+    await notify(GMAIL_DOWN, '2026-09-11T10:41:00+08:00');
+    await sendAt('2026-09-11T10:45:59+08:00');
+    expect(dingtalk().sent).toHaveLength(2);
+    await sendAt('2026-09-11T10:46:00+08:00');
+    expect(dingtalk().sent).toHaveLength(4);
+    // 只有这一条：单条的写法，不是「N 条新通知」
+    expect(
+      dingtalk()
+        .sent.slice(2)
+        .map((s) => s.text.split('\n')[0]),
+    ).toEqual(['【Forcome Support】Gmail 连接异常', '【Forcome Support】Gmail 连接异常']);
   });
 
   it('只有一条时单独成一条：标题、说明、对象与时间', async () => {

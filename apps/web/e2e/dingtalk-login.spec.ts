@@ -168,6 +168,8 @@ test('取二维码失败：失败浮层「加载二维码失败：原因」+「�
   await page.goto('/login');
   await expect(page.getByText('加载二维码失败：服务器内部错误', { exact: true })).toBeVisible();
   await expect(page.getByRole('img', { name: '钉钉登录二维码' })).toHaveCount(0);
+  // 格子保留骨架（G11 · G12 补充小样①）
+  await expect(qrSkeleton(page)).toBeVisible();
   await page.unroute('**/api/auth/dingtalk/start');
   await page.getByRole('button', { name: '立即重试' }).click();
   await expect(page.getByRole('img', { name: '钉钉登录二维码' })).toBeVisible();
@@ -214,6 +216,9 @@ test('回调地址缺授权码或 state：直接回到二维码', async ({ page 
   await expect(page.getByRole('img', { name: '钉钉登录二维码' })).toBeVisible();
 });
 
+/** 二维码格子里的骨架（还没取到二维码、或钉钉的扫码框还没放进来） */
+const qrSkeleton = (page: Page) => page.getByTestId('login-qr').locator('[data-slot="skeleton"]');
+
 test.describe('真实钉钉的扫码登录框（DTFrameLogin，接口桩）', () => {
   /** 开登录的接口桩：钉钉用真实接口时的参数 */
   async function realStart(page: Page, baseURL: string | undefined) {
@@ -238,7 +243,12 @@ test.describe('真实钉钉的扫码登录框（DTFrameLogin，接口桩）', ()
     await page.goto('/login');
     await expect(page.getByTestId('login-qr')).toHaveAttribute('data-mode', 'real');
     await expect(page.getByText('登录失败：暂时连不上钉钉', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('请稍后重新扫码；仍不行请联系管理员。', { exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: '立即重试' })).toBeVisible();
+    // 格子保留骨架（G11 · G12 补充小样②）
+    await expect(qrSkeleton(page)).toBeVisible();
   });
 
   test('把授权参数交给钉钉的登录框；扫码确认后照它给的地址带到回调页换会话', async ({
@@ -261,6 +271,7 @@ test.describe('真实钉钉的扫码登录框（DTFrameLogin，接口桩）', ()
     await page.goto('/login');
     const frame = page.getByTestId('login-qr').locator('[data-params]');
     await expect(frame).toHaveAttribute('data-size', '168x168');
+    await expect(qrSkeleton(page)).toHaveCount(0);
     expect(JSON.parse((await frame.getAttribute('data-params')) ?? '{}')).toEqual({
       redirect_uri: encodeURIComponent(start.redirectUri),
       client_id: 'dingclientid',

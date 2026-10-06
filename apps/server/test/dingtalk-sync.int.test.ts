@@ -359,7 +359,7 @@ describe('同步失败（E-32、AC-P1-22）：保留上次的成员与部门，�
     dingtalk().removeUser('wanglei', { silent: true });
     dingtalk().faults.failNext(
       { kind: 'error', status: 500 },
-      { operation: 'directory', times: 3 },
+      { operation: 'directory', times: 4 },
     );
 
     // 1 小时后的整点：第 1 次失败
@@ -396,6 +396,15 @@ describe('同步失败（E-32、AC-P1-22）：保留上次的成员与部门，�
     ]);
     expect(await activeMembers()).toEqual(before);
 
+    // 再下一个整点：连续第 4 次失败，不再重复提醒（只在第 1 次与第 3 次提醒，2026-10-06 用户确认）
+    t.clock.advance({ hours: 1 });
+    await reconcile({ allowFailures: true });
+    expect((await dingtalkCard(admin)).status).toBe('error');
+    expect((await syncFailures(admin, seen)).map((n) => n.title)).toEqual([
+      '钉钉连接异常',
+      '钉钉同步失败',
+    ]);
+
     // 不出全站横幅：横幅跟着「渠道连接异常」（钉钉除外，6.9），这里一条都没有；钉钉同步失败也只发站内，不发钉钉工作通知
     for (const client of [admin, supervisor]) {
       expect(
@@ -412,9 +421,12 @@ describe('同步失败（E-32、AC-P1-22）：保留上次的成员与部门，�
     expect((await t.scanLogin('zhoumin')).response.status).toBe(200);
   });
 
-  it('恢复后自动补同步：卡片回到已连接，漏掉的离职一并处理，失败计数清零', async () => {
+  it('恢复后自动补同步：卡片回到已连接，漏掉的离职一并处理，失败计数清零；恢复不发提醒', async () => {
     const admin = await t.loginAs('管理员');
+    const beforeRecovery = new Set((await syncFailures(admin)).map((n) => n.id));
     await reconcile();
+    // 11.4 没有钉钉恢复这一类（2026-10-06 用户确认）
+    expect(await syncFailures(admin, beforeRecovery)).toEqual([]);
     expect(await dingtalkCard(admin)).toMatchObject({
       status: 'connected',
       lastSyncAt: t.clock.now().toISOString(),

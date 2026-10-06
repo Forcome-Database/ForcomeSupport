@@ -434,7 +434,13 @@ g10_c = col(cap('③ 点头像 · 头像菜单') +
             '<div style="width: 420px; height: 300px; position: relative; background: %s; border: 1px solid %s; border-radius: 12px; overflow: hidden;">%s<div style="position: absolute; right: 12px; top: 62px;">%s</div></div>' % (
                 T['canvas'], T['line'], topbar_crop(420), avatar_menu(ZM)) +
             muted('「审计日志」所有角色可见（P27）：客服主管、管理员看全部，其他角色只看自己的操作记录；管理员另可从 P18 页头进入。「密度」与顶栏密度按钮是同一个设置（G9）。', 12, 'width: 420px;'), 8)
-g10_frame = '<div style="width: 1510px; box-sizing: border-box; padding: 20px; background: %s; display: flex; gap: 24px; align-items: flex-start;">%s%s%s</div>' % (T['canvas'], g10_a, g10_b, g10_c)
+# ④ 钉钉同步失败只提醒管理员（11.4、E-32；待办 05，2026-10-06 用户确认）：刘洋视角，连续失败的第 1 次与第 3 次各一条
+from data import DINGTALK_NOTIFICATIONS
+g10_d = col(cap('④ 钉钉同步失败 · 只提醒管理员（刘洋）') +
+            '<div style="width: 360px; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; box-shadow: %s; padding: 6px; display: flex; flex-direction: column; gap: 2px;">%s</div>' % (
+                T['line'], SHADOW_MD, ''.join(notif_item(n) for n in DINGTALK_NOTIFICATIONS)) +
+            muted('通讯录每个整点全量对账一次，失败不重试。连续失败的第 1 次发「钉钉同步失败」，第 3 次（P18 钉钉卡转「连接异常」）发「钉钉连接异常」，之后不重复；恢复后不发。只发站内，不发钉钉工作通知，不出全站横幅（G4）。', 12, 'width: 360px;'), 8)
+g10_frame = '<div style="width: 1510px; box-sizing: border-box; padding: 20px; background: %s; display: flex; flex-direction: column; gap: 24px;"><div style="display: flex; gap: 24px; align-items: flex-start;">%s%s%s</div>%s</div>' % (T['canvas'], g10_a, g10_b, g10_c, g10_d)
 
 
 # ---------------------------------------------------------------- G11 登录 · G12 登录被拒
@@ -492,6 +498,27 @@ g12_frame = mini(grid(
     deny('第一阶段 · 生产厂对接人', 'factory', '暂时无法进入', '工厂工作台第二阶段上线，目前无法进入。', None, who_cg),
     2, 20), 880, 680, '#ffffff', '20px')
 
+
+# ---------------------------------------------------------------- G11 · G12 补充小样（第一阶段实现，待办 05，2026-10-06 确认）
+def qr_box_loading():
+    """二维码还没取到（或取不到）时格子里是骨架。"""
+    return '<div style="padding: 10px; border: 1px solid %s; border-radius: 12px; background: #ffffff;">%s</div>' % (T['line'], skel('168px', 168, 6))
+
+
+login_card_loading = auth_card(col(text('用钉钉扫码登录', 16, T['ink'], 700, 'text-align: center;') + muted('打开钉钉，扫一扫下方二维码', 12, 'text-align: center;'), 2) +
+                               qr_box_loading() + nowrap('二维码 2 分钟内有效', 12, T['ink4']) + login_note)
+signing_in_card = auth_card(row(icon('spinner', 16, T['ink3'], 2) + nowrap('正在登录…', 13, T['ink3']), 8, extra='padding: 24px 0px;'))
+retry_link = link('立即重试')
+g1112_frame = '<div style="width: 1792px; box-sizing: border-box; padding: 20px; background: %s; display: flex; gap: 24px; align-items: flex-start;">%s%s%s%s</div>' % (
+    T['canvas'],
+    col(cap('① 取二维码失败 · 格子保留骨架') + login_card_loading + toast('error', '加载二维码失败：网络不可用', None, retry_link), 10, 'width: 380px;'),
+    col(cap('② 钉钉扫码框加载不出来（真实接口）') + login_card_loading + toast('error', '登录失败：暂时连不上钉钉', '请稍后重新扫码；仍不行请联系管理员。', retry_link), 10, 'width: 380px;'),
+    col(cap('③ 扫码确认后 · 换会话') + signing_in_card, 10, 'width: 380px;'),
+    col(cap('④ 换会话失败 · 回到二维码并弹浮层') +
+        toast('error', '登录失败：扫码结果已失效', '请重新扫码。') +
+        toast('error', '登录失败：登录已过期', '请重新扫码。') +
+        toast('error', '登录失败：暂时连不上钉钉', '请稍后重新扫码；仍不行请联系管理员。'), 10, 'width: 380px;'))
+
 gs_body = col(
     grid(variant('G1 整页加载', '首屏数据超过 300ms 未返回时显示骨架屏，保留外壳与导航；超过 10 秒转为加载失败（第 9 节）。', scaled(page_skel)) +
          variant('G2 无权限（403）', '导航里不显示无权限入口；从链接直接进入无权页面时显示本页，写明哪个角色能看（例「「渠道与店铺」只对管理员开放。你当前的角色是坐席，如需开通请联系管理员刘洋」）。按钮只有「返回首页」，回到该角色的默认首页（4.1，本例坐席为收件箱）；没有「申请权限」。', focus(page_403, key_403)), 2, 32) +
@@ -503,12 +530,14 @@ gs_body = col(
          variant('G8 未保存离开', '草稿类（回复框、内部备注）自动保存，离开时只弹「草稿已保存」浮层，不拦截。表单类（设置页）有未保存修改时弹窗：继续编辑 · 放弃修改 · 保存并离开，默认焦点在「继续编辑」。', unsaved_frame, 700), 2, 32) +
     variant('G9 密度切换', '第一期提供舒适（默认）与紧凑两档（Q-24）。顶栏「密度」按钮切换，按用户保存；只改字号、行距与内边距，不改布局和信息量。紧凑：正文 12、次要 11（中文最小 11）、队列行内边距 6、行距 2、表格行高 32。两档一致：队列卡片左侧色条只表示风险（转人工红），选中用浅底 + 描边。', dens_frame, 1500,
             trigger='点顶栏「密度」按钮（图标：三条横线）。') +
-    variant('G10 站内通知', '顶栏铃铛带未读数（本例 %d）；点开 360px 面板，页签「全部 · 未读」，每条写类型图标、标题、说明、对象编号与时间（当天只写时:分，之前的写「月-日 时:分」，不在今年的写全年份，同 P27），未读带圆点并用浅底；点一条即跳到对象并标为已读——查看者打不开目标页的（如客服主管收到的渠道通知，P18 只对管理员开放）只标为已读、不跳转，对象编号为灰字（同 P27）；右上「全部已读」，没有未读时置灰、悬停写「没有未读通知」；没有通知时显示空状态（第一阶段说明不写「审批、」，第二阶段起写「审批、渠道异常、未归属店铺来信等……」）。头像菜单：姓名、角色与部门（来自钉钉），「审计日志」所有角色可见（P27，按 10.2 过滤），「密度」同 G9，「退出登录」。示例为完整版；第一阶段只有 11.4 中阶段为「一起」的通知类型。' % UNREAD,
-            g10_frame, 1510, trigger='点顶栏铃铛；点顶栏头像。示例为周敏 · 客服主管（data.NOTIFICATIONS）。') +
+    variant('G10 站内通知', '顶栏铃铛带未读数（本例 %d）；点开 360px 面板，页签「全部 · 未读」，每条写类型图标、标题、说明、对象编号与时间（当天只写时:分，之前的写「月-日 时:分」，不在今年的写全年份，同 P27），未读带圆点并用浅底；点一条即跳到对象并标为已读——查看者打不开目标页的（如客服主管收到的渠道通知，P18 只对管理员开放）只标为已读、不跳转，对象编号为灰字（同 P27）；右上「全部已读」，没有未读时置灰、悬停写「没有未读通知」；没有通知时显示空状态（第一阶段说明不写「审批、」，第二阶段起写「审批、渠道异常、未归属店铺来信等……」）。头像菜单：姓名、角色与部门（来自钉钉），「审计日志」所有角色可见（P27，按 10.2 过滤），「密度」同 G9，「退出登录」。示例为完整版；第一阶段只有 11.4 中阶段为「一起」的通知类型。④ 钉钉同步失败只提醒管理员（刘洋视角，待办 05，10-06 用户确认）：连续失败的第 1 次「钉钉同步失败」、第 3 次「钉钉连接异常」，对象「P18 · 钉钉」，之后不重复，恢复后不发。' % UNREAD,
+            g10_frame, 1510, trigger='点顶栏铃铛；点顶栏头像。示例为周敏 · 客服主管（data.NOTIFICATIONS）；④ 为刘洋 · 管理员（data.DINGTALK_NOTIFICATIONS）。') +
     grid(variant('G11 登录', '居中卡片：产品名、「用钉钉扫码登录」二维码（2 分钟过期，过期后二维码上加蒙层与「刷新」），下方说明「成员与部门来自钉钉通讯录，由管理员在本系统分配角色后才能进入」。在钉钉内打开时免登（第二阶段）。会话 7 天无操作过期（G12）。', g11_frame, 880,
                  trigger='未登录或会话过期后访问任意页面。') +
          variant('G12 登录被拒', '同一张登录卡片换成被拒说明，三种：未分配角色、账号已停用、会话过期（「重新扫码登录」）。第一阶段不分配「生产厂对接人」角色，已分配者扫码后看到「工厂工作台第二阶段上线，目前无法进入」（4.1）。', g12_frame, 880,
-                 trigger='扫码成功但不能进入系统；或 7 天未操作。'), 2, 32),
+                 trigger='扫码成功但不能进入系统；或 7 天未操作。'), 2, 32) +
+    variant('G11 · G12 补充小样（第一阶段实现时确认，待办 05，10-06）', '① 取二维码失败：格子保留骨架，右上角失败浮层「加载二维码失败：<原因>」+「立即重试」（例为断网）；② 真实接口时钉钉的扫码框加载不出来：格子保留骨架，浮层「登录失败：暂时连不上钉钉」+ 说明 +「立即重试」；③ 扫码确认后钉钉把浏览器带回本系统，换会话期间卡片里写「正在登录…」；④ 换会话失败时回到二维码并弹失败浮层（不自动消失；下一步是重新扫码，不给重试）：扫码结果已失效、登录已过期（这次扫码登录超过 10 分钟，或在别的页签又开了一次）、暂时连不上钉钉。被拒（G12）不弹浮层，换成被拒说明。', g1112_frame, 1792,
+            trigger='取二维码或加载钉钉扫码框失败；扫码确认后换会话；换会话失败。'),
     32)
 save('GlobalStates.dc.html', board('全局状态与反馈', '所有页面共用的加载、无权限、找不到、断网、集成中断、提示、确认、并发、未保存、密度切换、站内通知与登录状态（G1–G12）。各模块自己的状态见对应状态板。演示时刻 %s。' % NOW_LABEL, gs_body, 1920, 2400))
 print('ok')

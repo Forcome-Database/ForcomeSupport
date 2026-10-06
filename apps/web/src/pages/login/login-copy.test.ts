@@ -1,7 +1,22 @@
 import { readFileSync } from 'node:fs';
-import { loginDenialMessage, loginDenialTitles } from '@forcome/contracts';
+import {
+  loginDenialMessage,
+  loginDenialTitles,
+  loginFailureDescriptions,
+  loginFailureMessages,
+  loginFailureReasons,
+} from '@forcome/contracts';
 import { describe, expect, it } from 'vitest';
-import { BACK_TO_LOGIN, LOGIN, QR_EXPIRED, SESSION_EXPIRED } from './login-copy';
+import { failureReason, NetworkError } from '@/lib/api';
+import {
+  BACK_TO_LOGIN,
+  LOGIN,
+  LOGIN_ACTION,
+  QR_ACTION,
+  QR_EXPIRED,
+  SESSION_EXPIRED,
+  SIGNING_IN,
+} from './login-copy';
 
 /*
  * 登录页（G11）与登录被拒（G12）的界面文案与原型逐字一致（CLAUDE.md「文案逐字照原型」）：直接读原型生成物 GlobalStates。
@@ -46,5 +61,22 @@ describe('G12 登录被拒', () => {
       expectText(loginDenialMessage(reason, ['刘洋']));
     }
     expectText(BACK_TO_LOGIN);
+  });
+});
+
+describe('G11 · G12 补充小样（PRD v2.23）', () => {
+  it('① 取二维码失败的浮层标题（例为断网，原因同 G5「网络不可用」）', () => {
+    expectText(`${QR_ACTION}失败：${failureReason(new NetworkError(null))}`);
+  });
+
+  it('② ④ 扫码登录失败的浮层：标题「登录失败：<原因>」与说明（三种原因）', () => {
+    for (const reason of loginFailureReasons) {
+      expectText(`${LOGIN_ACTION}失败：${loginFailureMessages[reason]}`);
+      expectText(loginFailureDescriptions[reason]);
+    }
+  });
+
+  it('③ 扫码确认后换会话的过渡「正在登录…」', () => {
+    expectText(SIGNING_IN);
   });
 });

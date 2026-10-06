@@ -4,7 +4,7 @@ import {
   type DingtalkLoginStart,
 } from '@forcome/contracts';
 import { RefreshCw } from 'lucide-react';
-import { useEffect, useId, useMemo } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LoginFailedError } from '@/lib/api';
@@ -67,7 +67,8 @@ function DemoQr() {
 
 /**
  * 钉钉官方的扫码登录框（真实接口）：在这个格子里放钉钉的 iframe，扫码确认后把浏览器带到回调页。
- * 加载不出来时弹失败浮层（G5），「立即重试」再加载一次
+ * 放进来之前格子里是骨架；加载不出来（或它报错）时格子保留骨架并弹失败浮层（G5），「立即重试」再加载一次
+ * （G11 · G12 补充小样②，PRD v2.23）。每次登录（state）各挂一个，刷新后从骨架重新开始
  */
 function DingtalkFrame({
   start,
@@ -77,6 +78,7 @@ function DingtalkFrame({
   onReload: () => Promise<unknown>;
 }) {
   const id = `dingtalk-login-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  const [shown, setShown] = useState(false);
   useEffect(() => {
     let cancelled = false;
     loadDingtalkFrame()
@@ -86,8 +88,12 @@ function DingtalkFrame({
           { id, width: QR_SIZE, height: QR_SIZE },
           dingtalkFrameParams(start),
           (result) => window.location.assign(result.redirectUrl),
-          () => frameFailed(onReload),
+          () => {
+            setShown(false);
+            frameFailed(onReload);
+          },
         );
+        setShown(true);
       })
       .catch(() => {
         if (!cancelled) frameFailed(onReload);
@@ -97,7 +103,12 @@ function DingtalkFrame({
       document.getElementById(id)?.replaceChildren();
     };
   }, [id, start, onReload]);
-  return <div id={id} className="size-42 overflow-hidden" aria-label="钉钉登录二维码" />;
+  return (
+    <div className="relative size-42">
+      <div id={id} className="size-42 overflow-hidden" aria-label="钉钉登录二维码" />
+      {!shown && <Skeleton className="absolute inset-0 rounded-md" />}
+    </div>
+  );
 }
 
 /**
@@ -126,7 +137,7 @@ export function LoginQr({
       ) : start.mode === 'fake' ? (
         <DemoQr />
       ) : (
-        <DingtalkFrame start={start} onReload={onRefresh} />
+        <DingtalkFrame key={start.state} start={start} onReload={onRefresh} />
       )}
       {expired && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg bg-card/93">

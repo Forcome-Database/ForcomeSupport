@@ -210,6 +210,7 @@ describe('登录被拒（G12）', () => {
     );
   });
 
+  // 复用 G12「未分配角色」的写法（协调者 2026-10-06 决定，用户口径：全面不考虑合规；PRD v2.23 G12）
   it('钉钉认得出、成员表里没有的人（不是本组织的，或通讯录权限范围没覆盖）：按未分配角色拒绝', async () => {
     const { response } = await t.scanLogin('stranger');
     expect(response.status).toBe(403);
