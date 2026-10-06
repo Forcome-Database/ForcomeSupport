@@ -139,7 +139,11 @@ export function fixtureMails(fixture: DemoFixture): ReplayMail[] {
           text: auto.body,
           at: auto.at,
           messageId: messageIdOf(ticket.no, 'auto'),
-          headers: { ...auto.headers, 'In-Reply-To': letters.at(-1)!, References: letters.join(' ') },
+          headers: {
+            ...auto.headers,
+            'In-Reply-To': letters.at(-1)!,
+            References: letters.join(' '),
+          },
           gmailId: `demo-${ticket.no}-auto`,
           threadId,
         },
