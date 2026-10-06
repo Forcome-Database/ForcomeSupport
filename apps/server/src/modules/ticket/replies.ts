@@ -82,8 +82,11 @@ async function alreadyLinked(tx: Tx, channelMessageId: string): Promise<boolean>
   return Boolean(row);
 }
 
+/** 回复要等 In-Reply-To 指向的来信归并（matchTicket 的结果之一） */
+const WAIT = Symbol('wait');
+
 /**
- * 这封回复归到哪张工单（见文件头第 1、3 点）：工单 id；要等 In-Reply-To 指向的来信归并时为 'wait'；找不到为 null。
+ * 这封回复归到哪张工单（见文件头第 1、3 点）：工单 id；要等 In-Reply-To 指向的来信归并时为 WAIT；找不到为 null。
  * 候选邮件由 channel 给出，它们在哪张工单由这里查
  */
 async function matchTicket(
@@ -92,7 +95,7 @@ async function matchTicket(
   reply: OutboundMessage & { readonly storeId: string },
   targets: readonly ReplyTarget[],
   final: boolean,
-): Promise<string | 'wait' | null> {
+): Promise<string | typeof WAIT | null> {
   const linked = await tx.db
     .select({ channelMessageId: ticketMessage.channelMessageId, ticketId: ticketMessage.ticketId })
     .from(ticketMessage)
@@ -118,7 +121,7 @@ async function matchTicket(
     const found = byMessageId(reply.inReplyTo);
     if (found) return found;
     const repliedTo = targets.filter((target) => target.rfcMessageId === reply.inReplyTo);
-    if (repliedTo.length === 0 || repliedTo.some((target) => target.mergeable)) return 'wait';
+    if (repliedTo.length === 0 || repliedTo.some((target) => target.mergeable)) return WAIT;
   }
   // 2. References，从最近的一封往前（最后一次识别时 In-Reply-To 也在这里再看一遍）
   for (const rfcMessageId of [reply.inReplyTo, ...[...reply.references].reverse()]) {
@@ -185,7 +188,7 @@ export async function attributeReply(
       logger.info({ messageId }, '我方回复等了 24 小时仍找不到对应的工单，不再等');
       return;
     }
-    if (ticketId === null || ticketId === 'wait') {
+    if (ticketId === null || ticketId === WAIT) {
       await waitForInbound(tx, reply);
       logger.info({ messageId }, '我方回复还找不到对应的来信，等来信归并（最多 24 小时）');
       return;
