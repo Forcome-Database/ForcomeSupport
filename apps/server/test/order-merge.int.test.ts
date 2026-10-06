@@ -288,7 +288,7 @@ describe('按订单归并（R-TK-01）', () => {
     expect(rows).toEqual([{ close_reason: null }]);
   });
 
-  it('关闭正好 30 天时同一订单来信仍重开（「30 天内」含第 30 天）', async () => {
+  it('「30 天内」按北京时间的日期算：关闭日之后第 30 天的晚上来信仍重开（已超过 30 × 24 小时）', async () => {
     placed('113-1000007-0000007', '2026-07-01T10:00:00+08:00');
     gmail.deliver(
       amazonLetter('Ella Ward', {
@@ -302,13 +302,43 @@ describe('按订单归并（R-TK-01）', () => {
     gmail.deliver(
       amazonLetter('Ella Ward', {
         text: 'Order 113-1000007-0000007 again',
-        at: '2026-09-10T10:00:00+08:00',
+        at: '2026-09-10T23:30:00+08:00',
       }),
     );
     await t.runJobs();
 
     expect(await ticketsOf(agent, 'Ella Ward')).toEqual([
       expect.objectContaining({ number: ticket!.number, status: 'awaiting_reply' }),
+    ]);
+  });
+
+  it('关闭日之后第 31 天（北京时间刚过零点，离关闭只多 20 分钟就满 30 × 24 小时）来信：新建工单', async () => {
+    placed('113-1000014-0000014', '2026-07-01T10:00:00+08:00');
+    gmail.deliver(
+      amazonLetter('Hugo Lane', {
+        text: 'Order 113-1000014-0000014',
+        at: '2026-07-20T10:00:00+08:00',
+      }),
+    );
+    await t.runJobs();
+    const [old] = await ticketsOf(agent, 'Hugo Lane');
+    await closeTicket(t, old!.number, '2026-08-11T23:50:00+08:00');
+    gmail.deliver(
+      amazonLetter('Hugo Lane', {
+        text: 'Order 113-1000014-0000014 again',
+        at: '2026-09-11T00:10:00+08:00',
+      }),
+    );
+    await t.runJobs();
+
+    expect(
+      (await ticketsOf(agent, 'Hugo Lane')).map((ticket) => [
+        ticket.number === old!.number,
+        ticket.status,
+      ]),
+    ).toEqual([
+      [false, 'awaiting_reply'],
+      [true, 'closed'],
     ]);
   });
 
@@ -594,8 +624,10 @@ describe('按订单归并（R-TK-01）', () => {
         at: '2026-09-10T16:30:00+08:00',
       }),
     );
-    // 来信已接收的归并任务最多重试 5 次：前 5 次尝试失败，第 6 次（最后一次）不关联订单建单
-    for (let attempt = 1; attempt <= 5; attempt += 1) {
+    // 来信已接收的归并任务重试 retryLimit 次：前面的尝试都失败，最后一次不关联订单建单
+    const retries = inboundReceivedJob.queue?.retryLimit ?? 0;
+    expect(retries).toBeGreaterThan(0);
+    for (let attempt = 1; attempt <= retries; attempt += 1) {
       const report = await t.runJobs({ allowFailures: true });
       expect(
         report.failed.map((job) => job.name),

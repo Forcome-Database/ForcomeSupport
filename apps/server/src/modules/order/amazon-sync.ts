@@ -1,4 +1,4 @@
-import { ORDER_QUEUE_NAME } from '@forcome/contracts';
+import { AMAZON_ORDER_NUMBER_PATTERN, ORDER_QUEUE_NAME } from '@forcome/contracts';
 import { z } from 'zod';
 import {
   defineFeed,
@@ -57,7 +57,7 @@ import {
 export const AMAZON_SYNC_OVERLAP_MS = 5 * 60_000;
 
 /** 亚马逊订单号（3-7-7）：来信里抽到的就是它（规格「订单号抽取」） */
-export const AMAZON_ORDER_ID = /^\d{3}-\d{7}-\d{7}$/;
+export const AMAZON_ORDER_ID = new RegExp(`^${AMAZON_ORDER_NUMBER_PATTERN}$`);
 
 /** 每个 worker 同时处理几个同步、几个通知触发的拉取（同一店铺、同一笔订单仍由 stately + singletonKey 保证只跑一个） */
 export const AMAZON_JOB_CONCURRENCY = 5;

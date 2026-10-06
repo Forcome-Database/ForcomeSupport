@@ -294,6 +294,14 @@ export async function mirroredOrder(
   return row ? toMirrored(row) : null;
 }
 
+/**
+ * 订单在工单上的写法（P04 订单号列、按订单归并的键，待办 14）：亚马逊为订单号（平台订单号即 3-7-7），Shopify 为订单名（如 #1063；
+ * Admin API 的订单都有订单名，万一没有取平台订单号）
+ */
+export function orderNumberOf(order: MirroredOrder): string {
+  return order.platform === 'shopify' && order.name ? order.name : order.platformOrderId;
+}
+
 /** 按什么找订单：订单名（Shopify，如 #1063）或平台订单号（亚马逊的订单号 3-7-7） */
 export type OrderRef = { readonly name: string } | { readonly platformOrderId: string };
 

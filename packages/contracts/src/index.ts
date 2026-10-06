@@ -292,6 +292,7 @@ export {
   platformSchema,
   platformTerms,
   SHOPIFY_CONTACT_FORM_SENDER,
+  AMAZON_ORDER_NUMBER_PATTERN,
   siteSchema,
   sites,
   storeConnectionSchema,

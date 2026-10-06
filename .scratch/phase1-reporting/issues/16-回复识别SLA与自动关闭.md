@@ -24,3 +24,5 @@ Blocked by: 09, 10, 14
   - 「已发送」入库随 09，`channel.message` 的 `in_reply_to`、`references`、`gmail_thread_id` 已存，回复识别直接用；SLA 字段加在 `ticket.ticket_message` 上。7 天、14 天从 `ticket.ticket.last_inbound_at` 起算（追加时取较晚的一封）。
   - 开发测试环境的示例来信回放（`integration/gmail-replay.ts`）只放了来信，我方回复与「等客户」等状态要在这里补；示例数据的时间在 9 月，开发测试环境用真实时钟，14 天规则上线后这些工单会被自动关闭，e2e `apps/web/e2e/tickets.spec.ts` 断言的「待回复」要随之调整（或把回放时间平移到当前）。
 - 2026-10-05（待办 10）：应回复来信 = 来源为客户：消息的来源在 `channel.message.source`（经 `findInboundMessage` 的 `recognition.source`；平台通知与营销不会进工单）。`ticket.ticket_message` 没有存来源，SLA 列加在那里时可在归并时一并写入（归并时已读到来源），或按 `channel` 的读服务取。生产厂、其他供应商的来信同样让等客户 / 已解决回到待回复（迁移表的 `inbound` 不论来源）。「客户来信触发的新建与重开」按触发那封来信的来源记，不看工单的来源（首封来信的来源）。
+
+- 2026-10-07（待办 14）：迁移表已有「已关闭 + `inbound_reopen` → 待回复」；本待办补「等客户 / 已解决 + `inbound` → 待回复」后，`merge.ts` 的追加（R-TK-01 与 R-TK-02 都走 `applyTransition(…, 'inbound', …)`）自然生效，不用改归并。重开的「30 天内」按关闭时刻判断，关闭时刻取该工单最近一条状态变更记录的时刻（`ticket-status.ts` 的 `closedTimes`），按时关闭写的状态变更 `occurred_at` 要是关闭的业务时刻（扫描时的「当前时间」）。`apps/server/test/order-merge.int.test.ts` 的 `closeTicket` 是直接写一条已关闭状态变更的测试准备步骤，本待办落地按时关闭后请改为推进时钟跑时限扫描。回放的示例来信正文末尾带「Order: 订单号」一行（按订单归并要用）。

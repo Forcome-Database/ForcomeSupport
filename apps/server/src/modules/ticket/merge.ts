@@ -1,4 +1,5 @@
-import { isTicketSource, sites, type Site } from '@forcome/contracts';
+import { addDays, businessDate } from '@forcome/calendar';
+import { isTicketSource, siteSchema, type Site } from '@forcome/contracts';
 import { and, desc, eq, isNull, ne } from 'drizzle-orm';
 import { findInboundMessage, findOrderStore, type InboundMessage } from '../channel';
 import {
@@ -7,7 +8,6 @@ import {
   storeScopeCondition,
   SYSTEM_STORE_SCOPE,
   systemActor,
-  toMilliseconds,
   transaction,
   updateWithVersion,
   type JobContext,
@@ -16,7 +16,13 @@ import {
   type Tx,
 } from '../core';
 import { ExternalServiceError, type IntegrationClients } from '../integration';
-import { findOrder, findOrdersByEmail, type MirroredOrder, type OrderStore } from '../order';
+import {
+  findOrder,
+  findOrdersByEmail,
+  orderNumberOf,
+  type MirroredOrder,
+  type OrderStore,
+} from '../order';
 import { customer, customerIdentity, ticket, ticketMessage } from './schema';
 import { applyTransition, closedTimes, createTicket } from './ticket-status';
 
@@ -36,8 +42,8 @@ import { applyTransition, closedTimes, createTicket } from './ticket-status';
  * 未归属店铺的来信进队列随 15。
  */
 
-/** R-TK-01、R-TK-05：关闭后 30 天内（含第 30 天）同一订单来信重开，超过新建 */
-const REOPEN_WITHIN_MS = toMilliseconds({ days: 30 });
+/** R-TK-01、R-TK-05：关闭后 30 天内（按北京时间的日期，关闭日之后的第 30 天整天都算）同一订单来信重开，超过新建 */
+const REOPEN_WITHIN_DAYS = 30;
 
 type TicketRow = typeof ticket.$inferSelect;
 
@@ -74,16 +80,11 @@ async function customerOf(tx: Tx, sender: { address: string; name: string }): Pr
   return created.id;
 }
 
-/** 订单在工单上的写法：亚马逊为订单号，Shopify 为订单名（如 #1063，P04 显示的就是它） */
-function orderNumberOf(order: MirroredOrder): string {
-  return order.platform === 'shopify' && order.name ? order.name : order.platformOrderId;
-}
-
 /** 新建工单的站点（R-ST-02）：Shopify 店铺按订单收件国家，收件国家不是我们的站点时取识别出的站点 */
 function siteOf(store: OrderStore, order: MirroredOrder | null, recognized: Site): Site {
   if (store.platform !== 'shopify' || !order?.shipCountry) return recognized;
-  const country = order.shipCountry.toUpperCase();
-  return (sites as readonly string[]).includes(country) ? (country as Site) : recognized;
+  const country = siteSchema.safeParse(order.shipCountry.toUpperCase());
+  return country.success ? country.data : recognized;
 }
 
 /**
@@ -163,8 +164,9 @@ async function targetForOrder(
     const at = closedAt.get(row.id)!;
     if (!latest || at > latest.at) latest = { row, at };
   }
-  // 来信可能晚于关闭时刻才同步进来，也可能在关闭前到达（关闭在后）：都按到达时间与关闭时刻的间隔判断
-  if (latest && receivedAt.getTime() - latest.at.getTime() <= REOPEN_WITHIN_MS) {
+  // 按到达日期与关闭日期（北京时间，规格「日界按 Asia/Shanghai」）比：关闭日之后第 30 天当天任何时刻到的都重开。
+  // 来信也可能在关闭前到达、晚于关闭才同步进来，同样重开
+  if (latest && businessDate(receivedAt) <= addDays(businessDate(latest.at), REOPEN_WITHIN_DAYS)) {
     return { kind: 'reopen', ticket: latest.row };
   }
   return { kind: 'create' };

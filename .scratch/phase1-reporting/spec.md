@@ -237,7 +237,7 @@ P04、P05 第一期版本的列、筛选、排序、取值与隐藏项见 PRD P0
   - 种子（迁移 0009，所有环境相同）：平台通知——发件域 `amazon.com`、`amazon.ca`、`amazon.com.mx`（亚马逊平台通知）、`shopify.com`（Shopify 系统邮件）；营销——带 `List-Unsubscribe` 头，或 `Precedence` 为 `bulk` / `list` / `junk`。已登记生产厂邮箱：示例数据的 FQD、FZJ 三个邮箱只在非生产环境随示例数据灌入（加载步骤 `channel.sender_rules`）；生产环境的真实生产厂邮箱与其他供应商名单由业务提供后用迁移补（待办 32 跟踪）；其他供应商第一期不预置。
   - 工单的来源取首封来信的来源，追加不改；消息的来源存在 `channel.message.source`，经工单详情接口给出。
 - 店铺与站点识别：按收件邮箱识别店铺；站点唯一口径——亚马逊按发件域，Shopify 按订单收件国家，无订单时取店铺默认站点。识别不出店铺 → 未归属店铺来信队列（尚未归并成工单；SLA 平台按发件域判断）。落地（待办 10）：亚马逊店铺按发件域（From）定站点——`amazon.com` / `marketplace.amazon.com` → US、`amazon.ca` / `marketplace.amazon.ca` → CA、`amazon.com.mx` / `marketplace.amazon.com.mx` → MX，精确等于，发件域不是这几个的取店铺默认站点；Shopify 店铺一律取店铺默认站点（按订单收件国家随 14），即使发件域是亚马逊的域。按发件域得出的站点不要求在店铺登记的站点里（R-ST-02 按发件域为唯一口径）。这几个域与联系表单的代发地址在 `contracts` 的 `amazonDomains`、`SHOPIFY_CONTACT_FORM_SENDER`，识别与 Fake 回放共用。
-- 订单号抽取：亚马逊正则 `\d{3}-\d{7}-\d{7}`；Shopify 按订单名（如 `#1063`）在该店铺内匹配；抽取结果交 `order` 校验。落地（待办 14）：纯函数 `channel/order-numbers.ts` 的 `extractOrderNumbers(店铺平台, { subject, text, html })`，先主题后正文、按出现先后、去重，最多 5 个候选；亚马逊 3-7-7 前后不连着数字；Shopify 认 `#1063`、`# 1063` 与「order / Order No. / order number: / Order ID / pedido / número de pedido」后跟 3 位以上数字，规范成 `#数字`；没有文本正文时从 HTML 去标签后抽（head、style、script 的内容不算）。不另存列：`findInboundMessage` 读的时候按来信当前所属店铺的平台抽（`orderNumbers`），指定店铺（15）后照样能抽，抽取口径改了也不用重放来信。
+- 订单号抽取：亚马逊正则 `\d{3}-\d{7}-\d{7}`；Shopify 按订单名（如 `#1063`）在该店铺内匹配；抽取结果交 `order` 校验。落地（待办 14）：纯函数 `channel/order-numbers.ts` 的 `extractOrderNumbers(店铺平台, { subject, text, html })`，先主题后正文、按出现先后、去重，最多 5 个候选；亚马逊 3-7-7 前后不连着数字；Shopify 认 `#1063`、`# 1063` 与「order / Order No. / order number: / Order ID / pedido / orden / número de pedido」后跟 4 位以上数字（Shopify 订单名从 #1001 起，「Apt #305」之类不算），规范成 `#数字`，带「order / pedido / orden」字样的候选排在只写 # 的前面；亚马逊订单号的正则源码只在 `contracts` 的 `AMAZON_ORDER_NUMBER_PATTERN` 定义一次（`order` 校验也用它）；没有文本正文时从 HTML 去标签后抽（head、style、script 的内容不算）。不另存列：`findInboundMessage` 读的时候按来信当前所属店铺的平台抽（`orderNumbers`），指定店铺（15）后照样能抽，抽取口径改了也不用重放来信。
 - 完成后发「来信已接收」「我方发信已同步」事件。
 - 渠道连接状态（6.9）：已连接 / 同步延迟（Gmail、订单 10 分钟，钉钉 2 小时）/ 连接异常（连续 3 次失败）/ 未连接；按店铺计算，渠道卡取最差状态并列出异常的邮箱或店铺。连接异常触发全站横幅（不可关闭，恢复后自动消失）与通知；钉钉例外：只更新卡片状态并给管理员站内提醒，不出横幅（E-32）。SQS 状态（亚马逊卡上的一行，协调者 2026-10-06 决定 Q7）：正常 · 积压 N（等待拉取的通知少于 10 条）/ 积压 N 条（≥ 10 条，每分钟检查一次）/ 拉取失败（连续 3 次）/ 未连接（没配置 SQS）；只影响这一行，不改卡片与店铺的连接状态、不出横幅、不发通知。
 
@@ -256,8 +256,8 @@ P04、P05 第一期版本的列、筛选、排序、取值与隐藏项见 PRD P0
 - 客户（Customer，最小形态）：渠道身份（邮箱或亚马逊中转地址）；第一期不做身份合并。
 - 归并（R-TK-01、R-TK-02）：在事务内按「店铺 + 订单号」或「店铺 + 客户渠道身份」取 `pg_advisory_xact_lock` 后再查再写；归并任务幂等，同一封消息重跑结果不变。落地（待办 14，`ticket/merge.ts`）：
   - 关联订单在事务外做（可能要补拉）：候选订单号逐个交 `order` 的 `findOrder`（先查镜像，没有时按需补拉）在来信所属店铺内校验，第一个查得到的即这封信的订单；查不到的不算，按抽不到处理（协调者 2026-10-07 决定，PRD v2.29 R-TK-01）。抽不到时 Shopify 店铺按客户渠道身份（联系表单的回复邮箱、直邮的发件地址）调 `findOrdersByEmail` 反查镜像，唯一命中才关联；亚马逊不反查（读不到买家邮箱）。店铺对象取 `channel` 的 `findOrderStore`。
-  - 订单在工单上的写法（`ticket.order_number`，P04 订单号列）：亚马逊为订单号，Shopify 为订单名（如 `#1063`）；归并键「店铺 + 订单号」，迁移 0026 加部分索引。
-  - R-TK-01：同店铺同订单有未关闭的工单则追加（不论谁写来：生产厂先来信建单、客户再来信也追加，工单来源仍是首封来信的）；没有时看已关闭的，取关闭时刻最近的一张，来信到达时间与关闭时刻相差 30 天以内（含第 30 天）则重开为待回复（迁移表 `closed + inbound_reopen → awaiting_reply`，关闭原因清空），否则新建。关闭时刻取该工单最近一条状态变更记录的时刻（`ticket-status.ts` 的 `closedTimes`）。
+  - 订单在工单上的写法（`ticket.order_number`，P04 订单号列；`order` 的 `orderNumberOf`）：亚马逊为订单号，Shopify 为订单名（如 `#1063`）；归并键「店铺 + 订单号」，迁移 0026 加部分索引。
+  - R-TK-01：同店铺同订单有未关闭的工单则追加（不论谁写来：生产厂先来信建单、客户再来信也追加，工单来源仍是首封来信的）；没有时看已关闭的，取关闭时刻最近的一张，按北京时间的日期，来信到达日不晚于关闭日之后第 30 天（当天任何时刻都算）则重开为待回复（迁移表 `closed + inbound_reopen → awaiting_reply`，关闭原因清空），否则新建。关闭时刻取该工单最近一条状态变更记录的时刻（`ticket-status.ts` 的 `closedTimes`）。
   - 新建工单的站点：Shopify 店铺关联到订单时取镜像的收件国家（不是 US / CA / MX 时取识别出的站点，即店铺默认站点）；其余照 `channel` 的识别。追加与重开不改站点、来源。
   - 加锁顺序固定：先客户身份锁（建客户），再归并锁（订单或客户），不会互相等死。
   - 补拉的外部调用失败：任务失败、按「来信已接收」的重试策略重试（5 次，10 秒起指数退避）；最后一次尝试（`JobContext.lastAttempt`）不再等这个候选，按查不到处理，来信照常归并成工单（ADR 0008 修订）。

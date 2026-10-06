@@ -75,6 +75,8 @@ describe('Shopify 订单名（规范写法 #数字）', () => {
       ['Order #: 1066', '#1066'],
       ['Order ID 1067', '#1067'],
       ['Mi pedido 1068 no llegó', '#1068'],
+      ['mi orden 1071 llegó rota', '#1071'],
+      ['Número de orden: 1072', '#1072'],
       ['Número de pedido: 1069', '#1069'],
       ['numero de pedido #1070', '#1070'],
     ];
@@ -98,16 +100,33 @@ describe('Shopify 订单名（规范写法 #数字）', () => {
     expect(extractOrderNumbers('shopify', mail('New customer message', form))).toEqual(['#1063']);
   });
 
-  it('不到 3 位的数字不算（#1、order 12），Shopify 店铺不抽亚马逊订单号', () => {
+  it('不到 4 位的数字不算（Apt #305、#1、order 12、pedido 999；Shopify 的订单名从 #1001 起），Shopify 店铺不抽亚马逊订单号', () => {
     expect(
-      extractOrderNumbers('shopify', mail('#1 fan', 'order 12 times; 113-5566112-7788990')),
+      extractOrderNumbers(
+        'shopify',
+        mail('#1 fan', 'Apt #305, order 12 times, pedido 999; 113-5566112-7788990'),
+      ),
     ).toEqual([]);
+  });
+
+  it('带「order / pedido / orden」字样的候选排在只写 # 的前面（不论在主题还是正文）', () => {
+    expect(
+      extractOrderNumbers('shopify', mail('Ticket #4521', 'About my order 1063, see #2001')),
+    ).toEqual(['#1063', '#4521', '#2001']);
   });
 
   it('同一订单的几种写法只算一次', () => {
     expect(extractOrderNumbers('shopify', mail('#1063', 'order 1063, pedido #1063'))).toEqual([
       '#1063',
     ]);
+  });
+});
+
+describe('HTML 正文里的 # 写成字符实体', () => {
+  it('&#35;、&#x23; 还原成 #', () => {
+    expect(
+      extractOrderNumbers('shopify', mail('', null, '<p>Order &#35;1063</p><p>and &#x23;1064</p>')),
+    ).toEqual(['#1063', '#1064']);
   });
 });
 

@@ -29,6 +29,12 @@ export const amazonDomains: Record<Site, { readonly site: string; readonly relay
 };
 export const SHOPIFY_CONTACT_FORM_SENDER = 'mailer@shopify.com';
 
+/**
+ * 亚马逊订单号（AmazonOrderId，3-7-7）的写法，正则源码：校验订单号（order）与从来信里抽订单号（channel，前后另加边界）共用，
+ * 只在这里定义一次（待办 14）
+ */
+export const AMAZON_ORDER_NUMBER_PATTERN = String.raw`\d{3}-\d{7}-\d{7}`;
+
 /** 各平台的平台标识（亚马逊卖家 ID、Shopify 店铺域名）与进线邮箱的叫法：店铺表、抽屉与报错共用 */
 export const platformTerms: Record<
   Platform,

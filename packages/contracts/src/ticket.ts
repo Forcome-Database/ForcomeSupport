@@ -131,7 +131,8 @@ export const ticketListItemSchema = z.object({
   source: ticketSourceSchema,
   /**
    * 渠道（R-TK-08）与站点，都取首封来信：亚马逊按发件域；Shopify 店铺关联到订单时按订单收件国家（收件国家不是 US / CA / MX
-   * 时取店铺默认站点），没有订单时取店铺默认站点；邮件取店铺默认站点（R-ST-02，待办 14）
+   * 时取店铺默认站点），没有订单时取店铺默认站点——Shopify 店铺收到的直邮同样如此；亚马逊店铺按发件域，不是亚马逊的域时取店铺默认站点
+   * （R-ST-02，待办 14）
    */
   channel: ticketChannelSchema,
   site: siteSchema,

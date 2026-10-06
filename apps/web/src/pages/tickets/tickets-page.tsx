@@ -19,6 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatLastInbound, ticketListQuery } from '@/lib/tickets';
+import { cn } from '@/lib/utils';
 import { A11Y, COLUMNS, EMPTY_TITLE, EMPTY_VALUE, PAGE_DESCRIPTION, PAGE_TITLE } from './p04-copy';
 
 /*
@@ -56,8 +57,14 @@ function TicketRow({ ticket, now }: { ticket: TicketListItem; now: Date }) {
         </div>
       </TableCell>
       <TableCell className="py-1.75">
-        {/* 原型：12 / 400、次要正文色、不折行；没有关联订单写「—」 */}
-        <span className="text-minor whitespace-nowrap text-ink-2" data-testid="ticket-order">
+        {/* 原型 p1_row：12 / 400、不折行；有订单为次要正文色 ink2，没有关联订单写「—」、ink4 */}
+        <span
+          className={cn(
+            'text-minor whitespace-nowrap',
+            ticket.orderNumber ? 'text-ink-2' : 'text-subtle-foreground',
+          )}
+          data-testid="ticket-order"
+        >
           {ticket.orderNumber ?? EMPTY_VALUE}
         </span>
       </TableCell>
