@@ -1,6 +1,6 @@
 # 16: 回复识别、SLA 与自动关闭
 
-Status: ready-for-agent
+Status: claimed
 Blocked by: 09, 10, 14
 
 规格：[第一期：报表与台账](../spec.md)
