@@ -123,8 +123,11 @@ async function syncMember(
   dept: string,
   syncedBy: Date,
 ): Promise<MemberSyncResult> {
+  // 本事务里刚写过的（同一轮对账里先停用、后又以新的用户 ID 碰到同一个人）不算更新过
   const newerThanData = (row: MemberRow) =>
-    row.dingtalkSyncedAt !== null && row.dingtalkSyncedAt > syncedBy;
+    row.dingtalkSyncedAt !== null &&
+    row.dingtalkSyncedAt > syncedBy &&
+    row.dingtalkSyncedAt.getTime() !== tx.now.getTime();
   const [byUserId] = await tx.db
     .select()
     .from(member)
@@ -297,7 +300,8 @@ export async function applyDirectory(
       ),
     );
 
-  const tree = departmentTreeOf(snapshot.departments);
+  // 部门显示按写完之后的部门表算：快照之后由部门事件改过的名字保留在部门表里，不被旧快照改回去
+  const tree = await loadDepartmentTree(tx.db);
   for (const user of snapshot.users) {
     count(changes, await syncMember(tx, user, departmentPath(tree, user.departmentIds), startedAt));
   }

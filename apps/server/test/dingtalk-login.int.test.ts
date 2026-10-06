@@ -168,6 +168,48 @@ describe('登录被拒（G12）', () => {
     );
   });
 
+  it('用户 ID 给了另一个人、旧成员的离职还没同步到时扫码：不能顶替旧成员——旧成员停用，新人按未分配角色拒绝', async () => {
+    await t.addMember({
+      dingtalkUserId: 'shared-id',
+      name: '原来的客服主管',
+      dept: 'FSH / 客服部',
+      roles: ['supervisor'],
+      allStores: true,
+    });
+    dingtalk().addUser({
+      userId: 'shared-id',
+      unionId: 'union-original',
+      name: '原来的客服主管',
+      departmentIds: ['101'],
+      email: null,
+    });
+    await t.runJobs();
+    expect((await t.scanLogin('shared-id')).response.status).toBe(200);
+
+    // 钉钉把这个用户 ID 给了新人，旧成员的离职与新人的入职都还没同步到
+    dingtalk().removeUser('shared-id', { silent: true });
+    dingtalk().addUser(
+      {
+        userId: 'shared-id',
+        unionId: 'union-newcomer',
+        name: '新来的人',
+        departmentIds: ['101'],
+        email: null,
+      },
+      { silent: true },
+    );
+    const { client, response } = await t.scanLogin('shared-id');
+    expect(response.status).toBe(403);
+    expect(loginDeniedSchema.parse(await response.json())).toMatchObject({
+      reason: 'no_role',
+      member: { name: '新来的人', roles: [] },
+    });
+    expect(client.cookie('forcome_session')).toBeUndefined();
+    expect(await t.auditRecords({ action: 'member.dingtalk_left' })).toContainEqual(
+      expect.objectContaining({ objectLabel: '原来的客服主管' }),
+    );
+  });
+
   it('钉钉认得出、成员表里没有的人（不是本组织的，或通讯录权限范围没覆盖）：按未分配角色拒绝', async () => {
     const { response } = await t.scanLogin('stranger');
     expect(response.status).toBe(403);

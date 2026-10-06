@@ -171,9 +171,14 @@ export function createDingtalkLoginRoutes(deps: {
     let found = identity.userId
       ? await findMemberByDingtalkUserId(runtime.db, identity.userId)
       : await findMemberByDingtalkUnionId(runtime.db, identity.unionId);
-    // 成员表还没跟上钉钉时，当场向钉钉取这个人再判断：刚入职（还没同步进来）、钉钉离职停用后又回来、已离职但还没停用
+    // 成员表还没跟上钉钉时，当场向钉钉取这个人再判断：刚入职（还没同步进来）、钉钉离职停用后又回来、已离职但还没停用、
+    // 用户 ID 换了人（对上了用户 ID、unionid 却不同：这个用户 ID 已给了另一个人，旧成员的离职还没同步到）
+    const anotherPerson =
+      found?.dingtalkUnionId != null && found.dingtalkUnionId !== identity.unionId;
     const stale = identity.userId
-      ? !found || (found.status === 'disabled' && found.disabledReason === 'dingtalk_left')
+      ? !found ||
+        anotherPerson ||
+        (found.status === 'disabled' && found.disabledReason === 'dingtalk_left')
       : found?.status === 'active';
     const userId = identity.userId ?? found?.dingtalkUserId;
     if (stale && userId) {
@@ -186,6 +191,8 @@ export function createDingtalkLoginRoutes(deps: {
       found ??= await findMemberByDingtalkUserId(runtime.db, userId);
     }
 
+    // 兜底：unionid 与扫码人对不上的成员一律不认，扫码人不能顶替别人
+    if (found?.dingtalkUnionId != null && found.dingtalkUnionId !== identity.unionId) found = null;
     // 钉钉认得、成员表里没有（通讯录权限范围没覆盖他，或不是本组织的人）：按未分配角色处理
     if (!found) return c.json(await loginDeniedBody(runtime.db, 'no_role'), 403);
     const denied = loginDenial(found);
