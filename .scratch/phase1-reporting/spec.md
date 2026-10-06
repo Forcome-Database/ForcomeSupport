@@ -247,7 +247,7 @@ P04、P05 第一期版本的列、筛选、排序、取值与隐藏项见 PRD P0
 - Shopify：Admin GraphQL，每 1–2 分钟 `updated_at` 增量；令牌 24 小时过期、每 20 小时提前刷新（动态凭据用主密钥 AES-GCM 加密存库）。
 - 回补 90 天（Shopify 61–90 天依赖 `read_all_orders`，否则 60 天并由报表注明）；每天夜间对账近 7 天。
 - 对外接口：「在某店铺内按订单号 / 订单名查订单（镜像没有则按需补拉）」「在某店铺内按客户邮箱反查订单」「各数据源最近同步成功时间」。
-- 落地（待办 11，Shopify）：镜像表 `order.platform_order`（「店铺 + 平台订单号」唯一，订单名店铺内唯一，只进不退）、同步记录 `order.order_sync`（迁移 0023）；每分钟 `order.shopify_poll` 给每个 Shopify 店铺排 `order.shopify_sync`，从水位前 2 分钟起按 `updated_at` 分页拉、全部写完才推进水位，新增或编辑店铺后立即同步一次、换了数据源从头算；对外接口 `findOrder`（镜像没有时按订单名补拉）、`findOrdersByEmail`（只查镜像，R-ST-03）、`orderSyncHealths`；`order` 不依赖 `channel`，店铺由调用方或组装根给出（ADR 0005 修订）。访问令牌用自建应用的客户端凭据（client credentials）按店铺换取、满 20 小时换新、主密钥 `CREDENTIAL_MASTER_KEY` AES-256-GCM 加密存 `integration.credential`；没配置 Shopify 凭据时照常启动、Shopify 为「未连接」（ADR 0011、0013 修订，`docs/部署说明.md` 第 13 节）。连接异常与恢复的卡片、横幅、通知、P27 写法套用 Gmail（协调者 2026-10-06 决定，PRD v2.26）；回补窗口行随 13。
+- 落地（待办 11，Shopify）：镜像表 `order.platform_order`（「店铺 + 平台订单号」唯一，只进不退；订单名平台保证店铺内唯一，库里只建普通索引，撞名不卡同步）、同步记录 `order.order_sync`（迁移 0023）；每分钟 `order.shopify_poll` 给每个 Shopify 店铺排 `order.shopify_sync`，从水位前 2 分钟起按 `updated_at` 分页拉、全部写完才推进水位，新增或编辑店铺后立即同步一次、换了数据源从头算；对外接口 `findOrder`（镜像没有时按订单名补拉）、`findOrdersByEmail`（只查镜像，R-ST-03）、`orderSyncHealths`；`order` 不依赖 `channel`，店铺由调用方或组装根给出（ADR 0005 修订）。访问令牌用自建应用的客户端凭据（client credentials）按店铺换取、满 20 小时换新、主密钥 `CREDENTIAL_MASTER_KEY` AES-256-GCM 加密存 `integration.credential`；没配置 Shopify 凭据时照常启动、Shopify 为「未连接」（ADR 0011、0013 修订，`docs/部署说明.md` 第 13 节）。连接异常与恢复的卡片、横幅、通知、P27 写法套用 Gmail（协调者 2026-10-06 决定，PRD v2.26）；回补窗口行随 13。
 - 说明：亚马逊非受限角色读不到买家邮箱，邮箱反查实际只对 Shopify 生效。
 
 **`ticket`**

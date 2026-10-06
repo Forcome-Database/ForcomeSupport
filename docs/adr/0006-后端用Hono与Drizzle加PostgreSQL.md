@@ -118,4 +118,4 @@ status: accepted
 
 ## 修订（2026-10-06，待办 11 落地）
 
-- **订单镜像的表**（迁移 0023）：`order.platform_order`（UUIDv7 主键；「店铺 + 平台订单号」唯一，订单名在店铺内唯一用部分唯一索引 `WHERE name IS NOT NULL`，亚马逊没有订单名；商品行、收件地址、履约单号是 jsonb，类型在 `order/schema.ts`；总额 numeric(12,2) + 币种）、`order.order_sync`（店铺 × 数据源一行，唯一约束）。`integration.credential` 的密文、IV、认证标签是 `bytea`（drizzle 的 `customType`，在 JS 中是 Buffer）。`order` 是 SQL 保留字，手写 SQL 写成 `"order".platform_order`。
+- **订单镜像的表**（迁移 0023）：`order.platform_order`（UUIDv7 主键；「店铺 + 平台订单号」唯一，订单名是部分普通索引 `WHERE name IS NOT NULL`——平台保证店铺内唯一，但不在库里加唯一约束，万一撞名也不让整页写入失败、同步卡住，按订单名查时取平台更新时间最新的一笔；亚马逊没有订单名；商品行、收件地址、履约单号是 jsonb，类型在 `order/schema.ts`；总额 numeric(12,2) + 币种）、`order.order_sync`（店铺 × 数据源一行，唯一约束）。`integration.credential` 的密文、IV、认证标签是 `bytea`（drizzle 的 `customType`，在 JS 中是 Buffer）。`order` 是 SQL 保留字，手写 SQL 写成 `"order".platform_order`。
