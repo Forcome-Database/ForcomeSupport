@@ -82,17 +82,18 @@ export async function listStoreChoices(db: DbExecutor): Promise<{ id: string; na
     .orderBy(asc(store.createdAt), asc(store.id));
 }
 
+/** 各平台的「立即同步一次订单」（加了平台而这里没跟上时编译报错） */
+const QUEUE_ORDER_SYNC: Record<Platform, (tx: Tx, storeId: string) => Promise<void>> = {
+  shopify: queueShopifySync,
+  amazon: queueAmazonSync,
+};
+
 /** 新增或编辑店铺后立即给它排一次订单同步（不等定时；Shopify 待办 11、亚马逊待办 12） */
-async function queueOrderSync(
+function queueOrderSync(
   tx: Tx,
   saved: { readonly id: string; readonly platform: Platform },
 ): Promise<void> {
-  switch (saved.platform) {
-    case 'shopify':
-      return queueShopifySync(tx, saved.id);
-    case 'amazon':
-      return queueAmazonSync(tx, saved.id);
-  }
+  return QUEUE_ORDER_SYNC[saved.platform](tx, saved.id);
 }
 
 /**
