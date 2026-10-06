@@ -25,3 +25,10 @@ Blocked by: 05, 08, 31
 - 2026-10-05（待办 20 留下的衔接）：出站 HTTP 客户端工厂已在 `apps/server/src/modules/integration/http.ts`（`createHttpClient(系统)`：进程共用 undici `EnvHttpProxyAgent`、调用时限、错误翻译成 `faults.ts` 的那一套，测试经参数换 undici `MockAgent`），第一个用它的是汇率客户端。按「系统 × 接口」的限流与每次外部调用的调用记录（系统、动作、店铺、耗时、状态码、请求与响应摘要）由本待办加在这个工厂里——汇率客户端（`integration/exchange-rate.ts`）也经它，加上后自然有记录。Gmail 的服务账号令牌与 googleapis 若不走 fetch，也要接到同一组代理变量与调用记录上（ADR 0009「待办 20 落地」修订）。
 
 - 2026-10-06（待办 31）：渠道连接异常与恢复的站内通知：在连接状态变为「连接异常」/ 恢复为「已连接」的事务里调 `org` 的 `notifyMembers(tx, { type: 'channel_disconnected' | 'channel_recovered', title, body, object: { type: 'channel', id: 'gmail', label: 'P18 · Gmail' } })`，接收人是在职的管理员与客服主管（11.4）；照原型 G10 的写法：标题「Gmail 连接异常」「Gmail 已恢复」，说明「support@forcome.mx 连续 3 次失败，来信暂存」「support@forcome.mx 已重新连接，补拉 3 封来信」。这两种按角色发给全部，**不要传 `storeId`**（传了会按接收人的店铺范围在查询时隐藏）。连接异常另发钉钉工作通知（05 的能力）给 `notifyMembers` 返回的接收人。客服主管打不开 P18，点这类通知只标为已读（`apps/web/src/lib/notifications.ts` 的 `notificationTarget`）。产生通知后 e2e 可改用真实的故障注入，现在用的是示例通知接口。
+
+- 2026-10-06（待办 05）：
+  - 常驻拉取的选主已在 `core/feeds.ts`：`defineFeed(名, 拉取, { exclusive: true, release })`，多个 worker 时会话级咨询锁选主、持有者断线自动交还（ADR 0008「待办 05 落地」）。Gmail 推送要不要独占由本待办定，改一个选项即可（测试见 `core/feeds.int.test.ts`）。
+  - 连接状态的规则在 `contracts` 的 `syncConnectionStatus` 与 `SYNC_DELAY_MS`（Gmail、订单 10 分钟，钉钉 2 小时；连续 3 次失败为连接异常；从没成功过为未连接），钉钉卡已按它出状态与最近同步时间（`org` 的 `dingtalkConnection`）。P18 钉钉卡在同步延迟、连接异常时的说明行（原型 K20 / `build_settings.py` 的钉钉卡：「通讯录 08:00 后未同步成功，超过 2 小时」「只提醒管理员，不出全站横幅；成员与部门保持上次结果，登录与权限不受影响」）由本待办随卡片展示一起做。
+  - 全站横幅（G4）跟着「渠道连接异常」：钉钉同步失败是另一种通知（`dingtalk_sync_failed`），横幅接口不要算它（6.9 钉钉例外）。
+  - `org` 的 `notifyMembers` 现在对 11.4 渠道里有钉钉的类型（`channel_disconnected`）自动排入钉钉工作通知，**不要另发**（取代待办 31 留言里「另发钉钉工作通知」的说法）；测试里推进 5 分钟后 `t.enqueue(sendWorkNotificationsJob, {})` 再 `t.runJobs()`，看 `t.clients.fake(dingtalkClient).sent`（`apps/server/test/work-notifications.int.test.ts`）。
+  - 出站 HTTP 客户端工厂多了 `postJson`，进程共用的出站连接 `outboundDispatcher` 已导出（钉钉 Stream 的 WebSocket 用它）；限流与调用记录仍由本待办加，钉钉的调用也经这个工厂。钉钉卡的「测试连接」可在 `org` 加一个取根部门（`getDepartment('1')`）的检查。

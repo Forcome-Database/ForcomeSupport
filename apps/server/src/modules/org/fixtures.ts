@@ -1,6 +1,6 @@
 import { roleByLabel } from '@forcome/contracts';
 import type { FixtureMember } from '@forcome/fixtures';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { defineFixtureStep } from '../core';
 import { createMember, type NewMember } from './members';
 import { member } from './schema';
@@ -30,8 +30,10 @@ function newMemberOf(fixture: FixtureMember): NewMember {
 
 /**
  * 示例成员（原型 data.py 的 STAFF）：沿用夹具里确定的 id（待办 02 的开发登录也用这组 id）；已存在则跳过。
- * 角色与店铺范围来自这里；姓名、部门与在职状态之后随 Fake 钉钉的通讯录同步（待办 05）。待办 05 之前灌进去的示例成员
- * 没有钉钉用户 ID，这里补上（幂等），否则对账会把他们当成通讯录之外的人、另建一份。
+ * 角色与店铺范围来自这里；姓名、部门与在职状态之后随 Fake 钉钉的通讯录同步（待办 05）。另做两件修补（都幂等）：
+ * - 待办 05 之前灌进去的示例成员没有钉钉用户 ID，补上，否则对账会把他们当成通讯录之外的人、另建一份；
+ * - 被钉钉离职停用、或回到通讯录后角色被清空的示例成员（开发测试环境联调过真实钉钉，docs/部署说明.md 第 11.2 节），
+ *   恢复成示例数据里的角色与店铺范围。加载步骤只在非生产环境执行。
  */
 export const orgMembersFixtureStep = defineFixtureStep({
   name: 'org.members',
@@ -43,6 +45,24 @@ export const orgMembersFixtureStep = defineFixtureStep({
         .update(member)
         .set({ dingtalkUserId: fixtureMember.key, email: fixtureMember.email })
         .where(and(eq(member.id, fixtureMember.id), isNull(member.dingtalkUserId)));
+      await tx.db
+        .update(member)
+        .set({
+          status: 'active',
+          disabledReason: null,
+          disabledAt: null,
+          roles: [...input.roles],
+          allStores: input.allStores,
+          storeIds: [...(input.storeIds ?? [])],
+          updatedAt: tx.now,
+          version: sql`${member.version} + 1`,
+        })
+        .where(
+          and(
+            eq(member.id, fixtureMember.id),
+            or(eq(member.disabledReason, 'dingtalk_left'), sql`cardinality(${member.roles}) = 0`),
+          ),
+        );
     }
   },
 });

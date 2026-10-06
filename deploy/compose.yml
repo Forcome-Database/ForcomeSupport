@@ -24,6 +24,13 @@ x-app: &app
     http_proxy: ${HTTP_PROXY:-}
     NO_PROXY: ${NO_PROXY:-}
     no_proxy: ${NO_PROXY:-}
+    # 钉钉企业内部应用（待办 05，docs/部署说明.md 第 11 节）：不设 CLIENT_MODE_DINGTALK 时非生产环境用 Fake、生产用真实接口；
+    # 用真实接口时四项凭据必填（api 启动时校验）
+    CLIENT_MODE_DINGTALK: ${CLIENT_MODE_DINGTALK:-}
+    DINGTALK_CLIENT_ID: ${DINGTALK_CLIENT_ID:-}
+    DINGTALK_CLIENT_SECRET: ${DINGTALK_CLIENT_SECRET:-}
+    DINGTALK_AGENT_ID: ${DINGTALK_AGENT_ID:-}
+    DINGTALK_CORP_ID: ${DINGTALK_CORP_ID:-}
     TZ: UTC
   depends_on:
     postgres:

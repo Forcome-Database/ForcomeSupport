@@ -318,6 +318,19 @@ describe('同步失败（E-32、AC-P1-22）：保留上次的成员与部门，�
   });
 });
 
+describe('开发测试环境：重灌示例数据恢复示例成员（联调真实钉钉后切回 Fake，docs/部署说明.md 第 11.2 节）', () => {
+  it('被钉钉离职停用的、回到通讯录后角色被清空的示例成员，恢复成示例数据的角色；其他人不动', async () => {
+    // 前面的用例里：王磊离职停用，陈晨回到通讯录后没有角色
+    expect(await memberNamed('王磊')).toBeUndefined();
+    expect(await memberNamed('陈晨')).toMatchObject({ roles: [] });
+    await t.loadFixtures();
+    expect(await memberNamed('王磊')).toMatchObject({ roles: ['aftersales_owner'] });
+    expect(await memberNamed('陈晨')).toMatchObject({ roles: ['agent'] });
+    // 不是示例成员的不动
+    expect(await memberNamed('孙悦')).toMatchObject({ roles: [] });
+  });
+});
+
 describe('示例数据：两家生产厂负责人的钉钉用户 ID', () => {
   it('取 factory-head-<厂代码>', () => {
     expect(factoryHeadUserId('FQD')).toBe('factory-head-fqd');
