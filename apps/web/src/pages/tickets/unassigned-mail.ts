@@ -88,7 +88,6 @@ function showTaken(mailId: string, error: ApiRequestError): void {
   });
 }
 
-/** 窗口结束：提交。成功或 409 后刷新（行随之移出），其余失败时行回到队列、浮层可重试 */
 /** 提交一次（提交中这一行不显示）：成功或 409 后刷新（行随之移出）；会话失效时按会话结束处理。其余失败照常抛出 */
 async function submit(queryClient: QueryClient, mail: UnassignedMail, store: StoreOption) {
   pending.set(mail.id, null);

@@ -247,15 +247,18 @@ describe('未归属店铺来信', () => {
       expect(mails.filter((m) => m.customer.name === 'Paz Duplicada')).toHaveLength(1);
     });
 
-    it('写给落到的店铺邮箱（To 里有它）：按它识别，即使 Delivered-To 写的是没登记的地址（识别的第一条分支）', async () => {
-      gmail().deliver({
-        ...forwardedLetter('Dan Direct', DIRECT.mailbox, { mailbox: DIRECT.mailbox }),
-        deliveredTo: 'amz-unknown@forcome.com',
-      });
+    it('同时写给两个店铺邮箱、落在后写的那个邮箱：按落到的店铺邮箱识别，不按 To 里先写的（识别的第一条分支，R-TK-07）', async () => {
+      gmail().deliver(
+        forwardedLetter('Dan Direct', '', {
+          to: [DIRECT.mailbox, AUTO.mailbox],
+          mailbox: AUTO.mailbox,
+          deliveredTo: AUTO.mailbox,
+        }),
+      );
       await t.runJobs();
       expect(await queued('Dan Direct')).toBeUndefined();
       const [ticket] = await ticketsOf('Dan Direct');
-      expect(ticket?.store.name).toBe('Forcome Direct');
+      expect(ticket?.store.name).toBe('Forcome Auto');
     });
 
     it('Delivered-To 写的是信落到的同步邮箱本身（寄到它的别名）：落到的邮箱不算收件地址，按 To 的别名进队列', async () => {

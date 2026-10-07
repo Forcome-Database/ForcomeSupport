@@ -10,7 +10,8 @@ import { slaTargetSchema, type SlaTarget } from './sla';
 
 /**
  * 收件地址取自的头字段，按识别时的先后：Delivered-To（实际投递到的地址，Gmail 写在最上面）、To、Cc。
- * 店铺按其中第一个登记过的进线邮箱识别；都没登记时，第一个地址就是 I17 的「识别依据」
+ * 写给信落到的店铺邮箱的（To、Cc 里有它）按它的店铺，否则按其中第一个登记过的进线邮箱识别（Delivered-To 里落到的邮箱自己不算）；
+ * 都没登记时，第一个地址就是 I17 的「识别依据」
  */
 export const recipientHeaders = ['delivered-to', 'to', 'cc'] as const;
 export const recipientHeaderSchema = z.enum(recipientHeaders);

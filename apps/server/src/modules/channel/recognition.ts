@@ -17,10 +17,12 @@ import { addressParser, decodeWords, type Address } from 'postal-mime';
 /*
  * 来信的渠道、站点、来源识别（规格 channel「渠道识别」「来源识别」「店铺与站点识别」，PRD R-TK-08、R-ST-02、
  * 1.4「来源」，待办 10）。纯函数：输入一封来信的发件人、Reply-To、正文与头字段，收到它的店铺，来源规则表；
- * 输出渠道、站点、来源与客户渠道身份。店铺按收件邮箱识别（gmail-sync.ts），不在这里。
+ * 输出渠道、站点、来源与客户渠道身份；另有按收件地址识别店铺的纯函数（第 0 条），由收信（gmail-sync.ts）与自动归位（unassigned.ts）调用。
  *
- * 0. 店铺（R-ST-02、E-13，待办 15）：按收件地址——Delivered-To、To、Cc 依次（recipientsOf），第一个登记为进线邮箱的地址所属的店铺
- *    （storeOfRecipients）；都没登记即未归属店铺，进队列，平台暂按发件域定（provisionalStore，E-13），指定店铺或自动归位后按所归店铺重新识别。
+ * 0. 店铺（R-ST-02、E-13，待办 15）：收件地址为 Delivered-To、To、Cc 依次（recipientsOf，Delivered-To 里信落到的同步邮箱自己不算），
+ *    店铺按 storeForMail 的四条分支：① 落到的店铺邮箱写在 To、Cc 里就按它（R-TK-07 以先入库那份为准）；② 否则第一个登记为进线邮箱的
+ *    收件地址所属的店铺；③ 一个收件地址都没有按落到的邮箱；④ 其余为未归属店铺，进队列，平台暂按发件域定（provisionalStore，E-13），
+ *    指定店铺或自动归位后按所归店铺重新识别。
  * 1. 渠道与客户渠道身份（R-TK-08）：
  *    - 亚马逊店铺邮箱收到亚马逊买家消息中转来信（发件域 marketplace.amazon.com / .ca / .com.mx）→ 亚马逊，身份是中转地址；
  *    - Shopify 店铺邮箱收到 Shopify 联系表单通知（mailer@shopify.com 代发，能找到填表客户的邮箱）→ Shopify，

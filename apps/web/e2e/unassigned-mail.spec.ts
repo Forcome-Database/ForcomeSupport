@@ -3,7 +3,7 @@ import {
   type StoreOption,
   type UnassignedMailList,
 } from '@forcome/contracts';
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page, type Request, type Route } from '@playwright/test';
 
 /*
  * 未归属店铺来信队列与指定店铺（待办 15；PRD P04「第一阶段」、I17 与补充小样③–⑥，协调者 2026-10-07 决定）：
@@ -133,10 +133,12 @@ test('指定后 5 秒内撤销：行移出、撤销浮层倒计时；撤销后�
   await loginAs(page, '周敏');
   await openQueue(page);
   const posts: string[] = [];
+  const meCalls: Request[] = [];
   page.on('request', (request) => {
     if (request.method() === 'POST' && request.url().includes('/api/channel/unassigned-mail/')) {
       posts.push(request.url());
     }
+    if (new URL(request.url()).pathname === '/api/me') meCalls.push(request);
   });
   await page.clock.install();
   const before = await row(page, '').count();
@@ -153,11 +155,23 @@ test('指定后 5 秒内撤销：行移出、撤销浮层倒计时；撤销后�
   await expect(toast).toContainText('3s');
 
   await page.getByRole('button', { name: '撤销' }).click();
+  const meBefore = meCalls.length;
   await expect(row(page, 'Lucía Herrera')).toBeVisible();
   await expect(page.getByText('已归入 forcome.mx')).toBeHidden();
   await page.clock.runFor(10_000);
+  // 提交链若还在跑：到点后先取 /api/me（核对成员），返回后才发 POST。先让页面跑一轮往返（期间发出的请求都已报上来），
+  // 等这些 /api/me 都返回，再跑一轮往返（返回后发出的 POST 也已报上来），才断言什么都没提交
+  const roundTrip = () => page.evaluate(async () => (await fetch('/api/health')).status);
+  await roundTrip();
+  await Promise.all(meCalls.slice(meBefore).map((request) => request.response()));
+  await roundTrip();
   expect(posts).toEqual([]);
   await expect(row(page, 'Lucía Herrera')).toBeVisible();
+  // 真实接口：Lucía Herrera 仍在队列里
+  const res = await page.request.get('/api/channel/unassigned-mail');
+  expect(res.ok()).toBe(true);
+  const { mails } = unassignedMailListSchema.parse(await res.json());
+  expect(mails.map((m) => m.customer.name)).toContain('Lucía Herrera');
 });
 
 test('不撤销：窗口结束才提交（带所选店铺），行随刷新移出，入口计数减一（AC-P1-15、AC-TK-11）', async ({
