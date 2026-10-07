@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """P04 Tickets · P05 TicketDetail · P06 Customer。"""
-import sys, os
+import datetime, sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ui import *
@@ -155,7 +155,7 @@ def vflow(steps, step_gap=5):
     out = ''
     n = len(steps)
     for i, (s_, tm, st) in enumerate(steps):
-        c = {'done': T['ok_solid'], 'current': T['accent'], 'todo': T['line_strong']}[st]
+        c = {'done': T['ok_solid'], 'current': T['accent'], 'todo': T['line_strong'], 'closed': T['ink4']}[st]  # closed：已关闭的最后一步（灰色实心）
         dot = '<div style="width: 10px; height: 10px; box-sizing: border-box; border-radius: 999px; background: %s; border: 2px solid %s; flex-shrink: 0; margin-top: 5px;"></div>' % (
             '#ffffff' if st == 'todo' else c, c)
         ln = '<div style="position: absolute; left: 4px; top: 17px; bottom: -3px; width: 2px; background: %s;"></div>' % T['line'] if i < n - 1 else ''
@@ -182,6 +182,33 @@ def order_card(no, pad=RCARD_PAD, synced=None):
                           grid(kv('履约方式', o['fulfil']) + kv('承诺送达', o['promise']), 2, 20) + kv('收件城市', o['ship_to']) +
                           kv('承运商', '%s %s' % (o['carrier'], o['tracking'])), 3), 6)
     return card(body, title='订单', extra=nowrap('平台镜像 · 最近同步 %s' % (synced or CHANNEL_SYNC['SP-API']), 11, T['ink3']), pad=pad, gap=8)
+
+
+def order_card_p1(no, synced, pad='12px 16px'):
+    """第一阶段订单卡（待办 17，协调者 2026-10-07 决定 Q1、Q2）：取第一期订单镜像的示例（data.AMAZON_ORDERS_P1 / SHOPIFY_ORDERS_P1）。
+    状态写平台履约状态的中文（P1_ORDER_STATUS，没有签收），右侧「更新于」平台最近更新日期；金额非美元的按演示汇率折算「≈ $」；
+    亚马逊多一行「履约方式 · 承诺送达」，Shopify 没有这一行；没有值写「—」。no 为 None 时写「未关联订单」。"""
+    extra = nowrap('平台镜像 · 最近同步 %s' % synced, 11, T['ink3'])
+    if no is None:
+        return card(nowrap('未关联订单', 12, T['ink3']), title='订单', pad=pad, gap=8)
+    amazon = no in AMAZON_ORDERS_P1
+    o = AMAZON_ORDERS_P1[no] if amazon else SHOPIFY_ORDERS_P1[no]
+    status = P1_ORDER_STATUS[o['status'] if amazon else o['fulfilled']]
+    head = between(nowrap(no, 13, T['ink'], 700), row(state(status) + nowrap('更新于 ' + o['updated'][:5], 12, T['ink3']), 6))
+    items = '、'.join('%s ×%d' % (t, q) for t, q in o['items'])
+    if amazon:
+        money_ = money_cur(*o['total'])  # 非美元附「（≈ $）」
+        city, region, _zip, country = o['ship_to']
+        fulfil = {'MFN': 'MFN（自发货）', 'AFN': 'AFN（亚马逊配送）'}[o['fulfil']]
+        extra_row = grid(kv('履约方式', fulfil) + kv('承诺送达', o['deliver_by'][:5]), 2, 20)
+    else:
+        money_ = money(o['total'])
+        _street, _apt, city, region, _zip, country = o['ship_to']
+        extra_row = ''
+    track = '%s %s' % o['tracking'] if o['tracking'] else '—'
+    body = col(head + col(kv('商品', items) + kv('金额', money_) + extra_row + kv('收件城市', '%s, %s, %s' % (city, region, country)) +
+                          kv('承运商', track), 3), 6)
+    return card(body, title='订单', extra=extra, pad=pad, gap=8)
 
 
 def inline_kv(k, v):
@@ -370,54 +397,110 @@ def our_reply(mailbox, via, time_, body):
     return message('我方', '%s · %s · %s' % (mailbox, via, time_), body, 'out', avatar(icon('send', 13, T['ink2'], 2), 'grey', 28))
 
 
-def p1_event(state_, at, trig):
-    """状态迁移事件行（触发方 · 事件 → 目标状态），数据取 P1_OLIVER['flow']。"""
+def p1_event(state_, at, trig, reason=None):
+    """状态迁移事件行（触发方 · 事件 → 目标状态），数据取 P1_OLIVER['flow'] 与 P1_DETAIL_CASES（待办 17 补重开、撤销、按时关闭的写法，Q6 e）。"""
     actor, what = trig.split(' · ')
-    t = {'新建': '新建工单，状态「%s」', '新来信': '新来信，回到「%s」'}.get(what, what + '，转「%s」') % state_
+    t = {'新建': '新建工单，状态「%s」', '新来信': '新来信，回到「%s」', '重开': '同一订单来信，重开为「%s」',
+         '撤销标记无需回复': '撤销标记无需回复，回到「%s」'}.get(what, what + '，转「%s」') % state_
+    if what in ('7 天无来信', '14 天无新来信'):
+        t = '%s，关闭（%s）' % (what, reason)
     return ev(at[6:], '系统', t) if actor == '系统' else ev(at[6:], '人工', actor + t)
 
 
-def p1_flow(steps, close_at, close_reason):
-    """第一阶段状态流转：每步写状态、触发方与时间，最后一步写预计关闭时刻与关闭原因。"""
+# 第一阶段按时关闭（prd_b 6.1）：状态 → 规则（元信息、状态流转卡头）
+P1_CLOSE_RULE = {'待回复': '14 天无新来信', '等客户': '7 天无来信', '已解决': '7 天无来信'}
+
+
+def p1_flow(steps, close):
+    """第一阶段状态流转：每步写状态、触发方与时间。还没关闭的最后一步写预计关闭时刻与关闭原因（灰色空心圈）；
+    已关闭的最后一步是实际关闭（灰色实心圈，时间不带「预计」，触发方后写关闭原因，待办 17 Q6 d）。"""
+    at, reason, closed = close
     n = len(steps)
-    vs = [(row(state(s) + nowrap(trig, 11, T['ink3']), 6), at, 'current' if i == n - 1 else 'done') for i, (s, at, trig) in enumerate(steps)]
-    vs.append((row(chip('已关闭', 'muted', 11) + nowrap(close_reason, 11, T['ink3']), 6), '预计 ' + close_at, 'todo'))
+    vs = []
+    for i, (s, when, trig) in enumerate(steps):
+        if s == '已关闭':
+            vs.append((row(chip('已关闭', 'muted', 11) + nowrap('%s（%s）' % (trig, reason), 11, T['ink3']), 6), when, 'closed'))
+        else:
+            vs.append((row(state(s) + nowrap(trig, 11, T['ink3']), 6), when, 'current' if i == n - 1 else 'done'))
+    if not closed:
+        vs.append((row(chip('已关闭', 'muted', 11) + nowrap(reason, 11, T['ink3']), 6), '预计 ' + at, 'todo'))
     return vflow(vs, 3)
 
 
-def p05_p1():
-    o = P1_OLIVER
-    t = TK[o['ticket']]
+def p1_close_words(status, close):
+    """元信息里的自动关闭（prd_c P05「第一阶段」，待办 17 Q6 d）：待回复不写状态前缀（PRD 例句），已关闭写实际关闭时刻"""
+    at, reason, closed = close
+    if closed:
+        return '已关闭 · %s 自动关闭（%s）' % (at, reason)
+    prefix = '' if status == '待回复' else status + ' · '
+    return '%s%s将于 %s 自动关闭（%s）' % (prefix, P1_CLOSE_RULE[status], at, reason)
+
+
+P1TK = {t['no']: t for t in p1_tickets()}
+# 来信卡头的渠道写法（待办 17 Q6 a）；我方回复只在亚马逊工单写「经亚马逊买家消息」
+P1_VIA_IN = {'亚马逊': '亚马逊买家消息', 'Shopify': 'Shopify 联系表单', '邮件': '邮件'}
+P1_WEEKDAY = '一二三四五六日'
+
+
+def p1_day_label(md):
+    """日期分隔条：「09-05 周六」（2026 年）"""
+    d = datetime.date(2026, int(md[:2]), int(md[3:]))
+    return '%s 周%s' % (md, P1_WEEKDAY[d.weekday()])
+
+
+def p1_case(no):
+    """P05 第一阶段画面的数据：Oliver Grant 取 P1_OLIVER（画面为 09-10 09:05 标记之后，带撤销浮层），其余取 P1_DETAIL_CASES"""
+    if no == P1_OLIVER['ticket']:
+        o = P1_OLIVER
+        return {'timeline': o['timeline'], 'flow': o['flow'], 'close': (o['close_at'], o['close_reason'], False), 'sla': o['sla'],
+                'order_synced': o['order_synced'], 'marked': (o['marked_by'], o['marked_at']), 'toast': True}
+    return dict(P1_DETAIL_CASES[no], marked=None, toast=False)
+
+
+def p05_p1(no=None):
+    """第一阶段 P05（I18）：默认 Oliver Grant（已解决，标记之后）；no 给 P1_DETAIL_CASES 的工单号时画待回复、等客户、已关闭（待办 17 补充小样）"""
+    no = no or P1_OLIVER['ticket']
+    o = p1_case(no)
+    t = P1TK[no]
     store = [s for s in STORES if s['name'] == t['store']][0]
-    via = '经亚马逊买家消息'
-    meta = ''.join([nowrap(t['no'], 12, T['ink3']), nowrap('·', 12, T['ink4']), nowrap('客户 ' + t['customer'], 12, T['ink3']), nowrap('·', 12, T['ink4']),
-                    nowrap('订单 ' + t['order'], 12, T['ink3']), nowrap('·', 12, T['ink4']),
-                    nowrap('已解决 · 7 天无来信将于 %s 自动关闭（%s）' % (o['close_at'], o['close_reason']), 12, T['ink3'])])
+    via_in = P1_VIA_IN[t['channel']]
+    out_meta = (store['mailbox'] + ' · 经亚马逊买家消息') if t['channel'] == '亚马逊' else store['mailbox']
+    open_ = not o['close'][2]
+    meta = ''.join([nowrap(t['no'], 12, T['ink3']), nowrap('·', 12, T['ink4']), nowrap('客户 ' + t['customer'], 12, T['ink3']), nowrap('·', 12, T['ink4'])] +
+                   ([nowrap('订单 ' + t['order'], 12, T['ink3']), nowrap('·', 12, T['ink4'])] if t['order'] else []) +
+                   [nowrap(p1_close_words(t['status'], o['close']), 12, T['ink3'])])
     head = detail_head(t['subject'], state(t['status']) + channel(t['channel'], t['site'], t['store']), '', meta=meta)
-    # 全程记录：消息（P1_OLIVER['timeline']）与状态迁移事件（P1_OLIVER['flow']）按时刻合并，按日期分组
-    day_label = {d[:5]: d for d, _, _, _ in o['timeline']}
+    # 全程记录：消息与状态迁移事件按时刻合并，按日期分组；未关闭工单里最后一封我方回复之后、没被标记的来信卡右上有「标记无需回复」
+    last_out = max(['%s %s' % (d[:5], tm) for d, tm, k, _ in o['timeline'] if k == 'out'] or [''])
     items = [('%s %s' % (d[:5], tm), 0, k, b) for d, tm, k, b in o['timeline']] + [(at, 1, s, trig) for s, at, trig in o['flow']]
     tl, last_day = '', None
     for at, kind, a, b in sorted(items, key=lambda x: (x[0], x[1])):
         if at[:5] != last_day:
-            tl += day_sep(day_label[at[:5]])
+            tl += day_sep(p1_day_label(at[:5]))
             last_day = at[:5]
         if kind == 1:
-            tl += p1_event(a, at, b)
+            tl += p1_event(a, at, b, o['close'][1])
         elif a == 'out':
-            tl += our_reply(o['mailbox'], via, at[6:], b)
+            tl += message('我方', '%s · %s' % (out_meta, at[6:]), b, 'out', avatar(icon('send', 13, T['ink2'], 2), 'grey', 28))
         else:
-            mark = chip('无需回复 · %s · %s' % (o['marked_by'], o['marked_at'][6:]), 'muted', 11, 'check') if a == 'marked' else None
-            tl += customer_msg(t['customer'], '亚马逊买家消息 · ' + at[6:], b, '', mark)
+            if a == 'marked':
+                mark = chip('无需回复 · %s · %s' % (o['marked'][0], o['marked'][1][6:]), 'muted', 11, 'check')
+            elif open_ and at > last_out:
+                mark = btn('标记无需回复', 'secondary', 'sm', 'check')
+            else:
+                mark = None
+            tl += customer_msg(t['customer'], '%s · %s' % (via_in, at[6:]), b, '', mark)
     tl = col(tl, 7, 'flex: 1; min-height: 0px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: %s transparent; padding-right: 6px;' % T['line_strong'])
     left = card(tl, title=text('全程记录', 13, T['ink'], 700), extra=row(seg(['全部', '仅消息', '仅事件'], '全部', 'sm'), 8), pad='14px 18px', gap=12, style='flex: 1; min-height: 0px;')
 
-    info = card(col(grid(kv('店铺', t['store']) + kv('站点', t['site']) + kv('渠道', t['channel']) + kv('来源', '客户'), 2, 20, extra='row-gap: 6px;') +
-                    kv('进线邮箱', store['mailbox']) + kv('订单号', t['order']), 6), title='工单信息', pad='12px 16px', gap=8)
-    slab = card(col(''.join(sla_line(*x) for x in o['sla']), 8), title='SLA 结果', extra=nowrap('亚马逊 24 小时', 11, T['ink3']), pad='12px 16px', gap=8)
-    flow = card(p1_flow(o['flow'], o['close_at'], o['close_reason']), title='状态流转', extra=nowrap('已解决 7 天无来信自动关闭', 11, T['ink3']), pad='12px 16px', gap=8)
-    right = info + order_card(t['order'], '12px 16px', P1_OLIVER['order_synced']) + slab + flow
-    ts = '<div style="position: absolute; right: 436px; bottom: 30px;">%s</div>' % toast('success', '已标记无需回复 · 工单转已解决', undo=5, remain=4)
+    info = card(col(grid(kv('店铺', t['store']) + kv('站点', t['site']) + kv('渠道', t['channel']) + kv('来源', t['source']), 2, 20, extra='row-gap: 6px;') +
+                    kv('进线邮箱', store['mailbox']) + kv('订单号', t['order'] or '—'), 6), title='工单信息', pad='12px 16px', gap=8)
+    target = '亚马逊 24 小时' if t['channel'] == '亚马逊' else '内部目标 24 小时'
+    slab = card(col(''.join(sla_line(*x) for x in o['sla']), 8), title='SLA 结果', extra=nowrap(target, 11, T['ink3']), pad='12px 16px', gap=8)
+    rule = nowrap('%s %s自动关闭' % (t['status'], P1_CLOSE_RULE[t['status']]), 11, T['ink3']) if open_ else ''
+    flow = card(p1_flow(o['flow'], o['close']), title='状态流转', extra=rule, pad='12px 16px', gap=8)
+    right = info + order_card_p1(t['order'], o['order_synced']) + slab + flow
+    ts = ('<div style="position: absolute; right: 436px; bottom: 30px;">%s</div>' % toast('success', '已标记无需回复 · 工单转已解决', undo=5, remain=4)) if o['toast'] else ''
     body = head + '<div style="flex: 1; min-height: 0px; display: flex; gap: 16px; padding: 14px 24px 16px 24px;"><div style="flex: 1; min-width: 0px; display: flex; flex-direction: column;">%s</div><div style="width: 380px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px;">%s</div></div>%s' % (left, right, ts)
     return app('liting', '工单', ['工单', t['no']], body, phase1=True)
 

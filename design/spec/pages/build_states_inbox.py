@@ -348,7 +348,8 @@ def auto_reply_card(a):
 
 
 def i18_kinds():
-    """第二张小图：SLA 结果的写法（P1_SLA_KINDS，取自不同工单）· 生产厂来信卡 · 自动回复 · 未回复来信的「标记无需回复」。"""
+    """第二张小图：SLA 结果的写法（P1_SLA_KINDS，取自不同工单）· 生产厂来信卡 · 自动回复 · 未回复来信的「标记无需回复」；
+    待办 17 补其他供应商来信卡（协调者 2026-10-07 决定 Q6 b）。"""
     slab = card(col(''.join(build_tickets.sla_line(*x) for x in P1_SLA_KINDS), 9), title='SLA 结果 · 写法示例', extra=nowrap('取自不同工单', 11, T['ink3']), pad='12px 16px', gap=10)
     fx = [t for t in P1_EXTRA_TICKETS if t['source'] == '生产厂'][0]
     fav = avatar(icon('factory', 14, T['flow'], 2), 'violet', 28)
@@ -359,17 +360,68 @@ def i18_kinds():
     tl = col(row(nowrap(fx['no'], 12, T['ink3'], 600) + state(fx['status']) + nowrap('· %s' % fx['store'], 12, T['ink3']), 6) +
              fmail + build_tickets.ev(fx['last_in'][6:], '系统', '新建工单，状态「待回复」；来源生产厂，不计工单量与 SLA') +
              auto_reply_card(P1_AUTO_REPLY) + build_tickets.ev(P1_AUTO_REPLY['at'][6:], '系统', '自动回复不算回复，工单保持「待回复」'), 9)
-    return mini(grid(slab + tl, template='316px minmax(0, 1fr)', gap=20, extra='align-items: start;'), VW, 380, pad='20px')
+    sx = P1_SUPPLIER_MAIL
+    sstore = [s for s in STORES if s['name'] == sx['store']][0]
+    sav = avatar(icon('truck', 14, T['flow'], 2), 'violet', 28)
+    smail = message(sx['customer'], '邮件 · %s' % sx['at'][6:],
+                    mail_hdr('发件人 %s → %s' % (sx['from'], sstore['mailbox'])) + '<b>%s</b><br>%s' % (sx['subject'], sx['body']), 'in', sav,
+                    build_tickets.source_badge('其他供应商', 10) + chip('不计（其他供应商）', 'muted', 10) + spacer() + btn('标记无需回复', 'secondary', 'sm', 'check'))
+    return mini(col(grid(slab + tl, template='316px minmax(0, 1fr)', gap=20, extra='align-items: start;') + smail, 16), VW, 600, pad='20px')
+
+
+def i18_events():
+    """补充小样（待办 17，Q6 e）：其余事件行与状态流转的写法——重开、没有引起状态变化的标记与撤销、引起状态变化的撤销、按时关闭两种。
+    撤销不删原来那行，追加一行。"""
+    rows_ = ''.join(build_tickets.ev(at[6:], actor, t) for at, actor, t, _ in P1_EVENT_KINDS)
+    steps = []
+    for _, _, _, f in P1_EVENT_KINDS:
+        if not f:
+            continue
+        s, when, trig = f
+        head = chip('已关闭', 'muted', 11) if s == '已关闭' else state(s)
+        steps.append((row(head + nowrap(trig, 11, T['ink3']), 6), when, 'closed' if s == '已关闭' else 'done'))
+    flow = card(build_tickets.vflow(steps, 3), title='状态流转 · 写法示例', extra=nowrap('取自不同工单', 11, T['ink3']), pad='12px 16px', gap=8)
+    left = card(col(rows_, 9), title='全程记录 · 事件行写法示例', extra=nowrap('取自不同工单', 11, T['ink3']), pad='12px 16px', gap=10)
+    return mini(grid(left + flow, template='minmax(0, 1fr) 340px', gap=20, extra='align-items: start;'), VW, 280, pad='20px')
+
+
+def i18_toasts():
+    """补充小样（待办 17）：标记与撤销的浮层——工单还有别的未回复来信（不转已解决）、标记失败可重试、被拒（已被别人标记等）、撤销已超时。"""
+    retry = btn('立即重试', 'link', 'sm')
+    ts = col(toast('success', '已标记无需回复', undo=5, remain=5) +
+             toast('error', '标记无需回复失败：网络不可用', '这封来信仍未标记', action=retry) +
+             toast('error', '标记无需回复失败：这封来信已被陈晨标记无需回复', '已刷新为最新内容。') +
+             toast('error', '撤销失败：已超过撤销时限，这封来信保持无需回复', '已刷新为最新内容。'), 10, 'align-items: flex-start;')
+    return mini(ts, VW, 400, pad='20px')
+
+
+def i18_missing():
+    """补充小样（待办 17，Q5）：P05 的 G2（其他店铺的工单，按店铺范围写）与 G3（第一阶段没有全局搜索，只有「返回工单列表」）。"""
+    g2 = card(no_permission('没有访问权限', P1_G2_DESC, btn('返回首页', 'primary', 'md', 'chev_l')), pad='0px 16px', style='flex: 1; min-width: 0px;')
+    g3 = card(empty('search', '找不到这张工单', P1_G3_DESC, btn('返回工单列表', 'primary')), pad='0px 16px', style='flex: 1; min-width: 0px;')
+    return mini(row(g2 + g3, 20, 'flex-start'), VW, 300, pad='20px')
 
 
 def i18():
     frame = stack(('① 第一阶段 P05 · 李婷 · 09-10 09:05 标记致谢来信无需回复之后', build_inbox_scaled(build_tickets.p05_p1())),
-                  ('② SLA 结果的写法、来源为生产厂的来信、自动回复，以及未回复来信的「标记无需回复」', i18_kinds()))
+                  ('② SLA 结果的写法、来源为生产厂与其他供应商的来信、自动回复，以及未回复来信的「标记无需回复」', i18_kinds()),
+                  ('③ 补充小样：待回复（Olivia Turner · Shopify 联系表单 · 内部目标）', build_inbox_scaled(build_tickets.p05_p1('T-20260911-0031'))),
+                  ('④ 补充小样：等客户（Priya Raman · Shopify，订单未发货）', build_inbox_scaled(build_tickets.p05_p1('T-20260910-0170'))),
+                  ('⑤ 补充小样：已关闭（Priya Raman · 客户未回复）', build_inbox_scaled(build_tickets.p05_p1('T-20260901-0059'))),
+                  ('⑥ 补充小样：其余事件行与状态流转的写法', i18_events()),
+                  ('⑦ 补充小样：标记与撤销的浮层', i18_toasts()),
+                  ('⑧ 补充小样：无权限（其他店铺的工单）与找不到', i18_missing()))
     return variant('I18 第一阶段工单详情',
                    '按 P05「第一阶段」小节：只读，标题区没有重新打开、合并、内部备注、导出记录、添加标签与负责人，元信息写自动关闭预计「已解决 · 7 天无来信将于 09-17 09:00 自动关闭（已解决后无来信）」；客户名不是链接。'
                    '全程记录：我方回复卡写「我方 · amz-direct@forcome.com · 经亚马逊买家消息」（回信来自 Gmail「已发送」，对应不到成员）；每次状态迁移一条事件行（系统 / 李婷）；致谢来信卡写「无需回复 · 李婷 · 09:05」，底部浮层「已标记无需回复 · 工单转已解决 · 撤销 4s」。'
-                   '右栏：工单信息（店铺、站点、渠道、进线邮箱、来源、订单号）· 订单（平台镜像 · 最近同步 %s）· SLA 结果（每封应回复来信一行）· 状态流转（每步写状态、时间与触发方，最后一步写关闭原因）。'
-                   '② 未关闭工单里未回复的来信卡右上有「标记无需回复」；生产厂来信带来源徽标并写「不计（生产厂）」；带 Auto-Submitted 的我方邮件为灰色「自动回复 · 不算回复」。' % P1_OLIVER['order_synced'],
+                   '右栏：工单信息（店铺、站点、渠道、进线邮箱、来源、订单号）· 订单（平台镜像 · 最近同步 %s；状态写平台履约状态，右侧「更新于」平台最近更新日期）· SLA 结果（每封来信一行）· 状态流转（每步写状态、时间与触发方，最后一步写关闭原因）。'
+                   '② 未关闭工单里未回复的来信卡右上有「标记无需回复」；生产厂、其他供应商来信带来源徽标并写「不计（生产厂）」「不计（其他供应商）」；带 Auto-Submitted 的我方邮件为灰色「自动回复 · 不算回复」。'
+                   '③–⑤ 其余状态：来信卡头按渠道写「亚马逊买家消息 / Shopify 联系表单 / 邮件 · 时刻」，我方回复只在亚马逊工单写「经亚马逊买家消息」；SLA 卡头亚马逊「亚马逊 24 小时」、其余「内部目标 24 小时」；'
+                   '状态流转卡头与元信息按当前状态（待回复「14 天无新来信将于 … 自动关闭（未识别到回复）」，等客户「等客户 · 7 天无来信将于 …」，已关闭写实际关闭时刻、卡头不写，最后一步为灰色实心）；'
+                   'Shopify 订单卡没有「履约方式 · 承诺送达」一行，没有值写「—」，没有关联订单写「未关联订单」。'
+                   '⑥ 撤销不删原来的事件行，再追加一行；没有引起状态变化的标记与撤销只写「李婷标记无需回复」「李婷撤销标记无需回复」，状态流转不记。'
+                   '⑦ 标记后工单还有别的未回复来信时浮层只写「已标记无需回复」；失败可重试，被拒（已被别人标记、已被回复、工单已关闭）与撤销超时不重试、页面刷新为最新。'
+                   '⑧ 其他店铺的工单显示 G2（按店铺范围写，按钮只有「返回首页」），不存在的显示 G3（第一阶段只有「返回工单列表」）。' % P1_OLIVER['order_synced'],
                    frame, VW, trigger='第一阶段打开 P05；画面为 09-10 09:05 李婷标记致谢来信之后。')
 
 

@@ -906,6 +906,66 @@ P1_SLA_KINDS = [('09-10 16:00', '剩 5h 40m', 'warning', '未到期'), ('09-10 0
                 ('09-11 09:58', '生产厂来信', 'muted', '不计（生产厂）')]
 P1_AUTO_REPLY = {'from': 'support@forcome.com', 'at': '09-11 09:59', 'header': 'Auto-Submitted: auto-replied',
                  'body': 'Thanks for contacting Forcome. We have received your email and will reply within 24 hours.'}
+# I18 ② 的 SLA 结果写法补两种（待办 17，协调者 2026-10-07 决定 Q6 b、c）：回复晚于截止的未达标、其他供应商来信不计
+P1_SLA_KINDS += [('09-08 16:30', '首次回复 1d 3h', 'danger', '未达标'), ('09-11 09:40', '其他供应商来信', 'muted', '不计（其他供应商）')]
+# I18 补充小样的其他供应商来信（待办 17，Q6 b）：来源规则命中「其他供应商」的直邮，照常建工单、带来源徽标，不计 SLA 与工单量
+P1_SUPPLIER_MAIL = {'customer': '云途物流', 'from': 'cs@yunexpress.example', 'store': 'forcome.mx', 'at': '09-11 09:40',
+                    'subject': '墨西哥专线 9 月第二周时效通知',
+                    'body': '受海关查验影响，9 月 8 日至 12 日发往墨西哥的包裹预计延误 2–3 天，签收时效以轨迹为准。'}
+# 第一阶段其余已解决的示例工单由谁、何时标记无需回复（待办 17，协调者 2026-10-07 决定 Q3）：工单号 → (来信时刻, 标记人, 标记时刻)。
+# Oliver Grant 的见 P1_OLIVER；Valeria Ríos 只有一封来信，李婷在 5 分钟后标记，工单转已解决（P1_STATUS）
+P1_EXTRA_MARKS = {'T-20260909-0131': ('09-09 08:40', '李婷', '09-09 08:45')}
+# 订单卡的状态（第一期订单镜像只有平台履约状态，没有签收；待办 17，协调者 2026-10-07 决定 Q1）：平台原值 → 中文，认不出的照写原值。
+# 亚马逊为 SP-API 的 fulfillmentStatus，Shopify 为 displayFulfillmentStatus（取消的单另由 cancelledAt 写「已取消」）
+P1_ORDER_STATUS = {'PENDING': '待付款', 'UNSHIPPED': '未发货', 'PARTIALLY_SHIPPED': '部分发货', 'SHIPPED': '已发货', 'CANCELLED': '已取消',
+                   'UNFULFILLABLE': '无法履约', 'UNFULFILLED': '未发货', 'PARTIALLY_FULFILLED': '部分发货', 'FULFILLED': '已发货'}
+# P05 第一阶段补充小样（待办 17，协调者 2026-10-07 决定 Q1、Q2、Q6）：待回复、等客户、已关闭三种状态的工单详情，取已有的示例工单
+# （与 Fake 回放一致：正文即主题，我方回复在最后一封来信 10 分钟后，回复正文同 integration/gmail-replay.ts）。
+# timeline 同 P1_OLIVER；flow 为 (状态, 时间, 触发方 · 事件)；close 为 (时刻, 关闭原因, 是否已关闭)；sla 同 P1_OLIVER；
+# order_synced 为订单卡「最近同步」（演示时刻 10:20，取 CHANNEL_SYNC['Shopify']）
+P1_REPLY_BODY = 'Hi %s, thanks for reaching out. We have looked into this — please see the steps below and let us know if anything is still not right.'
+P1_DETAIL_CASES = {
+    # 待回复 · Shopify 联系表单 · 内部目标：来信卡右上「标记无需回复」，SLA 未到期
+    'T-20260911-0031': {
+        'timeline': [('09-11 周五', '09:12', 'in', 'Vacuum loses suction after a few weeks')],
+        'flow': [('待回复', '09-11 09:12', '系统 · 新建')],
+        'close': ('09-25 09:12', '未识别到回复', False),
+        'sla': [('09-11 09:12', '剩 22h 52m · 内部', 'neutral', '未到期')],
+        'order_synced': CHANNEL_SYNC['Shopify'],
+    },
+    # 等客户 · Shopify：我方回复卡不写「经亚马逊买家消息」，订单未发货、没有单号
+    'T-20260910-0170': {
+        'timeline': [('09-10 周四', '10:05', 'in', 'Can I change my shipping address?'),
+                     ('09-10 周四', '10:15', 'out', P1_REPLY_BODY % 'Priya')],
+        'flow': [('待回复', '09-10 10:05', '系统 · 新建'), ('等客户', '09-10 10:15', '系统 · 识别到我方回复')],
+        'close': ('09-17 10:05', '客户未回复', False),
+        'sla': [('09-10 10:05', '首次回复 10m', 'success', '达标')],
+        'order_synced': CHANNEL_SYNC['Shopify'],
+    },
+    # 已关闭（客户未回复）：没有「标记无需回复」，状态流转最后一步是实际关闭
+    'T-20260901-0059': {
+        'timeline': [('09-02 周三', '10:30', 'in', 'My package is 9 days late'),
+                     ('09-02 周三', '10:40', 'out', P1_REPLY_BODY % 'Priya')],
+        'flow': [('待回复', '09-02 10:30', '系统 · 新建'), ('等客户', '09-02 10:40', '系统 · 识别到我方回复'),
+                 ('已关闭', '09-09 10:30', '系统 · 7 天无来信')],
+        'close': ('09-09 10:30', '客户未回复', True),
+        'sla': [('09-02 10:30', '首次回复 10m', 'success', '达标')],
+        'order_synced': CHANNEL_SYNC['Shopify'],
+    },
+}
+# P05 的无权限与找不到（待办 17，协调者 2026-10-07 决定 Q5）：G2 按店铺范围写（本例陈晨的店铺范围只有 Forcome Direct，同 K18 补充小样），
+# 管理员姓名的写法同 G2；G3 同全局状态 G3_DESC（第一阶段没有全局搜索，只有「返回工单列表」）
+P1_G2_DESC = '工单 T-20260911-0031 不在你的店铺范围内。你的店铺范围是 Forcome Direct，如需开通请联系管理员刘洋。'
+P1_G3_DESC = '工单 T-20260801-9999 不存在，请检查编号或链接是否完整。'
+# I18 补充小样：其余事件行与状态流转的写法（Q6 e）：(时刻, 执行者标识, 事件行) 与对应的状态流转 (状态, 时间, 触发方 · 事件)
+P1_EVENT_KINDS = [
+    ('09-12 10:02', '系统', '同一订单来信，重开为「待回复」', ('待回复', '09-12 10:02', '系统 · 重开')),
+    ('09-10 11:20', '人工', '陈晨标记无需回复', None),
+    ('09-10 11:20', '人工', '陈晨撤销标记无需回复', None),
+    ('09-10 09:05', '人工', '李婷撤销标记无需回复，回到「待回复」', ('待回复', '09-10 09:05', '李婷 · 撤销标记无需回复')),
+    ('09-17 10:05', '系统', '7 天无来信，关闭（客户未回复）', ('已关闭', '09-17 10:05', '系统 · 7 天无来信（客户未回复）')),
+    ('09-24 16:00', '系统', '14 天无新来信，关闭（未识别到回复）', ('已关闭', '09-24 16:00', '系统 · 14 天无新来信（未识别到回复）')),
+]
 
 # ---------------------------------------------------------------- 第一阶段台账（P13 第一阶段版 S13–S15，R-AS-08）
 # 手工登记需要、AFTERSALES 里没有的字段：订单号、费用发生日、完成时间、发货方、承运方式、寄出日期、责任理由

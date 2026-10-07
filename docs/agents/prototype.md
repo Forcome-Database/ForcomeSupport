@@ -18,7 +18,7 @@
 | P02 收件箱 · 邮件工单 | `TicketEmail` | 二起 | 同 P01 | |
 | P03 收件箱 · 转人工工单 | `TicketEscalated` | 二起 | 同 P01 | |
 | P04 工单列表 | `Tickets` | 一起 | 第一阶段 I16、I17；第二阶段见 P04「第二阶段」 | ✓ `P04_Tickets`、`P04_Tickets_drill`、`P04_Tickets_unassigned`、`P04_Tickets_unassigned_empty`（未归属店铺队列与空队列，I17 补充小样③④） |
-| P05 工单详情 · 全程记录 | `TicketDetail` | 一起 | 第一阶段 I18；第二阶段见 P05「第二阶段」 | ✓ `P05_TicketDetail` |
+| P05 工单详情 · 全程记录 | `TicketDetail` | 一起 | 第一阶段 I18；第二阶段见 P05「第二阶段」 | ✓ `P05_TicketDetail`、`P05_TicketDetail_awaiting`、`P05_TicketDetail_customer`、`P05_TicketDetail_closed`（待回复、等客户、已关闭，I18 补充小样③–⑤；其余写法与 G2/G3 看 I18 ⑥–⑧） |
 | P06 客户档案 | `Customer` | 二起 | | |
 | P07 售后单列表 | `AfterSalesList` | 二起 | 第一阶段遗留的手工登记单 S16 | |
 | P08 确认责任与处理方式 | `AfterSalesConfirm` | 二起 | 第二阶段见 P08「第二阶段」 | |
