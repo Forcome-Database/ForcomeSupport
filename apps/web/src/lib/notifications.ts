@@ -71,7 +71,8 @@ export const notificationLooks: Readonly<
 
 /**
  * 点一条跳到哪个页面（G10「点一条即跳到对象」）：按通知类型定，要带的地址参数见 notificationSearch。P13「负责人：待分配」筛选
- * （待办 23）上线后给 reassign_queue 带上筛选的地址参数；自动归位的工单在 P05（17）上线后改到详情。
+ * （待办 23）上线后给 reassign_queue 带上筛选的地址参数。自动归位的通知进归并成的工单的 P05（同一项能力「查看工单」，
+ * 工单号见 notificationTicket，待办 17）。
  */
 export const notificationTargets: Readonly<Record<NotificationType, PageDefinition>> = {
   channel_disconnected: pages.settingsChannels,
@@ -81,6 +82,16 @@ export const notificationTargets: Readonly<Record<NotificationType, PageDefiniti
   unassigned_mail_placed: pages.tickets,
   reassign_queue: pages.aftersalesLedger,
 };
+
+/**
+ * 点进工单详情（P05）的通知给出工单号：「未归属店铺来信已自动归位」的对象就是归并成的工单（协调者 2026-10-07 决定 Q3：
+ * 17 上线后改到详情）；其余为 null
+ */
+export function notificationTicket(notification: Notification): string | null {
+  return notification.type === 'unassigned_mail_placed' && notification.object.type === 'ticket'
+    ? notification.object.id
+    : null;
+}
 
 /** 跳转时带的地址参数：「未归属店铺来信」直接打开 P04 的未归属店铺队列（I17，待办 15，协调者 2026-10-07 决定） */
 export const notificationSearch: Readonly<

@@ -1,6 +1,6 @@
 import type { CurrentMember, Notification, Role } from '@forcome/contracts';
 import { describe, expect, it } from 'vitest';
-import { notificationTarget, unreadBadge } from './notifications';
+import { notificationTarget, notificationTicket, unreadBadge } from './notifications';
 import { pages } from './pages';
 
 /* 铃铛角标的写法与点一条的去向（G10；打不开目标页的只标为已读，同 P27 v2.20 的可点规则） */
@@ -55,7 +55,17 @@ describe('点一条跳到哪里', () => {
     ).toBe(pages.settingsChannels);
   });
 
-  it('未归属店铺来信与自动归位进 P04，改派队列进 P13：接收人客服主管都能打开', () => {
+  it('自动归位的通知点进归并成的工单的 P05（待办 17）；其余通知没有工单号', () => {
+    const placed = {
+      ...notification('unassigned_mail_placed'),
+      object: { type: 'ticket' as const, id: 'T-20260911-0042', label: 'T-20260911-0042' },
+    };
+    expect(notificationTicket(placed)).toBe('T-20260911-0042');
+    expect(notificationTicket(notification('unassigned_mail'))).toBeNull();
+    expect(notificationTicket(notification('channel_disconnected'))).toBeNull();
+  });
+
+  it('未归属店铺来信与自动归位要「查看工单」（P04 / P05），改派队列进 P13：接收人客服主管都能打开', () => {
     const supervisor = member('supervisor');
     expect(notificationTarget(notification('unassigned_mail'), supervisor)).toBe(pages.tickets);
     expect(notificationTarget(notification('unassigned_mail_placed'), supervisor)).toBe(

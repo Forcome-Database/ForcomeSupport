@@ -15,7 +15,13 @@ import { Toaster, UndoToaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { LoadError } from '@/components/load-error';
 import { CurrentMemberContext, useCurrentMember } from '@/lib/current-member';
-import { canOpenPage, pages, sectionPaths, type PageDefinition } from '@/lib/pages';
+import {
+  canOpenPage,
+  pages,
+  sectionPaths,
+  ticketDetailPath,
+  type PageDefinition,
+} from '@/lib/pages';
 import {
   applyDensity,
   currentMemberQuery,
@@ -34,6 +40,7 @@ import { LoginCallbackPage } from '@/pages/login/login-callback';
 import { LoginPage, loginSearchSchema } from '@/pages/login/login-page';
 import { ChannelsPage, channelsSearchSchema } from '@/pages/settings/channels-page';
 import { TeamPage, teamSearchSchema } from '@/pages/settings/team-page';
+import { TicketDetailPage } from '@/pages/tickets/ticket-detail-page';
 import { TicketsPage, ticketsSearchSchema } from '@/pages/tickets/tickets-page';
 
 /*
@@ -41,7 +48,7 @@ import { TicketsPage, ticketsSearchSchema } from '@/pages/tickets/tickets-page';
  * 没登录（含会话 7 天无操作过期）时，开启了开发登录（非生产环境）就去开发登录页，否则去钉钉扫码登录页（G11，/login；
  * 过期的先显示 G12「已退出登录」）；扫码确认后钉钉把浏览器带到 /login/dingtalk 换会话（待办 05）。
  * 「/」按角色进入默认首页（PRD 4.1）；各页面按能力把关，没有权限时在原地址显示 G2。
- * 第一期各页面的内容随各自的待办加进来（P05 17、P17 24、P20 06），在那之前内容区为空；P27 已有（30）；
+ * 第一期各页面的内容随各自的待办加进来（P17 24），在那之前内容区为空；P27 已有（30）、P20 已有（06）、P05 已有（17）；
  * P18 已有（07），P04 先是最简列表（08，完整版随 18），P13 已是第一期完整版（19–22）。
  */
 
@@ -186,6 +193,20 @@ const ticketsRoute = createRoute({
   ),
 });
 
+/** P05 工单详情（待办 17）：与 P04 同一项能力（查看工单），没有时显示 G2 */
+const ticketDetailRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: ticketDetailPath,
+  component: function TicketDetailRoute() {
+    const { number } = ticketDetailRoute.useParams();
+    return (
+      <PageGate page={pages.tickets}>
+        <TicketDetailPage key={number} number={number} />
+      </PageGate>
+    );
+  },
+});
+
 /** P13 登记台账：筛选条件在地址栏（点完整率筛出缺字段的已完成单，待办 21） */
 const ledgerRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -258,6 +279,7 @@ const routeTree = rootRoute.addChildren([
   appRoute.addChildren([
     homeRoute,
     ticketsRoute,
+    ticketDetailRoute,
     aftersalesRoute,
     ledgerRoute,
     pageRoute(pages.reports),

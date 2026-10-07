@@ -1,4 +1,4 @@
-import { platforms } from '@forcome/contracts';
+import { fulfillmentChannels, platforms } from '@forcome/contracts';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
@@ -47,10 +47,6 @@ export interface MirroredTracking {
   readonly number: string | null;
 }
 
-/** 亚马逊订单的履约方（PRD 1.4）：MFN 自发货、AFN 亚马逊配送（FBA）；Shopify 订单为空 */
-export const fulfillmentChannels = ['MFN', 'AFN'] as const;
-export type FulfillmentChannel = (typeof fulfillmentChannels)[number];
-
 /**
  * 本地订单镜像（规格 order、ADR 0011，待办 11 起）：平台订单的快照，一笔订单一行，以「店铺 + 平台订单号」为关联键
  * （Shopify 为 Admin API 的全局 ID，亚马逊为 AmazonOrderId，来信里写的就是它），Shopify 另存订单名（平台保证店铺内唯一，来信里写的是它）。
@@ -86,7 +82,7 @@ export const platformOrder = orderSchema.table(
     shipAddress: jsonb('ship_address').$type<MirroredAddress>(),
     /** 履约单号（承运商 + 单号；亚马逊为 MFN 包裹的单号，O-2 待实测） */
     tracking: jsonb('tracking').$type<MirroredTracking[]>().notNull(),
-    /** 亚马逊的履约方 MFN / AFN（待办 12）；Shopify 为空 */
+    /** 亚马逊的履约方 MFN 自发货 / AFN 亚马逊配送（PRD 1.4，待办 12；取值在 contracts，P05 订单卡同用）；Shopify 为空 */
     fulfillmentChannel: text('fulfillment_channel', { enum: fulfillmentChannels }),
     /** 亚马逊的承诺发货时限（shipByWindow 的最晚时刻）；Shopify 为空 */
     promisedShipBy: timestamptz('promised_ship_by'),

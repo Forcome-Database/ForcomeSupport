@@ -1,5 +1,6 @@
 import {
   messageDirections,
+  noReplyActions,
   sites,
   slaResults,
   ticketChannels,
@@ -111,7 +112,7 @@ export const ticket = ticketSchema.table(
  * 工单里的消息（PRD 11.1 Message 的工单部分）：哪封邮件属于哪张工单；邮件本身（头字段、正文、去重）在 channel。
  * 一封邮件只归并一次（channel_message_id 唯一），归并任务与回复识别重跑不会重复追加。
  * 来信记来源、渠道与首次回复（16）；应回复来信（来源为客户）另记 SLA 截止与结果，其余两列为空——R-SL-08 的统计对象，
- * 报表（24）按这几列算首响与达标率。我方回复（「已发送」，回复识别归到工单）记是否自动回复。无需回复标记随 17。
+ * 报表（24）按这几列算首响与达标率。我方回复（「已发送」，回复识别归到工单）记是否自动回复。来信被「标记无需回复」时记操作人与时刻（17）。
  */
 export const ticketMessage = ticketSchema.table(
   'ticket_message',
@@ -137,6 +138,13 @@ export const ticketMessage = ticketSchema.table(
     slaResult: text('sla_result', { enum: slaResults }),
     /** 我方回复是否自动回复（Auto-Submitted 等，不算回复，R-SL-08）；来信为 false */
     autoReply: boolean('auto_reply').notNull().default(false),
+    /**
+     * 来信被「标记无需回复」（17）：操作的成员、姓名快照与时刻；撤销时清空。被标记的来信不是未回复来信，应回复来信的 SLA 结果为无需回复。
+     * 标记与撤销的经过另记在 no_reply_event（全程记录的事件行）
+     */
+    noReplyById: uuid('no_reply_by_id'),
+    noReplyByName: text('no_reply_by_name'),
+    noReplyAt: timestamptz('no_reply_at'),
     createdAt: timestamptz('created_at').notNull(),
   },
   (t) => [
@@ -147,7 +155,38 @@ export const ticketMessage = ticketSchema.table(
       .on(t.slaDueAt)
       .where(sql`${t.slaResult} = 'pending'`),
     check('ticket_message_sla_pair', sql`(${t.slaDueAt} IS NULL) = (${t.slaResult} IS NULL)`),
+    // 标记的三列同时有或同时没有，只有来信能被标记
+    check(
+      'ticket_message_no_reply',
+      sql`(${t.noReplyById} IS NULL AND ${t.noReplyByName} IS NULL AND ${t.noReplyAt} IS NULL)
+        OR (${t.noReplyById} IS NOT NULL AND ${t.noReplyByName} IS NOT NULL AND ${t.noReplyAt} IS NOT NULL
+          AND ${t.direction} = 'inbound')`,
+    ),
   ],
+);
+
+/**
+ * 「标记无需回复」的经过（17，P05 全程记录的事件行）：每次标记、撤销一行，撤销不删原来那行（协调者 2026-10-07 决定）。
+ * 引起了状态变化（全部未回复来信都被标记 → 已解决，撤销 → 待回复）的记下目标状态；那次迁移另有状态变更记录（状态流转），
+ * 事件行只按这里写一行。
+ */
+export const noReplyEvent = ticketSchema.table(
+  'no_reply_event',
+  {
+    id: primaryId(),
+    ticketId: uuid('ticket_id')
+      .notNull()
+      .references(() => ticket.id),
+    /** 被标记的来信（channel.message 的 id） */
+    channelMessageId: uuid('channel_message_id').notNull(),
+    action: text('action', { enum: noReplyActions }).notNull(),
+    actorId: uuid('actor_id').notNull(),
+    actorName: text('actor_name').notNull(),
+    /** 引起的状态变化的目标状态；没有引起状态变化为空 */
+    toStatus: text('to_status', { enum: ticketStatuses }),
+    occurredAt: timestamptz('occurred_at').notNull(),
+  },
+  (t) => [index('no_reply_event_ticket_idx').on(t.ticketId, t.occurredAt)],
 );
 
 /**

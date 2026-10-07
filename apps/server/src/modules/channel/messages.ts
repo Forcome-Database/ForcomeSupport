@@ -7,7 +7,8 @@ import {
 } from '@forcome/contracts';
 import { and, asc, eq, inArray, isNull, ne, or } from 'drizzle-orm';
 import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
-import { isAutoReply } from './auto-reply';
+import { autoReplyHeader, isAutoReply } from './auto-reply';
+import { displayBody } from './body';
 import { extractOrderNumbers } from './order-numbers';
 import type { MailAddress, Recognition } from './recognition';
 import { message, store } from './schema';
@@ -209,7 +210,7 @@ export async function listReplyTargets(
   }));
 }
 
-/** 工单详情里一封消息的摘要（正文随 17） */
+/** 工单详情里一封消息的摘要（P05 全程记录） */
 export interface MessageSummary {
   readonly id: string;
   readonly direction: MessageDirection;
@@ -222,6 +223,10 @@ export interface MessageSummary {
   readonly receivedAt: Date;
   /** 同一封邮件同时发到的其他店铺邮箱（R-TK-07） */
   readonly alsoSentTo: readonly string[];
+  /** 显示的正文（body.ts：纯文本优先，只有 HTML 时转成文字，Shopify 联系表单只取留言；17） */
+  readonly body: string;
+  /** 我方自动回复带的标记头（「Auto-Submitted: auto-replied」，P05 灰色卡上写，17）；来信与不是自动回复的为 null */
+  readonly autoReplyHeader: string | null;
 }
 
 export async function listMessageSummaries(
@@ -241,19 +246,35 @@ export async function listMessageSummaries(
       subject: message.subject,
       receivedAt: message.receivedAt,
       alsoSentTo: message.alsoSentTo,
+      textBody: message.textBody,
+      htmlBody: message.htmlBody,
+      headers: message.headers,
     })
     .from(message)
     .where(and(inArray(message.id, [...ids]), storeScopeCondition(scope, message.storeId)));
-  return rows.map((row) => ({
-    id: row.id,
-    direction: row.direction,
-    mailbox: row.mailbox,
-    from: { address: row.fromAddress, name: row.fromName },
-    recognition: recognitionOf(row),
-    subject: row.subject,
-    receivedAt: row.receivedAt,
-    alsoSentTo: row.alsoSentTo,
-  }));
+  return rows.map((row) => {
+    const recognition = recognitionOf(row);
+    return {
+      id: row.id,
+      direction: row.direction,
+      mailbox: row.mailbox,
+      from: { address: row.fromAddress, name: row.fromName },
+      recognition,
+      subject: row.subject,
+      receivedAt: row.receivedAt,
+      alsoSentTo: row.alsoSentTo,
+      body: displayBody({
+        text: row.textBody,
+        html: row.htmlBody,
+        // 渠道为亚马逊、Shopify 的来信就是经买家消息、联系表单中转的（R-TK-08）
+        relay:
+          row.direction === 'inbound' && recognition && recognition.channel !== 'email'
+            ? recognition.channel
+            : undefined,
+      }),
+      autoReplyHeader: row.direction === 'outbound' ? autoReplyHeader(row.headers) : null,
+    };
+  });
 }
 
 /** 收取的一封邮件（含归档的平台通知与营销，不丢信） */

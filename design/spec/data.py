@@ -1201,6 +1201,12 @@ G7_OCC = {'record': next(k for k in KB if k[0] == '吸力下降排查'), 'by': '
           'theirs_fields': '第 2 步、适用型号'}
 # StatesInbox I18 第二张小图：生产厂来信正文（工单 T-20260911-0036，主题取 P1_EXTRA_TICKETS）
 P1_FACTORY_MAIL = '附件为 9 月电池批次抽检报告，请查收。若有客诉涉及该批次，请回复本邮件告知订单号，我们安排追溯。'
+# 直邮示例来信的正文（待办 17）：P05 直邮来信卡写粗体主题 + 正文，正文不能再是主题；其余示例工单回放时正文即主题
+P1_LETTER_BODIES = {
+    'T-20260911-0036': P1_FACTORY_MAIL,
+    'T-20260909-0142': 'Hi, we run a car accessories shop in Austin and would like a quote for 200 units of the V2 vacuum. '
+                       'Could you share the wholesale price and lead time?',
+}
 
 
 # ---- 第二阶段（D-25）演示

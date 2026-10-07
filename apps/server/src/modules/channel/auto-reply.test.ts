@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAutoReply } from './auto-reply';
+import { autoReplyHeader, isAutoReply } from './auto-reply';
 
 /*
  * 我方发出的自动回复（PRD R-SL-08、AC-P1-03，待办 16）：带 Auto-Submitted（RFC 3834）或常见的自动回复标记的邮件不算回复。
@@ -36,5 +36,14 @@ describe('自动回复标记', () => {
     ).toBe(false);
     expect(isAutoReply(headers({ precedence: 'bulk' }))).toBe(false);
     expect(isAutoReply([])).toBe(false);
+  });
+
+  it('P05 灰色卡上写认出它的那个头字段（标准写法的名 + 原值），不是自动回复为 null', () => {
+    expect(autoReplyHeader(headers({ subject: 'Re: hi', 'auto-submitted': 'auto-replied' }))).toBe(
+      'Auto-Submitted: auto-replied',
+    );
+    expect(autoReplyHeader(headers({ 'x-autoreply': 'yes' }))).toBe('X-Autoreply: yes');
+    expect(autoReplyHeader(headers({ precedence: 'auto_reply' }))).toBe('Precedence: auto_reply');
+    expect(autoReplyHeader(headers({ 'auto-submitted': 'no', precedence: 'bulk' }))).toBeNull();
   });
 });

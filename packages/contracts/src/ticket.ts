@@ -166,6 +166,13 @@ export const ticketMessageSlaSchema = z.object({
 });
 export type TicketMessageSla = z.infer<typeof ticketMessageSlaSchema>;
 
+/** 来信被「标记无需回复」（P05「第一阶段」，待办 17）：操作人与时刻；来信卡写「无需回复 · 李婷 · 09:05」 */
+export const noReplyMarkSchema = z.object({
+  by: z.string(),
+  at: z.iso.datetime({ offset: true }),
+});
+export type NoReplyMark = z.infer<typeof noReplyMarkSchema>;
+
 /** 工单里的一封消息：来信与「已发送」里归到这张工单的我方回复（16；正文与「无需回复」随 17） */
 export const ticketMessageSchema = z.object({
   id: z.uuid(),
@@ -179,6 +186,8 @@ export const ticketMessageSchema = z.object({
   from: z.object({ name: z.string(), address: z.string() }),
   /** 来信的来源（归档的平台通知与营销不会进工单）；我方发出的消息为空 */
   source: ticketSourceSchema.nullable(),
+  /** 来信自己的渠道（同一张工单里可能有亚马逊中转来信与直邮；P05 来信卡头写「亚马逊买家消息 / Shopify 联系表单 / 邮件」）；我方发出的为空 */
+  channel: ticketChannelSchema.nullable(),
   subject: z.string(),
   /** 到达时间（Gmail internalDate） */
   arrivedAt: z.iso.datetime({ offset: true }),
@@ -188,6 +197,8 @@ export const ticketMessageSchema = z.object({
    * 我方发出的自动回复（带 Auto-Submitted 或自动回复标记，R-SL-08）：不算回复，P05 显示灰色「自动回复 · 不算回复」；来信为 false
    */
   autoReply: z.boolean(),
+  /** 自动回复带的标记头（「Auto-Submitted: auto-replied」，灰色卡正文顶部的小字，17）；其余为空 */
+  autoReplyHeader: z.string().nullable(),
   /**
    * 来信的首次回复时间：同一工单内它之后的第一封我方回复（不含自动回复）的 internalDate，结束它的计时（R-SL-08，不论来源）；
    * 还没回复与我方发出的消息为空
@@ -195,12 +206,29 @@ export const ticketMessageSchema = z.object({
   firstReplyAt: z.iso.datetime({ offset: true }).nullable(),
   /** 应回复来信（来源为客户）的 SLA；生产厂、其他供应商的来信与我方发出的消息为空（不计 SLA） */
   sla: ticketMessageSlaSchema.nullable(),
+  /**
+   * 正文（P05 全程记录，17）：纯文本，没有纯文本部分的取 HTML 转成的文字；Shopify 联系表单只取表单里的留言（Body 栏）
+   */
+  body: z.string(),
+  /** 来信被「标记无需回复」（17）；没有标记与我方发出的消息为空 */
+  noReply: noReplyMarkSchema.nullable(),
 });
 export type TicketMessage = z.infer<typeof ticketMessageSchema>;
 
-/** GET /api/tickets/{number}：工单与它的消息（P05 第一阶段的全程记录、SLA、状态流转与订单卡随 17） */
-export const ticketDetailSchema = z.object({
-  ticket: ticketListItemSchema,
-  messages: z.array(ticketMessageSchema),
-});
-export type TicketDetail = z.infer<typeof ticketDetailSchema>;
+/**
+ * 未回复来信（PRD 1.4、D-24）：来信、还没有首次回复（我方最近一封回复之后到达）、没被标记无需回复，不论来源。
+ * 决定工单状态，也是 P05「标记无需回复」的对象
+ */
+export function isUnrepliedInbound(
+  message: Pick<TicketMessage, 'direction' | 'firstReplyAt' | 'noReply'>,
+): boolean {
+  return message.direction === 'inbound' && message.firstReplyAt === null && !message.noReply;
+}
+
+/** 能不能对这封来信「标记无需回复」（P05「第一阶段」）：只对未关闭工单中的未回复来信；能力（坐席、客服主管）另由调用方判断 */
+export function canMarkNoReply(
+  status: TicketStatus,
+  message: Pick<TicketMessage, 'direction' | 'firstReplyAt' | 'noReply'>,
+): boolean {
+  return status !== 'closed' && isUnrepliedInbound(message);
+}

@@ -1,11 +1,10 @@
-import type { Currency, Platform } from '@forcome/contracts';
+import type { Currency, FulfillmentChannel, Platform } from '@forcome/contracts';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { storeScopeCondition, type DbExecutor, type StoreScope, type Tx } from '../core';
 import type { AmazonOrder, ShopifyOrder } from '../integration';
 import {
   platformOrder,
-  type FulfillmentChannel,
   type MirroredAddress,
   type MirroredLineItem,
   type MirroredTracking,

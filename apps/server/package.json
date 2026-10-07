@@ -33,6 +33,7 @@
     "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.11.2",
     "hono": "^4.13.12",
+    "html-to-text": "^10.0.1",
     "jose": "^6.2.12",
     "p-throttle": "^8.1.1",
     "pg": "^8.23.1",
@@ -45,6 +46,7 @@
   "devDependencies": {
     "@forcome/config": "workspace:*",
     "@types/big.js": "^7.0.0",
+    "@types/html-to-text": "^9.0.4",
     "@types/pg": "^8.15.0",
     "drizzle-kit": "^0.31.11",
     "eslint": "^10.12.0",

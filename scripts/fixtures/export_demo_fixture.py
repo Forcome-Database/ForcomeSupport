@@ -173,6 +173,8 @@ def tickets():
             'lastInboundAt': at(t['last_in'] if len(t['last_in']) > 5 else d.NOW[5:10] + ' ' + t['last_in']),
             'order': t.get('order'),
             'from': t.get('from'),
+            # 来信的正文（直邮的两张，待办 17）；没有的回放时正文即主题
+            'body': d.P1_LETTER_BODIES.get(t['no']),
             # 原型画面在演示时刻显示的 SLA（剩余或结果）与色调；系统按来信重新计算，这里只作核对用
             'slaDisplay': {'text': t['sla_left'], 'level': t['sla_level'], 'internalTarget': t.get('sla_kind') == '内部目标'},
         })
@@ -323,6 +325,22 @@ def ticket_timeline():
     }
 
 
+# ---------------------------------------------------------------- 标记无需回复（I18，待办 17）
+def no_reply_marks():
+    """被「标记无需回复」的示例来信：P05 时间线那张（P1_OLIVER）与已解决的其余示例工单（P1_EXTRA_MARKS）。
+    回放后由 ticket 按来信到达时刻找到这封信，以标记人的身份在标记时刻标记（整天平移时跟着平移）。"""
+    o = d.P1_OLIVER
+    out = [{'ticket': o['ticket'], 'inboundAt': at('%s %s' % (day[:5], hhmm)), 'byKey': member_key(o['marked_by']), 'at': at(o['marked_at'])}
+           for day, hhmm, kind, _ in o['timeline'] if kind == 'marked']
+    p1 = {t['no']: t for t in d.p1_tickets()}
+    for no, (inbound, by, when) in d.P1_EXTRA_MARKS.items():
+        # 其余示例工单只回放一封来信（最近来信），标记的就是它
+        if p1[no]['last_in'] != inbound or d.P1_STATUS.get(no) != '已解决':
+            raise ValueError('P1_EXTRA_MARKS 的 %s 要是已解决工单的最近来信' % no)
+        out.append({'ticket': no, 'inboundAt': at(inbound), 'byKey': member_key(by), 'at': at(when)})
+    return out
+
+
 # ---------------------------------------------------------------- 自动回复（I18）
 def auto_reply():
     a = d.P1_AUTO_REPLY
@@ -398,6 +416,7 @@ def build():
         'aftersalesLastSequence': max(int(a['no'][-4:]) for a in d.AFTERSALES),
         'ticketTimeline': ticket_timeline(),
         'autoReply': auto_reply(),
+        'noReplyMarks': no_reply_marks(),
         'shopifyOrders': shopify_orders(),
         # 示例 Shopify 应用没开通 read_all_orders 时订单只回补 60 天（K19、K20，待办 13）
         'shopifyReadAllOrders': d.SHOPIFY_BACKFILL_DAYS >= d.AMZ_BACKFILL_DAYS,

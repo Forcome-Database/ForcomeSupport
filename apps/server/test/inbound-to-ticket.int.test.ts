@@ -533,11 +533,11 @@ describe('开发测试环境的示例来信回放（ADR 0009 修订）', () => {
     // Priya Raman 在 forcome.com 有两张示例工单（#1057、#1049 两笔订单），按订单归并成两张（14）
     expect(tickets).toHaveLength(fixture.tickets.length);
     expect(new Set(tickets.map((ticket) => ticket.customer.name))).toEqual(customers);
-    // 等客户的示例工单回放了我方回复（16）；「客户未回复」关闭的那张按时关闭；已解决的两张要「标记无需回复」，随 17
+    // 等客户的示例工单回放了我方回复（16）；「客户未回复」关闭的那张按时关闭；已解决的两张由示例数据的标记人标记了无需回复（17）
     const expected = {
       待回复: 'awaiting_reply',
       等客户: 'awaiting_customer',
-      已解决: 'awaiting_reply',
+      已解决: 'resolved',
       已关闭: 'closed',
     };
     const byOrderOrCustomer = (sample: (typeof fixture.tickets)[number]) =>
@@ -614,15 +614,15 @@ describe('开发测试环境的示例来信回放（ADR 0009 修订）', () => {
       ['outbound', DIRECT.mailbox, '2026-09-05T07:30:00.000Z'],
       ['inbound', DIRECT.mailbox, '2026-09-10T01:00:00.000Z'],
     ]);
-    // 原型 P1_OLIVER 的 SLA：首次回复 28m、6h 32m，都达标（第三封「无需回复」随 17）
+    // 原型 P1_OLIVER 的 SLA：首次回复 28m、6h 32m，都达标；第三封由李婷标记无需回复（17，详见 ticket-detail.int.test.ts）
     expect(
       detail.messages
         .filter((m) => m.direction === 'inbound')
-        .slice(0, 2)
         .map((m) => [m.firstReplyAt, m.sla?.result]),
     ).toEqual([
       ['2026-09-04T02:40:00.000Z', 'met'],
       ['2026-09-05T07:30:00.000Z', 'met'],
+      [null, 'not_required'],
     ]);
   });
 
@@ -679,7 +679,7 @@ describe('示例邮件回放到当前日期（开发测试环境与 Playwright �
       count[ticket.status] = (count[ticket.status] ?? 0) + 1;
       return count;
     }, {});
-    // 与演示时刻相同：7 张待回复 + 2 张已解决（随 17，现为待回复）、6 张等客户、1 张客户未回复关闭
-    expect(statuses).toEqual({ awaiting_reply: 9, awaiting_customer: 6, closed: 1 });
+    // 与演示时刻相同：7 张待回复、2 张已解决（标记无需回复的时刻跟着平移，17）、6 张等客户、1 张客户未回复关闭
+    expect(statuses).toEqual({ awaiting_reply: 7, resolved: 2, awaiting_customer: 6, closed: 1 });
   });
 });

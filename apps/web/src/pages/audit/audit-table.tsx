@@ -30,7 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { avatarText, roleAvatarTone } from '@/lib/avatar';
-import { canOpenPage, pages } from '@/lib/pages';
+import { canOpenPage, pages, ticketDetailPath } from '@/lib/pages';
 import { cn } from '@/lib/utils';
 import { A11Y, COLUMNS, EMPTY, EXPAND, MORE, NONE, SYSTEM } from './p27-copy';
 
@@ -41,8 +41,8 @@ import { A11Y, COLUMNS, EMPTY, EXPAND, MORE, NONE, SYSTEM } from './p27-copy';
  * 时间列 76）写在列的 meta；行展开用 rowExpandingFeature，展开状态由页面受控（同一时间只展开一行）。
  * 越权访问被拒的行浅红底、左侧红条；展开的行浅主色底、左侧主色条，下方浅灰底的两栏对照（左缩进 92），变化的后值主色浅底高亮，
  * 财务字段名旁标钱的图标，没有财务权限时值为「已隐藏」（K18）。点行任意处展开或收起；对象编号在查看者能打开目标页时是链接
- * （售后单进 P13 并打开该单，店铺进 P18 并打开店铺抽屉，成员进 P20 并选中该行，渠道进 P18），工单、来信随各自页面上线后在 objectLink 里接上
- * （PRD P27 v2.20）。
+ * （售后单进 P13 并打开该单，店铺进 P18 并打开店铺抽屉，成员进 P20 并选中该行，渠道进 P18，工单进它的 P05，来信进它所在工单的 P05——
+ * 工单号由接口的 ticketNumber 给出，还没归并成工单的来信不可点；PRD P27 v2.20、v2.31）。
  */
 
 /** 操作人头像的色调（原型 AV_TONE，同 P20 成员表）；系统灰 */
@@ -57,6 +57,23 @@ const stopRowToggle = (event: MouseEvent) => event.stopPropagation();
 
 /** 对象能不能点进详情（PRD P27 v2.20）：查看者能打开目标页时给链接，否则只显示编号 */
 function objectLink(entry: AuditLogEntry, member: CurrentMember): ReactNode {
+  // 工单进它的 P05，来信进它所在工单的 P05（v2.31，待办 17；协调者 2026-10-07 决定 Q5）
+  if (
+    (entry.objectType === 'ticket' || entry.objectType === 'message') &&
+    entry.ticketNumber &&
+    canOpenPage(member, pages.tickets)
+  ) {
+    return (
+      <Link
+        to={ticketDetailPath}
+        params={{ number: entry.ticketNumber }}
+        className={linkClass}
+        onClick={stopRowToggle}
+      >
+        {entry.objectLabel}
+      </Link>
+    );
+  }
   if (entry.objectType === 'aftersales' && canOpenPage(member, pages.aftersalesLedger)) {
     return (
       <Link

@@ -3,6 +3,7 @@
 // 把处理器加到 createJobHandlers（worker 据此订阅，测试据此「跑完任务」）。两边必须一一对应，
 // test/jobs.test.ts 核对。处理器要用外部客户端时从 deps 取，测试里拿到的就是 Fake。
 // 常驻拉取（Gmail 推送等）加到 createFeeds：worker 为每个起一个循环，测试的「跑完任务」每轮先拉一次。
+import { getDemoFixture } from '@forcome/fixtures';
 import type { ServerDeps } from './deps';
 import {
   createChannelFeeds,
@@ -24,7 +25,7 @@ import {
   type AnyJobHandler,
   type Feed,
 } from './modules/core';
-import { dingtalkClient, exchangeRateClient } from './modules/integration';
+import { dingtalkClient, exchangeRateClient, fixtureNoReplyMarks } from './modules/integration';
 import {
   createOrgFeeds,
   createOrgJobHandlers,
@@ -80,8 +81,12 @@ export function createJobHandlers(deps: ServerDeps): readonly AnyJobHandler[] {
     ...createChannelJobHandlers(deps),
     // 订单同步要的店铺来自 channel 的店铺配置（order 不依赖 channel）
     ...createOrderJobHandlers({ clients: deps.clients, stores: listOrderStores }),
-    // 按订单归并：镜像没有时经 order 去平台补拉，用同一组外部客户端
-    ...createTicketJobHandlers({ clients: deps.clients }),
+    // 按订单归并：镜像没有时经 order 去平台补拉，用同一组外部客户端；非生产环境的示例回放另按示例数据标记无需回复（待办 17）
+    ...createTicketJobHandlers({
+      clients: deps.clients,
+      fixtureMarks:
+        deps.config.appEnv === 'production' ? [] : fixtureNoReplyMarks(getDemoFixture()),
+    }),
   ];
 }
 

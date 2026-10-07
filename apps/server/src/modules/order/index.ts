@@ -36,7 +36,7 @@ export {
   testAmazonConnection,
 } from './amazon-sync';
 export { type OrderStore, type OrderStoreSource } from './incremental-sync';
-export { findOrder, normalizeShopifyOrderName } from './lookup';
+export { findMirroredOrder, findOrder, normalizeShopifyOrderName } from './lookup';
 export { findOrdersByEmail, orderNumberOf, type MirroredOrder, type OrderRef } from './mirror';
 export { orderQueueState } from './queue-health';
 export {

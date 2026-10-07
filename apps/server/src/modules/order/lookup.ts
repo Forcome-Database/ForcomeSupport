@@ -1,4 +1,4 @@
-import { isStoreInScope, type Runtime, type StoreScope } from '../core';
+import { isStoreInScope, type DbExecutor, type Runtime, type StoreScope } from '../core';
 import { ClientNotConfiguredError, type IntegrationClients } from '../integration';
 import { AMAZON_ORDER_ID, pullAmazonOrder } from './amazon-sync';
 import type { OrderStore } from './incremental-sync';
@@ -20,7 +20,7 @@ export function normalizeShopifyOrderName(name: string): string {
 }
 
 /** 按平台写成镜像里的查法：亚马逊的订单号就是平台订单号 */
-function lookupOf(store: OrderStore, ref: OrderRef): OrderRef {
+function lookupOf(store: Pick<OrderStore, 'platform'>, ref: OrderRef): OrderRef {
   if (!('name' in ref)) return { platformOrderId: ref.platformOrderId.trim() };
   return store.platform === 'shopify'
     ? { name: normalizeShopifyOrderName(ref.name) }
@@ -62,4 +62,17 @@ export async function findOrder(
     throw error;
   }
   return mirroredOrder(runtime.db, scope, store.id, lookup);
+}
+
+/**
+ * 只查镜像、不去平台补拉（P05 订单卡，待办 17）：工单上的订单号是归并时在镜像里校验过的（镜像只增不删），
+ * 打开详情不该触发外部调用；店铺不在范围内返回 null
+ */
+export function findMirroredOrder(
+  db: DbExecutor,
+  scope: StoreScope,
+  store: Pick<OrderStore, 'id' | 'platform'>,
+  ref: OrderRef,
+): Promise<MirroredOrder | null> {
+  return mirroredOrder(db, scope, store.id, lookupOf(store, ref));
 }

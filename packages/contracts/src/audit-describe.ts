@@ -43,7 +43,7 @@ import { adapterModeLabels } from './integration';
 import { formatMoney } from './money';
 import { roleLabels, roles } from './roles';
 import { storeScopeWords } from './team';
-import { ticketChannelLabels } from './ticket';
+import { ticketChannelLabels, ticketStatusLabels } from './ticket';
 import { recipientHeaderLabels } from './unassigned-mail';
 
 /*
@@ -74,6 +74,8 @@ export interface AuditRecordInput {
 export interface AuditNames {
   readonly stores: ReadonlyMap<string, string>;
   readonly members: ReadonlyMap<string, string>;
+  /** 来信对象所在的工单号（来信 id → 工单号；还没归并成工单的没有），对象点进 P05 用（v2.31，待办 17） */
+  readonly tickets?: ReadonlyMap<string, string>;
 }
 
 const EMPTY = '—';
@@ -97,7 +99,8 @@ type ValueKind =
   | 'auditFilters'
   | 'backfill'
   | 'trigger'
-  | 'sameDayTime';
+  | 'sameDayTime'
+  | 'whoAt';
 
 interface FieldDefinition {
   /** 快照里的路径（点分） */
@@ -197,6 +200,13 @@ const snapshotFields: Record<AuditSnapshotKind, readonly FieldDefinition[]> = {
     field('recipient', '收件地址'),
     field('recipientHeader', '识别依据', 'text', recipientHeaderLabels),
     field('subject', '主题'),
+  ],
+  // 来信的「标记无需回复」（待办 17，Q4）：来信（客户 · 到达时刻）、工单状态、无需回复（操作人 · 时刻）；
+  // 工单状态在无需回复之前，引起状态变化时摘要写「工单状态：待回复 → 已解决」等 2 项，没有时写「无需回复：— → 李婷 · 09-10 09:05」
+  ticketNoReply: [
+    field('message', '来信', 'whoAt'),
+    field('status', '工单状态', 'text', ticketStatusLabels),
+    field('noReply', '无需回复', 'whoAt'),
   ],
   accessDenied: [
     field('reason', '原因', 'text', { store_scope: '店铺不在授权范围内' }),
@@ -422,6 +432,10 @@ function valueWords(definition: FieldDefinition, value: unknown, ctx: FormatCont
     }
     case 'trigger':
       return triggerWords(value);
+    case 'whoAt':
+      return isPlainObject(value) && typeof value.name === 'string'
+        ? `${value.name} · ${dateTimeWords(value.at, ctx)}`
+        : EMPTY;
     default:
       return labelOf(value);
   }
@@ -536,6 +550,13 @@ export function describeAuditRecord(
     action: record.action,
     actionLabel: known?.label ?? record.action,
     denied: record.action === ACCESS_DENIED_ACTION,
+    // 点进 P05 的工单号：工单对象是它自己，来信对象是它所在的工单
+    ticketNumber:
+      record.objectType === 'ticket'
+        ? objectLabel
+        : record.objectType === 'message'
+          ? (options.names.tickets?.get(record.objectId) ?? null)
+          : null,
   };
   if (!known) return { ...base, summary: EMPTY, more: 0, fields: [] };
 

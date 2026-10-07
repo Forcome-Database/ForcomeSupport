@@ -5,11 +5,12 @@ import { ticketMessage } from './schema';
 
 /*
  * 来信的首次回复与 SLA（PRD R-SL-01、R-SL-07、R-SL-08，1.4「未回复来信」「应回复来信」，待办 16），记在 ticket.ticket_message：
- * - 每封来信（不论来源）记首次回复时间：同一工单内它之后的第一封我方回复（不含自动回复）的 internalDate。还没有的就是
- *   「未回复来信」，决定工单状态（识别到回复后是否转等客户、新来信是否让工单回到待回复）；
+ * - 每封来信（不论来源）记首次回复时间：同一工单内它之后的第一封我方回复（不含自动回复）的 internalDate。还没有、也没被标记
+ *   无需回复的就是「未回复来信」，决定工单状态（识别到回复后是否转等客户、新来信是否让工单回到待回复）；
  * - 应回复来信（来源为客户）另记 SLA 截止（到达 + 24 小时）与结果：有首次回复按它与截止比（达标 / 未达标），
  *   还没有的为未到期，每分钟的扫描把过了截止的改为未达标，工单关闭时仍未到期的一律计未达标（R-SL-07）。
- *   生产厂、其他供应商的来信不计 SLA，两列为空。被「标记无需回复」的（17）为无需回复，回复不再改它。
+ *   生产厂、其他供应商的来信不计 SLA，两列为空。被「标记无需回复」的（17，no-reply.ts）为无需回复、不是未回复来信，回复不再改它；
+ *   撤销时按 slaResultOf 恢复。
  */
 
 /** 新归并的一封来信的首次回复与 SLA 列（firstReplyAt：工单里已有、晚于它的第一封我方回复，乱序时才有） */
@@ -71,10 +72,7 @@ export async function endTimersBefore(tx: Tx, ticketId: string, replyAt: Date): 
     );
 }
 
-/**
- * 工单里还有没有未回复来信（1.4：在我方最近一封回复之后到达、且未被标记无需回复的来信，不论来源）。
- * 「标记无需回复」（17）落地时在这里一并排除被标记的来信
- */
+/** 工单里还有没有未回复来信（1.4：在我方最近一封回复之后到达、且未被标记无需回复的来信，不论来源；被标记的不算，17） */
 export async function hasUnrepliedInbound(tx: Tx, ticketId: string): Promise<boolean> {
   const [row] = await tx.db
     .select({ id: ticketMessage.id })
@@ -84,6 +82,7 @@ export async function hasUnrepliedInbound(tx: Tx, ticketId: string): Promise<boo
         eq(ticketMessage.ticketId, ticketId),
         eq(ticketMessage.direction, 'inbound'),
         isNull(ticketMessage.firstReplyAt),
+        isNull(ticketMessage.noReplyAt),
       ),
     )
     .limit(1);

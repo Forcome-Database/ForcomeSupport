@@ -314,6 +314,7 @@
       "lastInboundAt": "2026-09-10T08:15:00+08:00",
       "order": "113-5566112-7788990",
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "已超时 2h 05m",
         "level": "danger",
@@ -333,6 +334,7 @@
       "lastInboundAt": "2026-09-10T11:15:00+08:00",
       "order": "302-8811234-9901122",
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "0h 55m",
         "level": "danger",
@@ -352,6 +354,7 @@
       "lastInboundAt": "2026-09-10T11:48:00+08:00",
       "order": null,
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "1h 28m",
         "level": "danger",
@@ -371,6 +374,7 @@
       "lastInboundAt": "2026-09-10T16:00:00+08:00",
       "order": "113-4567890-1234567",
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "5h 40m",
         "level": "warning",
@@ -390,6 +394,7 @@
       "lastInboundAt": "2026-09-10T21:30:00+08:00",
       "order": "113-9988776-5544332",
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "11h 10m",
         "level": "normal",
@@ -409,6 +414,7 @@
       "lastInboundAt": "2026-09-11T09:12:00+08:00",
       "order": "#1063",
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "22h 52m",
         "level": "normal",
@@ -428,6 +434,7 @@
       "lastInboundAt": "2026-09-11T09:58:00+08:00",
       "order": null,
       "from": "qc@fqd-forcome.com",
+      "body": "附件为 9 月电池批次抽检报告，请查收。若有客诉涉及该批次，请回复本邮件告知订单号，我们安排追溯。",
       "slaDisplay": {
         "text": "—",
         "level": "none",
@@ -447,6 +454,7 @@
       "lastInboundAt": "2026-09-11T10:04:00+08:00",
       "order": "114-7788990-2233441",
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "已回复",
         "level": "none",
@@ -466,6 +474,7 @@
       "lastInboundAt": "2026-09-11T08:01:00+08:00",
       "order": "111-2233445-5566778",
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "已回复",
         "level": "none",
@@ -485,6 +494,7 @@
       "lastInboundAt": "2026-09-11T07:52:00+08:00",
       "order": "305-1122334-4455667",
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "已回复",
         "level": "none",
@@ -504,6 +514,7 @@
       "lastInboundAt": "2026-09-10T10:05:00+08:00",
       "order": "#1057",
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "已回复",
         "level": "none",
@@ -523,6 +534,7 @@
       "lastInboundAt": "2026-09-09T17:20:00+08:00",
       "order": "302-4455667-1122334",
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "已回复",
         "level": "none",
@@ -542,6 +554,7 @@
       "lastInboundAt": "2026-09-09T14:00:00+08:00",
       "order": null,
       "from": null,
+      "body": "Hi, we run a car accessories shop in Austin and would like a quote for 200 units of the V2 vacuum. Could you share the wholesale price and lead time?",
       "slaDisplay": {
         "text": "已回复",
         "level": "none",
@@ -561,6 +574,7 @@
       "lastInboundAt": "2026-09-10T09:00:00+08:00",
       "order": "204-5566778-9900112",
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "—",
         "level": "none",
@@ -580,6 +594,7 @@
       "lastInboundAt": "2026-09-09T08:40:00+08:00",
       "order": null,
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "—",
         "level": "none",
@@ -599,6 +614,7 @@
       "lastInboundAt": "2026-09-02T10:30:00+08:00",
       "order": "#1049",
       "from": null,
+      "body": null,
       "slaDisplay": {
         "text": "—",
         "level": "none",
@@ -1509,6 +1525,20 @@
     },
     "body": "Thanks for contacting Forcome. We have received your email and will reply within 24 hours."
   },
+  "noReplyMarks": [
+    {
+      "ticket": "T-20260904-0098",
+      "inboundAt": "2026-09-10T09:00:00+08:00",
+      "byKey": "liting",
+      "at": "2026-09-10T09:05:00+08:00"
+    },
+    {
+      "ticket": "T-20260909-0131",
+      "inboundAt": "2026-09-09T08:40:00+08:00",
+      "byKey": "liting",
+      "at": "2026-09-09T08:45:00+08:00"
+    }
+  ],
   "shopifyOrders": [
     {
       "name": "#0991",

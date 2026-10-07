@@ -124,6 +124,11 @@ export const auditLogEntrySchema = z.object({
   actionLabel: z.string(),
   /** 越权访问被拒（E-24，红色标出） */
   denied: z.boolean(),
+  /**
+   * 对象点进 P05 的工单号（v2.31，待办 17）：工单对象为它自己，来信对象为它所在的工单（还没归并成工单为空）；其余对象为空。
+   * 能不能点还要看查看者能否打开 P05
+   */
+  ticketNumber: z.string().nullable(),
   /** 变更摘要（「字段：前 → 后」，或该动作的说明）；没有为「—」 */
   summary: z.string(),
   /** 「等 N 项」的 N：这次变化的字段数，只有一项时为 0 */

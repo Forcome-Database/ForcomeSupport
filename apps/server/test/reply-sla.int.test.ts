@@ -1,5 +1,6 @@
 import {
   amazonDomains,
+  isUnrepliedInbound,
   SHOPIFY_CONTACT_FORM_SENDER,
   ticketDetailSchema,
   ticketListSchema,
@@ -761,8 +762,7 @@ describe('生产厂来信（AC-P1-04 的 SLA 部分）与时限扫描（AC-TK-07
     );
     await t.runJobs();
     const [ticket] = await ticketsOf(agent, 'Joy Kerr');
-    // 「标记无需回复」随待办 17：这里直接按迁移表把工单转为已解决（测试准备）
-    await markAllNoReply(t, ticket!.number, '2026-09-08T10:05:00+08:00');
+    await markAllNoReply(t, agent, ticket!.number, '2026-09-08T10:05:00+08:00');
     expect((await onlyTicketOf(agent, 'Joy Kerr')).ticket.status).toBe('resolved');
 
     await scanAt('2026-09-15T09:59:00+08:00');
@@ -778,7 +778,7 @@ describe('生产厂来信（AC-P1-04 的 SLA 部分）与时限扫描（AC-TK-07
     gmail.deliver(amazonLetter('Kai Lund', '<back-1@buyer.example>', '2026-09-09T10:00:00+08:00'));
     await t.runJobs();
     const [ticket] = await ticketsOf(agent, 'Kai Lund');
-    await markAllNoReply(t, ticket!.number, '2026-09-09T10:05:00+08:00');
+    await markAllNoReply(t, agent, ticket!.number, '2026-09-09T10:05:00+08:00');
     gmail.deliver(amazonLetter('Kai Lund', '<back-2@buyer.example>', '2026-09-09T12:00:00+08:00'));
     await travel('2026-09-09T12:01:00+08:00');
     await t.runJobs();
@@ -918,23 +918,18 @@ describe('生产厂来信（AC-P1-04 的 SLA 部分）与时限扫描（AC-TK-07
   });
 });
 
-/**
- * 把工单的全部未回复来信「标记无需回复」后的样子（测试准备）：「标记无需回复」的接口随待办 17，这里按迁移表的那一行
- * （待回复 · all_marked_no_reply · 成员 → 已解决）直接写一条状态变更并改工单状态，同一事务提交，满足数据库的状态守卫。
- * 17 落地后改成调接口
- */
-async function markAllNoReply(t: TestHarness, number: string, at: string): Promise<void> {
-  await t.runtime.db.transaction(async (db) => {
-    await db.execute(sql`
-      INSERT INTO ticket.status_change (ticket_id, from_status, to_status, event, trigger, actor_name, occurred_at)
-      SELECT id, status, 'resolved', 'all_marked_no_reply', 'member', '李婷', ${at}::timestamptz
-        FROM ticket.ticket WHERE number = ${number}`);
-    await db.execute(sql`
-      UPDATE ticket.ticket SET status = 'resolved', version = version + 1 WHERE number = ${number}`);
-    await db.execute(sql`
-      UPDATE ticket.ticket_message SET sla_result = 'not_required'
-       WHERE ticket_id = (SELECT id FROM ticket.ticket WHERE number = ${number}) AND sla_result = 'pending'`);
-  });
+/** 把工单的全部未回复来信「标记无需回复」（P05 的接口，待办 17），标记时刻为 at */
+async function markAllNoReply(
+  t: TestHarness,
+  client: ApiClient,
+  number: string,
+  at: string,
+): Promise<void> {
+  t.clock.set(at);
+  for (const message of (await ticketDetail(client, number)).messages.filter(isUnrepliedInbound)) {
+    const res = await client.post(`/api/tickets/${number}/messages/${message.id}/no-reply`, {});
+    expect(res.status, await res.clone().text()).toBe(200);
+  }
 }
 
 describe('Shopify 与邮件的内部目标', () => {

@@ -54,6 +54,7 @@ export {
   type GmailRawMessage,
 } from './gmail';
 export { type FakeMailInput } from './gmail-mime';
+export { fixtureNoReplyMarks, type ReplayNoReplyMark } from './gmail-replay';
 export { MailRecipientGuard, MailRecipientNotAllowedError } from './mail-recipient-guard';
 export {
   databaseCredentialVault,

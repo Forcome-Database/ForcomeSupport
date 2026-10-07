@@ -34,6 +34,7 @@ import {
   type AuditVisibility,
   type DbExecutor,
   type Runtime,
+  type StoreScope,
 } from '../core';
 import { requireCapability, requireSession, type Access, type AccessVariables } from './access';
 import { AUDIT_EXPORT_SHEET, auditExportFileName, auditWorkbook } from './audit-export';
@@ -54,6 +55,16 @@ import { json, unauthenticated } from './openapi';
 export type StoreNamesById = (
   db: DbExecutor,
   ids: readonly string[],
+) => Promise<ReadonlyMap<string, string>>;
+
+/**
+ * 来信所在的工单号（ticket 的 ticketNumbersOfMessages，由 app.ts 注入；org 不依赖 ticket）：来信对象点进它所在工单的 P05
+ * （PRD P27「第一阶段」v2.31，待办 17）；按查看者的店铺范围查，还没归并成工单的没有
+ */
+export type TicketNumbersOfMessages = (
+  db: DbExecutor,
+  scope: StoreScope,
+  messageIds: readonly string[],
 ) => Promise<ReadonlyMap<string, string>>;
 
 const forbidden = json(apiErrorSchema, '没有查看审计日志的权限（只有生产厂对接人角色）');
@@ -133,20 +144,31 @@ function conditionsOf(
   };
 }
 
-/** 把记录写成 P27 的行：先查要用到的店铺名与成员姓名 */
+/** 写成 P27 的行要查的名字（店铺名、成员姓名、来信所在的工单号）由 app.ts 注入的查询 */
+interface NameLookups {
+  readonly storeNamesById: StoreNamesById;
+  readonly ticketNumbersOfMessages: TicketNumbersOfMessages;
+}
+
+/** 把记录写成 P27 的行：先查要用到的店铺名、成员姓名与来信所在的工单号（按查看者的店铺范围） */
 async function describe(
   db: DbExecutor,
-  storeNamesById: StoreNamesById,
+  lookups: NameLookups,
+  access: Access,
   records: readonly AuditRecord[],
-  financeVisible: boolean,
 ): Promise<AuditLogEntry[]> {
   const ids = auditNameIds(records);
-  const [stores, members] = await Promise.all([
-    storeNamesById(db, [...ids.storeIds]),
+  const messageIds = records.filter((r) => r.objectType === 'message').map((r) => r.objectId);
+  const [stores, members, tickets] = await Promise.all([
+    lookups.storeNamesById(db, [...ids.storeIds]),
     memberNamesById(db, [...ids.memberIds]),
+    lookups.ticketNumbersOfMessages(db, access.stores, messageIds),
   ]);
   return records.map((record) =>
-    describeAuditRecord(record, { financeVisible, names: { stores, members } }),
+    describeAuditRecord(record, {
+      financeVisible: access.financeVisible,
+      names: { stores, members, tickets },
+    }),
   );
 }
 
@@ -169,8 +191,9 @@ export function createAuditLogRoutes(deps: {
   runtime: Runtime;
   appEnv: AppEnv;
   storeNamesById: StoreNamesById;
+  ticketNumbersOfMessages: TicketNumbersOfMessages;
 }) {
-  const { runtime, appEnv, storeNamesById } = deps;
+  const { runtime, appEnv } = deps;
   const routes = new OpenAPIHono<{ Variables: AccessVariables }>();
   for (const path of ['/api/audit', '/api/audit/*']) {
     routes.use(path, requireSession(runtime, appEnv));
@@ -210,7 +233,7 @@ export function createAuditLogRoutes(deps: {
       denied: result.denied,
       page,
       pageSize: AUDIT_PAGE_SIZE,
-      entries: await describe(runtime.db, storeNamesById, result.records, access.financeVisible),
+      entries: await describe(runtime.db, deps, access, result.records),
     };
     return c.json(body, 200);
   });
@@ -224,7 +247,7 @@ export function createAuditLogRoutes(deps: {
     const filter = c.req.valid('query');
     const { visibility, range, conditions } = prepare(access, filter);
     const { records } = await queryAuditLog(runtime.db, visibility, conditions, null);
-    const entries = await describe(runtime.db, storeNamesById, records, access.financeVisible);
+    const entries = await describe(runtime.db, deps, access, records);
     const body = await auditWorkbook(entries);
     const fileName = auditExportFileName(range);
     const q = filter.q?.trim();

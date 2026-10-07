@@ -77,6 +77,8 @@ export const fixtureTicketSchema = z.object({
   order: z.string().nullable(),
   /** 发件地址（只在原型写明时有，例如生产厂来信） */
   from: z.string().nullable(),
+  /** 来信的正文（直邮的两张，P05 直邮来信卡写粗体主题 + 正文，待办 17）；没有的回放时正文即主题 */
+  body: z.string().nullable(),
   /** 原型画面在演示时刻显示的 SLA（剩余或结果）；系统按来信重新计算，这里只作核对用 */
   slaDisplay: z.object({
     text: z.string(),
@@ -143,6 +145,17 @@ export const fixtureTicketTimelineSchema = z.object({
   autoCloseAt: instant,
   closeReason: z.string(),
   orderSyncedAt: instant,
+});
+
+/**
+ * 被「标记无需回复」的示例来信（I18，data.py 的 P1_OLIVER 与 P1_EXTRA_MARKS，待办 17）：哪张工单哪个时刻到达的来信、谁在什么时刻标记。
+ * 回放后由 ticket 按来信找到它，以标记人的身份在标记时刻标记（整天平移时跟着平移）
+ */
+export const fixtureNoReplyMarkSchema = z.object({
+  ticket: z.string().regex(/^T-\d{8}-\d{4}$/),
+  inboundAt: instant,
+  byKey: z.string(),
+  at: instant,
 });
 
 /**
@@ -272,6 +285,7 @@ export const demoFixtureSchema = z.object({
   aftersalesLastSequence: z.int().positive(),
   ticketTimeline: fixtureTicketTimelineSchema,
   autoReply: fixtureAutoReplySchema,
+  noReplyMarks: z.array(fixtureNoReplyMarkSchema),
   notifications: z.array(fixtureNotificationSchema),
   shopifyOrders: z.array(fixtureShopifyOrderSchema),
   /** 示例 Shopify 应用开通了 read_all_orders 没有（K19、K20 的示例没开通：Shopify 订单只回补 60 天，待办 13） */

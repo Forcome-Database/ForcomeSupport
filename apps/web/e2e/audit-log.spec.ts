@@ -289,6 +289,7 @@ test('渠道记录（Gmail 连接异常，待办 09 验收返工）：对象「G
     action: 'channel.disconnected',
     actionLabel: '连接异常',
     denied: false,
+    ticketNumber: null,
     summary: '状态：已连接 → 连接异常（连续 3 次失败）',
     more: 0,
     fields: [],

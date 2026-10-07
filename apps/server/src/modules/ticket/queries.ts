@@ -1,22 +1,15 @@
-import {
-  isTicketSource,
-  slaTargetOf,
-  type Site,
-  type TicketDetail,
-  type TicketListItem,
-  type TicketMessage,
-} from '@forcome/contracts';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
-import { listMessageSummaries, storeNamesById } from '../channel';
+import { type Site, type TicketListItem } from '@forcome/contracts';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { storeNamesById } from '../channel';
 import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
 import { customer, ticket, ticketMessage } from './schema';
 
 /*
- * 工单的查询（规格 ticket「查询接口」）：一律带店铺范围（ADR 0010）。待办 08 是 P04 的最简列表与工单的消息，
- * 16 给消息加上我方回复、首次回复与 SLA；筛选、SLA 列与默认排序的 SLA 部分、分页随 18，P05 的全程记录、状态流转与订单卡随 17。
+ * 工单的查询（规格 ticket「查询接口」）：一律带店铺范围（ADR 0010）。待办 08 是 P04 的最简列表；筛选、SLA 列与默认排序的
+ * SLA 部分、分页随 18。P05 的工单详情在 detail.ts（17）。
  */
 
-type TicketRow = typeof ticket.$inferSelect & { customerName: string };
+export type TicketRow = typeof ticket.$inferSelect & { customerName: string };
 
 const ticketColumns = {
   id: ticket.id,
@@ -42,7 +35,7 @@ const ticketColumns = {
 const statusRank = sql`CASE ${ticket.status}
   WHEN 'awaiting_reply' THEN 0 WHEN 'awaiting_customer' THEN 1 WHEN 'resolved' THEN 2 ELSE 3 END`;
 
-function toListItem(row: TicketRow, storeNames: Map<string, string>): TicketListItem {
+export function toListItem(row: TicketRow, storeNames: Map<string, string>): TicketListItem {
   return {
     id: row.id,
     number: row.number,
@@ -122,71 +115,25 @@ export async function findTicketReference(
   };
 }
 
-/** 工单与它的消息（来信与归到这里的我方回复，按到达时间先后）；row 已按店铺范围取出 */
-export async function ticketDetail(
+/**
+ * 来信所在的工单号（P27 来信对象点进它所在工单的 P05，PRD P27「第一阶段」v2.31，待办 17）：来信 id → 工单号，
+ * 按查看者的店铺范围；还没归并成工单的（还在未归属队列里）没有
+ */
+export async function ticketNumbersOfMessages(
   db: DbExecutor,
   scope: StoreScope,
-  row: TicketRow,
-): Promise<TicketDetail> {
-  const links = await db
-    .select({
-      channelMessageId: ticketMessage.channelMessageId,
-      channel: ticketMessage.channel,
-      autoReply: ticketMessage.autoReply,
-      firstReplyAt: ticketMessage.firstReplyAt,
-      slaDueAt: ticketMessage.slaDueAt,
-      slaResult: ticketMessage.slaResult,
-    })
+  messageIds: readonly string[],
+): Promise<ReadonlyMap<string, string>> {
+  if (messageIds.length === 0) return new Map();
+  const rows = await db
+    .select({ messageId: ticketMessage.channelMessageId, number: ticket.number })
     .from(ticketMessage)
-    .where(eq(ticketMessage.ticketId, row.id))
-    .orderBy(asc(ticketMessage.receivedAt), asc(ticketMessage.createdAt));
-  const summaries = await listMessageSummaries(
-    db,
-    scope,
-    links.map((l) => l.channelMessageId),
-  );
-  const byId = new Map(summaries.map((s) => [s.id, s]));
-  const messages: TicketMessage[] = links.map((link) => {
-    const s = byId.get(link.channelMessageId);
-    // 工单里的消息与工单同一个店铺（归并时取的就是来信识别出的店铺，15 指定店铺时一并回填来信的店铺；
-    // 我方回复只归到发件邮箱所属店铺的工单），读不到说明数据不一致：报错，不悄悄少给几封
-    if (!s) {
-      throw new Error(`工单 ${row.number} 的消息 ${link.channelMessageId} 在当前店铺范围里读不到`);
-    }
-    const common = {
-      id: s.id,
-      direction: s.direction,
-      mailbox: s.mailbox,
-      subject: s.subject,
-      arrivedAt: s.receivedAt.toISOString(),
-      alsoSentTo: [...s.alsoSentTo],
-      autoReply: link.autoReply,
-      firstReplyAt: link.firstReplyAt?.toISOString() ?? null,
-    };
-    if (s.direction === 'outbound') {
-      // 我方回复：发件人是店铺邮箱，没有来源与 SLA
-      return { ...common, from: { ...s.from }, source: null, sla: null };
-    }
-    // 工单里的来信都识别过，来源也不会是归档的平台通知与营销
-    const recognized = s.recognition;
-    if (!recognized || !isTicketSource(recognized.source)) {
-      throw new Error(`工单 ${row.number} 的消息 ${s.id} 没有识别结果`);
-    }
-    const sla =
-      link.slaDueAt && link.slaResult
-        ? {
-            target: slaTargetOf(link.channel ?? recognized.channel),
-            dueAt: link.slaDueAt.toISOString(),
-            result: link.slaResult,
-          }
-        : null;
-    return {
-      ...common,
-      from: { name: recognized.sender.name, address: recognized.sender.address },
-      source: recognized.source,
-      sla,
-    };
-  });
-  const names = await storeNamesById(db, [row.storeId]);
-  return { ticket: toListItem(row, names), messages };
+    .innerJoin(ticket, eq(ticket.id, ticketMessage.ticketId))
+    .where(
+      and(
+        inArray(ticketMessage.channelMessageId, [...messageIds]),
+        storeScopeCondition(scope, ticket.storeId),
+      ),
+    );
+  return new Map(rows.map((row) => [row.messageId, row.number]));
 }

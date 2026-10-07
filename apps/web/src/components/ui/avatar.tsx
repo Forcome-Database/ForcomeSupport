@@ -7,10 +7,10 @@ import { cn } from '@/lib/utils';
  * 内部成员用品牌渐变底、白字（设计规范第 1 节：渐变只用于 AI 标识、品牌标与内部成员头像）。
  * 尺寸：lg 32（头像菜单）、default 30（顶栏）、md 28（P20 成员表）、sm 24、xs 22（P27 操作人）；字号按原型取尺寸的 0.42 并不小于 11。
  * 色调：member（默认，内部成员，渐变底白字）；浅底粗体字的几种按原型 avatar() 的 tone——amber（浅黄，生产厂对接人、
- * P27 的售后负责人）、green（浅绿，P27 的坐席）、grey（浅灰，P27 的管理员与「系统」）、violet（浅紫，P27 的知识库负责人）。
- * 客户等其他色调等用到的待办按原型补上。
+ * P27 的售后负责人）、green（浅绿，P27 的坐席）、grey（浅灰，P27 的管理员与「系统」；P05 的我方发信）、violet（浅紫，P27 的知识库负责人；
+ * P05 的生产厂、其他供应商来信）；customer（灰色渐变底白字，P05 的客户，字号取尺寸的 0.4，待办 17）。
  */
-export type AvatarTone = 'member' | 'amber' | 'green' | 'grey' | 'violet';
+export type AvatarTone = 'member' | 'amber' | 'green' | 'grey' | 'violet' | 'customer';
 
 function Avatar({
   className,
@@ -49,6 +49,7 @@ function AvatarFallback({
         'group-data-[tone=green]/avatar:bg-success-soft group-data-[tone=green]/avatar:text-success-text',
         'group-data-[tone=grey]/avatar:bg-secondary group-data-[tone=grey]/avatar:text-ink-2',
         'group-data-[tone=violet]/avatar:bg-flow-soft group-data-[tone=violet]/avatar:text-flow',
+        'group-data-[tone=customer]/avatar:bg-customer-gradient',
         'group-data-[tone=amber]/avatar:bg-none group-data-[tone=amber]/avatar:font-bold group-data-[tone=green]/avatar:bg-none group-data-[tone=green]/avatar:font-bold group-data-[tone=grey]/avatar:bg-none group-data-[tone=grey]/avatar:font-bold group-data-[tone=violet]/avatar:bg-none group-data-[tone=violet]/avatar:font-bold',
         className,
       )}

@@ -8,7 +8,11 @@ export {
   type SessionMember,
   type StoreAccessTarget,
 } from './access';
-export { createAuditLogRoutes, type StoreNamesById } from './audit-log';
+export {
+  createAuditLogRoutes,
+  type StoreNamesById,
+  type TicketNumbersOfMessages,
+} from './audit-log';
 export { createDevLoginRoutes, devLoginAvailable } from './dev-login';
 export {
   createDevDingtalkRoutes,

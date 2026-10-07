@@ -569,6 +569,11 @@ describe('未归属店铺来信', () => {
         return auditLogSchema.parse(await res.json()).entries;
       };
       const all = await auditOf(supervisor);
+      // 来信对象点进它所在工单的 P05（PRD P27「第一阶段」v2.31，待办 17）：给出归并成的工单号
+      const [lola] = await ticketsOf('Lola Alias');
+      expect(all.find((i) => i.objectLabel === 'Lola Alias · info3@forcome.mx')?.ticketNumber).toBe(
+        lola!.number,
+      );
       const labels = (items: typeof all) =>
         items.map((i) => [i.actionLabel, i.objectLabel, i.summary]).sort();
       expect(labels(all)).toEqual(

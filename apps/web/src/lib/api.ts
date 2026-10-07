@@ -29,6 +29,7 @@ import {
   teamCandidatesSchema,
   teamMemberSchema,
   teamSchema,
+  ticketDetailSchema,
   ticketListSchema,
   unassignedMailListSchema,
   type AdminContacts,
@@ -72,6 +73,7 @@ import {
   type TeamChange,
   type TeamMember,
   type TeamMemberAdd,
+  type TicketDetail,
   type TicketListItem,
   type UnassignedMailList,
 } from '@forcome/contracts';
@@ -321,6 +323,29 @@ export const api = {
   /** P04 工单列表（店铺范围内） */
   tickets: async (): Promise<TicketListItem[]> =>
     (await call('/api/tickets', ticketListSchema)).tickets,
+
+  /** P05 工单详情（店铺范围外 403、没有 404） */
+  ticketDetail: (number: string): Promise<TicketDetail> =>
+    call(`/api/tickets/${encodeURIComponent(number)}`, ticketDetailSchema),
+
+  /**
+   * 标记无需回复（P05「第一阶段」）：返回标记后的详情。工单已关闭、来信已被回复 400，已被别人标记 409（message 写是谁），
+   * 没有这封来信 404
+   */
+  markNoReply: (number: string, messageId: string): Promise<TicketDetail> =>
+    call(
+      `/api/tickets/${encodeURIComponent(number)}/messages/${encodeURIComponent(messageId)}/no-reply`,
+      ticketDetailSchema,
+      jsonBody('POST', {}),
+    ),
+
+  /** 撤销标记无需回复（5 秒内、标记的人）：已超过撤销时限 400 */
+  undoNoReply: (number: string, messageId: string): Promise<TicketDetail> =>
+    call(
+      `/api/tickets/${encodeURIComponent(number)}/messages/${encodeURIComponent(messageId)}/undo-no-reply`,
+      ticketDetailSchema,
+      jsonBody('POST', {}),
+    ),
 
   /** P04 未归属店铺来信队列（I17，只给客服主管；不受店铺范围限制）与服务端当前时刻 */
   unassignedMail: (): Promise<UnassignedMailList> =>

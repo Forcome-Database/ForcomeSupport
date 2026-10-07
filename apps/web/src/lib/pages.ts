@@ -12,7 +12,7 @@ export interface PageDefinition {
 }
 
 export const pages = {
-  /** P04 工单列表（P05 工单详情随 17 号待办挂在它下面） */
+  /** P04 工单列表；P05 工单详情挂在它下面（ticketDetailPath，同一项能力与 G2 页面名） */
   tickets: { path: '/tickets', label: '工单', capability: 'ticket.view' },
   /** P13 登记台账（第一期「售后」只有它） */
   aftersalesLedger: {
@@ -37,6 +37,9 @@ export const pages = {
   /** P27 审计日志（从头像菜单进入） */
   audit: { path: '/audit', label: '审计日志', capability: 'audit.view' },
 } as const satisfies Record<string, PageDefinition>;
+
+/** P05 工单详情的路径（TanStack Router 的参数写法，Link 用 params: { number }；待办 17） */
+export const ticketDetailPath = '/tickets/$number' as const;
 
 /** 导航入口与默认首页的路径：设置入口指向 /settings（进入后落到第一个设置页 P18） */
 export const sectionPaths: Record<NavSection, string> = {

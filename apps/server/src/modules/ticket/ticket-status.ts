@@ -1,6 +1,6 @@
 import { SYSTEM_ACTOR_NAME, type TicketEvent, type TicketTrigger } from '@forcome/contracts';
-import { desc, inArray } from 'drizzle-orm';
-import { updateWithVersion, type Actor, type Tx } from '../core';
+import { asc, desc, eq, inArray } from 'drizzle-orm';
+import { updateWithVersion, type Actor, type DbExecutor, type Tx } from '../core';
 import { transition, type Transition } from './lifecycle';
 import { statusChange, ticket } from './schema';
 
@@ -130,6 +130,25 @@ export async function closedTimes(
     times.set(row.ticketId, row.occurredAt);
   }
   return times;
+}
+
+/** 一张工单的状态变更记录（P05 的状态流转与事件行，17），按写入先后（UUIDv7 主键，同数据库守卫的「最近」） */
+export async function listStatusChanges(db: DbExecutor, ticketId: string) {
+  return db
+    .select({
+      id: statusChange.id,
+      fromStatus: statusChange.fromStatus,
+      toStatus: statusChange.toStatus,
+      event: statusChange.event,
+      trigger: statusChange.trigger,
+      actorName: statusChange.actorName,
+      closeReason: statusChange.closeReason,
+      channelMessageId: statusChange.channelMessageId,
+      occurredAt: statusChange.occurredAt,
+    })
+    .from(statusChange)
+    .where(eq(statusChange.ticketId, ticketId))
+    .orderBy(asc(statusChange.id));
 }
 
 /**

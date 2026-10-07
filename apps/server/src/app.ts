@@ -24,7 +24,7 @@ import {
   devDingtalkScanAvailable,
   devLoginAvailable,
 } from './modules/org';
-import { createTicketRoutes } from './modules/ticket';
+import { createTicketRoutes, ticketNumbersOfMessages } from './modules/ticket';
 
 const DATABASE_CHECK_TIMEOUT_MS = 3_000;
 
@@ -107,8 +107,17 @@ export function createApp(deps: ServerDeps) {
   app.route('/', createChannelRoutes({ runtime, appEnv: config.appEnv, clients, logger }));
   app.route('/', createTicketRoutes({ runtime, appEnv: config.appEnv }));
   app.route('/', createAftersalesRoutes({ runtime, appEnv: config.appEnv }));
-  // P27 审计日志在 org（查看范围看角色、店铺范围与财务权限）；店铺名由这里注入 channel 的查询（org 不依赖 channel）
-  app.route('/', createAuditLogRoutes({ runtime, appEnv: config.appEnv, storeNamesById }));
+  // P27 审计日志在 org（查看范围看角色、店铺范围与财务权限）；店铺名与来信所在的工单号由这里注入 channel、ticket 的查询
+  // （org 不依赖它们）
+  app.route(
+    '/',
+    createAuditLogRoutes({
+      runtime,
+      appEnv: config.appEnv,
+      storeNamesById,
+      ticketNumbersOfMessages,
+    }),
+  );
   if (devLoginAvailable(config)) {
     app.route('/', createDevLoginRoutes({ runtime, appEnv: config.appEnv }));
     // 示例通知与开发登录同一个开关（产生通知的业务上线前，演示与 Playwright 用）

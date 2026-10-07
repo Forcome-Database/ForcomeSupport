@@ -16,7 +16,7 @@ import { connectionStatusSchema, platformSchema, siteSchema } from './channel';
 import { financeField } from './finance';
 import { adapterModeSchema } from './integration';
 import { roleSchema } from './roles';
-import { ticketChannelSchema } from './ticket';
+import { ticketChannelSchema, ticketStatusSchema } from './ticket';
 import { recipientHeaderSchema } from './unassigned-mail';
 
 /**
@@ -214,6 +214,17 @@ export const messageStoreAuditSnapshotSchema = z.object({
   subject: z.string(),
 });
 
+/**
+ * 来信的「标记无需回复」（待办 17，协调者 2026-10-07 决定 Q4，同待办 15 来信对象的写法）：坐席、客服主管在 P05 标记与 5 秒内撤销时记，
+ * 对象是工单。前后值为来信（客户与到达时刻，前后相同）、无需回复（操作人与时刻；没有标记为空）与工单状态
+ */
+const whoAtSchema = z.object({ name: z.string(), at: z.string() });
+export const ticketNoReplyAuditSnapshotSchema = z.object({
+  message: whoAtSchema,
+  noReply: whoAtSchema.nullable(),
+  status: ticketStatusSchema,
+});
+
 /** 没有前后值的动作（如退出登录） */
 export const emptyAuditSnapshotSchema = z.object({});
 
@@ -227,6 +238,7 @@ export const auditSnapshotSchemas = {
   accessDenied: accessDeniedAuditSnapshotSchema,
   channel: channelAuditSnapshotSchema,
   messageStore: messageStoreAuditSnapshotSchema,
+  ticketNoReply: ticketNoReplyAuditSnapshotSchema,
   empty: emptyAuditSnapshotSchema,
 } as const;
 export type AuditSnapshotKind = keyof typeof auditSnapshotSchemas;
@@ -300,6 +312,17 @@ export const auditActions = {
   // 未归属店铺的来信（待办 15，协调者 2026-10-07 决定）：客服主管指定店铺；登记新店铺或进线邮箱后收件地址匹配的自动归位（操作人「系统」）
   'message.assign_store': { label: '指定店铺', objectType: 'message', snapshot: 'messageStore' },
   'message.auto_place': { label: '自动归位', objectType: 'message', snapshot: 'messageStore' },
+  // P05 的唯一写操作（待办 17，协调者 2026-10-07 决定 Q4）：坐席、客服主管标记来信无需回复，与 5 秒内撤销
+  'ticket.mark_no_reply': {
+    label: '标记无需回复',
+    objectType: 'ticket',
+    snapshot: 'ticketNoReply',
+  },
+  'ticket.undo_no_reply': {
+    label: '撤销标记无需回复',
+    objectType: 'ticket',
+    snapshot: 'ticketNoReply',
+  },
 } as const satisfies Record<string, AuditActionDefinition>;
 
 export type AuditAction = keyof typeof auditActions;

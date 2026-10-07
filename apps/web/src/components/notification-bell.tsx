@@ -21,12 +21,14 @@ import {
   notificationsKey,
   notificationSearch,
   notificationTarget,
+  notificationTicket,
   submitRead,
   unreadBadge,
   unreadCountQuery,
   type ReadTarget,
 } from '@/lib/notifications';
 import { dismissToast, showError } from '@/lib/notify';
+import { ticketDetailPath } from '@/lib/pages';
 import { endSessionIfUnauthenticated } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { DisabledReason } from './disabled-reason';
@@ -318,6 +320,21 @@ function NotificationItem({
       />
     </>
   );
+  const ticket = notificationTicket(item);
+  if (target && ticket) {
+    return (
+      <Link
+        to={ticketDetailPath}
+        params={{ number: ticket }}
+        data-testid="notification-item"
+        data-read={item.read}
+        className={className}
+        onClick={() => onOpen(true)}
+      >
+        {content}
+      </Link>
+    );
+  }
   if (target) {
     return (
       <Link
