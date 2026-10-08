@@ -64,6 +64,13 @@ function awaitingReplyStatus(lastInFixtureIso: string, days: number): string | R
   return Date.now() < deadline + 2 * 60_000 ? /^(待回复|已关闭)$/ : '已关闭';
 }
 
+/** 已解决的示例工单此刻的状态：最近来信（平移后）满 7 天按规则关闭（已解决后无来信，PRD 6.1） */
+function resolvedStatus(lastInFixtureIso: string, days: number): string | RegExp {
+  const deadline = Date.parse(lastInFixtureIso) + (days + 7) * DAY;
+  if (Date.now() < deadline) return '已解决';
+  return Date.now() < deadline + 2 * 60_000 ? /^(已解决|已关闭)$/ : '已关闭';
+}
+
 async function loginAs(page: Page, name: string): Promise<void> {
   await page.goto('/dev-login');
   await page.getByRole('button', { name: new RegExp(name) }).click();
@@ -111,8 +118,8 @@ test('坐席在 P04 看到示例来信归并成的工单（状态按回复识别
     awaitingReplyStatus('2026-09-10T08:15:00+08:00', days),
     at('2026-09-10T08:15:00+08:00').lastInbound,
   ]);
-  // P05 时间线那张工单：三封来信与两封我方回复归到一张，编号日期取首封来信，最近来信是第三封（之后没有回复，待回复；
-  // 原型里它被标记无需回复为已解决，随 17）
+  // P05 时间线那张工单：三封来信与两封我方回复归到一张，编号日期取首封来信，最近来信是第三封（示例回放里李婷 09:05 标记无需回复，
+  // 已解决，17）
   await expect(rowOf('Oliver Grant').getByRole('cell')).toHaveText([
     new RegExp(`^T-${at('2026-09-04T10:12:00+08:00').numberDate}-[0-9]{4}$`),
     'Charger cable not working',
@@ -121,7 +128,7 @@ test('坐席在 P04 看到示例来信归并成的工单（状态按回复识别
     '亚马逊 CAForcome Direct',
     'Oliver Grant',
     '204-5566778-9900112',
-    awaitingReplyStatus('2026-09-10T09:00:00+08:00', days),
+    resolvedStatus('2026-09-10T09:00:00+08:00', days),
     at('2026-09-10T09:00:00+08:00').lastInbound,
   ]);
   // 已登记生产厂邮箱的来信：来源列是「生产厂」徽标；我方邮箱的自动回复不算回复，仍是待回复
