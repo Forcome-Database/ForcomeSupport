@@ -141,10 +141,8 @@ export const MARK_RESULT = {
 
 /** G2（其他店铺的工单，Q5）与 G3（第一阶段只有「返回工单列表」） */
 export const MISSING = {
-  forbiddenTitle: '没有访问权限',
   forbidden: (number: string, scope: string, contact: string) =>
     `工单 ${number} 不在你的店铺范围内。你的店铺范围是 ${scope}，如需开通请${contact}。`,
-  home: '返回首页',
   notFoundTitle: '找不到这张工单',
   notFound: (number: string) => `工单 ${number} 不存在，请检查编号或链接是否完整。`,
   backToList: '返回工单列表',

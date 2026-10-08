@@ -1,6 +1,6 @@
 import { NO_REPLY_UNDO_SECONDS, type TicketDetail, type TicketMessage } from '@forcome/contracts';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api, ApiRequestError } from '@/lib/api';
 import { dismissToast, showError, showUndo } from '@/lib/notify';
 import { endSessionIfUnauthenticated } from '@/lib/session';
@@ -91,6 +91,8 @@ function showFailure(
 export function useMarkNoReply(number: string) {
   const { queryClient, apply, refresh } = useDetailCache(number);
   const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
+  // 防重复点击：同一帧里连点两次时 state 还没更新，另用 ref 记正在提交的来信
+  const submitting = useRef(new Set<string>());
 
   async function undoOnce(messageId: string): Promise<void> {
     apply(await api.undoNoReply(number, messageId));
@@ -126,7 +128,8 @@ export function useMarkNoReply(number: string) {
   }
 
   async function mark(message: TicketMessage, before: TicketDetail['ticket']['status']) {
-    if (pending.has(message.id)) return;
+    if (submitting.current.has(message.id)) return;
+    submitting.current.add(message.id);
     setPending((current) => new Set(current).add(message.id));
     try {
       await markOnce(message, before);
@@ -139,6 +142,7 @@ export function useMarkNoReply(number: string) {
         retry: () => markOnce(message, before),
       });
     } finally {
+      submitting.current.delete(message.id);
       setPending((current) => {
         const next = new Set(current);
         next.delete(message.id);

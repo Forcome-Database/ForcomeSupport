@@ -1,4 +1,4 @@
-import { BUSINESS_TIME_ZONE } from '@forcome/calendar';
+import { businessDate } from '@forcome/calendar';
 import {
   formatMoney,
   fulfillmentChannelLabels,
@@ -17,7 +17,7 @@ import {
   type TicketTimelineEvent,
 } from '@forcome/contracts';
 import type { BadgeTone } from '@/components/ui/badge';
-import { formatLastInbound } from '@/lib/tickets';
+import { businessDayClock, formatLastInbound } from '@/lib/tickets';
 import {
   ACTOR_TAG,
   AUTO_CLOSE,
@@ -35,35 +35,13 @@ import {
  * 元信息与状态流转卡头的自动关闭、事件行、状态流转每一步、SLA 结果一行、订单卡。纯函数，单测在 p05-words.test.ts。
  */
 
-const parts = new Intl.DateTimeFormat('en-CA', {
-  timeZone: BUSINESS_TIME_ZONE,
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  weekday: 'short',
-  hourCycle: 'h23',
-});
-
-const WEEKDAYS: Record<string, string> = {
-  Mon: '一',
-  Tue: '二',
-  Wed: '三',
-  Thu: '四',
-  Fri: '五',
-  Sat: '六',
-  Sun: '日',
-};
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'] as const;
 
 function partsOf(iso: string) {
-  const all = parts.formatToParts(new Date(iso));
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    all.find((p) => p.type === type)?.value ?? '';
-  return {
-    day: `${part('month')}-${part('day')}`,
-    clock: `${part('hour')}:${part('minute')}`,
-    weekday: WEEKDAYS[part('weekday')] ?? '',
-  };
+  const at = new Date(iso);
+  // 北京时间的日期按 UTC 零点取星期几（只用日期部分，不受运行环境时区影响）
+  const weekday = new Date(`${businessDate(at)}T00:00:00Z`).getUTCDay();
+  return { ...businessDayClock(at), weekday: WEEKDAYS[weekday]! };
 }
 
 /** 时:分（全程记录里同一天的时刻） */

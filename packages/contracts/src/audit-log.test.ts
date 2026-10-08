@@ -67,8 +67,11 @@ describe('动作筛选', () => {
       { value: 'store.update', label: '编辑店铺' },
       { value: 'access.denied', label: '越权访问被拒' },
     ]);
+    // 按动作表的定义顺序；工单的两个动作随待办 17
     expect(auditActionFilterOptions('ticket').map((option) => option.label)).toEqual([
       '越权访问被拒',
+      '标记无需回复',
+      '撤销标记无需回复',
     ]);
   });
 

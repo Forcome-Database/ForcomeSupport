@@ -20,6 +20,7 @@ export {
   startingAt,
   systemClock,
   toMilliseconds,
+  UNDO_GRACE,
   type Clock,
   type Duration,
 } from './clock';

@@ -1,9 +1,10 @@
 import { can, contactAdmins, type TicketDetail } from '@forcome/contracts';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useSuspenseQueries } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { ChevronLeft, Lock, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
 import { EmptyState } from '@/components/empty-state';
+import { ForbiddenCard } from '@/components/forbidden';
 import { LoadError } from '@/components/load-error';
 import { TicketChannelStore, TicketStatusBadge } from '@/components/ticket-badges';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ApiRequestError } from '@/lib/api';
 import { storeOptionsQuery } from '@/lib/channel';
 import { useCurrentMember } from '@/lib/current-member';
-import { pages, sectionPaths } from '@/lib/pages';
+import { pages } from '@/lib/pages';
 import { adminContactsQuery } from '@/lib/session';
 import { ticketDetailQuery } from '@/lib/tickets';
 import { useMarkNoReply } from './no-reply';
@@ -109,55 +110,32 @@ function DetailSkeleton() {
   );
 }
 
-function Centered({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex flex-1 items-center justify-center">
-      <Card className="max-w-115 px-6 py-2">{children}</Card>
-    </div>
-  );
-}
-
-/** G2：其他店铺的工单（Q5）——写这张工单不在你的店铺范围内与你的店铺范围，管理员姓名的写法同 G2 */
+/** G2：其他店铺的工单（Q5）——写这张工单不在你的店铺范围内与你的店铺范围，管理员姓名的写法同 G2；数据都到了才显示 */
 function TicketForbidden({ number }: { number: string }) {
   const member = useCurrentMember();
-  const admins = useQuery(adminContactsQuery);
-  const stores = useQuery(storeOptionsQuery);
-  const scope = (stores.data ?? []).map((store) => store.name).join('、');
-  const contact = contactAdmins((admins.data?.admins ?? []).map((admin) => admin.name));
-  return (
-    <Centered>
-      <EmptyState
-        icon={Lock}
-        title={MISSING.forbiddenTitle}
-        description={MISSING.forbidden(number, scope, contact)}
-        action={
-          <Button asChild>
-            <Link to={sectionPaths[member.home]}>
-              <ChevronLeft />
-              {MISSING.home}
-            </Link>
-          </Button>
-        }
-      />
-    </Centered>
-  );
+  const [admins, stores] = useSuspenseQueries({ queries: [adminContactsQuery, storeOptionsQuery] });
+  const scope = stores.data.map((store) => store.name).join('、');
+  const contact = contactAdmins(admins.data.admins.map((admin) => admin.name));
+  return <ForbiddenCard description={MISSING.forbidden(number, scope, contact)} member={member} />;
 }
 
 /** G3：找不到这张工单（第一阶段没有全局搜索，只有「返回工单列表」） */
 function TicketNotFound({ number }: { number: string }) {
   return (
-    <Centered>
-      <EmptyState
-        icon={Search}
-        title={MISSING.notFoundTitle}
-        description={MISSING.notFound(number)}
-        action={
-          <Button asChild>
-            <Link to={pages.tickets.path}>{MISSING.backToList}</Link>
-          </Button>
-        }
-      />
-    </Centered>
+    <div className="flex flex-1 items-center justify-center">
+      <Card className="px-6 py-2">
+        <EmptyState
+          icon={Search}
+          title={MISSING.notFoundTitle}
+          description={MISSING.notFound(number)}
+          action={
+            <Button asChild>
+              <Link to={pages.tickets.path}>{MISSING.backToList}</Link>
+            </Button>
+          }
+        />
+      </Card>
+    </div>
   );
 }
 

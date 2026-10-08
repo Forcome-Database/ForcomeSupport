@@ -12,6 +12,7 @@ import {
   recordAudit,
   toMilliseconds,
   transaction,
+  UNDO_GRACE,
   type Actor,
   type Runtime,
   type Tx,
@@ -29,9 +30,6 @@ import { applyTransition } from './ticket-status';
  * - 每次标记、撤销记一行经过（no_reply_event，P05 的事件行；撤销不删原来那行），记审计（工单对象，前后值为来信、无需回复与工单状态）。
  * 一张工单的标记与撤销串行：事务里先锁工单行再锁这封来信。
  */
-
-/** 撤销的服务端时限比界面多留的网络时间（2026-10-05 用户确认的台账撤销口径） */
-const UNDO_GRACE_SECONDS = 5;
 
 type MemberActor = Extract<Actor, { kind: 'member' }>;
 
@@ -176,7 +174,7 @@ export function undoNoReply(
     if (letter.noReplyById !== actor.memberId) {
       throw new AccessDeniedError(noReplyMessages.notYours);
     }
-    const limit = toMilliseconds({ seconds: NO_REPLY_UNDO_SECONDS + UNDO_GRACE_SECONDS });
+    const limit = toMilliseconds({ seconds: NO_REPLY_UNDO_SECONDS }) + toMilliseconds(UNDO_GRACE);
     if (tx.now.getTime() - letter.noReplyAt.getTime() > limit) {
       throw new NoReplyRefusedError(400, noReplyMessages.undoExpired);
     }

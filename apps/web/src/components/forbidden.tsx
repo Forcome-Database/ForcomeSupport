@@ -18,6 +18,17 @@ export function Forbidden({ page, member }: { page: PageDefinition; member: Curr
   const description =
     `「${page.label}」只对${roleNames(rolesWith(page.capability))}开放。` +
     `你当前的角色是${roleNames(member.roles)}，如需开通请${contactAdmins(data.admins.map((a) => a.name))}。`;
+  return <ForbiddenCard description={description} member={member} />;
+}
+
+/** G2 的卡片：说明由调用方写（角色不够写角色，其他店铺的数据按店铺范围写，P05 待办 17） */
+export function ForbiddenCard({
+  description,
+  member,
+}: {
+  description: string;
+  member: CurrentMember;
+}) {
   return (
     <div className="flex flex-1 items-center justify-center">
       <Card className="px-6 py-2">

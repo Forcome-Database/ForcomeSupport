@@ -18,6 +18,12 @@ export interface Duration {
   milliseconds?: number;
 }
 
+/**
+ * 撤销窗口（台账「设为已完成」、P05「标记无需回复」）的服务端时限比界面多留的网络时间：界面倒计时从收到结果才开始数，
+ * 撤销请求到服务端还要一段时间（2026-10-05 用户确认）
+ */
+export const UNDO_GRACE: Duration = { seconds: 5 };
+
 /** 一段时长有多少毫秒 */
 export function toMilliseconds(d: Duration): number {
   return (

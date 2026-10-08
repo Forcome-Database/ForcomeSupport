@@ -372,6 +372,9 @@ describe('标记无需回复（AC-P1-01）', () => {
       ['只管 Forcome Auto 的坐席', 'ticket', detail.ticket.number, DIRECT.id],
     ]);
     expect((await detailOf(agent, detail.ticket.number)).ticket.status).toBe('awaiting_reply');
+    // P27 按记录的店铺过滤（自己的记录也一样）：她看不到这两条，所以工单对象的工单号不必再按范围查——看得到的工单都在范围里
+    const res = await narrow.get(`/api/audit?q=${detail.ticket.number}`);
+    expect(auditLogSchema.parse(await res.json()).entries).toEqual([]);
   });
 });
 

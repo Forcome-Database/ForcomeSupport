@@ -1,4 +1,4 @@
-import { BUSINESS_TIME_ZONE, businessDate } from '@forcome/calendar';
+import { businessDate, businessDateTime } from '@forcome/calendar';
 import { queryOptions } from '@tanstack/react-query';
 import { api, ApiRequestError } from './api';
 
@@ -16,28 +16,22 @@ export function ticketDetailQuery(number: string) {
   return queryOptions({
     queryKey: [...TICKETS_QUERY_KEY, 'detail', number],
     queryFn: () => api.ticketDetail(number),
-    // 403（G2）与 404（G3）是确定的结果，不重试
+    // 4xx 是确定的结果（403 为 G2，404 与编号格式不对的 400 为 G3，401 按会话结束处理），不重试
     retry: (count, error) =>
-      !(error instanceof ApiRequestError && [403, 404].includes(error.status)) && count < 3,
+      !(error instanceof ApiRequestError && error.status >= 400 && error.status < 500) && count < 3,
   });
 }
 
-const parts = new Intl.DateTimeFormat('en-CA', {
-  timeZone: BUSINESS_TIME_ZONE,
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hourCycle: 'h23',
-});
+/** 北京时间的「月-日」与「时:分」（P04、P05 显示时刻都用它） */
+export function businessDayClock(at: Date): { day: string; clock: string } {
+  // 「YYYY-MM-DD HH:mm:ss」
+  const text = businessDateTime(at);
+  return { day: text.slice(5, 10), clock: text.slice(11, 16) };
+}
 
 /** P04「最近来信」：当天只写时分，其余写「月-日 时:分」，都按北京时间（原型 short_time()） */
 export function formatLastInbound(iso: string, now: Date): string {
   const at = new Date(iso);
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.formatToParts(at).find((p) => p.type === type)?.value ?? '';
-  const clock = `${part('hour')}:${part('minute')}`;
-  return businessDate(at) === businessDate(now)
-    ? clock
-    : `${part('month')}-${part('day')} ${clock}`;
+  const { day, clock } = businessDayClock(at);
+  return businessDate(at) === businessDate(now) ? clock : `${day} ${clock}`;
 }

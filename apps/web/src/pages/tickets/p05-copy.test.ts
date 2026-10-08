@@ -173,12 +173,10 @@ describe('StatesInbox I18 ② 与补充小样⑥–⑧', () => {
   });
 
   it('G2（其他店铺的工单）与 G3', () => {
-    expectText(STATES_INBOX, MISSING.forbiddenTitle);
     expectText(
       STATES_INBOX,
       MISSING.forbidden('T-20260911-0031', 'Forcome Direct', contactAdmins(['刘洋'])),
     );
-    expectText(STATES_INBOX, MISSING.home);
     expectText(STATES_INBOX, MISSING.notFoundTitle);
     expectText(STATES_INBOX, MISSING.notFound('T-20260801-9999'));
     expectText(STATES_INBOX, MISSING.backToList);

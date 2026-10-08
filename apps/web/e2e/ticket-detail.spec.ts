@@ -3,6 +3,7 @@ import {
   storeOptionsSchema,
   ticketDetailSchema,
   ticketListSchema,
+  type TicketDetail,
   type TicketListItem,
 } from '@forcome/contracts';
 import { expect, test, type Page } from '@playwright/test';
@@ -260,6 +261,51 @@ test('标记失败：断网可立即重试（这封来信仍未标记）；已�
   await expect(page.getByText('已刷新为最新内容。')).toBeVisible();
   await expect(page.getByRole('button', { name: '立即重试' })).toHaveCount(0);
   await expect.poll(() => refetched).toBeGreaterThan(0);
+});
+
+test('撤销超时被拒：不重试，保持无需回复并刷新为最新（I18 补充小样⑦）', async ({ page }) => {
+  await loginAs(page, '李婷');
+  const james = await ticketOf(page, 'James Walker');
+  test.skip(james.status !== 'awaiting_reply', '示例工单已按时关闭，先重放来信再跑');
+  // 都用接口桩，不改开发测试环境的数据：标记取真实详情改成「李婷刚标记、工单已解决」，撤销返回 400 已超过时限
+  await page.route('**/api/tickets/*/messages/*/no-reply', async (route) => {
+    const real = ticketDetailSchema.parse(
+      await (await page.request.get(`/api/tickets/${james.number}`)).json(),
+    );
+    const messageId = /messages\/([^/]+)\/no-reply/.exec(route.request().url())![1]!;
+    const at = new Date().toISOString();
+    const marked: TicketDetail = {
+      ...real,
+      ticket: { ...real.ticket, status: 'resolved' },
+      messages: real.messages.map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              noReply: { by: '李婷', at },
+              sla: m.sla && { ...m.sla, result: 'not_required' },
+            }
+          : m,
+      ),
+      events: [
+        ...real.events,
+        { kind: 'no_reply', at, action: 'mark', actorName: '李婷', messageId, to: 'resolved' },
+      ],
+    };
+    await route.fulfill({ json: ticketDetailSchema.parse(marked) });
+  });
+  await page.route('**/api/tickets/*/messages/*/undo-no-reply', (route) =>
+    route.fulfill({
+      status: 400,
+      json: { error: 'invalid_request', message: noReplyMessages.undoExpired },
+    }),
+  );
+  await openDetail(page, james.number);
+  await markButton(page).first().click();
+  await expect(page.getByText('已标记无需回复 · 工单转已解决')).toBeVisible();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(page.getByText('撤销失败：已超过撤销时限，这封来信保持无需回复')).toBeVisible();
+  await expect(page.getByText('已刷新为最新内容。')).toBeVisible();
+  await expect(page.getByRole('button', { name: '立即重试' })).toHaveCount(0);
 });
 
 test('知识库负责人看得到详情，没有「标记无需回复」', async ({ page }) => {

@@ -5,6 +5,7 @@ import {
   usdOf,
   type OrderCard,
   type TicketDetail,
+  type TicketEvent,
   type TicketMessage,
   type TicketStatusStep,
   type TicketTimelineEvent,
@@ -28,7 +29,10 @@ import { IDLE_LIMITS } from './time-limits';
  */
 
 /** 由成员「标记无需回复」引起的迁移：事件行按 no_reply_event 写一行（带它引起的状态），不另写 */
-const MARK_EVENTS = new Set(['all_marked_no_reply', 'undo_mark_no_reply']);
+const MARK_EVENTS: ReadonlySet<TicketEvent> = new Set([
+  'all_marked_no_reply',
+  'undo_mark_no_reply',
+]);
 
 type MessageLink = {
   readonly channelMessageId: string;

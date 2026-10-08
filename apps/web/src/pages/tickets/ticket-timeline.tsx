@@ -126,7 +126,7 @@ function MessageCard({
 }
 
 const bubbleClass =
-  'rounded-lg rounded-tl-[4px] border px-3.25 text-13 leading-[1.6] break-words whitespace-pre-wrap';
+  'rounded-lg rounded-tl-bubble-tail border px-3.25 text-13 leading-[1.6] break-words whitespace-pre-wrap';
 
 /** 邮件头小字（原型 mail_hdr()：直邮的发件人与进线邮箱、自动回复的标记头） */
 function MailHeader({ children }: { children: ReactNode }) {

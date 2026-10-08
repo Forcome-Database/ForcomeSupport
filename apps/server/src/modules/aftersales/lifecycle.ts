@@ -1,4 +1,5 @@
 import { COMPLETE_UNDO_SECONDS, type AftersalesStatus } from '@forcome/contracts';
+import { toMilliseconds, UNDO_GRACE } from '../core';
 
 /*
  * 第一阶段台账状态的迁移表（PRD 6.5「第一阶段台账状态」、S15；ADR 0008：状态机写成纯函数迁移表，一行 = 当前状态 + 事件 + 守卫
@@ -10,21 +11,15 @@ import { COMPLETE_UNDO_SECONDS, type AftersalesStatus } from '@forcome/contracts
 
 export type LedgerEvent = 'register' | 'complete' | 'undo_complete' | 'cancel';
 
-/**
- * 撤销「设为已完成」的服务端时限：界面倒计时 COMPLETE_UNDO_SECONDS 秒，从界面收到完成结果才开始数，
- * 撤销请求到服务端还要一段网络时间，所以服务端多留 5 秒（2026-10-05 用户确认）
- */
-const UNDO_GRACE_SECONDS = 5;
-
 /** 守卫要看的：当前时间与完成时间 */
 export interface TransitionContext {
   readonly now: Date;
   readonly completedAt: Date | null;
 }
 
-/** 守卫：刚设为已完成，还在撤销时限内 */
+/** 守卫：刚设为已完成，还在撤销时限内（界面倒计时 COMPLETE_UNDO_SECONDS 秒，服务端再多留 core 的 UNDO_GRACE） */
 function withinUndoWindow({ now, completedAt }: TransitionContext): boolean {
-  const limit = (COMPLETE_UNDO_SECONDS + UNDO_GRACE_SECONDS) * 1000;
+  const limit = toMilliseconds({ seconds: COMPLETE_UNDO_SECONDS }) + toMilliseconds(UNDO_GRACE);
   return completedAt !== null && now.getTime() - completedAt.getTime() <= limit;
 }
 
