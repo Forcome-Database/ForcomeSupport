@@ -2,7 +2,7 @@ import { can, contactAdmins, type TicketDetail } from '@forcome/contracts';
 import { useQuery, useSuspenseQueries } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Search } from 'lucide-react';
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, Suspense, type ReactNode } from 'react';
 import { EmptyState } from '@/components/empty-state';
 import { ForbiddenCard } from '@/components/forbidden';
 import { LoadError } from '@/components/load-error';
@@ -163,7 +163,14 @@ export function TicketDetailPage({ number }: { number: string }) {
   if (detail.isPending) return <DetailSkeleton />;
   if (detail.isError) {
     const status = detail.error instanceof ApiRequestError ? detail.error.status : null;
-    if (status === 403) return <TicketForbidden number={number} />;
+    // G2 要等店铺范围与管理员两份数据：就近的 Suspense 兜住（路由没有 pending 组件，不然整个外壳会挂起）
+    if (status === 403) {
+      return (
+        <Suspense fallback={<DetailSkeleton />}>
+          <TicketForbidden number={number} />
+        </Suspense>
+      );
+    }
     // 编号格式不对（400）与没有这张工单都按找不到
     if (status === 404 || status === 400) return <TicketNotFound number={number} />;
     return (

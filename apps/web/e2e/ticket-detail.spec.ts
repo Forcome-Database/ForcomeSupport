@@ -320,8 +320,15 @@ test('其他店铺的工单显示 G2（按店铺范围写，只有「返回首�
   await loginAs(page, '李婷');
   const james = await ticketOf(page, 'James Walker');
   // 李婷是全部店铺：用接口桩把她的范围收窄为 Forcome Direct，详情返回 403（真实的越权由集成测试覆盖）
+  // 店铺范围晚一点回来：等的时候页面外壳（顶栏）照常显示，内容区是骨架
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  let waiting = () => {};
+  const reached = new Promise<void>((resolve) => (waiting = resolve));
   await page.route('**/api/channel/store-options', async (route) => {
     const real = storeOptionsSchema.parse(await (await route.fetch()).json());
+    waiting();
+    await held;
     await route.fulfill({
       json: { stores: real.stores.filter((store) => store.name === 'Forcome Direct') },
     });
@@ -333,7 +340,15 @@ test('其他店铺的工单显示 G2（按店铺范围写，只有「返回首�
     }),
   );
   await page.goto(`/tickets/${james.number}`);
+  // 详情已 403、G2 正等着店铺范围：外壳还在，内容区是骨架
+  await reached;
+  await page.waitForTimeout(300);
+  await expect(page.getByRole('banner').getByText('李婷', { exact: true })).toBeVisible();
+  await expect(page.locator('[aria-busy]').first()).toBeVisible();
+  await expect(page.getByText('没有访问权限')).toHaveCount(0);
+  release();
   await expect(page.getByText('没有访问权限')).toBeVisible();
+  await expect(page.getByRole('banner').getByText('李婷', { exact: true })).toBeVisible();
   await expect(
     page.getByText(
       `工单 ${james.number} 不在你的店铺范围内。你的店铺范围是 Forcome Direct，如需开通请联系管理员刘洋。`,
