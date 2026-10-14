@@ -13,7 +13,7 @@ import {
 } from '@forcome/contracts';
 import { getDemoFixture } from '@forcome/fixtures';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { gmailPollJob, listOrderStores } from '../src/modules/channel';
+import { gmailPollJob, listOrderStores, reportAcceptanceJob } from '../src/modules/channel';
 import {
   amazonOrdersClient,
   gmailClient,
@@ -460,5 +460,52 @@ describe('「更新于」与 Shopify 回补的注', () => {
     await t.runJobs();
     const data = await report(await t.loginAs('客服主管'));
     expect(data.shopifyBackfillDays).toBe(60);
+  });
+});
+
+describe('AC-P1-14 的验收夹具经开发任务投递（开发测试环境长期运行）', () => {
+  let t: TestHarness;
+
+  beforeAll(async () => {
+    t = await startTestHarness({ now: '2026-09-11T10:20:00+08:00' });
+    await t.loadFixtures();
+    await t.runJobs();
+  });
+
+  afterAll(async () => {
+    await t.close();
+  });
+
+  it('worker 重启过（Fake 的历史号从头数、库里记着更大的游标）：任务照样把 73 封投进来、同步并归并，验收日的柱为 73', async () => {
+    // 先让四个邮箱的游标往前走，再把 Fake 重置成刚启动的样子（历史号从头数、没有 watch）
+    const gmail = t.clients.fake(gmailClient);
+    for (const [n, { mail }] of reportAcceptanceMails(fixture).slice(0, 4).entries()) {
+      gmail.deliver({
+        to: mail.to,
+        from: { name: `Warmup ${n}`, address: `warmup.${n}@example.com` },
+        subject: 'Warmup',
+        text: 'Hello',
+        at: '2026-09-01T10:00:00+08:00',
+      });
+    }
+    await t.runJobs();
+    t.resetFakes();
+    await t.enqueue(reportAcceptanceJob, {});
+    await t.runJobs();
+    const data = await report(await t.loginAs('客服主管'), {
+      period: 'custom',
+      from: '2026-09-04',
+      to: '2026-09-10',
+    });
+    expect(data.daily.at(-1)).toEqual({ date: '2026-09-10', amazon: 52, shopify_email: 21 });
+    // 再投一次：按 Gmail 消息 ID 去重，不多出工单
+    await t.enqueue(reportAcceptanceJob, {});
+    await t.runJobs();
+    const again = await report(await t.loginAs('客服主管'), {
+      period: 'custom',
+      from: '2026-09-04',
+      to: '2026-09-10',
+    });
+    expect(again.daily.at(-1)).toEqual({ date: '2026-09-10', amazon: 52, shopify_email: 21 });
   });
 });

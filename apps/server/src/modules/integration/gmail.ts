@@ -182,6 +182,15 @@ export class FakeGmail implements FakeClient<GmailClient> {
     return box;
   }
 
+  /**
+   * 让这个邮箱之后到的信的 historyId 排在 historyId 之后（Fake 的历史号从 HISTORY_START 起数，进程重启就从头数；开发测试环境的库
+   * 却记着上一个进程的游标，新到的信历史号比游标小，增量同步取不到。之后投信前先接上库里的游标，待办 24 的验收夹具用）
+   */
+  continueHistoryFrom(address: string, historyId: number): void {
+    const box = this.#mailbox(address);
+    box.historyId = Math.max(box.historyId, historyId);
+  }
+
   #append(address: string, message: Omit<StoredMessage, 'historyId'>): void {
     const box = this.#mailbox(address);
     box.historyId += 1;

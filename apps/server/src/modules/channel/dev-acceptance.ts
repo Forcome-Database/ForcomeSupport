@@ -1,7 +1,10 @@
 import { getDemoFixture } from '@forcome/fixtures';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
+import { inArray } from 'drizzle-orm';
 import { defineJob, transaction, type AppEnv, type JobContext, type Runtime } from '../core';
 import { gmailClient, reportAcceptanceMails, type IntegrationClients } from '../integration';
+import { gmailSyncJob } from './gmail-sync';
+import { mailboxSync } from './schema';
 
 /*
  * AC-P1-14 的验收夹具（待办 24）：在验收日（示例的 09-10）投 73 封客户来信（亚马逊 52、Shopify 与邮件 21，integration 的
@@ -16,15 +19,32 @@ export const reportAcceptanceJob = defineJob('channel.report_acceptance', z.obje
   retryLimit: 0,
 });
 
-/** worker：把验收夹具的来信投进本进程的 Fake Gmail（生产环境拒绝：FakeNotAllowedError） */
-export function deliverReportAcceptance(
+/**
+ * worker：把验收夹具的来信投进本进程的 Fake Gmail（生产环境拒绝：FakeNotAllowedError），再给这几个邮箱各排一次同步。
+ * 开发测试环境长期运行：worker 重启后 Fake 的历史号从头数，库里却记着上一个进程的游标，所以投信前先让 Fake 接上库里的游标
+ * （否则新到的信历史号比游标小，增量同步取不到）；重启后的 Fake 邮箱也没有 watch、不会推送，所以直接排同步
+ */
+export async function deliverReportAcceptance(
   clients: IntegrationClients,
-  { logger }: Pick<JobContext, 'logger'>,
-): void {
+  { runtime, logger }: Pick<JobContext, 'runtime' | 'logger'>,
+): Promise<void> {
   const gmail = clients.fake(gmailClient);
   const mails = reportAcceptanceMails(getDemoFixture());
+  const mailboxes = [...new Set(mails.map((m) => m.mailbox.toLowerCase()))];
+  const cursors = await runtime.db
+    .select({ address: mailboxSync.address, historyId: mailboxSync.historyId })
+    .from(mailboxSync)
+    .where(inArray(mailboxSync.address, mailboxes));
+  for (const { address, historyId } of cursors) {
+    if (historyId) gmail.continueHistoryFrom(address, Number(historyId));
+  }
   for (const { mail } of mails) gmail.deliver(mail);
-  logger.info({ mails: mails.length }, '验收夹具：已投入报表验收日的来信');
+  await transaction(runtime, async (tx) => {
+    for (const mailbox of mailboxes) {
+      await tx.enqueue(gmailSyncJob, { mailbox }, { singletonKey: mailbox });
+    }
+  });
+  logger.info({ mails: mails.length, mailboxes }, '验收夹具：已投入报表验收日的来信');
 }
 
 const acceptanceRoute = createRoute({

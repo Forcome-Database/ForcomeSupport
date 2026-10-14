@@ -52,10 +52,9 @@ export function createChannelJobHandlers(deps: { clients: IntegrationClients }):
     handleJob(gmailPollJob, (_payload, { runtime, logger }) => pollMailboxes(runtime, logger)),
     handleJob(gmailRenewWatchJob, (_payload, context) => renewWatches(deps.clients, context)),
     // AC-P1-14 的验收夹具（只在非生产环境由开发接口排入，待办 24）
-    handleJob(reportAcceptanceJob, (_payload, context) => {
-      deliverReportAcceptance(deps.clients, context);
-      return Promise.resolve();
-    }),
+    handleJob(reportAcceptanceJob, (_payload, context) =>
+      deliverReportAcceptance(deps.clients, context),
+    ),
   ];
 }
 
