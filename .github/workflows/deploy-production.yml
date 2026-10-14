@@ -1,0 +1,79 @@
+# 部署到生产（ADR 0013 及其修订，待办 28）：打版本标签（v 开头，如 v1.0.0）触发——
+# 1. 云端运行器核对：标签打在 main 上，且这个提交的 CI（「CI 通过」）已经通过；
+# 2. 生产部署作业带 GitHub environment「production」：环境的保护规则要求指定的审批人批准，没批准不运行、不部署
+#    （超过 30 天没批准自动作废）；批准后只调度到生产运行器（独立系统用户 + 自己的 rootless Docker，标签 forcome-production）；
+# 3. 运行器执行同一个部署脚本 deploy/deploy.mjs production：构建镜像 → 迁移前自动备份（WAL-G 基础备份 + pg_dump）→ migrate
+#    → 起服务与备份服务 → 用根证书核对 HTTPS；部署报告写进作业摘要并作为产物上传。不灌示例数据、不跑冒烟（生产没有开发登录）。
+# 仓库暂不上 GitHub（2026-10-04 用户口径）：本工作流照写并经 actionlint 校验（pnpm lint:workflows）；上 GitHub 后在
+# Settings → Environments 建 production 并设审批人、只允许 v* 标签部署，步骤见 docs/部署说明.md 第 17 节，核对见待办 29。
+name: 部署到生产
+
+on:
+  push:
+    tags: ['v*']
+
+# 一次只部署一个版本；正在部署的不取消（迁移与备份不能中途打断），后面的排队
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 核对版本标签与 CI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: 标签必须打在 main 上
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::标签 $GITHUB_REF_NAME 指向的提交 $GITHUB_SHA 不在 main 上，不部署"
+            exit 1
+          fi
+      - name: 这个提交的 CI 必须已经通过
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          conclusion=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs" --paginate \
+            --jq '.check_runs[] | select(.name == "CI 通过") | .conclusion' | head -n 1)
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::提交 $GITHUB_SHA 的「CI 通过」是 ${conclusion:-没有运行}，先等 main 上的 CI 通过再打标签"
+            exit 1
+          fi
+
+  deploy:
+    name: 部署到生产（人工批准后）
+    needs: verify
+    # 只调度到生产运行器（与开发测试运行器不同的系统用户与 Docker，碰不到开发测试的 Compose 项目）
+    runs-on: [self-hosted, linux, forcome-production]
+    # 环境保护：审批人批准后才开始；环境里只放部署要的配置（环境文件在服务器上，不进 GitHub）
+    environment: production
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - name: 部署（构建镜像 → 迁移前备份 → migrate → 起服务 → HTTPS 核对）
+        run: node deploy/deploy.mjs production
+        env:
+          # 环境文件放在工作区以外（checkout 会清掉工作区里未跟踪的文件），权限 600
+          FORCOME_ENV_FILE: /etc/forcome/production.env
+          # 维护标记与宿主机检查（systemd 定时器，另一个工作区）共用同一个文件：部署期间不告警
+          FORCOME_MAINTENANCE_FILE: /var/lib/forcome/production/maintenance.json
+      - name: 上传部署报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-report-${{ github.ref_name }}
+          path: deploy/.state/production/
+          if-no-files-found: ignore
+          retention-days: 90

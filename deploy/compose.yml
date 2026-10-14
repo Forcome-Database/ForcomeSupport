@@ -1,13 +1,38 @@
 # 开发测试与生产共用的 Compose（ADR 0013）。由部署脚本 deploy/deploy.mjs 按环境调用：
 #   docker compose -p <项目名> -f deploy/compose.yml --env-file <环境文件> …
-# 项目名固定（开发测试 forcome-staging；生产 forcome-production 随 28 号待办），容器、卷、网络都以它为前缀，
-# 两套环境互不影响。变量见 deploy/.env.example；RELEASE（镜像版本，即 git 提交号）与 PLAYWRIGHT_VERSION
+# 项目名固定（开发测试 forcome-staging；生产 forcome-production），容器、卷、网络都以它为前缀，两套环境互不影响。
+# 变量见 deploy/.env.example（生产 deploy/.env.production.example）；RELEASE（镜像版本，即 git 提交号）与 PLAYWRIGHT_VERSION
 # 由部署脚本给出，手工执行 compose 命令时用 node deploy/deploy.mjs <环境> compose … 代为填好。
+
+# 日志（ADR 0013 修订，待办 28）：各服务 pino JSON 打到标准输出，Docker 的 json-file 驱动按大小轮转。json-file 不能按天数轮转：
+# 默认每个容器最多 30 个 20 MB 的文件，按第一期的日志量（每天几 MB）能留 30 天以上；docs/运维手册.md 写了怎么核对与调整
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: ${LOG_MAX_SIZE:-20m}
+    max-file: ${LOG_MAX_FILE:-30}
+
+# 备份（待办 28，docs/运维手册.md）：WAL-G 与 restic 的配置，数据库（archive_command 连续归档）、备份服务与恢复共用。
+# 备份目录 BACKUP_DIR：生产写 NAS 挂载到服务器上的目录（必填，部署脚本核对），开发测试环境不填用本项目的命名卷 backup
+x-backup-env: &backup-env
+  WALG_FILE_PREFIX: /backup/wal-g
+  # WAL-G 用 libsodium 加密基础备份与 WAL（64 位十六进制，openssl rand -hex 32），随备份单独离线保管
+  WALG_LIBSODIUM_KEY: ${WALG_LIBSODIUM_KEY:?按 deploy/.env.example 填写}
+  WALG_LIBSODIUM_KEY_TRANSFORM: hex
+  WALG_COMPRESSION_METHOD: zstd
+  RESTIC_REPOSITORY: /backup/restic
+  RESTIC_PASSWORD: ${RESTIC_PASSWORD:?按 deploy/.env.example 填写}
+  BACKUP_KEEP_DAILY: ${BACKUP_KEEP_DAILY:-30}
+  BACKUP_KEEP_MONTHLY: ${BACKUP_KEEP_MONTHLY:-12}
+  WALG_RETAIN_FULL: ${WALG_RETAIN_FULL:-7}
+  POSTGRES_USER: ${POSTGRES_USER:?}
+  POSTGRES_DB: ${POSTGRES_DB:?}
 
 x-app: &app
   image: forcome-server:${RELEASE:?由部署脚本给出}
   # 自建镜像都由部署脚本先构建（docker compose build），任何时候都不去镜像仓库拉同名镜像
   pull_policy: never
+  logging: *logging
   environment:
     APP_ENV: ${APP_ENV:?}
     DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
@@ -50,6 +75,22 @@ x-app: &app
     AMAZON_SQS_ACCESS_KEY_ID: ${AMAZON_SQS_ACCESS_KEY_ID:-}
     AMAZON_SQS_SECRET_ACCESS_KEY: ${AMAZON_SQS_SECRET_ACCESS_KEY:-}
     CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY:-}
+    # 运维群的钉钉自定义机器人（待办 28，docs/运维手册.md 第 5 节）：worker 每分钟自检的告警发到这里。不设 CLIENT_MODE_DINGTALK_ROBOT 时
+    # 非生产环境用 Fake（只写日志）、生产用真实接口；Webhook 没填时照常启动，告警只写日志
+    CLIENT_MODE_DINGTALK_ROBOT: ${CLIENT_MODE_DINGTALK_ROBOT:-}
+    DINGTALK_ROBOT_WEBHOOK: ${DINGTALK_ROBOT_WEBHOOK:-}
+    DINGTALK_ROBOT_SECRET: ${DINGTALK_ROBOT_SECRET:-}
+    # 自检的阈值（协调者 2026-10-14 决定 Q2、Q3；留空取默认值，单位写在变量名里）
+    ALERT_QUEUE_WAIT_MINUTES: ${ALERT_QUEUE_WAIT_MINUTES:-}
+    ALERT_FAILED_JOB_WINDOW_MINUTES: ${ALERT_FAILED_JOB_WINDOW_MINUTES:-}
+    ALERT_CALL_ERROR_WINDOW_MINUTES: ${ALERT_CALL_ERROR_WINDOW_MINUTES:-}
+    ALERT_CALL_ERROR_MIN_CALLS: ${ALERT_CALL_ERROR_MIN_CALLS:-}
+    ALERT_CALL_ERROR_PERCENT: ${ALERT_CALL_ERROR_PERCENT:-}
+    ALERT_DINGTALK_MONTHLY_CALLS: ${ALERT_DINGTALK_MONTHLY_CALLS:-}
+    ALERT_SQS_CHECK_STALE_MINUTES: ${ALERT_SQS_CHECK_STALE_MINUTES:-}
+    ALERT_RECONCILE_STALE_HOURS: ${ALERT_RECONCILE_STALE_HOURS:-}
+    ALERT_BACKUP_STALE_HOURS: ${ALERT_BACKUP_STALE_HOURS:-}
+    ALERT_REPEAT_HOURS: ${ALERT_REPEAT_HOURS:-}
     TZ: UTC
   volumes:
     # 不用真实 Gmail 时挂仓库里的空目录 deploy/keys（密钥文件不进 git）
@@ -63,13 +104,14 @@ services:
     build:
       context: ..
       dockerfile: deploy/postgres/Dockerfile
-    # 不随版本变：镜像没变时数据库容器不重建
+    # 不随版本变：镜像没变时数据库容器不重建（镜像内容变了，部署时 Compose 照样重建容器）
     image: forcome-postgres:18
     pull_policy: never
+    logging: *logging
+    # 镜像的默认命令开着连续归档（archive_mode、archive_command 经 WAL-G、archive_timeout 5 分钟）
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:?}
+      <<: *backup-env
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
-      POSTGRES_DB: ${POSTGRES_DB:?}
       TZ: UTC
     # 只在本机回环地址上开放，供运维用 psql 排查
     ports:
@@ -77,11 +119,84 @@ services:
     # PostgreSQL 18 镜像的数据目录在 /var/lib/postgresql/18/docker，卷挂到上一级
     volumes:
       - pgdata:/var/lib/postgresql
+      - ${BACKUP_DIR:-backup}:/backup
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 2s
       timeout: 3s
       retries: 30
+    # 最多等 60 秒让数据库正常关闭（默认 10 秒，超时被强杀后下次启动要做崩溃恢复）
+    stop_grace_period: 60s
+    restart: unless-stopped
+
+  # 定时备份（待办 28）：每天 BACKUP_CRON（默认 02:30，北京时间）做一次 WAL-G 物理基础备份 + pg_dump 与卷经 restic，执行保留策略；
+  # 启动时最近 24 小时没有成功的备份先补一次。以 root 运行（要读 caddy 的私钥），WAL-G 一步以 postgres 身份
+  backup:
+    image: forcome-postgres:18
+    pull_policy: never
+    logging: *logging
+    command: ['forcome-backup-scheduler']
+    environment:
+      <<: *backup-env
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:?}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
+      PGDATABASE: ${POSTGRES_DB:?}
+      BACKUP_CRON: ${BACKUP_CRON:-30 2 * * *}
+      TZ: Asia/Shanghai
+    volumes:
+      # WAL-G 的基础备份直接读数据目录（与数据库容器共用卷，只读）
+      - pgdata:/var/lib/postgresql:ro
+      - ${BACKUP_DIR:-backup}:/backup
+      # 要一起备份的卷挂在 /backup-src 下（第一期是 caddy 内部 CA 的根证书与私钥；第二期的附件卷加在这里）
+      - caddy_data:/backup-src/caddy_data:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  # 一次性：恢复（部署脚本的 restore 子命令，数据库停着时执行 forcome-restore prepare，把基础备份取回数据卷）
+  restore:
+    image: forcome-postgres:18
+    pull_policy: never
+    profiles: [restore]
+    user: postgres
+    environment:
+      <<: *backup-env
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ${BACKUP_DIR:-backup}:/backup:ro
+    restart: 'no'
+
+  # 一次性：恢复演练（部署脚本的 restore-drill 子命令）：在独立的临时卷里恢复到指定时点再核对，不碰正在运行的数据库
+  restore-drill:
+    image: forcome-postgres:18
+    pull_policy: never
+    profiles: [restore]
+    user: postgres
+    environment:
+      <<: *backup-env
+    volumes:
+      - restore_drill:/var/lib/postgresql
+      - ${BACKUP_DIR:-backup}:/backup:ro
+    restart: 'no'
+
+  # 只用于开发测试环境的演练（待办 28）：钉钉群机器人的接收替身，按加签核对每条消息、返回钉钉的 { errcode: 0 }，收到的消息打到日志、
+  # 也可经 GET /messages 取回。worker 的 DINGTALK_ROBOT_WEBHOOK 指 http://robot-sink:8080/robot/send?access_token=…，
+  # 宿主机检查经 127.0.0.1:${ROBOT_SINK_PORT} 发。生产不起它（部署脚本也不构建）
+  robot-sink:
+    build:
+      context: ..
+      dockerfile: deploy/robot-sink/Dockerfile
+    image: forcome-robot-sink:${RELEASE:?由部署脚本给出}
+    pull_policy: never
+    profiles: [robot-sink]
+    logging: *logging
+    environment:
+      DINGTALK_ROBOT_SECRET: ${DINGTALK_ROBOT_SECRET:-}
+    ports:
+      - '127.0.0.1:${ROBOT_SINK_PORT:-4514}:8080'
     restart: unless-stopped
 
   # 一次性：只向前执行迁移并安装 pg-boss 的表，先于 api 与 worker（部署脚本先单独运行它）
@@ -139,6 +254,7 @@ services:
       target: web
     image: forcome-web:${RELEASE:?由部署脚本给出}
     pull_policy: never
+    logging: *logging
     environment:
       SITE_HOST: ${SITE_HOST:?}
       TLS_MODE: ${TLS_MODE:-internal}
@@ -180,3 +296,7 @@ volumes:
   pgdata:
   caddy_data:
   caddy_config:
+  # 备份目录（没设 BACKUP_DIR 时；开发测试环境用它当 NAS 的替身）
+  backup:
+  # 恢复演练的临时数据目录：演练结束后由部署脚本删掉
+  restore_drill:

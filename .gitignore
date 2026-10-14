@@ -27,6 +27,7 @@ blob-report/
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # 部署产物：导出的根证书、部署报告与冒烟报告（deploy/deploy.mjs）
 deploy/.state/

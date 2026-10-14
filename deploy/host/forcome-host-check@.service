@@ -1,0 +1,27 @@
+# 宿主机检查（待办 28；docs/运维手册.md 第 6 节）：每分钟由同名的 .timer 触发一次，不经 worker 检查 worker 容器在不在运行、
+# 心跳（core.worker_heartbeat）有没有停，异常发运维群的钉钉机器人。实例名是环境：forcome-host-check@production。
+#
+# 模板，不由部署脚本安装（本期不在服务器上装系统级的东西）。启用时由运维以 root 执行（路径与用户按服务器的实际情况改）：
+#   cp deploy/host/forcome-host-check@.service deploy/host/forcome-host-check@.timer /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now forcome-host-check@production.timer
+#   systemctl list-timers 'forcome-host-check@*'          # 下一次执行的时刻
+#   journalctl -u forcome-host-check@production -n 20      # 每次检查的输出
+[Unit]
+Description=Forcome Support 宿主机检查（%i：worker 存活与心跳）
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# 与生产运行器同一个系统用户：它的 rootless Docker 里才看得到生产的容器（docs/部署说明.md 第 17 节）
+User=gh-production
+WorkingDirectory=/opt/forcome/support
+Environment=FORCOME_ENV_FILE=/etc/forcome/%i.env
+# 维护标记与部署工作流共用（部署、回放、恢复期间不告警）；检查状态（去重、再提醒）放在同一个目录
+Environment=FORCOME_MAINTENANCE_FILE=/var/lib/forcome/%i/maintenance.json
+Environment=FORCOME_HOST_CHECK_STATE=/var/lib/forcome/%i/host-check.json
+# rootless Docker 的套接字（uid 换成 gh-production 的）
+Environment=DOCKER_HOST=unix:///run/user/1001/docker.sock
+ExecStart=/usr/bin/node deploy/deploy.mjs %i host-check
+# 一次检查最多 50 秒（每分钟一次，不叠在一起）
+TimeoutStartSec=50

@@ -1,5 +1,6 @@
 // 部署环境（ADR 0013 修订）：每个环境一个固定的 Compose 项目名，部署脚本只操作这里列出的项目。
-// 生产环境随 28 号待办加入（打标签 + 人工批准、迁移前自动备份；不灌示例数据、不开开发登录）。
+// 生产环境（待办 28）：打标签 + 人工批准后由生产运行器执行（.github/workflows/deploy-production.yml）；迁移前自动备份；
+// 不灌示例数据、不开开发登录、不跑 Playwright 冒烟（冒烟要开发登录），只核对 HTTPS 与健康检查。
 
 /**
  * @typedef {object} DeployEnvironment
@@ -9,6 +10,7 @@
  * @property {'staging' | 'production'} appEnv 环境文件里 APP_ENV 必须等于它
  * @property {boolean} seed 部署时灌示例数据夹具（只用于非生产环境）
  * @property {boolean} smoke 部署后跑 Playwright 冒烟（apps/web/e2e 全部用例，需要开发登录）
+ * @property {boolean} backupBeforeMigrate 执行迁移前先做一次完整备份（生产，ADR 0013「生产迁移前自动备份」）
  */
 
 /** @type {Readonly<Record<string, DeployEnvironment>>} */
@@ -20,5 +22,15 @@ export const ENVIRONMENTS = Object.freeze({
     appEnv: 'staging',
     seed: true,
     smoke: true,
+    backupBeforeMigrate: false,
+  }),
+  production: Object.freeze({
+    name: 'production',
+    title: '生产环境',
+    project: 'forcome-production',
+    appEnv: 'production',
+    seed: false,
+    smoke: false,
+    backupBeforeMigrate: true,
   }),
 });

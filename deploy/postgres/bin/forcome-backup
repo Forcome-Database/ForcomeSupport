@@ -1,0 +1,214 @@
+#!/bin/bash
+# 备份（待办 28，ADR 0013 修订「备份」，docs/运维手册.md 第 2 节）。在备份服务（compose 的 backup）里以 root 运行：
+#   forcome-backup run <daily|manual|pre_migrate|after_restore>
+#       一次完整的备份：WAL-G 物理基础备份 → pg_dump 逻辑备份经 restic 存进备份目录 → 各卷（/backup-src/*，现在是 caddy 的根证书）
+#       经 restic 存进备份目录；daily 另执行保留策略。开始与结束写进 core.backup_run（worker 自检据此告警）。同一时间只跑一个。
+#   forcome-backup recent <小时>      最近这么多小时内有成功的备份时退出码 0（备份服务启动时据此决定要不要先补一次）
+#   forcome-backup list               列出基础备份与 restic 快照
+#   forcome-backup verify-retention   核对保留策略：在临时仓库里造 400 天的每日快照、按同一组参数执行 restic forget，
+#                                     核对留下的正是「近 30 天每天 1 份 + 近 12 个月每月 1 份」；再报告真实仓库的情况
+# 配置都来自环境变量（deploy/compose.yml）：PGHOST 等连接、WALG_*、RESTIC_REPOSITORY / RESTIC_PASSWORD、
+# BACKUP_KEEP_DAILY（30）、BACKUP_KEEP_MONTHLY（12）、WALG_RETAIN_FULL（7）。
+set -Eeuo pipefail
+
+PGDATA="${PGDATA:-/var/lib/postgresql/18/docker}"
+KEEP_DAILY="${BACKUP_KEEP_DAILY:-30}"
+KEEP_MONTHLY="${BACKUP_KEEP_MONTHLY:-12}"
+RETAIN_FULL="${WALG_RETAIN_FULL:-7}"
+# 要备份的卷都挂在这里（每个子目录一个卷）
+SOURCES=/backup-src
+LOCK=/backup/.forcome-backup.lock
+# restic 快照的主机名固定（容器名每次不同），保留策略按「主机 + 路径」分组
+RESTIC_HOST=forcome
+export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-/tmp/restic-cache}"
+
+log() { printf '%s %s\n' "$(date '+%F %T %Z')" "$*"; }
+die() {
+  log "错误：$*" >&2
+  exit 1
+}
+# 读写本库：变量经 -v 传入、语句从标准输入读（psql 只在标准输入里替换 :'变量'）
+sql() { psql -X -q -At -v ON_ERROR_STOP=1 "$@"; }
+# WAL-G 读数据目录、写备份目录都以 postgres 身份（与数据库容器里的 archive_command 一致）
+as_postgres() { gosu postgres "$@"; }
+
+STEP_OUTPUT=$(mktemp)
+FAILED_STEP=''
+# step <名字> <命令…>：执行并照常打出输出；失败时记下是哪一步与最后一行输出（写进 core.backup_run.detail）
+step() {
+  local name=$1
+  shift
+  log "▶ $name"
+  if ! "$@" >"$STEP_OUTPUT" 2>&1; then
+    cat "$STEP_OUTPUT"
+    FAILED_STEP="$name：$(grep -v '^[[:space:]]*$' "$STEP_OUTPUT" | tail -n 1)"
+    return 1
+  fi
+  cat "$STEP_OUTPUT"
+}
+
+# 第一次部署的迁移前备份时还没有 core.backup_run（迁移建它）：不记，返回空
+record_start() {
+  sql -v kind="$1" 2>/dev/null <<'SQL' || true
+INSERT INTO core.backup_run (kind, started_at)
+SELECT :'kind', now() WHERE to_regclass('core.backup_run') IS NOT NULL
+RETURNING id;
+SQL
+}
+
+record_finish() {
+  local id=$1 ok=$2 detail=$3
+  [ -n "$id" ] || return 0
+  sql -v id="$id" -v ok="$ok" -v detail="$detail" <<'SQL' || log "记录备份结果失败（备份本身见上）"
+UPDATE core.backup_run SET finished_at = now(), succeeded = :'ok'::boolean, detail = :'detail'
+ WHERE id = :'id'::uuid;
+SQL
+}
+
+ensure_restic_repo() {
+  if ! restic cat config >/dev/null 2>&1; then
+    log "restic 仓库 $RESTIC_REPOSITORY 还不存在，新建（用 RESTIC_PASSWORD 加密）"
+    restic init
+  fi
+}
+
+# 保留策略：restic 按天、按月保留；WAL-G 至少保留 RETAIN_FULL 份基础备份与这些天内的全部基础备份（及其后的 WAL）
+restic_policy=(--host "$RESTIC_HOST" --keep-daily "$KEEP_DAILY" --keep-monthly "$KEEP_MONTHLY")
+
+apply_retention() {
+  restic forget "${restic_policy[@]}" --prune
+  as_postgres wal-g delete retain FULL "$RETAIN_FULL" \
+    --after "$(date -u -d "-$RETAIN_FULL days" +%Y-%m-%dT%H:%M:%SZ)" --confirm
+}
+
+# pg_dump 的输出直接交给 restic（--stdin-from-command：pg_dump 失败时不留下残缺的快照）
+dump_to_restic() {
+  restic backup --host "$RESTIC_HOST" --tag pg_dump --tag "$1" \
+    --stdin-filename "${PGDATABASE:-forcome}.dump" --stdin-from-command -- \
+    pg_dump --format=custom --no-password
+}
+
+saved_snapshot() { sed -n 's/^snapshot \([0-9a-f]*\) saved$/\1/p' "$STEP_OUTPUT" | tail -n 1; }
+
+run_backup() {
+  local kind=$1
+  case "$kind" in daily | manual | pre_migrate | after_restore) ;; *) die "不认识的备份种类：$kind" ;; esac
+  exec 9>"$LOCK"
+  if ! flock -n 9; then
+    log "另一个备份正在进行，等它结束"
+    flock 9
+  fi
+  local id
+  id=$(record_start "$kind")
+  local started
+  started=$(date +%s)
+  trap 'record_finish "$id" false "${FAILED_STEP:-$BASH_COMMAND}"; log "备份失败：${FAILED_STEP:-$BASH_COMMAND}"' ERR
+
+  step "准备 restic 仓库" ensure_restic_repo
+  step "物理基础备份（WAL-G backup-push）" as_postgres wal-g backup-push "$PGDATA"
+  local base
+  base=$(as_postgres wal-g backup-list --json 2>/dev/null | jq -r 'last.backup_name')
+  step "逻辑备份（pg_dump → restic）" dump_to_restic "$kind"
+  local summary
+  summary="基础备份 $base；pg_dump 快照 $(saved_snapshot)"
+  local dir
+  for dir in "$SOURCES"/*/; do
+    [ -d "$dir" ] || continue
+    step "卷 $(basename "$dir")（restic）" restic backup --host "$RESTIC_HOST" --tag volume --tag "$kind" "$dir"
+    summary="$summary；卷 $(basename "$dir") 快照 $(saved_snapshot)"
+  done
+  if [ "$kind" = daily ]; then
+    step "保留策略（restic 近 $KEEP_DAILY 天每天 1 份、近 $KEEP_MONTHLY 个月每月 1 份；WAL-G 至少 $RETAIN_FULL 份）" apply_retention
+  fi
+  trap - ERR
+  summary="$summary；用时 $(($(date +%s) - started)) 秒"
+  record_finish "$id" true "$summary"
+  log "备份完成（$kind）：$summary"
+}
+
+recent_backup() {
+  local hours=$1
+  local found
+  found=$(sql -v hours="$hours" 2>/dev/null <<'SQL' || true
+SELECT count(*) FROM core.backup_run
+ WHERE succeeded AND finished_at > now() - make_interval(hours => :'hours'::int);
+SQL
+  )
+  [ "${found:-0}" -gt 0 ]
+}
+
+list_backups() {
+  echo "== 物理基础备份（WAL-G，$WALG_FILE_PREFIX）=="
+  as_postgres wal-g backup-list --detail
+  echo
+  echo "== restic 快照（$RESTIC_REPOSITORY）=="
+  restic snapshots --host "$RESTIC_HOST"
+}
+
+# 第 m 个月以前的那个月里，按「每天一份、最后一份在 today」会留下的那一天（m = 0 是本月，即 today）
+month_keep_day() {
+  local today=$1 m=$2
+  if [ "$m" -eq 0 ]; then
+    echo "$today"
+  else
+    date -d "$(date -d "$today" +%Y-%m-01) -$((m - 1)) month -1 day" +%F
+  fi
+}
+
+verify_retention() {
+  local work
+  work=$(mktemp -d)
+  local today
+  today=$(date +%F)
+  log "模拟：临时仓库里造 400 天的每日快照（到 $today），按 restic forget ${restic_policy[*]} 执行保留策略"
+  # 模拟用的临时仓库（不碰真实仓库）
+  sim() { RESTIC_REPOSITORY="$work/repo" RESTIC_PASSWORD=verify-retention restic "$@"; }
+  sim init --quiet
+  echo "forcome" >"$work/data"
+  local i
+  for i in $(seq 399 -1 0); do
+    sim backup --quiet --host "$RESTIC_HOST" --time "$(date -d "$today -$i day" +%F) 02:30:00" "$work/data"
+  done
+  sim forget --quiet "${restic_policy[@]}"
+  sim snapshots --json | jq -r '.[].time[0:10]' | sort -u >"$work/kept"
+  {
+    local i
+    for i in $(seq 0 $((KEEP_DAILY - 1))); do date -d "$today -$i day" +%F; done
+    for i in $(seq 0 $((KEEP_MONTHLY - 1))); do month_keep_day "$today" "$i"; done
+  } | sort -u >"$work/expected"
+  if ! diff -u "$work/expected" "$work/kept"; then
+    die "保留策略与预期不一致（上面是 预期 / 实际 的差异）"
+  fi
+  log "模拟通过：400 份每日快照留下 $(wc -l <"$work/kept") 份——近 $KEEP_DAILY 天每天 1 份、近 $KEEP_MONTHLY 个月每月 1 份（两者重叠的只算一份）；最早 $(head -n 1 "$work/kept")"
+  rm -rf "$work"
+
+  echo
+  log "真实仓库：$RESTIC_REPOSITORY"
+  local oldest_allowed
+  oldest_allowed=$(date -d "$(date +%Y-%m-01) -$((KEEP_MONTHLY - 1)) month" +%F)
+  restic snapshots --host "$RESTIC_HOST" --json |
+    jq -r --arg oldest "$oldest_allowed" --argjson max "$((KEEP_DAILY + KEEP_MONTHLY))" '
+      group_by(.paths) | .[] |
+      { paths: (.[0].paths | join(",")), count: length, oldest: (map(.time[0:10]) | min), newest: (map(.time[0:10]) | max) } |
+      "\(.paths)：\(.count) 份（\(.oldest) 至 \(.newest)）" +
+        (if .count > $max + 3 or .oldest < $oldest then "  ✗ 超出保留策略" else "  ✓" end)' |
+    tee "$STEP_OUTPUT"
+  log "物理基础备份（WAL-G）："
+  as_postgres wal-g backup-list --json 2>/dev/null |
+    jq -r --argjson keep "$RETAIN_FULL" '"共 \(length) 份（至少保留 \($keep) 份与近 \($keep) 天的全部），最早 \(.[0].backup_name // "—")"'
+  if grep -q '✗' "$STEP_OUTPUT"; then
+    die "真实仓库有超出保留策略的快照（每日备份的保留策略没有生效？看 backup 服务的日志）"
+  fi
+  log "真实仓库符合保留策略"
+}
+
+case "${1:-}" in
+  run) run_backup "${2:?用法：forcome-backup run <daily|manual|pre_migrate|after_restore>}" ;;
+  recent) recent_backup "${2:?用法：forcome-backup recent <小时>}" ;;
+  list) list_backups ;;
+  verify-retention) verify_retention ;;
+  *)
+    echo "用法：forcome-backup run <daily|manual|pre_migrate|after_restore> | recent <小时> | list | verify-retention" >&2
+    exit 2
+    ;;
+esac

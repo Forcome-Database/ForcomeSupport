@@ -1,0 +1,21 @@
+#!/bin/bash
+# 备份服务（compose 的 backup）的入口（待办 28）：等数据库可连；最近 24 小时没有成功的备份时先补一次（第一次部署、停机后），
+# 之后由 supercronic 按 BACKUP_CRON（默认每天 02:30，容器时区 Asia/Shanghai）执行 forcome-backup run daily。
+# 备份失败不让服务退出：失败写进 core.backup_run，worker 自检告警；下一个时点照常再跑。
+set -Eeuo pipefail
+
+until pg_isready -q; do
+  echo "等数据库 ${PGHOST:-}:${PGPORT:-5432} 可连…"
+  sleep 2
+done
+
+if forcome-backup recent 24; then
+  echo "最近 24 小时内有成功的备份，等下一个时点（${BACKUP_CRON:-30 2 * * *}）"
+else
+  echo "最近 24 小时内没有成功的备份，先补一次"
+  forcome-backup run daily || echo "这次备份失败（见上），下一个时点再跑"
+fi
+
+crontab=$(mktemp)
+echo "${BACKUP_CRON:-30 2 * * *} forcome-backup run daily" >"$crontab"
+exec supercronic -passthrough-logs "$crontab"

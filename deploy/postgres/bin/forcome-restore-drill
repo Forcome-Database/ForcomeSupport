@@ -1,0 +1,63 @@
+#!/bin/bash
+# 恢复演练（待办 28，ADR 0013 修订：每季度一次，必须包含「从基础备份恢复到其后指定时点」；docs/运维手册.md 第 4 节）。
+# 在一次性容器（compose 的 restore-drill，独立的临时卷）里做，不碰正在运行的数据库：
+#   forcome-restore-drill [--target-time <带时区的时刻>] [--expect-marker <值>]
+#   1. 取回「结束时刻不晚于目标时点」的最近一份基础备份（forcome-restore prepare）；
+#   2. 以不归档、只听本地套接字的方式起一个临时 PostgreSQL，重放归档的 WAL 到目标时点、promote；
+#   3. 核对：几张表的行数与最新时刻；给了 --expect-marker 时核对演练标记表 public.forcome_restore_drill 的内容
+#      （部署脚本的 restore-drill 在目标时点前后各写一行，恢复出来应当只有前一行）；
+#   4. 停掉临时库，输出各段用时（RESTORE_* 行，部署脚本据此写报告）。临时卷由部署脚本删掉。
+set -Eeuo pipefail
+
+DATA=/var/lib/postgresql/18/drill
+LOGFILE=/var/lib/postgresql/18/drill.log
+target=''
+expect=''
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --target-time) target=${2:?}; shift 2 ;;
+    --expect-marker) expect=${2:?}; shift 2 ;;
+    *) echo "不认识的参数：$1" >&2; exit 2 ;;
+  esac
+done
+
+log() { printf '%s %s\n' "$(date '+%F %T %Z')" "$*"; }
+q() { psql -X -At -v ON_ERROR_STOP=1 -h /var/run/postgresql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "$1"; }
+
+started=$(date +%s)
+rm -rf "$DATA" "$LOGFILE"
+forcome-restore prepare --data "$DATA" ${target:+--target-time "$target"}
+fetched=$(date +%s)
+
+log "起临时库（不归档、只听本地套接字），重放 WAL 到 ${target:-最新}"
+pg_ctl -D "$DATA" -l "$LOGFILE" -w -t 14400 \
+  -o "-c archive_mode=off -c listen_addresses='' -c unix_socket_directories=/var/run/postgresql" start
+until [ "$(psql -X -At -h /var/run/postgresql -U "$POSTGRES_USER" -d postgres -c 'SELECT pg_is_in_recovery()')" = f ]; do
+  sleep 1
+done
+promoted=$(date +%s)
+grep -E 'recovery stopping|redo done|selected new timeline|archive recovery complete' "$LOGFILE" || true
+
+log "核对恢复出来的数据"
+q "SELECT 'audit_log ' || count(*) || ' 行，最新 ' || coalesce(max(occurred_at)::text, '—') FROM core.audit_log"
+q "SELECT 'ticket ' || count(*) || ' 张' FROM ticket.ticket"
+q "SELECT 'aftersales ' || count(*) || ' 张' FROM aftersales.aftersales"
+q "SELECT 'worker 心跳 ' || coalesce(max(beat_at)::text, '—') FROM core.worker_heartbeat"
+result=ok
+if [ -n "$expect" ]; then
+  marker=$(q "SELECT coalesce(string_agg(label, ',' ORDER BY at), '') FROM public.forcome_restore_drill")
+  if [ "$marker" = "$expect" ]; then
+    log "演练标记：$marker（与预期一致：目标时点之前写的在，之后写的不在）"
+  else
+    log "演练标记：「$marker」，预期「$expect」"
+    result=marker_mismatch
+  fi
+fi
+pg_ctl -D "$DATA" -m fast -w stop >/dev/null
+finished=$(date +%s)
+
+echo "RESTORE_FETCH_SECONDS=$((fetched - started))"
+echo "RESTORE_REPLAY_SECONDS=$((promoted - fetched))"
+echo "RESTORE_TOTAL_SECONDS=$((finished - started))"
+echo "RESTORE_RESULT=$result"
+[ "$result" = ok ]

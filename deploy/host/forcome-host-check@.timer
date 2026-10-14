@@ -1,0 +1,11 @@
+# 宿主机检查的定时器（待办 28）：每分钟触发一次 forcome-host-check@<环境>.service。启用见 .service 文件开头的说明。
+[Unit]
+Description=Forcome Support 宿主机检查（%i）每分钟一次
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=5s
+Persistent=false
+
+[Install]
+WantedBy=timers.target

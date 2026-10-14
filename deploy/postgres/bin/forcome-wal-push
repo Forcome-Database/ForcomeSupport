@@ -1,0 +1,5 @@
+#!/bin/sh
+# PostgreSQL 的 archive_command（deploy/postgres/Dockerfile）：把一个写满（或满 archive_timeout）的 WAL 段经 WAL-G 推到备份目录。
+# WAL-G 的配置（WALG_FILE_PREFIX、WALG_LIBSODIUM_KEY 等）来自容器的环境变量（deploy/compose.yml）。
+# 失败时 PostgreSQL 保留这个段、过一会儿再试；一直失败时 pg_wal 会越积越多，worker 自检的「WAL 连续归档」会告警。
+exec wal-g wal-push "$1"

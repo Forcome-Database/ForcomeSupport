@@ -14,6 +14,11 @@ const HOSTNAME =
 // 连接串 postgres://用户:口令@postgres:5432/库 直接拼接，口令只用 URL 里不需要转义的字符
 const URL_SAFE_PASSWORD = /^[A-Za-z0-9._~-]{16,}$/;
 const IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
+/** WAL-G 的 libsodium 密钥：32 字节的十六进制（openssl rand -hex 32） */
+const HEX_32_BYTES = /^[0-9a-f]{64}$/i;
+
+/** 生成环境文件时换成随机值的几项（模板里都是占位值 change-me） */
+export const GENERATED_SECRETS = ['POSTGRES_PASSWORD', 'WALG_LIBSODIUM_KEY', 'RESTIC_PASSWORD'];
 
 function port(vars, name, problems) {
   const value = Number(vars[name]);
@@ -62,6 +67,35 @@ export function readDeployEnv(text, environment) {
     );
   }
 
+  // 备份（待办 28）：两把密钥都必填（Compose 也要求），随备份单独离线保管
+  const walgKey = vars.WALG_LIBSODIUM_KEY ?? '';
+  if (walgKey === '' || walgKey === PASSWORD_PLACEHOLDER) {
+    problems.push(
+      'WALG_LIBSODIUM_KEY：必填，用 openssl rand -hex 32 生成（WAL-G 加密基础备份与 WAL）',
+    );
+  } else if (!HEX_32_BYTES.test(walgKey)) {
+    problems.push('WALG_LIBSODIUM_KEY：必须是 64 位十六进制（openssl rand -hex 32 的输出）');
+  }
+  const resticPassword = vars.RESTIC_PASSWORD ?? '';
+  if (resticPassword === '' || resticPassword === PASSWORD_PLACEHOLDER) {
+    problems.push('RESTIC_PASSWORD：必填，用 openssl rand -hex 24 生成（restic 加密逻辑备份与卷）');
+  } else if (resticPassword.length < 16) {
+    problems.push('RESTIC_PASSWORD：至少 16 位');
+  }
+  const backupDir = vars.BACKUP_DIR || null;
+  if (environment.appEnv === 'production') {
+    if (!backupDir) {
+      problems.push(
+        'BACKUP_DIR：生产环境必填，写 NAS 挂载到服务器上的目录（如 /mnt/nas/forcome-support）',
+      );
+    } else if (!backupDir.startsWith('/')) {
+      problems.push('BACKUP_DIR：写服务器上的绝对路径（NAS 的挂载目录）');
+    }
+    if (vars.DEV_LOGIN_ENABLED === 'true') {
+      problems.push('DEV_LOGIN_ENABLED：生产环境不能开启开发登录');
+    }
+  }
+
   return {
     vars,
     siteHost: vars.SITE_HOST,
@@ -72,19 +106,39 @@ export function readDeployEnv(text, environment) {
     siteUrl: `https://${vars.SITE_HOST}${httpsPort === 443 ? '' : `:${httpsPort}`}/`,
     /** 部署脚本在服务器本机核对 HTTPS 时连接的地址：监听全部网卡时从回环地址连 */
     connectHost: httpsBind === '0.0.0.0' ? '127.0.0.1' : httpsBind,
+    /** 备份目录（NAS 的挂载目录）；没设为 null，用 Compose 的命名卷 backup */
+    backupDir,
     problems,
   };
 }
 
 /**
- * 第一次部署时从模板生成环境文件：只把口令那一行换成随机口令，其余原样保留。
- * @param {string} exampleText deploy/.env.example 的内容
- * @param {string} password 随机口令（十六进制）
+ * 环境文件的权限（ADR 0013：.env 权限 600）：生产环境在 Linux 上组或其他人能读写时拒绝部署；Windows 不看权限位
+ * @param {number} mode fs.statSync 的 mode
+ * @param {NodeJS.Platform} platform
+ * @param {import('./environments.mjs').DeployEnvironment} environment
+ * @returns {string | null}
  */
-export function createEnvFile(exampleText, password) {
-  const line = /^POSTGRES_PASSWORD=.*$/m;
-  if (!line.test(exampleText)) {
-    throw new Error('模板里没有 POSTGRES_PASSWORD 这一行，无法生成环境文件');
+export function envFilePermissionProblem(mode, platform, environment) {
+  if (platform === 'win32' || environment.appEnv !== 'production') return null;
+  return (mode & 0o077) !== 0
+    ? `环境文件的权限是 ${(mode & 0o777).toString(8)}，生产环境必须是 600（chmod 600 <环境文件>）`
+    : null;
+}
+
+/**
+ * 第一次部署时从模板生成环境文件：只把数据库口令与两把备份密钥换成随机值，其余原样保留。
+ * @param {string} exampleText deploy/.env.example 的内容
+ * @param {Readonly<Record<string, string>>} secrets GENERATED_SECRETS 各项的随机值（十六进制）
+ */
+export function createEnvFile(exampleText, secrets) {
+  let text = exampleText;
+  for (const name of GENERATED_SECRETS) {
+    const line = new RegExp(`^${name}=.*$`, 'm');
+    if (!line.test(text)) {
+      throw new Error(`模板里没有 ${name} 这一行，无法生成环境文件`);
+    }
+    text = text.replace(line, () => `${name}=${secrets[name]}`);
   }
-  return exampleText.replace(line, `POSTGRES_PASSWORD=${password}`);
+  return text;
 }

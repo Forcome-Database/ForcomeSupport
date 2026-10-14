@@ -1,0 +1,119 @@
+#!/bin/bash
+# 恢复（待办 28，ADR 0013 修订「备份」，docs/运维手册.md 第 3 节）：从 WAL-G 的物理基础备份恢复，再重放归档的 WAL 到指定时点。
+#   forcome-restore list
+#       列出基础备份（名字、开始与结束时刻）
+#   forcome-restore prepare [--target-time <带时区的时刻>] [--backup <基础备份名>] [--data <数据目录>] [--move-aside]
+#       在数据库停着时，把基础备份取回数据目录，写好 recovery.signal 与恢复参数（restore_command 经 WAL-G 取 WAL、
+#       recovery_target_time、到点后 promote）。没给 --backup 时取「结束时刻不晚于目标时点」的最近一份；没给 --target-time 时
+#       重放全部已归档的 WAL（恢复到最新）。数据目录里已有数据时拒绝，--move-aside 先把它整个改名留在卷里（核对无误后再删）。
+#       随后起数据库即开始恢复，到点后自动 promote 成新的时间线。
+#   forcome-restore finish
+#       在恢复好（已 promote）的数据库容器里执行：清掉恢复参数（ALTER SYSTEM RESET），之后照常运行。
+# 以 postgres 身份运行（compose 的 restore、restore-drill 服务；finish 在 postgres 服务里）。
+set -Eeuo pipefail
+
+PGDATA="${PGDATA:-/var/lib/postgresql/18/docker}"
+
+log() { printf '%s %s\n' "$(date '+%F %T %Z')" "$*"; }
+die() {
+  log "错误：$*" >&2
+  exit 1
+}
+
+# 基础备份：每行「名字 结束时刻（秒） 结束时刻（原文）」，按结束时刻升序
+backups() {
+  wal-g backup-list --json --detail |
+    jq -r '.[] | "\(.backup_name) \(.finish_time)"' |
+    while read -r name finish; do
+      printf '%s %s %s\n' "$name" "$(date -d "$finish" +%s)" "$finish"
+    done | sort -k2,2n
+}
+
+list() {
+  echo "基础备份（WAL-G，$WALG_FILE_PREFIX），按结束时刻："
+  backups | while read -r name _ finish; do
+    printf '  %s  结束于 %s\n' "$name" "$(date -d "$finish" '+%F %T %Z')"
+  done
+}
+
+prepare() {
+  local target='' backup='' move_aside=false
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --target-time) target=${2:?--target-time 要给时刻}; shift 2 ;;
+      --backup) backup=${2:?--backup 要给基础备份名}; shift 2 ;;
+      --data) PGDATA=${2:?--data 要给目录}; shift 2 ;;
+      --move-aside) move_aside=true; shift ;;
+      *) die "不认识的参数：$1" ;;
+    esac
+  done
+
+  local target_epoch=''
+  if [ -n "$target" ]; then
+    target_epoch=$(date -d "$target" +%s) || die "目标时点写不对：$target（写成带时区的时刻，如 2026-10-14T10:20:00+08:00）"
+    [ "$target_epoch" -le "$(date +%s)" ] || die "目标时点 $target 晚于现在"
+  fi
+
+  local chosen
+  if [ -n "$backup" ]; then
+    chosen=$(backups | awk -v name="$backup" '$1 == name')
+    [ -n "$chosen" ] || die "没有这份基础备份：$backup（forcome-restore list 看有哪些）"
+  elif [ -n "$target_epoch" ]; then
+    chosen=$(backups | awk -v t="$target_epoch" '$2 <= t' | tail -n 1)
+    [ -n "$chosen" ] || die "目标时点 $target 早于最早的基础备份结束的时刻，无法恢复到那时（forcome-restore list）"
+  else
+    chosen=$(backups | tail -n 1)
+    [ -n "$chosen" ] || die "还没有基础备份"
+  fi
+  local name finish_epoch
+  read -r name finish_epoch _ <<<"$chosen"
+  if [ -n "$target_epoch" ] && [ "$finish_epoch" -gt "$target_epoch" ]; then
+    die "基础备份 $name 结束于目标时点之后，不能用它恢复到 $target"
+  fi
+
+  if [ -e "$PGDATA/PG_VERSION" ]; then
+    $move_aside || die "数据目录 $PGDATA 里已有数据（要先改名留着，加 --move-aside）"
+    local aside
+    aside="$PGDATA.before-restore-$(date +%Y%m%d%H%M%S)"
+    mv "$PGDATA" "$aside"
+    log "原数据目录已改名为 $aside（核对恢复结果无误后再删，见运维手册）"
+  fi
+  rm -rf "$PGDATA"
+  mkdir -p "$PGDATA"
+  chmod 700 "$PGDATA"
+
+  log "取回基础备份 $name（结束于 $(date -d "@$finish_epoch" '+%F %T %Z')）"
+  wal-g backup-fetch "$PGDATA" "$name"
+  touch "$PGDATA/recovery.signal"
+  {
+    echo "# forcome-restore $(date '+%F %T %Z')：从基础备份 $name 恢复到 ${target:-最新}；恢复完成后由 forcome-restore finish 清掉"
+    echo "restore_command = '/usr/local/bin/wal-g wal-fetch \"%f\" \"%p\"'"
+    echo "recovery_target_action = 'promote'"
+    if [ -n "$target" ]; then echo "recovery_target_time = '$target'"; fi
+  } >>"$PGDATA/postgresql.auto.conf"
+  log "已准备好：起数据库后重放 WAL 到 ${target:-最新}，到点自动 promote"
+  echo "RESTORE_BASE_BACKUP=$name"
+  echo "RESTORE_BASE_FINISHED=$(date -u -d "@$finish_epoch" +%Y-%m-%dT%H:%M:%SZ)"
+}
+
+finish() {
+  [ "$(psql -X -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c 'SELECT pg_is_in_recovery()')" = f ] ||
+    die "数据库还在恢复中（pg_is_in_recovery），等 promote 之后再执行"
+  psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<'SQL'
+ALTER SYSTEM RESET restore_command;
+ALTER SYSTEM RESET recovery_target_time;
+ALTER SYSTEM RESET recovery_target_action;
+SELECT pg_reload_conf();
+SQL
+  log "已清掉恢复参数；数据库在新的时间线上照常运行"
+}
+
+case "${1:-}" in
+  list) list ;;
+  prepare) shift; prepare "$@" ;;
+  finish) finish ;;
+  *)
+    echo "用法：forcome-restore list | prepare [--target-time <时刻>] [--backup <名>] [--data <目录>] [--move-aside] | finish" >&2
+    exit 2
+    ;;
+esac
