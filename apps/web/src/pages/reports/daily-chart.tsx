@@ -1,6 +1,4 @@
 import type { ReportChannelGroup, ReportDay } from '@forcome/contracts';
-import { ChevronRight, Lock } from 'lucide-react';
-import type { ReactNode } from 'react';
 import {
   Bar,
   BarChart,
@@ -13,11 +11,10 @@ import {
   YAxis,
   type BarShapeProps,
 } from 'recharts';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { ChartHead, ChartTip, DetailLink, LockTag } from './chart-head';
 import { A11Y, DAILY } from './p17-copy';
 import { dayWords } from './p17-words';
 
@@ -105,20 +102,12 @@ function DailyTip({
   const row = payload?.[0]?.payload as Row | undefined;
   if (!active || !row) return null;
   return (
-    <div
-      className="flex flex-col gap-px rounded-md bg-foreground px-2.5 py-1.75 text-12 leading-normal whitespace-nowrap text-primary-foreground shadow-md"
-      data-testid="daily-tip"
-    >
-      <div className="font-semibold">{DAILY.tipTitle(row.label, row.total)}</div>
-      <div className="text-primary-foreground/82">
-        {DAILY.tipSplit(row.amazon, row.shopify_email)}
-      </div>
-      {drill && (
-        <div className="mt-0.75 border-t border-primary-foreground/18 pt-1 font-semibold text-primary-on-dark">
-          {DAILY.tipDrill(drill.condition(row.date))}
-        </div>
-      )}
-    </div>
+    <ChartTip
+      testId="daily-tip"
+      title={DAILY.tipTitle(row.label, row.total)}
+      lines={[DAILY.tipSplit(row.amazon, row.shopify_email)]}
+      drill={drill ? DAILY.tipDrill(drill.condition(row.date)) : null}
+    />
   );
 }
 
@@ -160,40 +149,6 @@ function Legend({ drill }: { drill: DailyDrill | null }) {
   );
 }
 
-/** 卡头：标题与副标题，右侧「查看明细 ›」或「没有工单页权限 · 不可下钻」 */
-function ChartHead({
-  sub,
-  drill,
-  tag,
-}: {
-  sub: string;
-  drill: DailyDrill | null;
-  tag?: ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex min-w-0 flex-col gap-px">
-        <div className="flex items-center gap-2">
-          <div className="text-13 font-bold text-foreground">{DAILY.title}</div>
-          {tag}
-        </div>
-        <div className="text-12 text-muted-foreground">{sub}</div>
-      </div>
-      {drill ? (
-        <Button variant="text-link" size="text" className="gap-1" onClick={drill.detail}>
-          {DAILY.detail}
-          <ChevronRight className="size-3.5" />
-        </Button>
-      ) : (
-        <Badge tone="muted" data-testid="daily-no-drill">
-          <Lock className="size-3" strokeWidth={2} />
-          {DAILY.noDrill}
-        </Badge>
-      )}
-    </div>
-  );
-}
-
 export function DailyChart({
   days,
   sub,
@@ -218,7 +173,17 @@ export function DailyChart({
   const labeled = rows.length <= MAX_LABELED_BARS;
   return (
     <Card className="min-w-0 gap-3 px-4.5 py-3.5" data-testid="daily-chart">
-      <ChartHead sub={sub} drill={drill} />
+      <ChartHead
+        title={DAILY.title}
+        sub={sub}
+        action={
+          drill ? (
+            <DetailLink label={DAILY.detail} onClick={drill.detail} />
+          ) : (
+            <LockTag testId="daily-no-drill">{DAILY.noDrill}</LockTag>
+          )
+        }
+      />
       <Legend drill={drill} />
       <div
         role="img"

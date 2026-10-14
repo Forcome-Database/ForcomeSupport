@@ -33,12 +33,14 @@ import {
   ticketDetailSchema,
   ticketListSchema,
   ticketReportSchema,
+  costReportSchema,
   unassignedMailListSchema,
   type AdminContacts,
   type AftersalesDetail,
   type AssignStoreResult,
   type AuditLog,
   type AuditLogFilter,
+  type CostReport,
   type AuditLogOptions,
   type AuditLogQuery,
   type CancelInput,
@@ -371,6 +373,16 @@ export const api = {
    */
   ticketReport: (query: ReportQuery, mode?: FetchMode): Promise<TicketReport> =>
     call(`/api/reports/tickets${queryString(query)}`, ticketReportSchema, modeInit(mode)),
+
+  /**
+   * P17「售后成本按责任类型」（本月、店铺范围与店铺筛选内，待办 25）：没有财务权限的角色不返回 cost；店铺筛选选了范围外的店铺抛 403
+   */
+  costReport: (query: Pick<ReportQuery, 'store'>, mode?: FetchMode): Promise<CostReport> =>
+    call(`/api/reports/cost${queryString(query)}`, costReportSchema, modeInit(mode)),
+
+  /** 导出 P17（K5）：按当前筛选与字段权限在服务端生成 Excel（有财务权限时含售后成本），导出记审计 */
+  exportReport: (query: ReportQuery): Promise<ExportedFile> =>
+    download(`/api/reports/export${queryString(query)}`, 'report.xlsx'),
 
   /** P05 工单详情（店铺范围外 403、没有 404） */
   ticketDetail: (number: string, mode?: FetchMode): Promise<TicketDetail> =>

@@ -1,12 +1,21 @@
 import { readFileSync } from 'node:fs';
-import { reportPeriodLabels, reportPeriods, ticketDrillOf } from '@forcome/contracts';
+import {
+  formatMoney,
+  reportPeriodLabels,
+  reportPeriods,
+  responsibilityLabels,
+  ticketDrillOf,
+  UNREGISTERED_RESPONSIBILITY,
+} from '@forcome/contracts';
 import { describe, expect, it } from 'vitest';
 import { pages } from '@/lib/pages';
 import { drillChipWords } from '@/pages/tickets/p04-words';
 import {
   COMPARE,
+  COST,
   DAILY,
   EMPTY,
+  EXPORT,
   FILTERS,
   KPI,
   NOTES,
@@ -24,6 +33,8 @@ import { firstResponseDelta, slaDelta, volumeDelta } from './p17-words';
 const read = (path: string) =>
   readFileSync(new URL(`../../../../../${path}`, import.meta.url), 'utf8');
 const P17 = read('design/spec/phase1/P17_Reports.dc.html');
+/** 完整版 P17（悬停浮层画在这里：成本卡的 drill_tip） */
+const REPORTS = read('design/Reports.dc.html');
 const STATES_ADMIN = read('design/StatesAdmin.dc.html');
 const PRD_C = read('design/spec/prd_c.md');
 
@@ -124,5 +135,44 @@ describe('原型没画的写法（PRD P17「第一阶段」v2.34）', () => {
     ]) {
       expect(PRD_C.includes(text), `PRD 里没有「${text}」`).toBe(true);
     }
+  });
+});
+
+describe('售后成本按责任类型与导出（待办 25，K19 补充小样⑥–⑧、K5，PRD P17「第一阶段」v2.35）', () => {
+  it('参照页：卡头标题、带锁的「本月 · 不随时间筛选」、副标题、查看明细、总额与旁注、各条的名称与金额；页头「导出」', () => {
+    expectText(P17, COST.title);
+    expectText(P17, COST.tag);
+    expectText(P17, COST.sub);
+    expectText(P17, COST.detail);
+    expectText(P17, formatMoney('188.79', 'USD'));
+    expectText(P17, COST.totalNote(12, true));
+    for (const name of Object.values(responsibilityLabels)) expectText(P17, name);
+    for (const amount of ['118.89', '38.40', '22.10', '9.40']) {
+      expectText(P17, formatMoney(amount, 'USD'));
+    }
+    expectText(P17, EXPORT.button);
+  });
+
+  it('悬停浮层（完整版 P17 的 drill_tip）', () => {
+    expectText(REPORTS, COST.tipTitle(responsibilityLabels.product_quality, '$118.89'));
+    expectText(REPORTS, COST.tipSource);
+    expectText(REPORTS, COST.tipDrill);
+  });
+
+  it('⑥ 未登记责任（不可点，悬停没有下钻）；⑦ 本月没有售后成本', () => {
+    expectText(STATES_ADMIN, UNREGISTERED_RESPONSIBILITY);
+    expectText(STATES_ADMIN, COST.tipTitle(UNREGISTERED_RESPONSIBILITY, '$36.50'));
+    expectText(STATES_ADMIN, COST.tipUnregistered(3));
+    expectText(STATES_ADMIN, COST.totalNote(15, true));
+    expectText(STATES_ADMIN, formatMoney('0', 'USD'));
+    expectText(STATES_ADMIN, COST.totalNote(0, false));
+    expectText(STATES_ADMIN, COST.empty);
+  });
+
+  it('⑧ 导出（K5）：生成中与完成浮层', () => {
+    expectText(STATES_ADMIN, EXPORT.busy);
+    expectText(STATES_ADMIN, EXPORT.done('报表_近7天_0905-0911.xlsx'));
+    expectText(STATES_ADMIN, EXPORT.doneDescription);
+    expect(PRD_C.includes('导出失败：原因」+「立即重试」')).toBe(true);
   });
 });

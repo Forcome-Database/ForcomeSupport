@@ -1,8 +1,9 @@
 /*
  * P17 报表（工单部分）的界面文案（逐字照原型；p17-copy.test.ts 直接读原型生成物核对）：第一期参照页
  * design/spec/phase1/P17_Reports.dc.html，状态板 design/StatesAdmin.dc.html 的 K19（含补充小样①–⑤：对比、没有可比值、未归属的
- * 未达标来信、第一阶段的 K4 与 K3）。原型没画的写法照 PRD P17「第一阶段」v2.34（协调者 2026-10-14 决定 Q1–Q7），拼句子在
- * p17-words.ts。界面上看得见的文字都在这里，组件里不写死。售后成本卡与「导出」随待办 25。
+ * 未达标来信、第一阶段的 K4 与 K3；⑥–⑧：未登记责任、本月没有售后成本、导出）。原型没画的写法照 PRD P17「第一阶段」v2.34、
+ * v2.35（协调者 2026-10-14 决定：待办 24 的 Q1–Q7、待办 25 的 Q1–Q5），拼句子在 p17-words.ts。界面上看得见的文字都在这里，
+ * 组件里不写死。
  */
 
 /** 页头（原型 p17_p1()：标题「报表」，说明「数据来源：…· 更新于 10:12」，其下两条注） */
@@ -69,4 +70,38 @@ export const A11Y = {
   kpiDrill: (label: string) => `${label}：查看明细`,
   legendDrill: (label: string) => `${label}：查看明细`,
   chart: '每日工单量柱状图',
+  costChart: '售后成本按责任类型条形图',
+  costDrill: (label: string) => `${label}：查看明细`,
+} as const;
+
+/**
+ * 售后成本按责任类型（原型 p17_p1_cost()、K19 补充小样⑥⑦，PRD P17「第一阶段」v2.35，待办 25）：本月、随店铺不随时间与站点；
+ * 卡头总额即售后成本；悬停与原型 Reports 的 drill_tip() 一致；责任类型为空的单列「未登记责任」、不可点（悬停没有下钻那一行）
+ */
+export const COST = {
+  title: '售后成本按责任类型',
+  tag: '本月 · 不随时间筛选',
+  sub: '产品成本 + 运费 + 额外赔偿 + 其他',
+  detail: '查看明细',
+  /** 卡头总额旁：「售后成本 · 12 单 · 来自登记台账，不含待确认 · 点条下钻」；没有可点的条时没有「· 点条下钻」 */
+  totalNote: (count: number, drillable: boolean) =>
+    `售后成本 · ${count} 单 · 来自登记台账，不含待确认${drillable ? ' · 点条下钻' : ''}`,
+  /** 本月没有时（补充小样⑦） */
+  empty: '本月还没有登记的售后成本',
+  /** 悬停：「产品质量问题 · $118.89」「本月登记台账，不含待确认」「点击查看明细 → P13 登记台账（已按责任筛选）」 */
+  tipTitle: (name: string, amount: string) => `${name} · ${amount}`,
+  tipSource: '本月登记台账，不含待确认',
+  tipDrill: '点击查看明细 → P13 登记台账（已按责任筛选）',
+  /** 未登记责任的悬停第二行（补充小样⑥）：「3 单 · 责任类型未登记」 */
+  tipUnregistered: (count: number) => `${count} 单 · 责任类型未登记`,
+} as const;
+
+/** 导出（K5、K19 补充小样⑧）：页头右侧「导出」，生成中「正在生成，约 3 秒」，完成浮层「已导出 报表_近7天_0905-0911.xlsx · 已记入审计日志」 */
+export const EXPORT = {
+  button: '导出',
+  busy: '正在生成，约 3 秒',
+  done: (fileName: string) => `已导出 ${fileName}`,
+  doneDescription: '已记入审计日志',
+  /** 失败浮层「导出失败：原因」+「立即重试」（G5，同 P13） */
+  failedAction: '导出',
 } as const;
