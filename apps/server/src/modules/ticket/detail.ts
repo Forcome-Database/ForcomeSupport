@@ -24,7 +24,7 @@ import { IDLE_LIMITS } from './time-limits';
  * P05 工单详情（PRD P05「第一阶段」、I18，待办 17；规格 ticket「查询接口」）：工单、消息（正文、首次回复、SLA、无需回复标记）、
  * 全程记录的事件行、状态流转、自动关闭预计与订单卡。一律按查看者的店铺范围读（ADR 0010）。
  * 时刻取业务时刻（ADR 0008「待办 17 落地」修订）：由来信或我方回复引起的状态变更（新建、新来信、重开、识别到回复）取那封邮件的时间，
- * 按时关闭取到期时刻（关闭前最近一封来信 + 7 / 14 天），标记与撤销取操作时刻。处理时刻在实时运行时与它们只差几秒，
+ * 按时关闭取关闭时存下的到期时刻（关闭时最近一封来信 + 7 / 14 天，待办 33：不在读取时重算），标记与撤销取操作时刻。处理时刻在实时运行时与它们只差几秒，
  * 但 Gmail 中断后补拉、示例回放把几天的邮件压在几秒内处理时对不上邮件时间，状态流转会全挤在处理的那一刻。
  */
 
@@ -49,18 +49,7 @@ function businessTimeOf(
     ? links.find((link) => link.channelMessageId === change.channelMessageId)
     : undefined;
   if (cause) return cause.receivedAt;
-  const limit = change.fromStatus ? IDLE_LIMITS[change.fromStatus] : undefined;
-  if (limit && limit.event === change.event) {
-    // 关闭前最近一封来信（不论来源）起算的到期时刻
-    const last = links
-      .filter((link) => link.direction === 'inbound' && link.receivedAt <= change.occurredAt)
-      .reduce<Date | null>(
-        (latest, link) => (!latest || link.receivedAt > latest ? link.receivedAt : latest),
-        null,
-      );
-    if (last) return new Date(last.getTime() + toMilliseconds({ days: limit.days }));
-  }
-  return change.occurredAt;
+  return change.dueAt ?? change.occurredAt;
 }
 
 /** 订单卡：工单关联订单的镜像；非美元金额按下单日的汇率折算（当天没有取此前最近一天，E-20） */

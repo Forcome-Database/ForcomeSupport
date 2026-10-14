@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import type { JobWithMetadata } from 'pg-boss';
 import {
   runJob,
@@ -45,9 +46,25 @@ export interface RunJobsOptions {
    * 回放的真正入口随 26 号待办，这里只是让测试能在回放模式下跑同一条流水线
    */
   readonly replay?: boolean;
+  /** 只跑这几个队列（按任务名），其余的留在队列里：例如只同步邮箱、先不归并（待办 33 的同步与归并滞后） */
+  readonly only?: readonly string[];
+  /**
+   * 这次最多跑几个任务，跑满就返回、其余留在队列里（常驻拉取照常每轮拉一次）：一个一个地推进 worker，在任意两个任务之间插入别的动作
+   * （例如每分钟的时限扫描落在两封来信的归并之间，待办 33）。跨队列按创建先后取（像 worker 各队列同时在取），不是一个队列取完再取下一个
+   */
+  readonly limit?: number;
 }
 
 const BATCH_SIZE = 100;
+
+/** 有待跑任务的队列，按各自最早的任务的创建时间排（pg-boss 没有偷看队列的接口，直接查它的任务表，同 drainJobs） */
+async function oldestFirst(runtime: Runtime, queues: readonly string[]): Promise<string[]> {
+  if (queues.length === 0) return [];
+  const { rows } = await runtime.db.execute<{ name: string }>(sql`
+    SELECT name FROM pgboss.job WHERE state IN ('created', 'retry') AND name IN ${queues}
+    GROUP BY name ORDER BY min(created_on)`);
+  return rows.map((row) => row.name);
+}
 
 /** 本次处理失败的任务这时才交给 pg-boss 记失败（还有重试次数的进入 retry） */
 async function failAll(runtime: Runtime, failed: readonly FailedJobRun[]): Promise<void> {
@@ -78,17 +95,22 @@ export async function runQueuedJobs(
   const completed: JobRun[] = [];
   const failed: FailedJobRun[] = [];
   const maxRounds = options.maxRounds ?? 50;
+  const queues = [...byName.keys()].filter((name) => !options.only || options.only.includes(name));
+  const ran = () => completed.length + failed.length;
 
   for (let round = 0; ; round += 1) {
+    if (options.limit !== undefined && ran() >= options.limit) break;
     let pulled = 0;
     for (const feed of feeds) {
       pulled += await feed.pull({ runtime, logger, signal, waitSeconds: 0 });
     }
     const batch: JobWithMetadata<unknown>[] = [];
-    for (const name of byName.keys()) {
+    for (const name of options.limit === undefined ? queues : await oldestFirst(runtime, queues)) {
+      const room = options.limit === undefined ? BATCH_SIZE : options.limit - ran() - batch.length;
+      if (room <= 0) break;
       batch.push(
         ...(await runtime.boss.fetch(name, {
-          batchSize: BATCH_SIZE,
+          batchSize: Math.min(BATCH_SIZE, room),
           ignoreStartAfter: true,
           includeMetadata: true,
         })),

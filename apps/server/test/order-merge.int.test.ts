@@ -19,7 +19,6 @@ import {
   type FakeMailInput,
   type FakeShopify,
 } from '../src/modules/integration';
-import { ticketTimeLimitsJob } from '../src/modules/ticket';
 import type { ApiClient } from './api-client';
 import { startTestHarness, type TestHarness } from './harness';
 
@@ -113,8 +112,7 @@ async function closeTicket(t: TestHarness, number: string, closedAt: string): Pr
   const before = t.clock.now();
   t.clock.set(closedAt);
   try {
-    await t.enqueue(ticketTimeLimitsJob, {});
-    await t.runJobs();
+    await t.scanTimeLimits();
   } finally {
     t.clock.set(before);
   }

@@ -23,7 +23,6 @@ import {
   type FakeMailInput,
 } from '../src/modules/integration';
 import { amazonPollJob, shopifyPollJob, startOrderBackfill } from '../src/modules/order';
-import { ticketTimeLimitsJob } from '../src/modules/ticket';
 import type { ApiClient } from './api-client';
 import { startTestHarness, type TestHarness } from './harness';
 
@@ -140,8 +139,7 @@ describe('P17 工单指标的口径与对比（演示时刻 09-30 12:00）', () 
       mails();
       await t.runJobs();
       if (scan) {
-        await t.enqueue(ticketTimeLimitsJob, {});
-        await t.runJobs();
+        await t.scanTimeLimits();
       }
     };
     // X、Y：客户来信新建（9 月），14 天无来信关闭
@@ -279,8 +277,7 @@ describe('P17 与 P04 一致、店铺范围与权限（AC-P1-14 验收夹具，�
       at: '2026-09-09T11:00:00+08:00',
     });
     await t.runJobs();
-    await t.enqueue(ticketTimeLimitsJob, {});
-    await t.runJobs();
+    await t.scanTimeLimits();
     supervisor = await t.loginAs('客服主管');
   });
 

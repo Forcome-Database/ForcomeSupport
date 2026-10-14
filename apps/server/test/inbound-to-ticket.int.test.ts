@@ -14,7 +14,6 @@ import {
   type FakeMailInput,
 } from '../src/modules/integration';
 import { inboundReceivedJob } from '../src/modules/channel';
-import { ticketTimeLimitsJob } from '../src/modules/ticket';
 import type { ApiClient } from './api-client';
 import { startTestHarness, type TestHarness } from './harness';
 
@@ -520,8 +519,7 @@ describe('开发测试环境的示例来信回放（ADR 0009 修订）', () => {
     t.clients.replayFixtures(getDemoFixture());
     await t.runJobs();
     // worker 每分钟的时限扫描（客户未回复的那张 7 天前就该关了）
-    await t.enqueue(ticketTimeLimitsJob, {});
-    await t.runJobs();
+    await t.scanTimeLimits();
   });
 
   afterAll(async () => {
@@ -661,8 +659,7 @@ describe('示例邮件回放到当前日期（开发测试环境与 Playwright �
     await t.loadFixtures();
     t.clients.replayFixtures(getDemoFixture());
     await t.runJobs();
-    await t.enqueue(ticketTimeLimitsJob, {});
-    await t.runJobs();
+    await t.scanTimeLimits();
   });
 
   afterAll(async () => {

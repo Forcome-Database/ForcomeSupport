@@ -13,6 +13,7 @@ export {
 export {
   findInboundMessage,
   findOutboundMessage,
+  listMergeableInboundIds,
   listMessageSummaries,
   listReceivedMail,
   listReplyTargets,
@@ -23,7 +24,7 @@ export {
   type ReplyTarget,
 } from './messages';
 export { type MailAddress, type Recognition, type SenderRule } from './recognition';
-export { mailboxHealths, type MailboxHealth } from './mailbox-health';
+export { mailboxHealths, mailSyncedThrough, type MailboxHealth } from './mailbox-health';
 export { channelSelfCheckProbe } from './self-check';
 export {
   mailCutoverStatus,

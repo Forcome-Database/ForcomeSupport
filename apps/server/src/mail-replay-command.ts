@@ -25,6 +25,7 @@ import {
   systemClock,
   toMilliseconds,
   type AnyJobHandler,
+  type AppEnv,
   type FailedDrainJob,
   type Logger,
   type Runtime,
@@ -70,6 +71,8 @@ export interface MailReplayOptions {
   readonly io: MailReplayCommandIo;
   /** 回放流水线的任务（「来信已接收」「我方发信已同步」、回复重新识别）：回放里只跑这几个队列，其余留给 worker */
   readonly pipelineJobs: readonly string[];
+  /** 运行环境：时限扫描在回放里不看它（回放按回放时钟算邮箱已同步到哪），签名要求 */
+  readonly appEnv: AppEnv;
   /** 有没有 worker 连着这个库；默认按连接的 application_name 查（forcome-worker…，core 的 startRuntime 设的） */
   readonly workerRunning?: (runtime: Runtime) => Promise<boolean>;
   /** 等任务重试时的睡眠（测试换成不真等的） */
@@ -329,7 +332,7 @@ async function replay(
       const scanAt = due.getTime() > now.getTime() ? ceilToMinute(due) : minuteAfter(now);
       if (scanAt.getTime() > until.getTime()) return;
       clock.set(scanAt);
-      const scan = await scanTimeLimits(replayRuntime, scanAt, logger);
+      const scan = await scanTimeLimits(replayRuntime, options.appEnv, scanAt, logger);
       counts.closed += scan.closed;
       counts.overdue += scan.overdue;
       await drain();

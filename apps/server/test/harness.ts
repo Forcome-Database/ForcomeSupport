@@ -25,6 +25,7 @@ import {
   type HistorySheet,
 } from '../src/modules/aftersales';
 import {
+  gmailPollJob,
   listOrderStores,
   listReceivedMail,
   registerSenderRule,
@@ -65,6 +66,7 @@ import {
   type AccessVariables,
   type NewMember,
 } from '../src/modules/org';
+import { ticketTimeLimitsJob } from '../src/modules/ticket';
 import { resetInboundData, type InboundResetReport } from '../src/reset-inbound-data';
 import { createApiClient, type ApiClient, type RequestHandler } from './api-client';
 import { createTestDatabase } from './database';
@@ -177,6 +179,11 @@ export interface TestHarness {
    * 反复直到都空闲；有任务失败默认抛错
    */
   runJobs(options?: RunJobsOptions): Promise<JobRunReport>;
+  /**
+   * 像 worker 那样在当前时钟做一次时限扫描：先排一次邮箱轮询（每 5 分钟的 history.list 兜底，同步记录随之前进到此刻）并跑完，
+   * 再排每分钟的时限扫描并跑到空闲。按时关闭要店铺的邮箱已同步到到期时刻（待办 33），只排扫描不轮询时到期的工单不关
+   */
+  scanTimeLimits(options?: RunJobsOptions): Promise<JobRunReport>;
   /** 直接排一个任务（例如模拟每分钟扫描的定时触发），随后用 runJobs 跑 */
   enqueue<T extends object>(
     job: JobDefinition<T>,
@@ -382,6 +389,18 @@ export async function startTestHarness(
 
     runJobs: (runOptions) => runQueuedJobs(runtime, { handlers, feeds }, silentLogger, runOptions),
 
+    scanTimeLimits: async (runOptions) => {
+      const worker = { handlers, feeds };
+      await transaction(runtime, (tx) => tx.enqueue(gmailPollJob, {}));
+      const polled = await runQueuedJobs(runtime, worker, silentLogger, runOptions);
+      await transaction(runtime, (tx) => tx.enqueue(ticketTimeLimitsJob, {}));
+      const scanned = await runQueuedJobs(runtime, worker, silentLogger, runOptions);
+      return {
+        completed: [...polled.completed, ...scanned.completed],
+        failed: [...polled.failed, ...scanned.failed],
+      };
+    },
+
     enqueue: (job, payload, jobOptions) =>
       transaction(runtime, (tx) => tx.enqueue(job, payload, jobOptions)),
 
@@ -440,6 +459,7 @@ export async function startTestHarness(
           },
         },
         pipelineJobs: mailReplayPipelineJobs,
+        appEnv,
         workerRunning: () => {
           const running = replayOptions.workerRunning ?? false;
           return Promise.resolve(typeof running === 'function' ? running() : running);

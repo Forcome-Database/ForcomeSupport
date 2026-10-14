@@ -220,8 +220,18 @@ export const statusChange = ticketSchema.table(
      */
     channelMessageId: uuid('channel_message_id'),
     occurredAt: timestamptz('occurred_at').notNull(),
+    /**
+     * 按时关闭所用的到期时刻（关闭时最近一封来信 + 7 / 14 天，待办 33）：P05 状态流转里这一步的业务时刻，不在读取时重算
+     * （补拉进来的、早于关闭时刻的来信会把重算的结果推到关闭之后）。按时关闭必有、不晚于发生时刻，其余迁移为空。
+     * 迁移 0034 之前的关闭按当时已归并的最近来信回填，回填不出的取发生时刻
+     */
+    dueAt: timestamptz('due_at'),
   },
   (t) => [
+    check(
+      'status_change_due_at',
+      sql`(${t.event} IN ('idle_7_days', 'idle_14_days')) = (${t.dueAt} IS NOT NULL) AND ${t.dueAt} <= ${t.occurredAt}`,
+    ),
     index('status_change_ticket_idx').on(t.ticketId, t.occurredAt),
     // 新建与重开按触发的来信找（customer_trigger_event 视图，24）
     index('status_change_trigger_message_idx')

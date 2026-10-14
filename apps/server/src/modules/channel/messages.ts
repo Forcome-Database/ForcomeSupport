@@ -1,11 +1,12 @@
 import {
   isArchivedSource,
+  ticketSources,
   type MessageDirection,
   type MessageSource,
   type Site,
   type TicketChannel,
 } from '@forcome/contracts';
-import { and, asc, eq, inArray, isNull, ne, or } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lt, ne, or } from 'drizzle-orm';
 import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
 import { autoReplyHeader, isAutoReply } from './auto-reply';
 import { displayBody } from './body';
@@ -109,6 +110,35 @@ export async function findInboundMessage(
       ? extractOrderNumbers(platform, { subject, text: row.textBody, html: row.htmlBody })
       : [],
   };
+}
+
+/**
+ * 一个店铺在 (after, before) 之间到达、要归并成工单的来信（ticket 按时关闭前确认到期前的来信都已归并，待办 33、ADR 0008 修订）：
+ * 条件同 ticket 归并的入口——来信、不是别的邮箱已收过的副本、识别出店铺与客户渠道身份、来源要建工单（不是归档的平台通知与营销）。
+ * 未归属店铺的来信不在内：它等客服主管指定店铺，不知道归哪个店铺。系统操作，不受店铺范围限制
+ */
+export async function listMergeableInboundIds(
+  db: DbExecutor,
+  storeId: string,
+  range: { readonly after: Date; readonly before: Date },
+): Promise<string[]> {
+  const rows = await db
+    .select({ id: message.id })
+    .from(message)
+    .where(
+      and(
+        eq(message.storeId, storeId),
+        gt(message.receivedAt, range.after),
+        lt(message.receivedAt, range.before),
+        eq(message.direction, 'inbound'),
+        isNull(message.duplicateOfId),
+        inArray(message.source, [...ticketSources]),
+        isNotNull(message.channel),
+        isNotNull(message.site),
+        ne(message.senderAddress, ''),
+      ),
+    );
+  return rows.map((row) => row.id);
 }
 
 /**

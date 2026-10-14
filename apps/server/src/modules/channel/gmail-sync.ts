@@ -624,6 +624,7 @@ async function backfill(
   range: { from: Date; historyId: string },
   logger: Logger,
 ): Promise<void> {
+  const listedAt = runtime.clock.now();
   const ids = await gmail.listMessages(target.address, { after: range.from });
   const synced = await ingestAll(runtime, gmail, target, ids, logger);
   await transaction(runtime, async (tx) => {
@@ -636,7 +637,7 @@ async function backfill(
         updatedAt: tx.now,
       })
       .where(eq(mailboxSync.address, target.address));
-    await recordMailboxSuccess(tx, target.address, synced);
+    await recordMailboxSuccess(tx, target.address, synced, listedAt);
   });
   logger.info({ mailbox: target.address, messages: ids.length }, '区间补拉完成');
 }
@@ -693,6 +694,7 @@ export async function syncMailbox(
       return;
     }
     let changes: Awaited<ReturnType<GmailClient['listHistory']>>;
+    const listedAt = runtime.clock.now();
     try {
       changes = await gmail.listHistory(address, cursor);
     } catch (error) {
@@ -710,7 +712,7 @@ export async function syncMailbox(
     const synced = await ingestAll(runtime, gmail, target, changes.messageIds, logger);
     await transaction(runtime, async (tx) => {
       await advanceCursor(tx, address, cursor, changes.historyId);
-      await recordMailboxSuccess(tx, address, synced);
+      await recordMailboxSuccess(tx, address, synced, listedAt);
     });
   } catch (error) {
     await noteFailure(runtime, address, error, logger);

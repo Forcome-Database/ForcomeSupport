@@ -12,7 +12,6 @@ import { getDemoFixture } from '@forcome/fixtures';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { syncExchangeRatesJob } from '../src/modules/core';
 import { gmailClient, type FakeGmail, type FakeMailInput } from '../src/modules/integration';
-import { ticketTimeLimitsJob } from '../src/modules/ticket';
 import type { ApiClient } from './api-client';
 import { startTestHarness, type TestHarness } from './harness';
 
@@ -298,8 +297,7 @@ describe('标记无需回复（AC-P1-01）', () => {
 
     // 14 天无新来信 → 已关闭：剩下那封未回复来信也不能再标记
     t.clock.set('2026-09-24T10:00:00+08:00');
-    await t.enqueue(ticketTimeLimitsJob, {});
-    await t.runJobs();
+    await t.scanTimeLimits();
     const closed = await detailOf(await t.loginAs('坐席'), number);
     expect(closed.ticket.status).toBe('closed');
     expect(closed.autoClose).toBeNull();
@@ -390,8 +388,7 @@ describe('P05 按示例夹具（P1_OLIVER）渲染', () => {
     t.clients.replayFixtures(fixture);
     await t.enqueue(syncExchangeRatesJob, {});
     await t.runJobs();
-    await t.enqueue(ticketTimeLimitsJob, {});
-    await t.runJobs();
+    await t.scanTimeLimits();
     agent = await t.loginAs('坐席');
   });
 

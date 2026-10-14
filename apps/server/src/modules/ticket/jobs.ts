@@ -1,5 +1,5 @@
 import { inboundReceivedJob, outboundSyncedJob } from '../channel';
-import { handleJob, type AnyJobHandler } from '../core';
+import { handleJob, type AnyJobHandler, type AppEnv } from '../core';
 import type { IntegrationClients, ReplayNoReplyMark } from '../integration';
 import { applyFixtureMark } from './fixture-marks';
 import { mergeInbound } from './merge';
@@ -14,6 +14,7 @@ import { scanTimeLimits, ticketTimeLimitsJob } from './time-limits';
  * - 每分钟的时限扫描：SLA 到期、按时关闭、不再等的回复（16），「当前时间」取运行时的时钟。
  */
 export function createTicketJobHandlers(deps: {
+  appEnv: AppEnv;
   clients: IntegrationClients;
   fixtureMarks: readonly ReplayNoReplyMark[];
 }): AnyJobHandler[] {
@@ -25,7 +26,7 @@ export function createTicketJobHandlers(deps: {
     handleJob(outboundSyncedJob, (payload, context) => attributeReply(payload, context)),
     handleJob(attributeReplyJob, (payload, context) => attributeReply(payload, context, true)),
     handleJob(ticketTimeLimitsJob, async (_payload, { runtime, logger }) => {
-      await scanTimeLimits(runtime, runtime.clock.now(), logger);
+      await scanTimeLimits(runtime, deps.appEnv, runtime.clock.now(), logger);
     }),
   ];
 }

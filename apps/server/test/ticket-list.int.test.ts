@@ -16,7 +16,6 @@ import {
   type FakeGmail,
   type FakeMailInput,
 } from '../src/modules/integration';
-import { ticketTimeLimitsJob } from '../src/modules/ticket';
 import type { ApiClient } from './api-client';
 import { startTestHarness, type TestHarness } from './harness';
 
@@ -79,8 +78,7 @@ describe('P04 工单列表：示例数据（16 张，演示时刻 09-11 10:20）
     // 与 worker 启动时一样回放示例来信与我方回复（演示时刻不平移），再跑一次每分钟的时限扫描（过了截止的改为未达标）
     t.clients.replayFixtures(fixture);
     await t.runJobs();
-    await t.enqueue(ticketTimeLimitsJob, {});
-    await t.runJobs();
+    await t.scanTimeLimits();
     supervisor = await t.loginAs('客服主管');
   });
 
@@ -418,8 +416,7 @@ describe('P04 工单列表：分页与重开的事件数', () => {
     // 待回复 14 天无新来信关闭（拨到 09-16 跑一次时限扫描，扫完拨回）
     const back = t.clock.now();
     t.clock.set('2026-09-16T10:00:00+08:00');
-    await t.enqueue(ticketTimeLimitsJob, {});
-    await t.runJobs();
+    await t.scanTimeLimits();
     t.clock.set(back);
     gmail.deliver(
       buyer('Reopen Buyer', {

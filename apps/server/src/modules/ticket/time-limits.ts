@@ -1,6 +1,7 @@
 import type { TicketEvent, TicketStatus } from '@forcome/contracts';
-import { and, eq, gt, gte, isNotNull, lte, min, or } from 'drizzle-orm';
+import { and, eq, gt, gte, inArray, isNotNull, lte, min, or } from 'drizzle-orm';
 import { z } from 'zod';
+import { listMergeableInboundIds, mailSyncedThrough } from '../channel';
 import {
   defineJob,
   storeScopeCondition,
@@ -8,6 +9,7 @@ import {
   systemActor,
   toMilliseconds,
   transaction,
+  type AppEnv,
   type DbExecutor,
   type Logger,
   type Runtime,
@@ -22,7 +24,10 @@ import { applyTransition } from './ticket-status';
  * 每分钟的时限扫描（规格 ticket「时限扫描」，ADR 0008：时限靠每分钟扫描与表里的时间列，不挂延迟任务；PRD 6.1、R-SL-07，待办 16）：
  * 1. 应回复来信过了 SLA 截止仍未回复：未到期 → 未达标；
  * 2. 按时关闭：待回复 14 天无新来信 → 已关闭（未识别到回复）；等客户、已解决 7 天无来信 → 已关闭（客户未回复 / 已解决后无来信）。
- *    都从工单内最近一封来信（不论来源）的到达时间起算，满 7 × 24、14 × 24 小时即关；关闭时仍未回复的应回复来信计未达标；
+ *    都从工单内最近一封来信（不论来源）的到达时间起算，满 7 × 24、14 × 24 小时即关；关闭时仍未回复的应回复来信计未达标。
+ *    前提是到期前的来信都已看到（待办 33，ADR 0008 修订）：店铺的进线邮箱都已同步到到期时刻（回放按回放时钟，不看）、
+ *    店铺在最近来信与到期之间到达的来信都已归并；没看到就本轮不关，等之后的扫描——否则同步滞后、归并排队时会先关再按 30 天内重开。
+ *    关闭时把到期时刻记进状态变更（P05 状态流转这一步的业务时刻）；
  * 3. 等对应来信的我方回复满 24 小时的不再等（replies.ts）。
  * 接收显式的「当前时间」（回放时注入为邮件时间，ADR 0008）：状态变更记录的时刻即它——关闭的业务时刻，R-TK-01 的 30 天重开按它判断。
  * 第一期不产生 SLA 提醒。一张工单一个事务，锁住后按当时的状态与最近来信再判断一次（并发的归并可能刚追加了来信）。
@@ -51,32 +56,73 @@ export const IDLE_LIMITS: Readonly<
   resolved: { days: 7, event: 'idle_7_days' },
 };
 
-/** 到了时限要发生的迁移事件；还没到（或已关闭）为 null */
-export function idleEventOf(
+/** 按时关闭：迁移事件与到期时刻（最近来信 + 7 / 14 天）；还没到（或已关闭）为 null */
+export function idleCloseOf(
   status: TicketStatus,
   lastInboundAt: Date,
   now: Date,
-): IdleEvent | null {
+): { readonly event: IdleEvent; readonly dueAt: Date } | null {
   const limit = IDLE_LIMITS[status];
   if (!limit) return null;
-  return now.getTime() - lastInboundAt.getTime() >= toMilliseconds({ days: limit.days })
-    ? limit.event
-    : null;
+  const dueAt = new Date(lastInboundAt.getTime() + toMilliseconds({ days: limit.days }));
+  return now.getTime() >= dueAt.getTime() ? { event: limit.event, dueAt } : null;
 }
 
-/** 锁住一张工单，到了时限就按迁移表关闭（同时把仍未回复的应回复来信计未达标）；返回是否关闭了 */
-async function closeIfIdle(tx: Tx, ticketId: string, now: Date): Promise<boolean> {
+type TicketRow = typeof ticket.$inferSelect;
+
+/** 按时关闭被挡住超过这么久（到期之后）记一条警告：多半是邮箱同步一直失败或有来信归并不了，要人去看 */
+const HELD_WARN_MS = toMilliseconds({ hours: 1 });
+
+/**
+ * 到期前的来信是否都已看到（见文件头）：店铺的进线邮箱都同步到了到期时刻（回放里按回放时钟，回放逐封入库、跑完流水线才扫描，
+ * 不看同步记录），且店铺在 (最近来信, 到期) 之间到达、要归并的来信都已在工单里。只看店铺：还没归并的信归哪张工单要归并了才知道
+ */
+async function mailSeenBefore(
+  tx: Tx,
+  appEnv: AppEnv,
+  current: Pick<TicketRow, 'storeId' | 'lastInboundAt'>,
+  dueAt: Date,
+): Promise<boolean> {
+  if (!tx.replay && !(await mailSyncedThrough(tx.db, appEnv, current.storeId, dueAt))) {
+    return false;
+  }
+  const ids = await listMergeableInboundIds(tx.db, current.storeId, {
+    after: current.lastInboundAt,
+    before: dueAt,
+  });
+  if (ids.length === 0) return true;
+  const merged = await tx.db
+    .select({ id: ticketMessage.channelMessageId })
+    .from(ticketMessage)
+    .where(inArray(ticketMessage.channelMessageId, ids));
+  return merged.length === ids.length;
+}
+
+/** 一张工单这一轮的结果：关闭了、到期了但来信还没看全（挡住，到期时刻随附）、没到期 */
+type IdleOutcome =
+  { readonly kind: 'closed' } | { readonly kind: 'held'; readonly dueAt: Date } | null;
+
+/** 锁住一张工单，到了时限、到期前的来信也都看到了，就按迁移表关闭（同时把仍未回复的应回复来信计未达标） */
+async function closeIfIdle(
+  tx: Tx,
+  appEnv: AppEnv,
+  ticketId: string,
+  now: Date,
+): Promise<IdleOutcome> {
   const [current] = await tx.db
     .select()
     .from(ticket)
     .where(and(eq(ticket.id, ticketId), storeScopeCondition(SYSTEM_STORE_SCOPE, ticket.storeId)))
     .for('update');
-  if (!current) return false;
-  const event = idleEventOf(current.status, current.lastInboundAt, now);
-  if (!event) return false;
-  await applyTransition(tx, current, event, systemActor);
+  if (!current) return null;
+  const close = idleCloseOf(current.status, current.lastInboundAt, now);
+  if (!close) return null;
+  if (!(await mailSeenBefore(tx, appEnv, current, close.dueAt))) {
+    return { kind: 'held', dueAt: close.dueAt };
+  }
+  await applyTransition(tx, current, close.event, systemActor, { dueAt: close.dueAt });
   await missUnrepliedOnClose(tx, ticketId);
-  return true;
+  return { kind: 'closed' };
 }
 
 export interface TimeLimitScan {
@@ -84,13 +130,16 @@ export interface TimeLimitScan {
   readonly overdue: number;
   /** 按时关闭的工单张数 */
   readonly closed: number;
+  /** 到期了、但到期前的来信还没看全，这一轮没关的工单张数 */
+  readonly held: number;
   /** 不再等的我方回复封数 */
   readonly expiredReplies: number;
 }
 
-/** 按给定的「当前时间」扫一遍（任务处理器传运行时时钟的当前时间） */
+/** 按给定的「当前时间」扫一遍（任务处理器传运行时时钟的当前时间）；appEnv 定上线切换前算不算已切换（mail-cutover） */
 export async function scanTimeLimits(
   runtime: Runtime,
+  appEnv: AppEnv,
   now: Date,
   logger: Logger,
 ): Promise<TimeLimitScan> {
@@ -119,15 +168,35 @@ export async function scanTimeLimits(
       ),
     );
   let closed = 0;
+  let held = 0;
+  // 到期超过 1 小时仍被挡住的到期时刻：一轮汇总记一条警告
+  const heldLong: Date[] = [];
   for (const { id } of due) {
-    if (await transaction(at, (tx) => closeIfIdle(tx, id, now))) closed += 1;
+    const outcome = await transaction(at, (tx) => closeIfIdle(tx, appEnv, id, now));
+    if (outcome?.kind === 'closed') closed += 1;
+    if (outcome?.kind === 'held') {
+      held += 1;
+      if (now.getTime() - outcome.dueAt.getTime() >= HELD_WARN_MS) heldLong.push(outcome.dueAt);
+    }
+  }
+  if (heldLong.length > 0) {
+    logger.warn(
+      {
+        count: heldLong.length,
+        earliestDueAt: new Date(Math.min(...heldLong.map((d) => d.getTime()))),
+      },
+      '有工单按时关闭已到期超过 1 小时仍没关：店铺的邮箱还没同步到到期时刻，或有到期前的来信没归并',
+    );
   }
 
   const expiredReplies = await transaction(at, (tx) => expireWaitingReplies(tx, now, logger));
-  if (overdue + closed + expiredReplies > 0) {
-    logger.info({ overdue, closed, expiredReplies }, '时限扫描：SLA 到期、按时关闭与不再等的回复');
+  if (overdue + closed + held + expiredReplies > 0) {
+    logger.info(
+      { overdue, closed, held, expiredReplies },
+      '时限扫描：SLA 到期、按时关闭（与等来信看全的）、不再等的回复',
+    );
   }
-  return { overdue, closed, expiredReplies };
+  return { overdue, closed, held, expiredReplies };
 }
 
 /**

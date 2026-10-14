@@ -28,11 +28,14 @@ function triggerOf(actor: Actor): TicketTrigger {
 }
 
 /**
- * 引起这次迁移的消息（channel.message 的 id）：新建、追加、重开为触发的来信，识别到回复为那封我方回复；按时关闭与成员的动作没有。
+ * 引起这次迁移的原因：消息（channel.message 的 id）——新建、追加、重开为触发的来信，识别到回复为那封我方回复，按时关闭与成员的动作没有；
+ * 按时关闭另记到期时刻。
  * 工单量只计由客户来信触发的新建与重开，按它找来信的来源（待办 16 记录，24 统计）
  */
 export interface TransitionCause {
   readonly messageId?: string;
+  /** 按时关闭所用的到期时刻（最近一封来信 + 7 / 14 天，time-limits.ts，待办 33）：P05 状态流转里这一步的业务时刻 */
+  readonly dueAt?: Date;
 }
 
 async function recordChange(
@@ -54,6 +57,7 @@ async function recordChange(
     closeReason: result.closeReason,
     channelMessageId: cause.messageId ?? null,
     occurredAt: tx.now,
+    dueAt: cause.dueAt ?? null,
   });
   await ticketsChanged(tx);
 }
@@ -152,6 +156,7 @@ export async function listStatusChanges(db: DbExecutor, ticketId: string) {
       closeReason: statusChange.closeReason,
       channelMessageId: statusChange.channelMessageId,
       occurredAt: statusChange.occurredAt,
+      dueAt: statusChange.dueAt,
     })
     .from(statusChange)
     .where(eq(statusChange.ticketId, ticketId))

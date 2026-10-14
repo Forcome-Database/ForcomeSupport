@@ -45,6 +45,7 @@ try {
       stderr: (line) => process.stderr.write(line),
     },
     pipelineJobs: mailReplayPipelineJobs,
+    appEnv: config.appEnv,
   });
 } catch (error) {
   logger.error({ err: error }, '历史邮件回放失败');

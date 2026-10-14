@@ -1,4 +1,9 @@
-import { amazonDomains, ticketListSchema, type TicketListItem } from '@forcome/contracts';
+import {
+  amazonDomains,
+  ticketDetailSchema,
+  ticketListSchema,
+  type TicketListItem,
+} from '@forcome/contracts';
 import { getDemoFixture } from '@forcome/fixtures';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -10,7 +15,6 @@ import {
   type FakeGmail,
   type FakeMailInput,
 } from '../src/modules/integration';
-import { ticketTimeLimitsJob } from '../src/modules/ticket';
 import type { ApiClient } from './api-client';
 import { startTestHarness, type TestHarness } from './harness';
 
@@ -237,6 +241,31 @@ describe('AC-P1-13：近 90 天邮件回放（编号日期取首封来信日期�
     ]);
   });
 
+  it('回放的关闭记下到期时刻（待办 33）：P05 状态流转里这一步取它，关闭时刻照旧按邮件时间', async () => {
+    const dueOf = async (number: string) => {
+      const { rows } = await t.runtime.db.execute<{ due_at: Date }>(sql`
+        SELECT c.due_at FROM ticket.status_change c JOIN ticket.ticket k ON k.id = c.ticket_id
+         WHERE k.number = ${number} AND c.due_at IS NOT NULL ORDER BY c.id`);
+      return rows.map((r) => new Date(r.due_at).toISOString());
+    };
+    // 回放在到期那一分钟扫描：到期时刻与关闭时刻相同
+    expect(await dueOf('T-20260720-0001')).toEqual([
+      iso('2026-07-27T10:00:00+08:00'),
+      iso('2026-08-24T10:00:00+08:00'),
+    ]);
+    // 回复让早已到点的时限生效：07-10 12:01 关闭，到期时刻是最近来信 07-01 10:00 + 7 天
+    const [leo] = await ticketsOf(agent, 'Leo Grant');
+    expect(await dueOf(leo!.number)).toEqual([iso('2026-07-08T10:00:00+08:00')]);
+    const res = await agent.get(`/api/tickets/${leo!.number}`);
+    expect(res.status).toBe(200);
+    const detail = ticketDetailSchema.parse(await res.json());
+    expect(detail.statusFlow.map((s) => [s.event, s.at])).toEqual([
+      ['inbound', iso('2026-07-01T10:00:00+08:00')],
+      ['reply_detected', iso('2026-07-10T12:00:30+08:00')],
+      ['idle_7_days', iso('2026-07-08T10:00:00+08:00')],
+    ]);
+  });
+
   it('历史来信照常计算首次回复与 SLA（R-SL-08）：2 小时回复达标，没回复的过了截止计未达标', async () => {
     expect(await slaResults(t, 'Ava Chen')).toEqual(['met', 'missed']);
     expect(await slaResults(t, 'Ben Ortiz')).toEqual(['missed']);
@@ -257,8 +286,7 @@ describe('AC-P1-13：近 90 天邮件回放（编号日期取首封来信日期�
   it('T0 时仍未回复的来信所在工单受 14 天规则约束：最近一封来信 + 14 天后由实时扫描关闭（未识别到回复）', async () => {
     const scanAt = async (at: string) => {
       t.clock.set(at);
-      await t.enqueue(ticketTimeLimitsJob, {});
-      await t.runJobs();
+      await t.scanTimeLimits();
     };
     await scanAt('2026-09-19T08:59:00+08:00');
     expect((await statusChanges(t, 'T-20260905-0001')).map(([event]) => event)).toEqual([

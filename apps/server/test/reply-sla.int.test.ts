@@ -18,7 +18,7 @@ import {
   type FakeGmail,
   type FakeMailInput,
 } from '../src/modules/integration';
-import { attributeReplyJob, ticketTimeLimitsJob } from '../src/modules/ticket';
+import { attributeReplyJob } from '../src/modules/ticket';
 import type { ApiClient } from './api-client';
 import { startTestHarness, type TestHarness } from './harness';
 
@@ -484,8 +484,7 @@ describe('乱序：回复先于它所回复的来信入库（R-SL-08）', () => 
     expect(await waitingFor(t, '<gone@buyer.example>')).toBe(1);
     // 24 小时后的扫描移出等待表、最后识别一次（找不到，放弃）
     t.clock.set('2026-09-12T08:01:00+08:00');
-    await t.enqueue(ticketTimeLimitsJob, {});
-    await t.runJobs();
+    await t.scanTimeLimits();
     expect(await waitingFor(t, '<gone@buyer.example>')).toBe(0);
     // 之前排下、晚于扫描才跑的重新识别不把它插回等待表（最长只等 24 小时）
     const { rows } = await t.runtime.db.execute<{ id: string }>(sql`
@@ -544,8 +543,7 @@ describe('乱序：回复先于它所回复的来信入库（R-SL-08）', () => 
 
     t.clock.set('2026-09-17T10:00:00+08:00');
     agent = await t.loginAs('坐席');
-    await t.enqueue(ticketTimeLimitsJob, {});
-    await t.runJobs();
+    await t.scanTimeLimits();
     const detail = await onlyTicketOf(agent, 'Kim Rowe');
     expect(detail.ticket.status).toBe('awaiting_customer');
     expect(slaOf(inbound(detail)[0]!)).toEqual({
@@ -561,8 +559,7 @@ describe('乱序：回复先于它所回复的来信入库（R-SL-08）', () => 
     );
     await t.runJobs();
     t.clock.set('2026-09-14T07:59:00+08:00');
-    await t.enqueue(ticketTimeLimitsJob, {});
-    await t.runJobs();
+    await t.scanTimeLimits();
 
     gmail.deliver(amazonLetter('Dot Rhee', '<slow@buyer.example>', '2026-09-13T07:40:00+08:00'));
     await t.runJobs();
@@ -598,8 +595,7 @@ describe('生产厂来信（AC-P1-04 的 SLA 部分）与时限扫描（AC-TK-07
   /** 拨到某个时刻并排一次时限扫描 */
   async function scanAt(at: string): Promise<void> {
     await travel(at);
-    await t.enqueue(ticketTimeLimitsJob, {});
-    await t.runJobs();
+    await t.scanTimeLimits();
   }
 
   /** 已登记生产厂邮箱的来信（示例数据的 FQD），直接写到亚马逊店铺邮箱 */

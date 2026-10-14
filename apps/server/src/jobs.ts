@@ -115,6 +115,7 @@ export function createJobHandlers(deps: ServerDeps): readonly AnyJobHandler[] {
     ...createOrderJobHandlers({ clients: deps.clients, stores: listOrderStores }),
     // 按订单归并：镜像没有时经 order 去平台补拉，用同一组外部客户端；非生产环境的示例回放另按示例数据标记无需回复（待办 17）
     ...createTicketJobHandlers({
+      appEnv: deps.config.appEnv,
       clients: deps.clients,
       fixtureMarks:
         deps.config.appEnv === 'production' ? [] : fixtureNoReplyMarks(getDemoFixture()),
