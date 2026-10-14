@@ -20,7 +20,9 @@
 
 {$SITE_HOST} {
 	import tls_{$TLS_MODE:internal}
-	encode zstd gzip
+	# 实时推送（/api/live，SSE，待办 18）不压缩：压缩要攒够字节才写出，推送会被压着不发
+	@compressible not path /api/live
+	encode @compressible zstd gzip
 	log {
 		output stdout
 		format json

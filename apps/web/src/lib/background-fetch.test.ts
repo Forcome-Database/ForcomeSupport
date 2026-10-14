@@ -1,6 +1,7 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { invalidateInBackground, isBackgroundFetch } from './background-fetch';
+import { LIVE_COALESCE_MS, liveInvalidator } from './live-updates';
 
 /*
  * 推送触发的重新拉取是后台请求（ADR 0010 修订「7 天无操作过期」，待办 18）：正在显示的查询失效后重新拉取时，queryFn 认得出
@@ -45,5 +46,34 @@ describe('推送触发的重新拉取', () => {
     expect(client.getQueryState(options.queryKey)?.isInvalidated).toBe(true);
     await client.fetchQuery(options);
     expect(calls).toEqual([false, false]);
+  });
+});
+
+describe('一阵推送合成一次', () => {
+  it('同一类变化在合并窗口内只失效一次；resync 让全部缓存失效', async () => {
+    vi.useFakeTimers();
+    try {
+      const client = new QueryClient();
+      const spy = vi.spyOn(client, 'invalidateQueries');
+      const invalidator = liveInvalidator(client);
+      for (let i = 0; i < 5; i += 1) invalidator.apply('tickets');
+      expect(spy).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(LIVE_COALESCE_MS);
+      expect(spy.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([['tickets']]);
+      invalidator.apply('resync');
+      await vi.advanceTimersByTimeAsync(LIVE_COALESCE_MS);
+      expect(spy.mock.calls.slice(1).map(([filters]) => filters?.queryKey)).toEqual([
+        ['tickets'],
+        ['unassigned-mail'],
+        ['notifications'],
+      ]);
+      // 停掉后还没到点的不再失效
+      invalidator.apply('tickets');
+      invalidator.stop();
+      await vi.advanceTimersByTimeAsync(LIVE_COALESCE_MS);
+      expect(spy).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -303,7 +303,7 @@ test('数据变化时自动刷新：在 P04 开着时别处标记无需回复 �
   const row = page.getByTestId('ticket-row').filter({ hasText: 'James Walker' });
   await expect(row).toContainText('待回复');
   const path = `/api/tickets/${james.number}/messages/${letter.id}`;
-  let undone = false;
+  let undone: boolean;
   try {
     expect((await page.request.post(`${path}/no-reply`, { data: {} })).ok()).toBe(true);
     await expect(row).toContainText('已解决', { timeout: 4_000 });

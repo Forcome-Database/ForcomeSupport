@@ -27,10 +27,36 @@ const TOPIC_KEYS: Readonly<Record<Exclude<LiveTopic, 'resync'>, QueryKey>> = {
   notifications: notificationsKey,
 };
 
-/** 收到一条推送 */
-export function applyLiveTopic(queryClient: QueryClient, topic: LiveTopic): void {
-  const keys = topic === 'resync' ? Object.values(TOPIC_KEYS) : [TOPIC_KEYS[topic]];
-  for (const key of keys) void invalidateInBackground(queryClient, key);
+/**
+ * 一阵推送合成一次重新拉取：同一类变化在这段时间内只失效一次（批量归并、历史回放时每个事务都会推一条，不能每条都重新拉取）
+ */
+export const LIVE_COALESCE_MS = 300;
+
+/**
+ * 收到推送后，把要失效的缓存攒一下再失效（返回登记的函数与清掉还没到点的计时器的函数）；
+ * resync 让全部缓存失效
+ */
+export function liveInvalidator(queryClient: QueryClient) {
+  const timers = new Map<QueryKey, ReturnType<typeof setTimeout>>();
+  return {
+    apply(topic: LiveTopic): void {
+      const keys = topic === 'resync' ? Object.values(TOPIC_KEYS) : [TOPIC_KEYS[topic]];
+      for (const key of keys) {
+        if (timers.has(key)) continue;
+        timers.set(
+          key,
+          setTimeout(() => {
+            timers.delete(key);
+            void invalidateInBackground(queryClient, key);
+          }, LIVE_COALESCE_MS),
+        );
+      }
+    },
+    stop(): void {
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
+    },
+  };
 }
 
 /** 登录后挂在外壳上：连着 /api/live，直到退出登录或页面关闭 */
@@ -40,6 +66,7 @@ export function useLiveUpdates(): void {
     let source: EventSource | null = null;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
+    const invalidator = liveInvalidator(queryClient);
 
     const later = () => {
       clearTimeout(retry);
@@ -50,7 +77,7 @@ export function useLiveUpdates(): void {
       if (stopped) return;
       const current = new EventSource(LIVE_PATH);
       source = current;
-      current.addEventListener(READY_EVENT, () => applyLiveTopic(queryClient, 'resync'));
+      current.addEventListener(READY_EVENT, () => invalidator.apply('resync'));
       current.addEventListener(LIVE_EVENT, (event) => {
         let data: unknown;
         try {
@@ -59,7 +86,7 @@ export function useLiveUpdates(): void {
           return;
         }
         const parsed = liveEventSchema.safeParse(data);
-        if (parsed.success) applyLiveTopic(queryClient, parsed.data.topic);
+        if (parsed.success) invalidator.apply(parsed.data.topic);
       });
       current.onerror = () => {
         // 还在 CONNECTING 是浏览器在自己重连；CLOSED 是连接被拒（401 等），不会再自己重连
@@ -75,6 +102,7 @@ export function useLiveUpdates(): void {
     return () => {
       stopped = true;
       clearTimeout(retry);
+      invalidator.stop();
       source?.close();
     };
   }, [queryClient]);
