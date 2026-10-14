@@ -120,7 +120,7 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 
 **环境**：Node 24（`.node-version`）；pnpm 10，先 `corepack enable`，版本按 `package.json` 的 `packageManager` 自动取用；Docker（含 compose）；Python 3（只在重新生成示例数据夹具时需要）。不需要任何外部账号，外部服务一律用 Fake。
 
-**本机端口**（本期本机可用 4510–4520，ADR 0013 修订）：开发库 4520 · api 4516 · 前端开发服务器 4517 · Playwright 用的 e2e api 4518 与前端预览 4519；开发测试环境 4510（HTTPS）与 4511（PostgreSQL）；4512–4513 预留给生产（28 号待办），4514–4515 机动。
+**本机端口**（本期本机可用 4510–4520，ADR 0013 修订）：开发库 4520 · api 4516 · 前端开发服务器 4517 · Playwright 用的 e2e api 4518 与前端预览 4519；开发测试环境 4510（HTTPS）与 4511（PostgreSQL）；生产 4512–4513（待办 28）；4514 是开发测试环境告警演练的接收替身（平时不起），4515 机动。
 
 | 命令 | 作用 |
 |---|---|
@@ -135,14 +135,15 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 | `pnpm --filter @forcome/server dev:api` / `dev:worker` | 本机运行 api（4516）/ worker，环境变量默认取 `apps/server/dev.env`（开启开发登录）；worker 启动时 Fake Gmail 回放示例来信，几秒后在 P04 归并成工单 |
 | `pnpm --filter @forcome/web dev` | 本机运行前端（http://127.0.0.1:4517），`/api` 转给本机 api；未登录时进入开发登录页，选一位示例成员即可登录 |
 | `pnpm typecheck` · `pnpm lint` · `pnpm build` | 类型检查 · lint（含模块边界）与格式 · 构建 |
-| `pnpm lint:workflows` | 用 actionlint（Docker）校验 CI 工作流语法 |
+| `pnpm lint:workflows` | 用 actionlint（Docker）校验工作流语法，并用同一镜像的 shellcheck 检查部署用的 shell 脚本（文件经标准输入送进容器，远端 Docker 上下文也能用） |
 | `pnpm fixtures:generate` · `pnpm fixtures:verify` | 从 `design/spec/data.py` 重新生成示例数据夹具 · 核对产物与 data.py 一致 |
 | `pnpm test:unit` · `pnpm test:integration` | 单元测试 · 集成测试（需要 `pnpm db:up`；CI 经 `TEST_DATABASE_URL` 指向服务容器） |
 | `pnpm test:e2e` | Playwright 端到端（需要 `pnpm db:up`；自己起 4518、4519 两个服务，用 e2e 专用库 `forcome_e2e`） |
 | `pnpm ci:local` | 本机跑一遍与 CI 相同的检查（先 `pnpm db:up`，并且需要 Docker 构建镜像） |
 | `pnpm deploy:staging` | 部署到开发测试环境（本机 Docker）：构建镜像 → migrate → 示例数据 → 起服务 → 用根证书核对 HTTPS → Playwright 冒烟，报告在 `deploy/.state/staging/`（`docs/部署说明.md`）；识别或归并口径变了的版本加 `--reset-inbound`，起服务前先重放来信 |
 | `pnpm staging smoke` · `cert` · `compose …` · `down` · `reset-inbound` · `import-aftersales …` · `order-backfill …` · `mail-replay …` | 对开发测试环境：重跑 HTTPS 核对与冒烟 · 导出根证书 · 执行 docker compose · 停止（保留数据） · 重放来信（停 worker、清空收信与工单、起 worker，`docs/部署说明.md`） · 导入售后登记表（第 10 节） · 开始订单回补（第 15 节） · 历史邮件回放与 T0 切换（第 16 节，加 `--confirm` 时自动停起 worker） |
-| `pnpm deploy:verify` | 部署配置检查：Compose 文件、前端镜像、Caddyfile（CI 与 `ci:local` 执行） |
+| `pnpm staging backup [list \| verify-retention]` · `restore …` · `restore-drill` · `host-check` · `alert-test` · `maintenance …` | 对开发测试环境：立即备份 · 列出备份 · 核对保留策略 · 按时间点恢复 · 恢复演练 · 宿主机检查一次 · 发「告警通道已连通」· 写或清维护标记（`docs/运维手册.md`）；生产环境是 `node deploy/deploy.mjs production …`（`docs/部署说明.md` 第 17 节） |
+| `pnpm deploy:verify` | 部署配置检查：Compose 文件（开发测试与生产两份模板）、前端镜像、Caddyfile、PostgreSQL 镜像（CI 与 `ci:local` 执行） |
 
 **测试**：`*.test.ts` 是单元测试；`*.int.test.ts` 是集成测试，用真实 PostgreSQL 18——每次运行先建模板库并迁移，各测试文件再复制出自己的库，互不干扰。集成测试只经主接缝（规格「测试接缝」）：用 `apps/server/test/harness.ts` 的 `startTestHarness()` 在测试进程内调用 HTTP 接口，`t.loginAs('坐席')` 以某个角色登录（`t.addMember(…)` 建多角色、店铺范围受限等示例数据里没有的成员后用 `t.loginAs({ memberId })`），`t.clients.fake(…)` 往 Fake 里放数据、注入故障，`t.clock` 推进时钟，`t.runJobs()` 把 worker 跑到空闲（每轮先拉常驻拉取源，如 Fake Gmail 的推送通知，再跑已排队的任务），`t.auditRecords()` 核对审计；要验证生产环境的限制时用 `startTestHarness({ appEnv: 'production' })`（应用按生产组装，测试工具另用非生产实例做开发登录，见 `apps/server/test/stores.int.test.ts`）；样板见 `apps/server/test/dev-login.int.test.ts`；还没有业务接口使用的公共工具（店铺范围、越权审计、财务字段过滤）用 `startTestHarness({ routes })` 挂示范接口来测，见 `apps/server/test/access-tools.int.test.ts`。外部客户端的「接口 + 真实现 + Fake」写法见 `apps/server/src/modules/integration/fake-framework.test.ts`。来信用 `t.clients.fake(gmailClient).deliver(…)` 放进 Fake Gmail（邮箱要先开始监听：灌完店铺先 `t.runJobs()` 一次），见 `apps/server/test/inbound-to-ticket.int.test.ts`。历史导入的售后单经 `t.importAftersales({ file } | { rows })` 走售后登记表导入命令的同一个函数（默认用合成样本的映射表），见 `apps/server/test/aftersales-history-import.int.test.ts`。实时推送（`/api/live`，SSE）在进程内打开读事件流，会话中途结束的用例用 `startTestHarness({ liveHeartbeatMs })` 调短心跳，见 `apps/server/test/live.int.test.ts`。
 
@@ -170,13 +171,15 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 
 **历史邮件回放与 T0 切换**（待办 26）：上线时把 T0 之前 90 天的邮件按到达时间单线程回放成工单，走实时收信的同一条流水线、时钟拨成邮件时间、回放模式下不发任何通知（`apps/server/src/mail-replay-command.ts`，ADR 0008「待办 26 落地」）。切换状态在 `channel.mail_cutover`：生产环境切换完成前只 watch 不收信；本机与开发测试环境没有切换记录时视为已切换、照常实时收示例来信，执行回放命令（要先停 worker）后先进入回放中、完成后回到实时，`pnpm db:reset-inbound` 连切换记录一起清掉。集成测试用 `t.runMailReplay(['--confirm'], { workerRunning?, pageSize? })` 执行同一个命令函数（`apps/server/test/mail-replay.int.test.ts`）；邮件先 `gmail.deliver` 进还没开始监听的 Fake 邮箱，就是「上线前的历史邮件」。
 
+**运维自检与告警**（待办 28）：worker 每分钟跑自检任务 `core.self_check`（写心跳 `core.worker_heartbeat`，查任务队列、各数据源同步、外部调用错误率、钉钉配额、备份与 WAL），异常经全局客户端 `dingtalk_robot`（运维群的钉钉自定义机器人）发出；本机与测试默认 Fake，告警只写 worker 日志（`自检发现 N 项异常`）。各模块的自检项在自己的 `self-check.ts`，在 `apps/server/src/jobs.ts` 组合。集成测试用 `t.enqueue(selfCheckJob, {})` 后 `t.runJobs()`，看 `t.clients.fake(dingtalkRobotClient).sent`（`apps/server/test/self-check.int.test.ts`）；群机器人的真实现（加签）用 undici MockAgent 回放（`integration/dingtalk-robot.test.ts`）。阈值是 `ALERT_*` 环境变量。备份、恢复、宿主机检查与告警处理见 `docs/运维手册.md`。
+
 **演示时刻**：非生产环境可设 `CLOCK_START`（带时区的 ISO 时刻，例如 `CLOCK_START=2026-09-11T10:20:00+08:00 pnpm --filter @forcome/server dev:api`，worker 同样设），api 与 worker 的时钟从该时刻起随系统时钟前进，本机截图与演示对上原型的演示时刻（例如当月登记完整率落在 9 月）；生产环境配置了就拒绝启动，开发测试环境不设（ADR 0008「待办 21 落地」修订）。
 
 **CI 与合并**：`.github/workflows/ci.yml` 在 PR 与 main 上跑类型检查、lint、迁移一致性、示例数据夹具一致性、构建、单元与集成测试、镜像构建与部署配置检查，最后由「CI 通过」汇总。仓库推到 GitHub 后，在 Settings → Branches 为 `main` 加保护规则：Require a pull request before merging（至少 1 个批准）、Require status checks to pass（必需检查选「CI 通过」）。仓库暂不上 GitHub，期间用 `pnpm ci:local` 代替。
 
-**部署**：main 上 CI 通过后，`.github/workflows/deploy-staging.yml` 在内网的开发测试运行器上执行 `deploy/deploy.mjs`，部署后对开发测试环境跑 Playwright（`apps/web/e2e` 全部用例）并在作业摘要里报告。仓库暂不上 GitHub，期间在本机用 `pnpm deploy:staging` 部署与冒烟；启用步骤、根证书安装与运维清单见 `docs/部署说明.md`。本机开发时的端到端用 `pnpm test:e2e`。
+**部署**：main 上 CI 通过后，`.github/workflows/deploy-staging.yml` 在内网的开发测试运行器上执行 `deploy/deploy.mjs`，部署后对开发测试环境跑 Playwright（`apps/web/e2e` 全部用例）并在作业摘要里报告。生产由 `v*` 版本标签触发 `.github/workflows/deploy-production.yml`，GitHub environment `production` 的审批人批准后在生产运行器上部署（迁移前自动备份），见 `docs/部署说明.md` 第 17 节。仓库暂不上 GitHub，期间在本机用 `pnpm deploy:staging` 部署与冒烟；启用步骤、根证书安装与运维清单见 `docs/部署说明.md`。本机开发时的端到端用 `pnpm test:e2e`。
 
-**镜像**：`docker build -f apps/server/Dockerfile -t forcome-server .`（构建上下文是仓库根目录）；默认运行 api，`node dist/worker.mjs`、`node dist/migrate.mjs` 运行另两个入口，`node dist/seed.mjs` 在非生产环境灌示例数据，`node dist/reset-inbound.mjs` 在非生产环境重放来信，`node dist/import-aftersales.mjs <登记表>` 导入售后登记表（各环境都用）。前端镜像（caddy + 静态文件）、自建 PostgreSQL 与冒烟镜像在 `deploy/`，由部署脚本构建。
+**镜像**：`docker build -f apps/server/Dockerfile -t forcome-server .`（构建上下文是仓库根目录）；默认运行 api，`node dist/worker.mjs`、`node dist/migrate.mjs` 运行另两个入口，`node dist/seed.mjs` 在非生产环境灌示例数据，`node dist/reset-inbound.mjs` 在非生产环境重放来信，`node dist/import-aftersales.mjs <登记表>` 导入售后登记表（各环境都用），`node dist/alert-test.mjs` 经群机器人发「告警通道已连通」。前端镜像（caddy + 静态文件）、自建 PostgreSQL 与冒烟镜像在 `deploy/`，由部署脚本构建。
 
 ## 约定
 

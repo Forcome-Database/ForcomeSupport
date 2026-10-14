@@ -82,10 +82,11 @@ describe('worker 每分钟自检', () => {
     ]);
 
     expect(await selfCheck()).toBeNull();
-    const [beat] = await rows<{ beat_at: string; pid: number }>(
-      sql`SELECT beat_at, pid FROM core.worker_heartbeat`,
+    // 心跳按数据库时间写（宿主机检查与数据库的 now() 比），不是测试的手动时钟
+    const [beat] = await rows<{ age_seconds: number; pid: number }>(
+      sql`SELECT extract(epoch FROM now() - beat_at)::int AS age_seconds, pid FROM core.worker_heartbeat`,
     );
-    expect(new Date(beat?.beat_at ?? 0)).toEqual(t.clock.now());
+    expect(beat?.age_seconds).toBeLessThan(30);
     expect(beat?.pid).toBe(process.pid);
   });
 

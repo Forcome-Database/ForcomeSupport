@@ -105,6 +105,8 @@ run_backup() {
   trap 'record_finish "$id" false "${FAILED_STEP:-$BASH_COMMAND}"; log "备份失败：${FAILED_STEP:-$BASH_COMMAND}"' ERR
 
   step "准备 restic 仓库" ensure_restic_repo
+  # WAL-G 的文件存储要求根目录已存在（第一次备份时数据库可能还没归档过任何 WAL）
+  as_postgres mkdir -p "$WALG_FILE_PREFIX"
   step "物理基础备份（WAL-G backup-push）" as_postgres wal-g backup-push "$PGDATA"
   local base
   base=$(as_postgres wal-g backup-list --json 2>/dev/null | jq -r 'last.backup_name')

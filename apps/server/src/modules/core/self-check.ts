@@ -81,13 +81,12 @@ export async function runSelfCheck(
   context: Pick<JobContext, 'logger'>,
 ): Promise<SelfCheckReport> {
   const now = runtime.clock.now();
+  // 心跳按数据库时间写：宿主机检查拿它与数据库的 now() 比（开发测试环境的运行时时钟可以设 CLOCK_START）
+  const beat = { beatAt: sql`now()`, host: hostname(), pid: process.pid };
   await runtime.db
     .insert(workerHeartbeat)
-    .values({ id: 'worker', beatAt: now, host: hostname(), pid: process.pid })
-    .onConflictDoUpdate({
-      target: workerHeartbeat.id,
-      set: { beatAt: now, host: hostname(), pid: process.pid },
-    });
+    .values({ id: 'worker', ...beat })
+    .onConflictDoUpdate({ target: workerHeartbeat.id, set: beat });
 
   const probeContext: SelfCheckContext = {
     db: runtime.db,
