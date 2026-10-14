@@ -165,6 +165,8 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 
 **报表**（待办 24）：P17 的工单量、首响中位数、SLA 达标率与「每日工单量」由 `report` 在只读角色下直读 `ticket` 的两个口径视图（`customer_trigger_event`、`customer_letter`，P04 的下钻数同一个视图），示例数据回放后 P17 照常有数。AC-P1-14 要一天 73 次客户来信触发的新建，示例数据里那天只有几张：开发工具「投报表验收夹具」`POST /api/dev/report-acceptance`（开启开发登录的非生产环境）让 worker 在验收日（示例的 09-10）投 73 封客户来信（亚马逊 52、Shopify 与邮件 21），逐封归并要几分钟，重复调用不会多出工单；Playwright 的 `apps/web/e2e/reports.spec.ts` 用它（集成测试直接 `gmail.deliver(…reportAcceptanceMails(fixture))`，见 `apps/server/test/report-tickets.int.test.ts`）。本机开发库调用后验收日的柱会多出这 73 次，要回到示例数据用 `pnpm db:reset-inbound`。
 
+**售后成本卡与报表导出**（待办 25）：P17「售后成本按责任类型」由 `report` 在只读角色下直读售后成本视图 `aftersales.aftersales_cost`（与 P13 合计行同一个视图），统计本月、随店铺筛选，只对客服主管、售后负责人显示；示例数据在 9 月，本机要看到示例的 $188.79 需按演示时刻 `CLOCK_START=2026-09-11T10:20:00+08:00` 启动 api（否则本月只有自己登记的单）。页头「导出」按当前筛选生成 xlsx，没有财务权限的角色文件里没有成本表；集成测试见 `apps/server/test/report-cost.int.test.ts`。
+
 **演示时刻**：非生产环境可设 `CLOCK_START`（带时区的 ISO 时刻，例如 `CLOCK_START=2026-09-11T10:20:00+08:00 pnpm --filter @forcome/server dev:api`，worker 同样设），api 与 worker 的时钟从该时刻起随系统时钟前进，本机截图与演示对上原型的演示时刻（例如当月登记完整率落在 9 月）；生产环境配置了就拒绝启动，开发测试环境不设（ADR 0008「待办 21 落地」修订）。
 
 **CI 与合并**：`.github/workflows/ci.yml` 在 PR 与 main 上跑类型检查、lint、迁移一致性、示例数据夹具一致性、构建、单元与集成测试、镜像构建与部署配置检查，最后由「CI 通过」汇总。仓库推到 GitHub 后，在 Settings → Branches 为 `main` 加保护规则：Require a pull request before merging（至少 1 个批准）、Require status checks to pass（必需检查选「CI 通过」）。仓库暂不上 GitHub，期间用 `pnpm ci:local` 代替。
