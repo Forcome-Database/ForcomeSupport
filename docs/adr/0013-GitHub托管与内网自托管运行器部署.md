@@ -91,3 +91,8 @@ status: accepted
 
 - **部署子命令 `order-backfill`**：`node deploy/deploy.mjs <环境> order-backfill [--store <店铺名>]… [--again]`，用当前部署的镜像起一次性容器执行 `dist/order-backfill.mjs`：给选中的店铺（不给为全部订单店铺）开始近 90 天的订单回补，只登记并排上第一页，worker 在后台逐页做，进度见 P18；已完成的跳过（`--again` 从头重来），没做完的接着做。上线前、选定 T0 与回放邮件之前执行（待办 26 的顺序），上线后新加的店铺再执行一次（`docs/部署说明.md` 第 15 节）。没配置平台凭据的店铺照常登记、先不取，配好后由每 10 分钟的续跑接着做。
 - **示例环境模拟「上线前已回补」**：`seedDemoData`（`pnpm db:seed`、开发测试环境的 seed 步骤、Playwright 的 e2e api）灌完示例数据后调同一个函数开始回补，P18 两张卡的回补行与原型一致（亚马逊 90 天已完成、Shopify 没开通 read_all_orders 只回补 60 天）。不放进示例数据的加载步骤：集成测试灌示例数据后自己决定回补与否。
+
+## 修订（2026-10-14，待办 26 落地）
+
+- **部署子命令 `mail-replay`**：`node deploy/deploy.mjs <环境> mail-replay [--t0 <带时区的时刻>] [--confirm]`，用当前部署的镜像起一次性容器执行 `dist/mail-replay.mjs`（历史邮件回放与 T0 切换，ADR 0008「待办 26 落地」）。不加 `--confirm` 只看计划（T0、回放区间、各邮箱开始监听的时刻、worker 是否在运行），不停 worker、不写库——生产环境的明确确认就是这一步；加了先 `stop worker`，命令成功（退出码 0）后 `up -d --wait --no-deps worker`，失败时 worker 保持停止并提示再执行同一命令接着回放（回放排的任务只能由回放跑完）。不挂载本机文件，远端 Docker 上下文（本机部署到远端主机）也能用。参数在 `deploy/lib/mail-replay.mjs` 里转成容器里的命令（有单测）。生产环境随 28 号待办加入部署脚本后同样可用；在那之前的等价 `docker compose` 写法见 `docs/部署说明.md` 第 16 节。
+- **重放来信也清切换记录**：非生产环境的「重放来信」清掉 `channel.mail_cutover` 与 `channel.mail_replay_item`，回到「已切换」，回放命令可以重新演练。

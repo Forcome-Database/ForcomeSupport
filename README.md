@@ -131,6 +131,7 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 | `pnpm db:reset-inbound` | 重放来信：清空本机开发库的收信与工单（识别或归并口径变了以后用；先停 `dev:worker`，再启动后按新口径重新回放；生产环境拒绝） |
 | `pnpm db:generate` | 改了某个模块的 `schema.ts` 后生成迁移 |
 | `pnpm --filter @forcome/server import:aftersales <登记表> [--mapping <映射表>] [--dry-run]` | 把售后登记表导入本机开发库（相对路径从 `apps/server` 算；`--dry-run` 只报告不写库；映射表与步骤见 `docs/部署说明.md` 第 10 节）；`history:sample` 重新生成合成样本 `test/fixtures/history-import/register-sample.xlsx` |
+| `pnpm --filter @forcome/server mail-replay [--t0 <时刻>] [--confirm]` | 历史邮件回放与 T0 切换（演练上线切换；不加 `--confirm` 只看计划，加了要先停 `dev:worker`，完成后再启动；步骤见 `docs/部署说明.md` 第 16 节） |
 | `pnpm --filter @forcome/server dev:api` / `dev:worker` | 本机运行 api（4516）/ worker，环境变量默认取 `apps/server/dev.env`（开启开发登录）；worker 启动时 Fake Gmail 回放示例来信，几秒后在 P04 归并成工单 |
 | `pnpm --filter @forcome/web dev` | 本机运行前端（http://127.0.0.1:4517），`/api` 转给本机 api；未登录时进入开发登录页，选一位示例成员即可登录 |
 | `pnpm typecheck` · `pnpm lint` · `pnpm build` | 类型检查 · lint（含模块边界）与格式 · 构建 |
@@ -140,7 +141,7 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 | `pnpm test:e2e` | Playwright 端到端（需要 `pnpm db:up`；自己起 4518、4519 两个服务，用 e2e 专用库 `forcome_e2e`） |
 | `pnpm ci:local` | 本机跑一遍与 CI 相同的检查（先 `pnpm db:up`，并且需要 Docker 构建镜像） |
 | `pnpm deploy:staging` | 部署到开发测试环境（本机 Docker）：构建镜像 → migrate → 示例数据 → 起服务 → 用根证书核对 HTTPS → Playwright 冒烟，报告在 `deploy/.state/staging/`（`docs/部署说明.md`）；识别或归并口径变了的版本加 `--reset-inbound`，起服务前先重放来信 |
-| `pnpm staging smoke` · `cert` · `compose …` · `down` · `reset-inbound` · `import-aftersales …` · `order-backfill …` | 对开发测试环境：重跑 HTTPS 核对与冒烟 · 导出根证书 · 执行 docker compose · 停止（保留数据） · 重放来信（停 worker、清空收信与工单、起 worker，`docs/部署说明.md`） · 导入售后登记表（第 10 节） · 开始订单回补（第 15 节） |
+| `pnpm staging smoke` · `cert` · `compose …` · `down` · `reset-inbound` · `import-aftersales …` · `order-backfill …` · `mail-replay …` | 对开发测试环境：重跑 HTTPS 核对与冒烟 · 导出根证书 · 执行 docker compose · 停止（保留数据） · 重放来信（停 worker、清空收信与工单、起 worker，`docs/部署说明.md`） · 导入售后登记表（第 10 节） · 开始订单回补（第 15 节） · 历史邮件回放与 T0 切换（第 16 节，加 `--confirm` 时自动停起 worker） |
 | `pnpm deploy:verify` | 部署配置检查：Compose 文件、前端镜像、Caddyfile（CI 与 `ci:local` 执行） |
 
 **测试**：`*.test.ts` 是单元测试；`*.int.test.ts` 是集成测试，用真实 PostgreSQL 18——每次运行先建模板库并迁移，各测试文件再复制出自己的库，互不干扰。集成测试只经主接缝（规格「测试接缝」）：用 `apps/server/test/harness.ts` 的 `startTestHarness()` 在测试进程内调用 HTTP 接口，`t.loginAs('坐席')` 以某个角色登录（`t.addMember(…)` 建多角色、店铺范围受限等示例数据里没有的成员后用 `t.loginAs({ memberId })`），`t.clients.fake(…)` 往 Fake 里放数据、注入故障，`t.clock` 推进时钟，`t.runJobs()` 把 worker 跑到空闲（每轮先拉常驻拉取源，如 Fake Gmail 的推送通知，再跑已排队的任务），`t.auditRecords()` 核对审计；要验证生产环境的限制时用 `startTestHarness({ appEnv: 'production' })`（应用按生产组装，测试工具另用非生产实例做开发登录，见 `apps/server/test/stores.int.test.ts`）；样板见 `apps/server/test/dev-login.int.test.ts`；还没有业务接口使用的公共工具（店铺范围、越权审计、财务字段过滤）用 `startTestHarness({ routes })` 挂示范接口来测，见 `apps/server/test/access-tools.int.test.ts`。外部客户端的「接口 + 真实现 + Fake」写法见 `apps/server/src/modules/integration/fake-framework.test.ts`。来信用 `t.clients.fake(gmailClient).deliver(…)` 放进 Fake Gmail（邮箱要先开始监听：灌完店铺先 `t.runJobs()` 一次），见 `apps/server/test/inbound-to-ticket.int.test.ts`。历史导入的售后单经 `t.importAftersales({ file } | { rows })` 走售后登记表导入命令的同一个函数（默认用合成样本的映射表），见 `apps/server/test/aftersales-history-import.int.test.ts`。实时推送（`/api/live`，SSE）在进程内打开读事件流，会话中途结束的用例用 `startTestHarness({ liveHeartbeatMs })` 调短心跳，见 `apps/server/test/live.int.test.ts`。
@@ -166,6 +167,8 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 **报表**（待办 24）：P17 的工单量、首响中位数、SLA 达标率与「每日工单量」由 `report` 在只读角色下直读 `ticket` 的两个口径视图（`customer_trigger_event`、`customer_letter`，P04 的下钻数同一个视图），示例数据回放后 P17 照常有数。AC-P1-14 要一天 73 次客户来信触发的新建，示例数据里那天只有几张：开发工具「投报表验收夹具」`POST /api/dev/report-acceptance`（开启开发登录的非生产环境）让 worker 在验收日（示例的 09-10）投 73 封客户来信（亚马逊 52、Shopify 与邮件 21），逐封归并要几分钟，重复调用不会多出工单；Playwright 的 `apps/web/e2e/reports.spec.ts` 用它（集成测试直接 `gmail.deliver(…reportAcceptanceMails(fixture))`，见 `apps/server/test/report-tickets.int.test.ts`）。本机开发库调用后验收日的柱会多出这 73 次，要回到示例数据用 `pnpm db:reset-inbound`。
 
 **售后成本卡与报表导出**（待办 25）：P17「售后成本按责任类型」由 `report` 在只读角色下直读售后成本视图 `aftersales.aftersales_cost`（与 P13 合计行同一个视图），统计本月、随店铺筛选，只对客服主管、售后负责人显示；示例数据在 9 月，本机要看到示例的 $188.79 需按演示时刻 `CLOCK_START=2026-09-11T10:20:00+08:00` 启动 api（否则本月只有自己登记的单）。页头「导出」按当前筛选生成 xlsx，没有财务权限的角色文件里没有成本表；集成测试见 `apps/server/test/report-cost.int.test.ts`。
+
+**历史邮件回放与 T0 切换**（待办 26）：上线时把 T0 之前 90 天的邮件按到达时间单线程回放成工单，走实时收信的同一条流水线、时钟拨成邮件时间、回放模式下不发任何通知（`apps/server/src/mail-replay-command.ts`，ADR 0008「待办 26 落地」）。切换状态在 `channel.mail_cutover`：生产环境切换完成前只 watch 不收信；本机与开发测试环境没有切换记录时视为已切换、照常实时收示例来信，执行回放命令（要先停 worker）后先进入回放中、完成后回到实时，`pnpm db:reset-inbound` 连切换记录一起清掉。集成测试用 `t.runMailReplay(['--confirm'], { workerRunning?, pageSize? })` 执行同一个命令函数（`apps/server/test/mail-replay.int.test.ts`）；邮件先 `gmail.deliver` 进还没开始监听的 Fake 邮箱，就是「上线前的历史邮件」。
 
 **演示时刻**：非生产环境可设 `CLOCK_START`（带时区的 ISO 时刻，例如 `CLOCK_START=2026-09-11T10:20:00+08:00 pnpm --filter @forcome/server dev:api`，worker 同样设），api 与 worker 的时钟从该时刻起随系统时钟前进，本机截图与演示对上原型的演示时刻（例如当月登记完整率落在 9 月）；生产环境配置了就拒绝启动，开发测试环境不设（ADR 0008「待办 21 落地」修订）。
 
