@@ -130,6 +130,6 @@ status: accepted
 
 ## 修订（2026-10-14，待办 18 落地）
 
-- **实时推送的落地**：业务事务里 `core` 的 `announceChange` 执行 `pg_notify('forcome_change', 内容)`——随事务提交送出、回滚不送，同一事务内容相同的只送一次；内容只说哪一类变了（`tickets`、`unassigned_mail`，站内通知 `notifications` 另带接收人的成员 id，NOTIFY 有 8000 字节上限，接收人每 100 个分一条）。api 进程用 `core` 的 `createChangeFeed(数据库地址)` 开一条专门的连接 LISTEN（不占连接池；第一位订阅者到来时才连，测试与没人连推送时不占连接），连接出错或断开 5 秒后重连，重连上给所有订阅者送 `resync`（断开期间的变化可能漏了）；进程退出时先关它，各条推送随之结束。
+- **实时推送的落地**：业务事务里 `core` 的 `announceChange` 执行 `pg_notify('forcome_change', 内容)`——随事务提交送出、回滚不送，同一事务内容相同的只送一次；内容只说哪一类变了（`tickets`、`unassigned_mail`，站内通知 `notifications` 另带接收人的成员 id，NOTIFY 有 8000 字节上限，接收人每 100 个分一条）。api 进程用 `core` 的 `createChangeFeed(数据库地址)` 开一条专门的连接 LISTEN（不占连接池；第一位订阅者到来时才连，之后一直保持——还没人连过推送的测试与进程不占这条连接），连接出错或断开 5 秒后重连，重连上给所有订阅者送 `resync`（断开期间的变化可能漏了）；进程退出时先关它，各条推送随之结束（订阅时登记的关闭回调）；浏览器断开时立即退订，数据库连不上、还在等监听建立的连接也不挂着。
 - **SSE 接口**：`GET /api/live`（`org/live.ts`，按会话与成员决定推什么，所以在 `org`）：Hono 的 `streamSSE`；开始监听后先发 `event: ready`（带 `retry: 5000`），之后每条变化发 `event: change`、`data: {"topic": …}`（`contracts/live.ts`），不带数据——浏览器让对应缓存失效后照常经各自的接口重新拉取（店铺范围、财务字段照常过滤）。工单只推给有「查看工单」能力的，未归属店铺队列只推给有「指定店铺」能力的，站内通知只推给接收人；不再按店铺范围细分（推送里没有数据，多拉一次无妨）。每 25 秒写一行注释心跳（`LIVE_HEARTBEAT_MS`，保住经代理的连接），顺带重新核对会话（见 ADR 0010「待办 18 落地」）。经 caddy 与 Vite 开发 / 预览服务器的代理照常流式转发（`text/event-stream` 不缓冲）。
 - **测试**：主接缝里 `startTestHarness` 为每个测试库建同样的变化来源（`liveHeartbeatMs` 可调短），用例在进程内打开 `/api/live` 读事件流，写法见 `apps/server/test/live.int.test.ts`。

@@ -1,4 +1,12 @@
-import { can, LIVE_EVENT, LIVE_PATH, type LiveTopic, type Role } from '@forcome/contracts';
+import {
+  can,
+  LIVE_EVENT,
+  LIVE_PATH,
+  LIVE_READY_EVENT,
+  LIVE_RETRY_MS,
+  type LiveTopic,
+  type Role,
+} from '@forcome/contracts';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { AppEnv, ChangeEvent, ChangeFeed, Runtime } from '../core';
@@ -17,12 +25,6 @@ import { lookupSession, sessionToken } from './session';
 
 /** 心跳间隔：写一行注释保住连接（代理与浏览器都不会当它断了），顺带重新核对会话 */
 export const LIVE_HEARTBEAT_MS = 25_000;
-
-/** 断线后浏览器隔多久重连（SSE 的 retry） */
-const RECONNECT_MS = 5_000;
-
-/** 连接建立、开始监听后发的第一条（浏览器据此知道是不是重连上的：重连上时全部重新拉取，补上断开期间的变化） */
-export const LIVE_READY_EVENT = 'ready';
 
 /** 这位成员要不要收这一条，要的话推哪一类 */
 function topicFor(
@@ -58,9 +60,13 @@ export function createLiveRoutes(deps: {
     const token = sessionToken(c);
     let member = { id: access.member.id, roles: access.member.roles };
     return streamSSE(c, async (stream) => {
-      // 等心跳的计时器在连接断开时立即结束，不让断开的连接再挂一个心跳周期
+      // 等心跳的计时器在连接断开、进程退出时立即结束，不让断开的连接再挂一个心跳周期
       let wake: (() => void) | undefined;
-      stream.onAbort(() => wake?.());
+      let ended = false;
+      const end = () => {
+        ended = true;
+        wake?.();
+      };
       const pause = (ms: number) =>
         new Promise<void>((resolve) => {
           const timer = setTimeout(resolve, ms);
@@ -70,22 +76,23 @@ export function createLiveRoutes(deps: {
           };
         });
 
+      // 进程退出（变化来源关闭）时结束连接，浏览器稍后重连到新的进程
       const subscription = changes.subscribe((event) => {
         const topic = topicFor(event, member);
         if (topic) void stream.writeSSE({ event: LIVE_EVENT, data: JSON.stringify({ topic }) });
-      });
-      // 进程退出（变化来源关闭）时结束连接，浏览器稍后重连到新的进程
-      let shuttingDown = false;
-      void subscription.closed.then(() => {
-        shuttingDown = true;
-        wake?.();
+      }, end);
+      // 浏览器断开：立即退订（数据库连不上、还在等监听建立时也不挂着）
+      stream.onAbort(() => {
+        subscription.unsubscribe();
+        end();
       });
       try {
         await subscription.ready;
-        await stream.writeSSE({ event: LIVE_READY_EVENT, data: '{}', retry: RECONNECT_MS });
-        while (!stream.aborted && !stream.closed && !shuttingDown) {
+        if (ended || stream.aborted) return;
+        await stream.writeSSE({ event: LIVE_READY_EVENT, data: '{}', retry: LIVE_RETRY_MS });
+        while (!stream.aborted && !stream.closed && !ended) {
           await pause(heartbeatMs);
-          if (stream.aborted || shuttingDown || !token) break;
+          if (stream.aborted || ended || !token) break;
           // 会话已结束（过期、退出、停用、不再能进入）就断开；角色改了按新角色推
           const found = await lookupSession(runtime.db, token, runtime.clock.now(), {
             renew: false,

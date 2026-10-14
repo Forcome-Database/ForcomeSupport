@@ -61,17 +61,18 @@ function parseChange(payload: string | undefined): Change | null {
   return null;
 }
 
-/** 一位订阅者：ready 在监听已建立（之后提交的变化都会送到）时完成；closed 在变化来源关闭（进程退出）时完成 */
+/** 一位订阅者：ready 在监听已建立（之后提交的变化都会送到）或已退订时完成 */
 export interface ChangeSubscription {
   readonly ready: Promise<void>;
-  readonly closed: Promise<void>;
   unsubscribe(): void;
 }
 
 /** api 进程里的变化来源：一条专门的数据库连接 LISTEN，分发给各条 SSE 连接 */
 export interface ChangeFeed {
-  /** 订阅；第一位订阅者到来时才连数据库开始监听 */
-  subscribe(listener: (event: ChangeEvent) => void): ChangeSubscription;
+  /**
+   * 订阅；第一位订阅者到来时才连数据库开始监听，之后一直保持。onClose 在变化来源关闭（进程退出）时调用，退订后不再调用
+   */
+  subscribe(listener: (event: ChangeEvent) => void, onClose?: () => void): ChangeSubscription;
   /** 断开监听（进程退出、测试结束） */
   close(): Promise<void>;
 }
@@ -82,7 +83,7 @@ export interface ChangeFeedOptions {
 }
 
 /**
- * 变化来源：懒连接（没有人订阅时不占连接），连接出错或断开后按 retryMs 重连，重连上后给所有订阅者送 resync。
+ * 变化来源：懒连接（还没有人订阅过时不占连接，连上后一直保持），连接出错或断开后按 retryMs 重连，重连上后给所有订阅者送 resync。
  * 多个 api 实例各自监听，不用改代码（ADR 0006）。
  */
 export function createChangeFeed(
@@ -91,19 +92,16 @@ export function createChangeFeed(
   options: ChangeFeedOptions = {},
 ): ChangeFeed {
   const retryMs = options.retryMs ?? 5_000;
-  const listeners = new Set<(event: ChangeEvent) => void>();
+  /** 订阅者 → 关闭时的回调 */
+  const listeners = new Map<(event: ChangeEvent) => void, (() => void) | undefined>();
   let client: pg.Client | null = null;
   let connecting: Promise<void> | null = null;
   let retry: NodeJS.Timeout | undefined;
   let everConnected = false;
   let closed = false;
-  let markClosed: () => void = () => undefined;
-  const whenClosed = new Promise<void>((resolve) => {
-    markClosed = resolve;
-  });
 
   const dispatch = (event: ChangeEvent) => {
-    for (const listener of listeners) {
+    for (const listener of listeners.keys()) {
       try {
         listener(event);
       } catch (error) {
@@ -172,8 +170,8 @@ export function createChangeFeed(
   }
 
   return {
-    subscribe(listener) {
-      listeners.add(listener);
+    subscribe(listener, onClose) {
+      listeners.set(listener, onClose);
       // 连不上时 ready 一直等到重连成功（SSE 连接照常保持，浏览器不用跟着重连）
       const ready = new Promise<void>((resolve) => {
         const attempt = () => {
@@ -184,7 +182,6 @@ export function createChangeFeed(
       });
       return {
         ready,
-        closed: whenClosed,
         unsubscribe: () => {
           listeners.delete(listener);
         },
@@ -192,9 +189,10 @@ export function createChangeFeed(
     },
     async close() {
       closed = true;
-      markClosed();
       clearTimeout(retry);
+      const onCloses = [...listeners.values()];
       listeners.clear();
+      for (const onClose of onCloses) onClose?.();
       await connecting?.catch(() => undefined);
       const current = client;
       client = null;

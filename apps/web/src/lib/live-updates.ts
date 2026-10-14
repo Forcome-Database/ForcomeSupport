@@ -1,4 +1,11 @@
-import { LIVE_EVENT, LIVE_PATH, liveEventSchema, type LiveTopic } from '@forcome/contracts';
+import {
+  LIVE_EVENT,
+  LIVE_PATH,
+  LIVE_READY_EVENT,
+  LIVE_RETRY_MS,
+  liveEventSchema,
+  type LiveTopic,
+} from '@forcome/contracts';
 import { useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { api } from './api';
@@ -13,12 +20,6 @@ import { TICKETS_QUERY_KEY, UNASSIGNED_MAIL_QUERY_KEY } from './tickets';
  * 每次连上（收到 ready，服务端已开始监听）都在后台全部重新拉取一次：第一次补上页面取数与开始监听之间的变化，断线重连（浏览器按服务端
  * 给的 retry 自己重连）后补上断开期间的变化。连接被拒（401 等）时先用后台请求核对会话：会话已结束就按会话结束处理，否则隔一会儿再连。
  */
-
-/** 连接被拒或连不上时隔多久再连 */
-const RECONNECT_MS = 5_000;
-
-/** 服务端在开始监听后发的第一条（org/live.ts 的 LIVE_READY_EVENT） */
-const READY_EVENT = 'ready';
 
 /** 每一类变化让哪些缓存失效 */
 const TOPIC_KEYS: Readonly<Record<Exclude<LiveTopic, 'resync'>, QueryKey>> = {
@@ -70,14 +71,14 @@ export function useLiveUpdates(): void {
 
     const later = () => {
       clearTimeout(retry);
-      retry = setTimeout(open, RECONNECT_MS);
+      retry = setTimeout(open, LIVE_RETRY_MS);
     };
 
     function open() {
       if (stopped) return;
       const current = new EventSource(LIVE_PATH);
       source = current;
-      current.addEventListener(READY_EVENT, () => invalidator.apply('resync'));
+      current.addEventListener(LIVE_READY_EVENT, () => invalidator.apply('resync'));
       current.addEventListener(LIVE_EVENT, (event) => {
         let data: unknown;
         try {

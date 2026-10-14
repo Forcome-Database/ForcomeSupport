@@ -6,6 +6,7 @@ import {
   ticketDrillChannelSchema,
   ticketDrillKindSchema,
   ticketDrillLetterStateSchema,
+  ticketDrillOf,
   ticketDrillOriginSchema,
   ticketInboundPeriodSchema,
   ticketListSortDefaults,
@@ -59,9 +60,9 @@ export function ticketQueryOf(search: TicketsSearch): TicketListQuery {
   return rest.inbound === 'custom' ? { ...rest, from, to } : rest;
 }
 
-/** 有没有报表下钻（与后端 ticketDrillOf 同一判断：要有 drill 与起始日） */
+/** 有没有报表下钻（与后端同一个 ticketDrillOf：要有 drill 与起始日） */
 export function hasDrill(search: TicketsSearch): boolean {
-  return Boolean(search.drill && search.drillFrom);
+  return ticketDrillOf(search) !== null;
 }
 
 /** 条件是否就是默认（最近来信近 30 天、其余都没选、没有下钻）：是的话不出「清除筛选」 */

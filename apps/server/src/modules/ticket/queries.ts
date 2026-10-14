@@ -2,6 +2,7 @@ import { addDays, businessDate, startOfBusinessDate } from '@forcome/calendar';
 import {
   slaTargetOf,
   TICKET_PAGE_SIZE,
+  ticketListSortDefaults,
   ticketDrillChannelMembers,
   ticketDrillOf,
   ticketInboundRange,
@@ -214,25 +215,28 @@ export async function listTickets(
   // SLA 剩余只看待回复的工单
   const dueAt = sql`CASE WHEN ${ticket.status} = 'awaiting_reply' THEN ${pending.dueAt} END`;
   const sort = query.sort ?? 'sla';
-  const dir = query.dir ?? (sort === 'sla' ? 'asc' : 'desc');
-  const order: SQL[] =
-    sort === 'sla'
-      ? dir === 'asc'
-        ? [
-            sql`${dueAt} ASC NULLS LAST`,
-            statusRank,
-            desc(ticket.lastInboundAt),
-            desc(ticket.number),
-          ]
-        : [
-            sql`${dueAt} DESC NULLS FIRST`,
-            sql`${statusRank} DESC`,
-            asc(ticket.lastInboundAt),
-            asc(ticket.number),
-          ]
-      : dir === 'desc'
-        ? [desc(ticket.lastInboundAt), desc(ticket.number)]
-        : [asc(ticket.lastInboundAt), asc(ticket.number)];
+  const dir = query.dir ?? ticketListSortDefaults[sort];
+  const orders: Record<typeof sort, Record<typeof dir, SQL[]>> = {
+    sla: {
+      asc: [
+        sql`${dueAt} ASC NULLS LAST`,
+        statusRank,
+        desc(ticket.lastInboundAt),
+        desc(ticket.number),
+      ],
+      desc: [
+        sql`${dueAt} DESC NULLS FIRST`,
+        sql`${statusRank} DESC`,
+        asc(ticket.lastInboundAt),
+        asc(ticket.number),
+      ],
+    },
+    last_inbound: {
+      asc: [asc(ticket.lastInboundAt), asc(ticket.number)],
+      desc: [desc(ticket.lastInboundAt), desc(ticket.number)],
+    },
+  };
+  const order = orders[sort][dir];
 
   const page = query.page ?? 1;
   const rows = db

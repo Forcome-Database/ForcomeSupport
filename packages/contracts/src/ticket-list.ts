@@ -41,7 +41,8 @@ const PERIOD_DAYS: Record<Exclude<TicketInboundPeriod, 'custom'>, number> = {
 
 /**
  * 下钻按什么计（PRD P17「指标口径」）：
- * - triggered：客户来信触发的新建或重开（工单量、每日工单量）——按事件计，列出这些事件的工单；归期按状态变更的发生时刻
+ * - triggered：客户来信触发的新建或重开（工单量、每日工单量）——按事件计，列出这些事件的工单；归期按触发那封来信的到达时间
+ *   （业务时刻，ADR 0008「待办 18 落地」）
  * - arrived：客户来信到达（首响中位数、SLA 达标率）——按封计，列出含这些来信的工单；归期按来信的到达时间
  */
 export const ticketDrillKinds = ['triggered', 'arrived'] as const;

@@ -9,6 +9,7 @@ import { queryOptions, type QueryClient } from '@tanstack/react-query';
 import { CircleCheck, Store, TriangleAlert, Users, type LucideIcon } from 'lucide-react';
 import type { IconTileTone } from '@/components/icon-tile';
 import { api } from './api';
+import { isBackgroundFetch } from './background-fetch';
 import { canOpenPage, pages, type PageDefinition } from './pages';
 
 /*
@@ -25,7 +26,11 @@ export const notificationsKey = ['notifications'] as const;
 
 export const unreadCountQuery = queryOptions({
   queryKey: [...notificationsKey, 'unread-count'],
-  queryFn: api.notificationUnread,
+  // 未读数总是后台请求；推送触发时登记的也在这里用掉（lib/background-fetch.ts）
+  queryFn: ({ queryKey }) => {
+    isBackgroundFetch(queryKey);
+    return api.notificationUnread();
+  },
   refetchInterval: NOTIFICATION_POLL_MS,
 });
 
@@ -45,7 +50,12 @@ export function fetchByUser(view: NotificationView): void {
 export function notificationListQuery(view: NotificationView) {
   return queryOptions({
     queryKey: [...notificationsKey, 'list', view],
-    queryFn: () => api.notifications(view, { background: !userFetches.delete(view) }),
+    queryFn: ({ queryKey }) => {
+      // 两种登记都用掉：推送触发的（background-fetch.ts）与人的操作（fetchByUser）
+      const pushed = isBackgroundFetch(queryKey);
+      const byUser = userFetches.delete(view);
+      return api.notifications(view, { background: pushed || !byUser });
+    },
     refetchInterval: NOTIFICATION_POLL_MS,
   });
 }

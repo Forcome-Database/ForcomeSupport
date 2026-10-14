@@ -8,8 +8,14 @@ import { z } from 'zod';
 /** 推送的地址（EventSource 连这里；会话照常校验，但连接本身不续期会话） */
 export const LIVE_PATH = '/api/live';
 
-/** SSE 的事件名 */
+/** SSE 的事件名：某类对象变了 */
 export const LIVE_EVENT = 'change';
+
+/** 开始监听后发的第一条（每次连上都有：浏览器据此全部重新拉取一次，补上取数与开始监听之间、断开期间的变化） */
+export const LIVE_READY_EVENT = 'ready';
+
+/** 断线、连接被拒后隔多久重连（SSE 的 retry，浏览器连接被拒时自己等同样久） */
+export const LIVE_RETRY_MS = 5_000;
 
 /**
  * 变了的是哪一类：

@@ -77,10 +77,20 @@ function contactForm(
   };
 }
 
+/**
+ * 全部工单：本文件的来信从 7 月起，超出 P04 默认的「最近来信近 30 天」，按最近来信不限日期取、逐页取完（待办 18 起接口分页）
+ */
 async function ticketList(client: ApiClient): Promise<TicketListItem[]> {
-  const res = await client.get('/api/tickets');
-  expect(res.status).toBe(200);
-  return ticketListSchema.parse(await res.json()).tickets;
+  const tickets: TicketListItem[] = [];
+  for (let page = 1; ; page += 1) {
+    const res = await client.get(
+      `/api/tickets?inbound=custom&from=2000-01-01&to=2099-12-31&page=${page}`,
+    );
+    expect(res.status).toBe(200);
+    const list = ticketListSchema.parse(await res.json());
+    tickets.push(...list.tickets);
+    if (page * list.pageSize >= list.total) return tickets;
+  }
 }
 
 async function ticketDetail(client: ApiClient, number: string): Promise<TicketDetail> {
