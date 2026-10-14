@@ -391,7 +391,7 @@ def s15():
                 cap('保存后 · 「缺 1 项」消失') + after_bf +
                 row(muted('补登记入审计日志（P27）。页头完整率：', 12) + BL.completion(c_bf), 10, wrap=True), 10)
     two = col(cap('② 取消售后单 · 二次确认，原因必填') + over_page(BL.cancel_dialog(), 680, drawer_=False), 8)
-    return col(frame(grid(col(one + three, 24) + two, 2, 32, extra='align-items: start;'), WIDE) + s15_more(), 0)
+    return col(frame(grid(col(one + three, 24) + two, 2, 32, extra='align-items: start;'), WIDE) + s15_more() + s15_reassign(), 0)
 
 
 def s15_more():
@@ -420,7 +420,7 @@ def s15_more():
     left = width(cap('当月没有已完成的单（例如月初）：写「—」、进度条为空，右侧不写筛出，整块不可点') + row(empty_month, 0) +
                  cap('点「筛出缺字段的 N 单」后：选中态的筛选芯片「缺字段的已完成单：9 月」带 ×，右侧「清除筛选」；只列当月（按完成时间）已完成、缺适用字段的单，与完整率同口径，历史导入不列') + filtered +
                  cap('「缺 N 项」悬停列出缺的字段（按抽屉顺序；配件 × 数量算一项，索赔对象与状态合算一项）') + miss_tip +
-                 cap('行尾「更多」不可用的项禁用并悬停说明原因（这张单已取消时两项都写「这张单已取消」）；坐席没有「更多」') + menus)
+                 cap('行尾「更多」不可用的项禁用并悬停说明原因（这张单已取消时三项都写「这张单已取消」，见下方改派小样）；坐席没有「更多」') + menus)
     right = col(cap('设为已完成后不缺字段：只写标题，带撤销倒计时（同 G5「已关闭工单」）') + done_ok +
                 cap('撤销失败（超过撤销时限或网络）') + undo_fail +
                 cap('操作时这张单刚被别人改过（设为已完成、取消、补登同理）：台账随之刷新') + stale +
@@ -428,6 +428,49 @@ def s15_more():
                 cap('行内补登时快递单号为空：「保存」禁用，悬停说明') + empty_bf, 10)
     return frame(cap('S15 补充小样（第一阶段实现时确认，10-05）') + grid(left + col(right + cap('取消弹窗 · 没登记的费用项不列（S-20260911-0019 的产品成本、运费还没登记）；原因为空点「取消售后单」报错；四项都没登记时不显示费用框与「保留合计」') +
                                                                           over_page(BL.cancel_dialog('S-20260911-0019', True), 640, drawer_=False), 10), 2, 32, extra='align-items: start;'), WIDE, gap=10)
+
+
+def reassign_dialog(no, current, choice=None, blocked=None):
+    """改派负责人（待办 23，协调者 2026-10-14 决定 Q8）：照取消弹窗的样子；接手人只列有该店铺范围的在职售后负责人、去掉现负责人。"""
+    r = BL.P1R[no]
+    now_owner = row(nowrap('现在的负责人', 12, T['ink3']) + nowrap(current, 13, T['ink'], 600), 8)
+    if blocked:
+        ctrl = field('接手人', select_box(None, '没有可选的售后负责人', 'disabled'), True, error=blocked)
+        foot = btn('取消', 'secondary') + btn('改派', 'primary', disabled=True, reason=blocked)
+    else:
+        ctrl = field('接手人', select_box(choice), True, hint='只列有该店铺范围的售后负责人')
+        foot = btn('取消', 'secondary') + btn('改派', 'primary')
+    return dialog('改派 %s？' % r['no'], now_owner + ctrl, foot, 460, None, '%s · %s · %s' % (r['customer'], r['method'], r['resp']))
+
+
+def s15_reassign():
+    """S15 补充小样 · 改派负责人与「待分配」（待办 23，协调者 2026-10-14 决定 Q5–Q9）：行尾「更多」的「改派负责人」（进行中、已完成可用，
+    已取消禁用）、改派弹窗与结果、负责人筛选的「待分配」、负责人列的写法、改派队列的站内通知。示例假设李婷原是 S-20260911-0021 的负责人、
+    已钉钉离职，赵倩另被分配了售后负责人角色。"""
+    item = lambda t, ic, tone=None: (t, ic, tone)
+    cancelled = row(menu([item('设为已完成', 'check_c', 'muted'), item('改派负责人', 'users', 'muted'), '-', item('取消售后单', 'x_c', 'muted')], 168) +
+                    tooltip('这张单已取消'), 8, 'flex-start')
+    chip_ = filter_chip('负责人', '待分配', True)
+    pick = col(row(chip_, 0) + option_list(['全部', '待分配', '王磊', '赵倩'], '待分配', 168), 6)
+    cell = row(text('待分配', 13, T['warn'], 600) + tooltip('原负责人 李婷 已停用'), 12)
+    ok = reassign_dialog('S-20260911-0018', '王磊', '赵倩（售后负责人）')
+    pending = reassign_dialog('S-20260911-0021', '待分配（原负责人 李婷 已停用）', '王磊（售后负责人）')
+    none = reassign_dialog('S-20260911-0019', '王磊', blocked='没有其他有该店铺范围的售后负责人可接手')
+    done = toast('success', '已改派 S-20260911-0018', '负责人：王磊 → 赵倩，已记入审计日志。')
+    stale = toast('error', '改派失败：数据已被他人修改', '已刷新为最新内容，请核对后再操作。')
+    tile = '<div style="width: 32px; height: 32px; border-radius: 8px; background: %s; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">%s</div>' % (T['warn_bg'], icon('users', 16, T['warn']))
+    note = '<div style="width: 360px; box-sizing: border-box; background: #ffffff; border: 1px solid %s; border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px;">%s%s</div>' % (
+        T['line'], tile, col(nowrap('售后单待改派', 13, T['ink'], 600) + text('李婷已停用（钉钉离职），Forcome Auto 有 1 张进行中的售后单待分配负责人', 12, T['ink3']) +
+                                     row(nowrap('P13 · 待分配', 12, T['accent'], 600) + nowrap('10:12', 12, T['ink4']), 8), 3))
+    left = col(cap('这张单已取消：三项都禁用，悬停「这张单已取消」；进行中、已完成的单「改派负责人」可用（客服主管、售后负责人，店铺范围内任何单）') + cancelled +
+               cap('负责人筛选：「全部」之后第一项「待分配」，选中写「负责人：待分配」；只列钉钉离职自动停用后进入改派队列的单（负责人为空的历史导入单不算）。地址栏没给日期时，费用发生日从待分配单里最早的一天到今天') + pick +
+               cap('负责人列：待分配的单写「待分配」，悬停写原负责人；改派、或在编辑登记里改了负责人后恢复写负责人姓名') + cell +
+               cap('改派队列的站内通知（11.4）：按店铺各发一条，只发给店铺范围包含该店铺的在职客服主管；点进 P13「负责人：待分配」') + note, 10)
+    right = col(cap('改派弹窗：一行「现在的负责人」，「接手人」只列有该店铺范围的在职售后负责人（不含现负责人），选项写「姓名（售后负责人）」') + ok +
+                cap('待分配的单：「现在的负责人」写「待分配（原负责人 李婷 已停用）」') + pending +
+                cap('没有可选的人：下拉置灰，字段下写原因，「改派」置灰') + none +
+                cap('改派成功；单刚被别人改过（G7）同 S15 的写法，台账随之刷新') + row(done + stale, 12, 'flex-start', wrap=True), 10)
+    return frame(cap('S15 补充小样 · 改派负责人与待分配（待办 23，协调者 2026-10-14 决定）') + grid(left + right, 2, 32, extra='align-items: start;'), WIDE, gap=10)
 
 
 # ---------------------------------------------------------------- S16 第二阶段的手工登记单（prd_b 6.5 边界，D-27）

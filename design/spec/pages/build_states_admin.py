@@ -261,8 +261,61 @@ def k10():
     a = overlay(scaled(BS.p20(1000), 1440, 1000, 0.6), stop_dialog('liting', select_box('陈晨（坐席）')), W, 600)
     b = stop_dialog('wanglei', case_ctrl=select_box(None, '没有可选的售后负责人', 'disabled'), case_err='王磊是唯一的售后负责人，没有其他人可接手', blocked=WL_NO_PEER)
     small = '<div style="background: %s; padding: 16px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start;">%s%s</div>' % (
-        T['canvas'], cap('另一张小图 · 停用王磊：4 张进行中售后单，没有其他售后负责人可接手'), b)
-    return col(a + small, 0)
+        T['canvas'], cap('另一张小图（完整版）· 停用王磊：4 张进行中售后单，没有其他售后负责人可接手'), b)
+    return col(a + small + k10_phase1(), 0)
+
+
+P1_STOP_NOTE = '停用后%s不能登录，现有会话立即失效；历史记录与操作日志保留。改派与停用记入审计日志。'
+P1_SCOPE_FOOT = '请先在成员表为其他售后负责人加上该店铺的数据范围'
+
+
+def stop_dialog_p1(key, controls, blocked=None):
+    """第一阶段的停用弹窗（PRD P20「第一阶段」：只检查进行中售后单）：没有「未关闭工单」区块，说明句不写审批单。
+    controls: [(标签, 下拉, 提示, 报错)]——平时一个「接手人」；没有一人覆盖全部店铺、但每个店铺各有人可接时按店铺各一个。"""
+    name = STAFF[key]['name']
+    cases = [(a['no'], a['status']) for a in AFTERSALES if a['owner'] == name and a['status'] == '进行中']
+    head = row(nowrap('进行中售后单', 13, T['ink'], 700) + chip('%d 张' % len(cases), 'neutral', 11), 6)
+    lst = grid(''.join(row(nowrap(no, 12, T['accent'], 600) + state(st), 6) for no, st in cases), 2, 8, extra='row-gap: 6px;')
+    fields = ''.join(field(lbl, ctrl, True, hint=hint, error=err) for lbl, ctrl, hint, err in controls)
+    block = '<div style="border: 1px solid %s; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;">%s%s%s</div>' % (T['line'], head, lst, fields)
+    body = muted(P1_STOP_NOTE % name, 12) + block
+    if blocked:
+        foot = '<div style="flex: 1; min-width: 0px; display: flex; align-items: center; gap: 6px;">%s%s</div>' % (icon('lock', 14, T['ink4']), nowrap(blocked, 12, T['ink3'])) + \
+            btn('取消', 'secondary') + btn('改派并停用', 'danger', disabled=True, reason=blocked)
+    else:
+        foot = btn('取消', 'secondary') + btn('改派并停用', 'danger')
+    return dialog('停用成员%s？' % name, body, foot, 520, 'warning')
+
+
+def k10_phase1():
+    """K10 第一阶段补充小样（待办 23，协调者 2026-10-14 决定 Q1–Q4）：只检查进行中售后单；一个「接手人」下拉，候选为店铺范围覆盖这些单
+    全部店铺的在职售后负责人（去掉被停用的人），只有没有一人覆盖全部店铺、但每个店铺各有人可接时才按店铺分组；不可用的两种写法；
+    P20 行尾「更多」与停用结果浮层。示例假设赵倩、陈晨另被分配了售后负责人角色。"""
+    hint = '只列有该店铺范围的售后负责人'
+    no_one = '没有可选的售后负责人'
+    ok = stop_dialog_p1('wanglei', [('接手人', select_box('赵倩（售后负责人）'), hint, None)])
+    only = stop_dialog_p1('wanglei', [('接手人', select_box(None, no_one, 'disabled'), None, '王磊是唯一的售后负责人，没有其他人可接手')], WL_NO_PEER)
+    scope = stop_dialog_p1('wanglei', [('接手人', select_box(None, no_one, 'disabled'), None, '其他售后负责人都没有 Forcome Auto 的数据范围')], P1_SCOPE_FOOT)
+    split = stop_dialog_p1('wanglei', [('接手人 · Forcome Auto', select_box('赵倩（售后负责人）'), None, None),
+                                       ('接手人 · Forcome Direct', select_box('陈晨（售后负责人）'), hint, None)])
+    item = lambda t, ic, tone=None: (t, ic, tone)
+    menus = row(col(nowrap('在职成员', 12, T['ink3']) + menu([item('停用', 'x_c', 'danger')], 140), 6) +
+                col(nowrap('已停用的成员', 12, T['ink3']) + row(menu([item('停用', 'x_c', 'muted')], 140) + tooltip('这位成员已停用'), 8, 'flex-start'), 6) +
+                col(nowrap('当前登录的管理员自己', 12, T['ink3']) + row(menu([item('停用', 'x_c', 'muted')], 140) + tooltip('不能停用自己'), 8, 'flex-start'), 6) +
+                col(nowrap('最后一位在职管理员', 12, T['ink3']) + row(menu([item('停用', 'x_c', 'muted')], 140) + tooltip('至少要有一位在职的管理员'), 8, 'flex-start'), 6), 20, 'flex-start', wrap=True)
+    done = toast('success', '已停用 王磊', '4 张售后单已改派给 赵倩，已记入审计日志。')
+    done_none = toast('success', '已停用 李婷', '已记入审计日志。')
+    failed = toast('error', '停用失败：网络连接已断开', None, link('立即重试', 12))
+    stale = toast('error', '王磊刚被他人修改', '已刷新为最新内容，请核对后再操作。')
+    return '<div style="background: %s; padding: 16px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start;">%s</div>' % (T['canvas'], (
+        cap('第一阶段补充小样（待办 23，协调者 2026-10-14 决定）：第一阶段只检查进行中售后单——没有「未关闭工单」区块，说明句不写审批单；示例假设赵倩、陈晨也是售后负责人') +
+        cap('① 有人可接：一个「接手人」下拉，只列店铺范围覆盖这些单全部店铺的在职售后负责人（不含被停用的人），选好后「改派并停用」') + ok +
+        cap('② 没有其他售后负责人：下拉置灰，字段下写原因，「改派并停用」置灰、底部写怎么办（被停用的人自己不是售后负责人、又没有一位在职售后负责人时，字段下写「没有在职的售后负责人可接手」）') + only +
+        cap('③ 有别的售后负责人，但都没有这些单的店铺范围：字段下写缺哪些店铺（用「、」连接），底部写怎么办') + scope +
+        cap('④ 没有一人覆盖全部店铺、但每个店铺各有人可接：按店铺各一个下拉「接手人 · 店铺名」，每个只列有该店铺范围的') + split +
+        cap('⑤ P20 成员行尾「更多」：只有「停用」（危险色）；不可用时禁用并悬停写原因') + menus +
+        cap('⑥ 停用成功（有改派的写给了谁；没有进行中售后单的只写「已记入审计日志。」）；失败照 G5 给「立即重试」；成员刚被别人改过（G7）刷新后再核对') +
+        row(done + done_none, 12, 'flex-start') + row(failed + stale, 12, 'flex-start')))
 
 # ---------------------------------------------------------------- K11 素材库
 def kb_tabs(active):
@@ -754,7 +807,7 @@ def k24():
 SPEC = {
     'K5': '服务端按当前筛选与字段权限同步生成：生成中按钮转圈并写「正在生成，约 3 秒」；完成后浏览器直接下载，浮层「已导出 %s · 已记入审计日志」；不留存文件、没有导出记录页。' % EXPORT_FILE,
     'K8': 'P18 点「新增店铺」或行尾「编辑」从右侧滑出抽屉（页面保持可见）：店铺名、平台、站点（多选）、默认站点、进线邮箱、平台标识、签名与覆盖项；开发测试环境另有「数据来源：真实接口 / 模拟数据」（新建时默认模拟数据），生产环境不显示也不接受。店铺名重复、平台标识为空、邮箱格式错误在字段下方报错，多个错误一次列全；保存按钮保持可点，点击后定位到第一个错误（AC-ST-01）。保存记入审计日志，未归属队列中收件地址匹配的来信自动归位。下方补充小样：进线邮箱没有错误时的提示、亚马逊店铺的平台标识、进线邮箱重复（每个地址一条错误）、其余必填项、编辑抽屉标题、保存结果浮层（成功 3 秒消失；失败保留输入、可立即重试）、店铺表为空、新增时的未保存离开（G8）。',
-    'K10': '二次确认弹窗列出该成员的未关闭工单与进行中售后单，分别选接手人：工单选坐席或客服主管，售后单只列有该店铺范围的售后负责人；选齐后「改派并停用」，变更记审计（AC-ST-02）。成员在钉钉离职后自动停用，其未关闭工单与进行中售后单进入客服主管改派队列（AC-ST-05）。示例：停用李婷，未关闭工单按 data.TICKETS 计 → 接手人陈晨，进行中售后单 0 张；另一张小图：停用王磊，4 张进行中售后单但没有其他售后负责人，「改派并停用」置灰并写原因。',
+    'K10': '二次确认弹窗列出该成员的未关闭工单与进行中售后单，分别选接手人：工单选坐席或客服主管，售后单只列有该店铺范围的售后负责人；选齐后「改派并停用」，变更记审计（AC-ST-02）。成员在钉钉离职后自动停用，其未关闭工单与进行中售后单进入客服主管改派队列（AC-ST-05）。示例：停用李婷，未关闭工单按 data.TICKETS 计 → 接手人陈晨，进行中售后单 0 张；另一张小图（完整版）：停用王磊，4 张进行中售后单但没有其他售后负责人，「改派并停用」置灰并写原因。下方为第一阶段补充小样（待办 23，协调者 2026-10-14 决定）：只检查进行中售后单（没有「未关闭工单」区块），一个「接手人」下拉（必要时按店铺分组），不可用的两种写法，P20 行尾「更多」与停用结果。',
     'K15': '页签「风险信号 · 7」，7 条风险信号命中即转人工（data.RISK_SIGNALS）。安全事故、平台风险与疑似提示注入（D-21）为硬规则：开关锁定并写「硬规则，不可关闭」。重复联系、高价值行内写明关闭影响「关闭需二次确认：近 30 天约少转人工 N 封」（data.RISK_OFF_IMPACT）；关闭任一可关的信号都是危险开关，二次确认并写明影响（关闭后命中的来信不再转人工，可能自动发送），确认后进入吸底保存栏。「发送方式与阈值」页签名旁圆点表示该页签有未保存修改。',
     'K17': '权限矩阵一张表全部展开（不折叠），按 工单 / 审批 / 售后 / 知识 / 报表 / 设置 / 工厂 分组，能力行照 prd_d 10.1（含第一阶段的标记无需回复、新建与编辑登记、设为已完成，以及指定店铺、补登与汇率、改派售后单负责人、查看成本与结算金额、查看审计日志）；● 有权限、○ 只能看自己发起或负责的（「○ 自己登记的」写明范围）、「—」无权限、文字为部分能力。只读，按角色固定；第一阶段只显示已上线的能力行。下方为 P20 第一阶段的补充小样（待办 06，10-06 用户确认）：格内修改角色与数据范围、改过的格与吸底保存栏（K6）、保存结果与断网、保存时的报错（含至少一位在职管理员）、已停用的成员、并发（G7）、离开（G8）、「从钉钉添加」抽屉与成员下拉、添加结果。',
     'K18': '两张小图：① 李婷（坐席）视角：页头提示「你只能看到自己的操作记录」，操作人筛选锁定为本人，列表只有李婷的记录；② 刘洋（管理员，没有财务权限）视角：展开 S-20260909-0016 的记录（data.AUDIT_EXPAND_DEMO），展开列出该单前后任一侧有值的全部字段、变化的标出，产品成本、运费、额外赔偿、其他、承担比例的前后值显示灰色「已隐藏」，其他字段照常显示；摘要「等 N 项」的 N 是变化的字段数；管理员打不开 P13，售后单编号不可点（10.2、D-24）。示例为完整版，第一阶段只有 P27「第一阶段」列出的对象类型。下方为补充小样（待办 30，10-05 用户确认）：第一阶段几种记录的写法、列表为空、导出、自定义时间。',
