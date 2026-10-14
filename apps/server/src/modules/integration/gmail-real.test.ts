@@ -284,6 +284,7 @@ describe('Gmail 接口', () => {
       shopify: null,
       spApi: null,
       amazonSqs: null,
+      dingtalkRobot: null,
       credentialVault: null,
       clock: systemClock,
     });

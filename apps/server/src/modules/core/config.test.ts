@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ConfigError, loadConfig } from './index';
+import { ConfigError, DEFAULT_ALERT_SETTINGS, loadConfig } from './index';
 
 const DATABASE_URL = 'postgres://forcome:secret@127.0.0.1:4520/forcome';
 
@@ -48,6 +48,8 @@ describe('配置读取', () => {
       spApi: null,
       amazonSqs: null,
       credentialMasterKey: null,
+      dingtalkRobot: null,
+      alerts: DEFAULT_ALERT_SETTINGS,
     });
   });
 
@@ -484,5 +486,77 @@ describe('SP-API 的 LWA 凭据与订单通知队列（待办 12）', () => {
         CLIENT_MODE_AMAZON_SQS: 'fake',
       }),
     ).toThrow(/CLIENT_MODE_AMAZON_SQS/);
+  });
+});
+
+describe('运维群的钉钉机器人与自检阈值（待办 28）', () => {
+  const ROBOT = {
+    DINGTALK_ROBOT_WEBHOOK: 'https://oapi.dingtalk.com/robot/send?access_token=robot-token',
+    DINGTALK_ROBOT_SECRET: 'SEC-robot-secret-value',
+  };
+
+  it('不填 Webhook 照常启动（生产也一样，告警只写日志）；填了读出 Webhook 与加签密钥', () => {
+    expect(loadConfig({ DATABASE_URL, ...REAL, APP_ENV: 'production' }).dingtalkRobot).toBeNull();
+    expect(
+      loadConfig({ DATABASE_URL, ...REAL, ...ROBOT, APP_ENV: 'production' }).dingtalkRobot,
+    ).toEqual({
+      webhook: ROBOT.DINGTALK_ROBOT_WEBHOOK,
+      secret: ROBOT.DINGTALK_ROBOT_SECRET,
+    });
+  });
+
+  it('Webhook 要带 access_token；生产只能是钉钉的地址，开发测试环境可以指到接收替身；密钥要配 Webhook 一起填', () => {
+    expect(() =>
+      loadConfig({ DATABASE_URL, DINGTALK_ROBOT_WEBHOOK: 'https://oapi.dingtalk.com/robot/send' }),
+    ).toThrow(/DINGTALK_ROBOT_WEBHOOK：要带 access_token/);
+    const sink = 'http://robot-sink:8080/robot/send?access_token=drill';
+    expect(
+      loadConfig({ DATABASE_URL, APP_ENV: 'staging', DINGTALK_ROBOT_WEBHOOK: sink }).dingtalkRobot,
+    ).toEqual({ webhook: sink, secret: null });
+    expect(() =>
+      loadConfig({ DATABASE_URL, ...REAL, APP_ENV: 'production', DINGTALK_ROBOT_WEBHOOK: sink }),
+    ).toThrow('DINGTALK_ROBOT_WEBHOOK：生产环境必须是 https://oapi.dingtalk.com/robot/send');
+    let error: unknown;
+    try {
+      loadConfig({ DATABASE_URL, DINGTALK_ROBOT_SECRET: 'SEC-robot-secret-value' });
+    } catch (e) {
+      error = e;
+    }
+    expect((error as Error).message).toContain(
+      'DINGTALK_ROBOT_SECRET：与 DINGTALK_ROBOT_WEBHOOK 一起填',
+    );
+    expect((error as Error).message).not.toContain('SEC-robot-secret-value');
+  });
+
+  it('自检阈值默认取协调者决定的值，可用 ALERT_* 调整（单位写在变量名里），不是正数拒绝启动', () => {
+    expect(DEFAULT_ALERT_SETTINGS).toEqual({
+      queueWaitMs: 10 * 60_000,
+      failedJobWindowMs: 60 * 60_000,
+      callErrorWindowMs: 15 * 60_000,
+      callErrorMinCalls: 10,
+      callErrorPercent: 50,
+      dingtalkMonthlyCalls: 4_000,
+      sqsCheckStaleMs: 10 * 60_000,
+      reconcileStaleMs: 24 * 3_600_000,
+      backupStaleMs: 26 * 3_600_000,
+      repeatMs: 2 * 3_600_000,
+    });
+    const config = loadConfig({
+      DATABASE_URL,
+      ALERT_QUEUE_WAIT_MINUTES: '5',
+      ALERT_REPEAT_HOURS: '0.5',
+      ALERT_DINGTALK_MONTHLY_CALLS: '4500',
+    });
+    expect(config.alerts).toMatchObject({
+      queueWaitMs: 5 * 60_000,
+      repeatMs: 30 * 60_000,
+      dingtalkMonthlyCalls: 4_500,
+    });
+    expect(() => loadConfig({ DATABASE_URL, ALERT_BACKUP_STALE_HOURS: '0' })).toThrow(
+      /ALERT_BACKUP_STALE_HOURS：必须是正数/,
+    );
+    expect(() => loadConfig({ DATABASE_URL, ALERT_CALL_ERROR_PERCENT: 'half' })).toThrow(
+      ConfigError,
+    );
   });
 });

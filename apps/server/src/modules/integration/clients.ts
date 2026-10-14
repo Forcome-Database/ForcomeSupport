@@ -9,6 +9,7 @@ import {
   type AppEnv,
   type Clock,
   type DingtalkCredentials,
+  type DingtalkRobotConfig,
   type GoogleCredentials,
   type MailSendPolicy,
   type ShopifyCredentials,
@@ -75,6 +76,8 @@ export interface IntegrationClientsOptions {
   readonly credentialVault?: CredentialVault | null;
   /** 真实现的当前时间（凭据何时换新）；不传为系统时钟 */
   readonly clock?: Clock;
+  /** 运维群的钉钉机器人（AppConfig.dingtalkRobot），交给群机器人的真实现；不传为 null */
+  readonly dingtalkRobot?: DingtalkRobotConfig | null;
 }
 
 export class IntegrationClients {
@@ -93,6 +96,7 @@ export class IntegrationClients {
   readonly #amazonSqs: AmazonSqsConfig | null;
   readonly #credentialVault: CredentialVault | null;
   readonly #clock: Clock;
+  readonly #dingtalkRobot: DingtalkRobotConfig | null;
   /** 发信白名单守卫，经 RealClientContext 交给真实现 */
   readonly mailRecipientGuard: MailRecipientGuard;
 
@@ -112,6 +116,7 @@ export class IntegrationClients {
     this.#amazonSqs = options.amazonSqs ?? null;
     this.#credentialVault = options.credentialVault ?? null;
     this.#clock = options.clock ?? systemClock;
+    this.#dingtalkRobot = options.dingtalkRobot ?? null;
     for (const [system, mode] of Object.entries(this.#modes)) {
       const definition = [...this.#definitions].find((d) => d.system === system);
       const variable = clientModeVariable(system);
@@ -158,6 +163,7 @@ export class IntegrationClients {
       amazonSqs: this.#amazonSqs,
       credentialVault: this.#credentialVault,
       clock: this.#clock,
+      dingtalkRobot: this.#dingtalkRobot,
     };
   }
 
@@ -244,6 +250,7 @@ export function createIntegrationClients(
     | 'shopify'
     | 'spApi'
     | 'amazonSqs'
+    | 'dingtalkRobot'
   >,
   options: {
     definitions?: readonly AnyClientDefinition[];
@@ -262,6 +269,7 @@ export function createIntegrationClients(
     shopify: config.shopify,
     spApi: config.spApi,
     amazonSqs: config.amazonSqs,
+    dingtalkRobot: config.dingtalkRobot,
     definitions: options.definitions,
     callRecorder: options.callRecorder,
     credentialVault: options.credentialVault,

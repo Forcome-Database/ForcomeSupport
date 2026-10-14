@@ -333,6 +333,7 @@ describe('Fake 从示例数据夹具回放（ADR 0009 修订）', () => {
           shopify: null,
           spApi: null,
           amazonSqs: null,
+          dingtalkRobot: null,
         },
         { definitions: withReplay, fixture: () => demo },
       );
@@ -352,6 +353,7 @@ describe('Fake 从示例数据夹具回放（ADR 0009 修订）', () => {
         shopify: null,
         spApi: null,
         amazonSqs: null,
+        dingtalkRobot: null,
       },
       {
         definitions: withReplay,

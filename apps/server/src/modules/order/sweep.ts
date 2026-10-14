@@ -124,6 +124,7 @@ async function restartSweep(tx: Tx, storeId: string, kind: OrderSweepKind): Prom
     startedAt: tx.now,
     completedAt: null,
     lastError: null,
+    failingSince: null,
     updatedAt: tx.now,
   };
   await tx.db
@@ -268,7 +269,11 @@ async function noteSweepFailure(
   try {
     await runtime.db
       .update(orderSweep)
-      .set({ lastError: text.slice(0, 500), updatedAt: runtime.clock.now() })
+      .set({
+        lastError: text.slice(0, 500),
+        failingSince: sql`coalesce(${orderSweep.failingSince}, ${runtime.clock.now()})`,
+        updatedAt: runtime.clock.now(),
+      })
       .where(eq(orderSweep.id, row.id));
   } catch (recordError) {
     logger.error({ err: recordError }, '记订单回补或对账的失败时出错');
@@ -348,6 +353,7 @@ export async function runOrderSweepPage(
         orders: sql`${orderSweep.orders} + ${page.count}`,
         completedAt: page.next ? null : tx.now,
         lastError: null,
+        failingSince: null,
         updatedAt: tx.now,
       })
       .where(

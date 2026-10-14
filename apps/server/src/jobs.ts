@@ -7,6 +7,7 @@ import { getDemoFixture } from '@forcome/fixtures';
 import type { ServerDeps } from './deps';
 import { createAftersalesJobHandlers } from './modules/aftersales';
 import {
+  channelSelfCheckProbe,
   createChannelFeeds,
   createChannelJobHandlers,
   gmailPollJob,
@@ -18,22 +19,32 @@ import {
   placeUnassignedJob,
   reportAcceptanceJob,
   storeChangedJob,
+  storeNamesById,
 } from './modules/channel';
 import {
   createCoreJobHandlers,
+  DEFAULT_ALERT_SETTINGS,
+  selfCheckJob,
   sendWorkNotificationsJob,
   syncExchangeRatesJob,
   type AnyJobDefinition,
   type AnyJobHandler,
   type Feed,
 } from './modules/core';
-import { dingtalkClient, exchangeRateClient, fixtureNoReplyMarks } from './modules/integration';
+import {
+  dingtalkClient,
+  dingtalkRobotClient,
+  exchangeRateClient,
+  fixtureNoReplyMarks,
+  integrationSelfCheckProbe,
+} from './modules/integration';
 import {
   createOrgFeeds,
   createOrgJobHandlers,
   dingtalkEventJob,
   dingtalkReconcileJob,
   memberDisabledJob,
+  orgSelfCheckProbe,
 } from './modules/org';
 import {
   amazonOrderChangedJob,
@@ -41,6 +52,7 @@ import {
   amazonSyncJob,
   createOrderFeeds,
   createOrderJobHandlers,
+  createOrderSelfCheckProbes,
   orderReconcileJob,
   orderSweepPageJob,
   orderSweepResumeJob,
@@ -52,6 +64,7 @@ import { attributeReplyJob, createTicketJobHandlers, ticketTimeLimitsJob } from 
 export const jobDefinitions: readonly AnyJobDefinition[] = [
   syncExchangeRatesJob,
   sendWorkNotificationsJob,
+  selfCheckJob,
   dingtalkReconcileJob,
   dingtalkEventJob,
   memberDisabledJob,
@@ -81,6 +94,18 @@ export function createJobHandlers(deps: ServerDeps): readonly AnyJobHandler[] {
     ...createCoreJobHandlers({
       exchangeRates: () => deps.clients.global(exchangeRateClient),
       workNotifications: () => deps.clients.global(dingtalkClient),
+      // 每分钟自检（待办 28）：各模块的自检项在这里组装，告警经运维群的钉钉机器人发出
+      selfCheck: {
+        alerts: () => deps.clients.global(dingtalkRobotClient),
+        probes: [
+          channelSelfCheckProbe,
+          ...createOrderSelfCheckProbes({ storeNames: storeNamesById }),
+          orgSelfCheckProbe,
+          integrationSelfCheckProbe,
+        ],
+        appEnv: deps.config.appEnv,
+        settings: deps.config.alerts ?? DEFAULT_ALERT_SETTINGS,
+      },
     }),
     ...createOrgJobHandlers({ dingtalk: () => deps.clients.global(dingtalkClient) }),
     ...createChannelJobHandlers(deps),

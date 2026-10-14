@@ -191,11 +191,15 @@ export function worstConnectionStatus(statuses: readonly ConnectionStatus[]): Co
   return statuses.reduce((worst, status) => (SEVERITY[status] > SEVERITY[worst] ? status : worst));
 }
 
-/** 同步延迟的阈值（6.9）：最近一次同步成功超过这么久为同步延迟。Gmail、订单 10 分钟，钉钉 2 小时 */
+/**
+ * 同步延迟的阈值（6.9）：最近一次同步成功超过这么久为同步延迟。Gmail、订单 10 分钟，钉钉 2 小时，汇率 1 天
+ * （汇率没有渠道卡，只用于 worker 自检，待办 28）
+ */
 export const SYNC_DELAY_MS = {
   gmail: 10 * 60_000,
   orders: 10 * 60_000,
   dingtalk: 2 * 60 * 60_000,
+  exchangeRate: 24 * 60 * 60_000,
 } as const;
 
 /** 连续失败这么多次为连接异常（6.9） */

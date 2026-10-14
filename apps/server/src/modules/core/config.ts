@@ -33,6 +33,12 @@ import { z } from 'zod';
  *   「未连接」，订单靠每 4 分钟的增量兜底。生产不允许用 Fake（`CLIENT_MODE_AMAZON_SQS`）。
  * - `CREDENTIAL_MASTER_KEY`：主密钥（32 字节的 base64），动态凭据（各店铺的 Shopify 访问令牌、SP-API 刷新令牌）用它 AES-256-GCM
  *   加密后存库（ADR 0013）。填了 Shopify 或 SP-API 凭据就必填；单独填可以（先放好主密钥）。
+ * - `DINGTALK_ROBOT_WEBHOOK` / `DINGTALK_ROBOT_SECRET`：运维群钉钉自定义机器人的 Webhook（带 access_token）与加签密钥（SEC 开头），
+ *   worker 每分钟自检发现异常时发到这个群（待办 28，ADR 0013 修订）。全局客户端 dingtalk_robot 按 `CLIENT_MODE_DINGTALK_ROBOT`
+ *   选择（生产默认真实接口）；用真实接口但没填 Webhook 时照常启动，告警只写日志（协调者 2026-10-14 决定 Q1）。生产环境的 Webhook
+ *   必须是 https://oapi.dingtalk.com/robot/send。
+ * - `ALERT_*`：自检的阈值（协调者 2026-10-14 决定 Q2、Q3，默认值见 DEFAULT_ALERT_SETTINGS）；各数据源的同步阈值是 PRD 6.9 的口径，
+ *   在 contracts 的 SYNC_DELAY_MS，不在这里。
  * 空值视同未设置。
  */
 const envSchema = z.object({
@@ -86,7 +92,100 @@ const envSchema = z.object({
       '必须是 32 字节密钥的 base64（如 openssl rand -base64 32 的输出）',
     )
     .optional(),
+  DINGTALK_ROBOT_WEBHOOK: z
+    .url({ error: '必须是机器人的 Webhook 地址' })
+    .refine(
+      (value) => new URL(value).searchParams.get('access_token'),
+      '要带 access_token（在群设置的机器人详情里复制完整的 Webhook）',
+    )
+    .optional(),
+  DINGTALK_ROBOT_SECRET: z.string().optional(),
 });
+
+/** 一个 ALERT_* 阈值：正数（分钟、小时、次数或百分数，看变量名） */
+const alertThresholdSchema = z.coerce.number({ error: '必须是正数' }).positive('必须是正数');
+
+/** 自检的阈值（协调者 2026-10-14 决定 Q2、Q3；都可用环境变量调整） */
+export interface AlertSettings {
+  /** 队列积压：已到点、还没开始的任务最久等了多久 */
+  readonly queueWaitMs: number;
+  /** 失败任务：看多久以内重试用完失败的任务（之后没有新的失败即为恢复） */
+  readonly failedJobWindowMs: number;
+  /** 外部调用错误率：看近多久的调用 */
+  readonly callErrorWindowMs: number;
+  /** 外部调用错误率：调用少于这么多次不判断 */
+  readonly callErrorMinCalls: number;
+  /** 外部调用错误率：失败占比达到这个百分数告警 */
+  readonly callErrorPercent: number;
+  /** 钉钉配额：本月工作通知调用达到这么多次告警（标准版每月 5,000 次） */
+  readonly dingtalkMonthlyCalls: number;
+  /** 订单通知队列（SQS）：超过多久没有检查记录（拉取源没在跑） */
+  readonly sqsCheckStaleMs: number;
+  /** 夜间对账：开始超过多久仍未完成 */
+  readonly reconcileStaleMs: number;
+  /** 备份：最近一次成功超过多久 */
+  readonly backupStaleMs: number;
+  /** 异常持续时隔多久再提醒一次 */
+  readonly repeatMs: number;
+}
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+
+/** ALERT_* 环境变量与默认值（单位写在变量名里） */
+const ALERT_VARIABLES = [
+  { variable: 'ALERT_QUEUE_WAIT_MINUTES', key: 'queueWaitMs', unitMs: MINUTE_MS, value: 10 },
+  {
+    variable: 'ALERT_FAILED_JOB_WINDOW_MINUTES',
+    key: 'failedJobWindowMs',
+    unitMs: MINUTE_MS,
+    value: 60,
+  },
+  {
+    variable: 'ALERT_CALL_ERROR_WINDOW_MINUTES',
+    key: 'callErrorWindowMs',
+    unitMs: MINUTE_MS,
+    value: 15,
+  },
+  { variable: 'ALERT_CALL_ERROR_MIN_CALLS', key: 'callErrorMinCalls', unitMs: 1, value: 10 },
+  { variable: 'ALERT_CALL_ERROR_PERCENT', key: 'callErrorPercent', unitMs: 1, value: 50 },
+  {
+    variable: 'ALERT_DINGTALK_MONTHLY_CALLS',
+    key: 'dingtalkMonthlyCalls',
+    unitMs: 1,
+    value: 4_000,
+  },
+  {
+    variable: 'ALERT_SQS_CHECK_STALE_MINUTES',
+    key: 'sqsCheckStaleMs',
+    unitMs: MINUTE_MS,
+    value: 10,
+  },
+  { variable: 'ALERT_RECONCILE_STALE_HOURS', key: 'reconcileStaleMs', unitMs: HOUR_MS, value: 24 },
+  { variable: 'ALERT_BACKUP_STALE_HOURS', key: 'backupStaleMs', unitMs: HOUR_MS, value: 26 },
+  { variable: 'ALERT_REPEAT_HOURS', key: 'repeatMs', unitMs: HOUR_MS, value: 2 },
+] as const satisfies readonly {
+  variable: string;
+  key: keyof AlertSettings;
+  unitMs: number;
+  value: number;
+}[];
+
+/** 自检阈值的默认值（没设 ALERT_* 时；测试与本机开发也用它） */
+export const DEFAULT_ALERT_SETTINGS: AlertSettings = Object.fromEntries(
+  ALERT_VARIABLES.map(({ key, unitMs, value }) => [key, value * unitMs]),
+) as unknown as AlertSettings;
+
+/** 运维群的钉钉自定义机器人（待办 28） */
+export interface DingtalkRobotConfig {
+  /** Webhook：https://oapi.dingtalk.com/robot/send?access_token=… */
+  readonly webhook: string;
+  /** 加签密钥（SEC 开头）；群机器人的安全设置没选加签时为 null */
+  readonly secret: string | null;
+}
+
+/** 生产环境的 Webhook 只能是钉钉的地址（开发测试环境演练时可以指到接收替身） */
+const DINGTALK_ROBOT_ENDPOINT = 'https://oapi.dingtalk.com/robot/send';
 
 export type AppEnv = z.infer<typeof envSchema>['APP_ENV'];
 
@@ -229,6 +328,10 @@ export interface AppConfig {
   amazonSqs: AmazonSqsConfig | null;
   /** 动态凭据的主密钥（32 字节）；没填为 null */
   credentialMasterKey: Buffer | null;
+  /** 运维群的钉钉自定义机器人；没填 Webhook 为 null（用真实接口时告警只写日志） */
+  dingtalkRobot: DingtalkRobotConfig | null;
+  /** 自检的阈值 */
+  alerts: AlertSettings;
 }
 
 export interface MailSendPolicy {
@@ -417,6 +520,38 @@ export function loadConfig(
     }
   }
 
+  // 运维群的钉钉机器人：Webhook 可以不填（照常启动，告警只写日志）；加签密钥要配 Webhook 一起填
+  let dingtalkRobot: DingtalkRobotConfig | null = null;
+  if (result.success) {
+    const webhook = result.data.DINGTALK_ROBOT_WEBHOOK;
+    const secret = result.data.DINGTALK_ROBOT_SECRET ?? null;
+    if (webhook) {
+      const url = new URL(webhook);
+      if (
+        result.data.APP_ENV === 'production' &&
+        `${url.origin}${url.pathname}` !== DINGTALK_ROBOT_ENDPOINT
+      ) {
+        problems.push(
+          `DINGTALK_ROBOT_WEBHOOK：生产环境必须是 ${DINGTALK_ROBOT_ENDPOINT}?access_token=…`,
+        );
+      }
+      dingtalkRobot = { webhook, secret };
+    } else if (secret) {
+      problems.push('DINGTALK_ROBOT_SECRET：与 DINGTALK_ROBOT_WEBHOOK 一起填');
+    }
+  }
+
+  const alerts: Record<string, number> = {};
+  for (const { variable, key, unitMs, value } of ALERT_VARIABLES) {
+    const given = env[variable];
+    const parsed =
+      given === undefined
+        ? { success: true as const, data: value }
+        : alertThresholdSchema.safeParse(given);
+    if (parsed.success) alerts[key] = parsed.data * unitMs;
+    else problems.push(`${variable}：必须是正数`);
+  }
+
   if (!result.success || problems.length > 0) {
     throw new ConfigError(`环境变量配置有误：\n${problems.join('\n')}`);
   }
@@ -450,5 +585,7 @@ export function loadConfig(
     credentialMasterKey: CREDENTIAL_MASTER_KEY
       ? Buffer.from(CREDENTIAL_MASTER_KEY, 'base64')
       : null,
+    dingtalkRobot,
+    alerts: alerts as unknown as AlertSettings,
   };
 }

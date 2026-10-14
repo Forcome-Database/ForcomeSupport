@@ -8,7 +8,9 @@ import type { AppConfig, Logger, Runtime } from './modules/core';
 export interface ServerDeps {
   readonly runtime: Runtime;
   readonly logger: Logger;
-  readonly config: Pick<AppConfig, 'appEnv' | 'devLoginEnabled'>;
+  /** 自检的阈值（alerts）只有 worker 用；不给时用默认值（测试、api） */
+  readonly config: Pick<AppConfig, 'appEnv' | 'devLoginEnabled'> &
+    Partial<Pick<AppConfig, 'alerts'>>;
   /** 外部客户端（真实现或 Fake，ADR 0009 修订） */
   readonly clients: IntegrationClients;
 }

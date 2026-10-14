@@ -295,6 +295,7 @@ describe('SP-API 卖家授权与访问令牌', () => {
       google: null,
       shopify: null,
       amazonSqs: null,
+      dingtalkRobot: null,
       callRecorder: noCallRecords,
       credentialVault: vault(),
       clock: t.clock,

@@ -40,6 +40,7 @@ export {
 export { createNotificationRoutes, notifyMembers } from './notifications';
 export { createOrgRoutes } from './routes';
 export { memberDisabledJob } from './events';
+export { orgSelfCheckProbe } from './self-check';
 export { type MemberHandover, type TeamStoreChoices } from './team';
 export { createTeamRoutes } from './team-routes';
 export { SESSION_COOKIE, SESSION_IDLE_TIMEOUT_MS } from './session';

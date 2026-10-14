@@ -3,6 +3,19 @@
 // 其他模块只能经本文件使用 core；core 不依赖任何业务模块。
 export { AccessDeniedError } from './access-denied';
 export {
+  alertBrand,
+  alertTestMessage,
+  alertTime,
+  formatAlertMessage,
+  planAlerts,
+  syncAlertProblem,
+  type AlertFinding,
+  type AlertMessage,
+  type AlertPlan,
+  type AlertSender,
+  type FiringAlert,
+} from './alerts';
+export {
   announceChange,
   CHANGE_CHANNEL,
   createChangeFeed,
@@ -47,12 +60,15 @@ export {
 export {
   clientModeVariable,
   ConfigError,
+  DEFAULT_ALERT_SETTINGS,
   defaultClientMode,
   defaultMailSendPolicy,
   loadConfig,
+  type AlertSettings,
   type AppConfig,
   type AppEnv,
   type DingtalkCredentials,
+  type DingtalkRobotConfig,
   type GoogleCredentials,
   type MailSendPolicy,
   type ShopifyCredentials,
@@ -119,6 +135,13 @@ export {
   type WorkerOptions,
 } from './jobs';
 export { createLogger, silentLogger, type Logger } from './logger';
+export {
+  DINGTALK_MONTHLY_QUOTA,
+  selfCheckJob,
+  type SelfCheckContext,
+  type SelfCheckProbe,
+  type SelfCheckReport,
+} from './self-check';
 export {
   queueWorkNotifications,
   sendWorkNotificationsJob,

@@ -24,6 +24,7 @@ export {
 } from './messages';
 export { type MailAddress, type Recognition, type SenderRule } from './recognition';
 export { mailboxHealths, type MailboxHealth } from './mailbox-health';
+export { channelSelfCheckProbe } from './self-check';
 export {
   mailCutoverStatus,
   readMailCutover,

@@ -30,6 +30,11 @@ const TABLES_WITHOUT_UUID_ID = new Set([
   'channel.mail_cutover',
   // 历史邮件回放的清单按（邮箱，Gmail 消息 ID）唯一，是一次性命令的工作清单，不是业务实体
   'channel.mail_replay_item',
+  // worker 心跳、汇率同步的状态都只有一行（id 固定，待办 28），不是业务实体
+  'core.worker_heartbeat',
+  'core.exchange_rate_sync',
+  // 自检正在告警的异常项按异常项的键唯一（待办 28），不是业务实体
+  'core.alert',
 ]);
 const NUMERIC_COLUMNS_NOT_MONEY = new Set<string>([
   // 汇率 numeric(12,6)：1 USD = 汇率 原币（R-FL-06），不是金额

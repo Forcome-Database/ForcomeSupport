@@ -1,5 +1,6 @@
 import { desc, sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   date,
   index,
@@ -176,5 +177,88 @@ export const workNotification = coreSchema.table(
       .on(t.dingtalkUserId, t.createdAt)
       .where(sql`${t.sentAt} IS NULL AND ${t.failedAt} IS NULL`),
     check('work_notification_attempts_check', sql`${t.attempts} >= 0`),
+  ],
+);
+
+/**
+ * worker 的心跳（规格「运维」、ADR 0013 修订「worker 存活检查」，待办 28）：每分钟的自检任务（core.self_check）一开始就写这一行。
+ * 宿主机检查（deploy/deploy.mjs <环境> host-check）不经 worker，直接读它：超过阈值没更新即「worker 心跳停止」。
+ * 由排程的任务写，所以 worker 进程在、但任务队列停了（取不到任务）也算心跳停。
+ */
+export const workerHeartbeat = coreSchema.table(
+  'worker_heartbeat',
+  {
+    /** 固定为 worker（只有一行；几个 worker 时由跑到自检的那一个写） */
+    id: text('id').primaryKey(),
+    beatAt: timestamptz('beat_at').notNull(),
+    /** 写心跳的容器（主机名）与进程号（排错用） */
+    host: text('host').notNull(),
+    pid: integer('pid').notNull(),
+  },
+  (t) => [check('worker_heartbeat_singleton_check', sql`${t.id} = 'worker'`)],
+);
+
+/**
+ * 自检正在告警的异常项（待办 28，协调者 2026-10-14 决定 Q3）：每项一行，按异常项的键去重（队列名、邮箱、数据源等），
+ * 文案里的时刻变了也不重发。发现时提醒一次，持续时每隔 ALERT_REPEAT_HOURS 再提醒，恢复时发「已恢复」并删掉这一行。
+ * 钉钉群机器人发送成功（或没配置、只写日志）后才写，发送失败下一分钟再试。
+ */
+export const alertState = coreSchema.table('alert', {
+  /** 异常项的键，如 gmail:support@forcome.com、job_failed:core.sync_exchange_rates */
+  key: text('key').primaryKey(),
+  /** 异常的对象（如「Gmail support@forcome.com」）：恢复时只写它 */
+  subject: text('subject').notNull(),
+  /** 最近一次提醒时的问题说明（如「超过 10 分钟没有同步成功（最近成功 10-14 10:02）」） */
+  problem: text('problem').notNull(),
+  firingSince: timestamptz('firing_since').notNull(),
+  notifiedAt: timestamptz('notified_at').notNull(),
+});
+
+/**
+ * 汇率同步的记录（待办 28，照 channel.mailbox_sync 的写法）：自检按「最近一次同步成功」判断汇率是否超过 1 天没同步（PRD 6.9）。
+ * 不能看 core.exchange_rate 的最近写入：欧洲央行周末与假日不公布，那几天同步成功也没有新行。
+ */
+export const exchangeRateSync = coreSchema.table(
+  'exchange_rate_sync',
+  {
+    /** 固定为 exchange_rate（只有一行） */
+    id: text('id').primaryKey(),
+    lastSuccessAt: timestamptz('last_success_at'),
+    lastAttemptAt: timestamptz('last_attempt_at').notNull(),
+    consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+    lastError: text('last_error'),
+  },
+  (t) => [
+    check('exchange_rate_sync_singleton_check', sql`${t.id} = 'exchange_rate'`),
+    check('exchange_rate_sync_failures_check', sql`${t.consecutiveFailures} >= 0`),
+  ],
+);
+
+/** 备份的种类：每日（定时）、手动、迁移前（生产部署）、恢复后（新时间线的第一份基础备份） */
+export const backupKinds = ['daily', 'manual', 'pre_migrate', 'after_restore'] as const;
+
+/**
+ * 备份记录（待办 28，ADR 0013 修订「备份」）：PostgreSQL 镜像里的备份脚本 forcome-backup（deploy/postgres/）开始时插一行、
+ * 结束时写结果——WAL-G 物理基础备份、pg_dump 逻辑备份与卷经 restic 同步到备份目录（NAS）。自检按它判断「最近一次备份成功
+ * 超过 ALERT_BACKUP_STALE_HOURS」与「最近一次备份失败」。表由迁移建；第一次部署的迁移前备份时还没有这张表，脚本跳过记录。
+ */
+export const backupRun = coreSchema.table(
+  'backup_run',
+  {
+    id: primaryId(),
+    kind: text('kind', { enum: backupKinds }).notNull(),
+    startedAt: timestamptz('started_at').notNull(),
+    finishedAt: timestamptz('finished_at'),
+    /** 结果；还在跑为空 */
+    succeeded: boolean('succeeded'),
+    /** 成功时写各步的摘要（基础备份名、快照号），失败时写出错的步骤与原因 */
+    detail: text('detail'),
+  },
+  (t) => [
+    index('backup_run_started_idx').on(desc(t.startedAt)),
+    check(
+      'backup_run_kind_check',
+      sql`${t.kind} IN ('daily', 'manual', 'pre_migrate', 'after_restore')`,
+    ),
   ],
 );

@@ -7,13 +7,13 @@ import {
   type ForeignCurrency,
   type PublishedRateSource,
 } from '@forcome/contracts';
-import { and, desc, eq, lte, max } from 'drizzle-orm';
+import { and, desc, eq, lte, max, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbExecutor } from './db';
 import { defineJob } from './jobs';
 import type { Logger } from './logger';
 import { transaction, type Runtime } from './runtime';
-import { exchangeRate } from './schema';
+import { exchangeRate, exchangeRateSync } from './schema';
 
 /*
  * 汇率（规格 core「汇率」、R-FL-06、E-20、PRD 11.1 ExchangeRate）：
@@ -90,8 +90,47 @@ interface ExchangeRateSyncReport {
  * 同步汇率：从库里最近一个有汇率的日期的次日（库里没有时从 RATE_HISTORY_START）取到今天（北京时间），
  * 先欧洲央行、失败改 Frankfurter，两者都失败抛错（不写任何数据，按日期取汇率时自然回退到此前的日期）。
  * 已有的日期不覆盖：汇率只增不改，已保存的金额冻结了自己的汇率，不受影响（E-20「恢复后不回改」）。
+ * 每次同步的成败记在 core.exchange_rate_sync（待办 28：自检按最近一次同步成功判断是否超过 1 天没同步）。
  */
 export async function syncExchangeRates(
+  runtime: Runtime,
+  source: ExchangeRateSource,
+  logger: Logger,
+): Promise<ExchangeRateSyncReport> {
+  const report = await fetchAndStoreRates(runtime, source, logger);
+  await recordSyncSuccess(runtime);
+  return report;
+}
+
+const SYNC_ROW = 'exchange_rate';
+
+async function recordSyncSuccess(runtime: Runtime): Promise<void> {
+  const now = runtime.clock.now();
+  const row = { lastSuccessAt: now, lastAttemptAt: now, consecutiveFailures: 0, lastError: null };
+  await runtime.db
+    .insert(exchangeRateSync)
+    .values({ id: SYNC_ROW, ...row })
+    .onConflictDoUpdate({ target: exchangeRateSync.id, set: row });
+}
+
+/** 两个来源都取不到：记一次失败（错误只留前一段） */
+async function recordSyncFailure(runtime: Runtime, error: Error): Promise<void> {
+  const now = runtime.clock.now();
+  const lastError = error.message.length > 500 ? `${error.message.slice(0, 500)}…` : error.message;
+  await runtime.db
+    .insert(exchangeRateSync)
+    .values({ id: SYNC_ROW, lastAttemptAt: now, consecutiveFailures: 1, lastError })
+    .onConflictDoUpdate({
+      target: exchangeRateSync.id,
+      set: {
+        lastAttemptAt: now,
+        consecutiveFailures: sql`${exchangeRateSync.consecutiveFailures} + 1`,
+        lastError,
+      },
+    });
+}
+
+async function fetchAndStoreRates(
   runtime: Runtime,
   source: ExchangeRateSource,
   logger: Logger,
@@ -112,10 +151,12 @@ export async function syncExchangeRates(
     try {
       days = await source.frankfurterRates(range);
     } catch (fallbackError) {
-      throw new Error(
+      const error = new Error(
         `汇率主源（欧洲央行）与备用源（Frankfurter）都取不到。主源：${String(ecbError)}；备用源：${String(fallbackError)}`,
         { cause: fallbackError },
       );
+      await recordSyncFailure(runtime, error);
+      throw error;
     }
   }
 

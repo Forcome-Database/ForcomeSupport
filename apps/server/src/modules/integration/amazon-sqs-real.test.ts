@@ -161,6 +161,7 @@ describe('SQS 真实现', () => {
       shopify: null,
       spApi: null,
       amazonSqs: null,
+      dingtalkRobot: null,
       callRecorder: noCallRecords,
       credentialVault: null,
       clock,

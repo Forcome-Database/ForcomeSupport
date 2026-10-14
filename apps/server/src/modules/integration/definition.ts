@@ -3,6 +3,7 @@ import type {
   AmazonSqsConfig,
   Clock,
   DingtalkCredentials,
+  DingtalkRobotConfig,
   GoogleCredentials,
   ShopifyCredentials,
   SpApiCredentials,
@@ -41,6 +42,8 @@ export interface RealClientContext {
   readonly credentialVault: CredentialVault | null;
   /** 当前时间（凭据何时换新；测试里是手动时钟） */
   readonly clock: Clock;
+  /** 运维群的钉钉自定义机器人（待办 28）；没配置 Webhook 为 null，真实现发送时以「未配置」失败（告警只写日志） */
+  readonly dingtalkRobot: DingtalkRobotConfig | null;
 }
 
 /** Fake 的最小约定：给出（某店铺视角的）客户端，能重置到初始状态 */

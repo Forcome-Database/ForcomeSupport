@@ -39,6 +39,7 @@ export { type OrderStore, type OrderStoreSource } from './incremental-sync';
 export { findMirroredOrder, findOrder, normalizeShopifyOrderName } from './lookup';
 export { findOrdersByEmail, orderNumberOf, type MirroredOrder, type OrderRef } from './mirror';
 export { orderQueueState } from './queue-health';
+export { createOrderSelfCheckProbes } from './self-check';
 export {
   queueShopifySync,
   shopifyPollJob,

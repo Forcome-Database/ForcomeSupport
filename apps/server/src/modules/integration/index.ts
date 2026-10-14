@@ -37,6 +37,7 @@ export {
   type SentWorkNotification,
 } from './dingtalk';
 export { factoryHeadUserId } from './dingtalk-replay';
+export { dingtalkRobotClient, FakeDingtalkRobot, type DingtalkRobotClient } from './dingtalk-robot';
 export {
   exchangeRateClient,
   FakeExchangeRates,
@@ -62,6 +63,7 @@ export {
   type ReplayNoReplyMark,
 } from './gmail-replay';
 export { MailRecipientGuard, MailRecipientNotAllowedError } from './mail-recipient-guard';
+export { integrationSelfCheckProbe } from './self-check';
 export {
   databaseCredentialVault,
   type CredentialVault,

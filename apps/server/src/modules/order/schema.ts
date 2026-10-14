@@ -174,6 +174,8 @@ export const orderSweep = orderSchema.table(
     completedAt: timestamptz('completed_at'),
     /** 最近一次失败的原因（排错用；不算进连接状态） */
     lastError: text('last_error'),
+    /** 这一串连续失败的第 1 次（取到一页即清空）：worker 自检按它判断失败是否持续（待办 28） */
+    failingSince: timestamptz('failing_since'),
     updatedAt: timestamptz('updated_at').notNull(),
   },
   (t) => [unique('order_sweep_store_kind_key').on(t.storeId, t.kind)],
