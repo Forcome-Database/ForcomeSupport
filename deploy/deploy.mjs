@@ -458,7 +458,10 @@ async function deploy({ smokeOnly, resetInboundData = false }) {
       await step('重放来信（清空收信与工单）', () => resetInbound(compose));
     }
     await step('启动 api、worker、caddy 与备份服务', () => {
-      compose.run('up', '-d', '--wait', '--no-deps', 'api', 'worker', 'caddy', 'backup');
+      // 同一个版本再部署一次时，重新构建的镜像换了 ID（构建证明的时刻不同）、标签移到新 ID，Compose 却不重建容器，
+      // 容器还跑着上一次构建、ps 里只剩 ID：带版本的三个服务一律重建，确保跑的是本次构建
+      compose.run('up', '-d', '--wait', '--no-deps', '--force-recreate', 'api', 'worker', 'caddy');
+      compose.run('up', '-d', '--wait', '--no-deps', 'backup');
       checkRunningRelease(compose, release);
       writeFileSync(releaseFile, `${release}\n`);
     });
