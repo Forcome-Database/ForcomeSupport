@@ -172,6 +172,19 @@ describe('AC-P1-13：近 90 天邮件回放（编号日期取首封来信日期�
       text: 'Hello',
       at: '2026-08-15T09:00:00+08:00',
     });
+    // 最近来信 9 天后才回复：转等客户时 7 天已过，实时 worker 在处理完回复后的那一分钟就关单
+    gmail.deliver({
+      ...directLetter('Leo Grant', '2026-07-01T10:00:00+08:00'),
+      messageId: '<leo-1@example.com>',
+    });
+    gmail.send({
+      from: AUTO.mailbox,
+      to: 'leo.grant@example.com',
+      subject: 'Re: Help please',
+      text: 'Sorry for the late reply.',
+      at: '2026-07-10T12:00:30+08:00',
+      headers: { 'In-Reply-To': '<leo-1@example.com>' },
+    });
     // 早于 90 天的不回放
     gmail.deliver(directLetter('Old Timer', '2026-06-01T09:00:00+08:00'));
     agent = await t.loginAs('坐席');
@@ -189,8 +202,8 @@ describe('AC-P1-13：近 90 天邮件回放（编号日期取首封来信日期�
     expect(output.stdout).toContain(
       'T0 2026-09-11 10:20（北京时间）：回放 2026-06-13 10:20（北京时间） 至 T0 之前到达的邮件（近 90 天）',
     );
-    expect(output.stdout).toContain('回放完成：共 6 封');
-    expect(output.stdout).toContain('新入库来信 5 封、我方发信 1 封');
+    expect(output.stdout).toContain('回放完成：共 8 封');
+    expect(output.stdout).toContain('新入库来信 6 封、我方发信 2 封');
     expect(output.stdout).toContain('上线切换完成于 2026-09-11 10:20（北京时间）');
   });
 
@@ -210,6 +223,13 @@ describe('AC-P1-13：近 90 天邮件回放（编号日期取首封来信日期�
       // 关闭 14 天后同一订单来信：重开（R-TK-01 的 30 天按关闭时刻比）
       ['inbound_reopen', 'awaiting_reply', iso('2026-08-10T10:00:00+08:00')],
       ['idle_14_days', 'closed', iso('2026-08-24T10:00:00+08:00')],
+    ]);
+    // 回复让早已到点的 7 天时限生效：关在回复之后的下一分钟，不早于回复（时钟只往前走）
+    const [leo] = await ticketsOf(agent, 'Leo Grant');
+    expect(await statusChanges(t, leo!.number)).toEqual([
+      ['inbound', 'awaiting_reply', iso('2026-07-01T10:00:00+08:00')],
+      ['reply_detected', 'awaiting_customer', iso('2026-07-10T12:00:30+08:00')],
+      ['idle_7_days', 'closed', iso('2026-07-10T12:01:00+08:00')],
     ]);
     expect(await statusChanges(t, 'T-20260805-0001')).toEqual([
       ['inbound', 'awaiting_reply', iso('2026-08-05T23:30:00+08:00')],
@@ -274,7 +294,7 @@ describe('AC-P1-13：近 90 天邮件回放（编号日期取首封来信日期�
     const { rows } = await t.runtime.db.execute<{ n: number }>(
       sql`SELECT count(*)::int AS n FROM channel.mail_replay_item`,
     );
-    expect(rows[0]!.n).toBe(6);
+    expect(rows[0]!.n).toBe(8);
   });
 });
 

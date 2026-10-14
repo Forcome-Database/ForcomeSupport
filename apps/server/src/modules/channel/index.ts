@@ -25,7 +25,6 @@ export {
 export { type MailAddress, type Recognition, type SenderRule } from './recognition';
 export { mailboxHealths, type MailboxHealth } from './mailbox-health';
 export {
-  cutoverStatusOf,
   mailCutoverStatus,
   readMailCutover,
   type MailCutover,

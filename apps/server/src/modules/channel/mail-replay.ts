@@ -1,5 +1,5 @@
 import { MAIL_REPLAY_DAYS } from '@forcome/contracts';
-import { and, asc, count, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, count, eq, isNotNull, isNull, max } from 'drizzle-orm';
 import {
   announceChange,
   toMilliseconds,
@@ -147,16 +147,20 @@ export async function listReplayMail(
   return listed;
 }
 
-/** 回放清单的进度：共几封、已回放几封 */
+/** 回放清单的进度：共几封、已回放几封、已回放到哪一封的到达时间（一封也没有为 null） */
 export async function replayProgress(
   runtime: Runtime,
-): Promise<{ total: number; replayed: number }> {
+): Promise<{ total: number; replayed: number; through: Date | null }> {
   const [total] = await runtime.db.select({ n: count() }).from(mailReplayItem);
   const [replayed] = await runtime.db
-    .select({ n: count() })
+    .select({ n: count(), through: max(mailReplayItem.internalDate) })
     .from(mailReplayItem)
     .where(isNotNull(mailReplayItem.replayedAt));
-  return { total: total?.n ?? 0, replayed: replayed?.n ?? 0 };
+  return {
+    total: total?.n ?? 0,
+    replayed: replayed?.n ?? 0,
+    through: replayed?.through ?? null,
+  };
 }
 
 /** 接下来要回放的几封：还没回放的，按到达时间升序（同一时刻按邮箱、Gmail 消息 ID） */

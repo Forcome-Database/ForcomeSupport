@@ -16,6 +16,7 @@ import {
   watchedMailboxes,
   watchMailboxes,
   type MailCutover,
+  type WatchedMailbox,
 } from './modules/channel';
 import {
   drainJobs,
@@ -50,7 +51,7 @@ import { nextTimeLimitAt, scanTimeLimits } from './modules/ticket';
 export const MAIL_REPLAY_USAGE =
   '用法：node dist/mail-replay.mjs [--t0 <带时区的时刻，如 2026-11-01T00:00:00+08:00>] [--confirm]（不加 --confirm 只看计划）';
 
-export interface MailReplayIo {
+export interface MailReplayCommandIo {
   readonly stdout: (text: string) => void;
   readonly stderr: (text: string) => void;
 }
@@ -66,7 +67,7 @@ export interface MailReplayRuntime {
 
 export interface MailReplayOptions {
   readonly startRuntime: () => Promise<MailReplayRuntime>;
-  readonly io: MailReplayIo;
+  readonly io: MailReplayCommandIo;
   /** 回放流水线的任务（「来信已接收」「我方发信已同步」、回复重新识别）：回放里只跑这几个队列，其余留给 worker */
   readonly pipelineJobs: readonly string[];
   /** 有没有 worker 连着这个库；默认按连接的 application_name 查（forcome-worker…，core 的 startRuntime 设的） */
@@ -79,6 +80,8 @@ export interface MailReplayOptions {
 
 const LOCK_KEY = 'channel.mail_replay';
 const PAGE_SIZE = 200;
+/** 每回放多少封写一行进度 */
+const PROGRESS_EVERY = 200;
 const MINUTE_MS = 60_000;
 
 const t0Schema = z.iso.datetime({ offset: true });
@@ -97,6 +100,16 @@ export async function workerConnected(runtime: Runtime): Promise<boolean> {
 /** 时刻向上取整到分钟：实时 worker 的时限扫描是每分钟整点一次（cron * * * * *） */
 function ceilToMinute(instant: Date): Date {
   return new Date(Math.ceil(instant.getTime() / MINUTE_MS) * MINUTE_MS);
+}
+
+/** 某一时刻之后的下一个整分（正好在整分上也取下一个：那一刻的扫描可能先于这件事） */
+function minuteAfter(instant: Date): Date {
+  return new Date((Math.floor(instant.getTime() / MINUTE_MS) + 1) * MINUTE_MS);
+}
+
+/** 这个邮箱开始监听晚于 T0（或还没开始）：T0 到开始监听之间的信既不回放、也不在增量里 */
+function watchedAfter(mailbox: WatchedMailbox, t0: Date): boolean {
+  return !mailbox.watchedAt || mailbox.watchedAt.getTime() > t0.getTime();
 }
 
 /** 会话级咨询锁：拿不到返回 null（另一个回放正在跑） */
@@ -192,7 +205,7 @@ export async function runMailReplayCommand(
 /** 不加 --confirm：只写计划（T0、回放区间、各邮箱是否已开始监听、worker 是否在运行），不动任何东西 */
 async function printPlan(
   { runtime }: MailReplayRuntime,
-  io: MailReplayIo,
+  io: MailReplayCommandIo,
   cutover: MailCutover | null,
   requestedT0: Date | null,
   workerRunning: boolean,
@@ -215,11 +228,11 @@ async function printPlan(
   const mailboxes = await watchedMailboxes(runtime.db);
   lines.push(`进线邮箱 ${mailboxes.length} 个：`);
   for (const m of mailboxes) {
-    const late = !cutover && requestedT0 && m.watchedAt && m.watchedAt > requestedT0;
+    const late = !cutover && requestedT0 && watchedAfter(m, requestedT0);
     lines.push(
       `  ${m.address}：${
         m.watchedAt ? `${at(m.watchedAt)} 开始监听` : '还没开始监听（执行时先开始监听）'
-      }${late || (!cutover && requestedT0 && !m.watchedAt) ? '——晚于 T0，执行会被拒绝' : ''}`,
+      }${late ? '——晚于 T0，执行会被拒绝' : ''}`,
     );
   }
   lines.push(
@@ -265,7 +278,7 @@ async function replay(
       io.stderr(`T0 ${at(t0)} 还没到：T0 不能晚于现在（${at(now)}）。\n`);
       return 1;
     }
-    const late = watched.filter((m) => !m.watchedAt || m.watchedAt.getTime() > t0.getTime());
+    const late = watched.filter((m) => watchedAfter(m, t0));
     if (late.length > 0) {
       io.stderr(
         `T0 ${at(t0)} 早于这些邮箱开始监听的时刻，T0 到开始监听之间的信既不回放、也不在增量里：\n${late
@@ -291,29 +304,40 @@ async function replay(
   if (requeued > 0) io.stdout(`上次中断时还在处理的任务 ${requeued} 个，已交回重试。\n`);
 
   // 4. 按到达时间升序逐封回放
-  const clock = new ManualClock(cutover.replayFrom);
-  const replayRuntime: Runtime = { ...runtime, clock, replay: true };
   const progress = await replayProgress(runtime);
+  // 续跑时时钟从上次回放到的那一封起走（之前该扫的都已扫过）
+  const clock = new ManualClock(progress.through ?? cutover.replayFrom);
+  const replayRuntime: Runtime = { ...runtime, clock, replay: true };
   const counts = { inbound: 0, outbound: 0, copies: 0, skipped: 0, closed: 0, overdue: 0 };
   const failed: FailedDrainJob[] = [];
-  let scannedThrough = cutover.replayFrom;
+  // 扫描过、仍到点却没改动的时限（单线程下不会出现，防死循环）：之后只看它之后的
+  let stuckBefore: Date | null = null;
   const drain = async () => {
     const report = await drainJobs(replayRuntime, pipeline, logger, { sleep: options.sleep });
     failed.push(...report.failed);
   };
-  // 到 until 为止该到的时限扫描，放在实时 worker 会扫的那一分钟
+  /**
+   * 到 until 为止该到的时限扫描，放在实时 worker 会扫的那一分钟：时限在当前时钟之后的，取它向上取整的那一分钟；已经过了的
+   * （一封邮件改了工单状态，让早就到点的时限生效，例如最近来信 9 天后才回复、转等客户，7 天的时限已过），取这封邮件之后的
+   * 下一分钟——实时 worker 也是在处理完它之后的那次扫描里关单。时钟只往前走
+   */
   const catchUp = async (until: Date) => {
     for (;;) {
-      const due = await nextTimeLimitAt(runtime.db, scannedThrough);
+      const due = await nextTimeLimitAt(runtime.db, stuckBefore);
       if (!due) return;
-      const scanAt = ceilToMinute(due);
+      const now = clock.now();
+      const scanAt = due.getTime() > now.getTime() ? ceilToMinute(due) : minuteAfter(now);
       if (scanAt.getTime() > until.getTime()) return;
       clock.set(scanAt);
       const scan = await scanTimeLimits(replayRuntime, scanAt, logger);
       counts.closed += scan.closed;
       counts.overdue += scan.overdue;
       await drain();
-      scannedThrough = scanAt;
+      const left = await nextTimeLimitAt(runtime.db, stuckBefore);
+      if (left && left.getTime() <= scanAt.getTime()) {
+        logger.warn({ due: left, scanAt }, '时限到点但扫描没有改动，之后跳过它');
+        stuckBefore = scanAt;
+      }
     }
   };
   let done = progress.replayed;
@@ -334,7 +358,7 @@ async function replay(
       await drain();
       await markReplayed(runtime, item, systemClock.now());
       done += 1;
-      if (done % PAGE_SIZE === 0) {
+      if (done % PROGRESS_EVERY === 0) {
         io.stdout(`已回放 ${done} / ${progress.total} 封（到 ${at(item.internalDate)}）\n`);
       }
     }
