@@ -1,5 +1,6 @@
 import {
   relativeTimeWords,
+  reportPeriodLabels,
   reportRangeDays,
   slaRate,
   type ReportDateRange,
@@ -28,11 +29,14 @@ export function rangeWords(range: ReportDateRange, today: string): string {
   return drillDateWords(range, today);
 }
 
-/** 副标题里的期间（Q7）：「近 7 天」「本月」，自定义写起止 */
+/** 一天：今年的「09-10」，不在今年的写全年份（每日工单量的横轴与悬停） */
+export function dayWords(date: string, today: string): string {
+  return drillDateWords({ from: date, to: date }, today);
+}
+
+/** 副标题里的期间（Q7）：「近 7 天」「本月」（同时间筛选的叫法），自定义写起止 */
 export function periodWords(range: Range, today: string): string {
-  if (range.period === '7d') return COMPARE.weekPeriod;
-  if (range.period === 'month') return COMPARE.monthPeriod;
-  return rangeWords(range, today);
+  return range.period === 'custom' ? rangeWords(range, today) : reportPeriodLabels[range.period];
 }
 
 /** 对比的前缀：近 7 天「较前 7 天」，本月「较上月同期」，自定义「较前 N 天」 */
@@ -95,7 +99,9 @@ export function slaDelta(
   const now = slaRate(current);
   const before = slaRate(prior);
   if (now === null || before === null) return null;
-  const diff = Math.round((now - before) * 10) / 10;
+  // 按两期显示出来的值（保留一位）相减，差值与卡上的数对得上
+  const shown = (rate: number) => Math.round(rate * 10);
+  const diff = (shown(now) - shown(before)) / 10;
   if (diff === 0) return { text: `${comparePrefix(range)} ${COMPARE.flat}`, tone: 'muted' };
   return {
     text: `${comparePrefix(range)} ${signed(diff, Math.abs(diff).toFixed(1))} ${COMPARE.points}`,

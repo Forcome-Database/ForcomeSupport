@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   comparePrefix,
+  dayWords,
   emptyScopeWords,
   firstResponseDelta,
   firstResponseWords,
@@ -27,6 +28,8 @@ const M = 60_000;
 describe('期间与对比的前缀', () => {
   it('筛选行写起止；副标题写「近 7 天」「本月」或起止；对比前缀随期间', () => {
     expect(rangeWords(week, TODAY)).toBe('09-05 至 09-11');
+    expect(dayWords('2026-09-10', TODAY)).toBe('09-10');
+    expect(dayWords('2025-09-10', TODAY)).toBe('2025-09-10');
     expect(rangeWords({ from: '2025-12-30', to: '2026-01-02' }, TODAY)).toBe('2025-12-30 至 01-02');
     expect([week, month, custom].map((r) => periodWords(r, TODAY))).toEqual([
       '近 7 天',
@@ -94,6 +97,10 @@ describe('与上一周期的对比（Q2）', () => {
       tone: 'danger',
     });
     expect(slaDelta({ met: 1, counted: 1 }, { met: 0, counted: 0 }, custom)).toBeNull();
+    // 按两期显示的值相减：96.44% 写 96.4%、95.35% 写 95.4%，差值写 +1.0（不是未舍入相减的 +1.1）
+    expect(slaDelta({ met: 9644, counted: 10000 }, { met: 9535, counted: 10000 }, week)?.text).toBe(
+      '较前 7 天 +1.0 个百分点',
+    );
   });
 });
 

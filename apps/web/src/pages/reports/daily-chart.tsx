@@ -19,6 +19,7 @@ import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { A11Y, DAILY } from './p17-copy';
+import { dayWords } from './p17-words';
 
 /*
  * 「每日工单量」卡（原型 p17_p1_daily()、build_approval_kb_reports.stacked_columns()、K19）：卡头 13 / 700 标题与 12 次要色副标题，
@@ -57,6 +58,7 @@ export function dailyTicks(max: number): number[] {
 }
 
 interface Row extends ReportDay {
+  /** 横轴与悬停写的日期：今年的「09-10」，不在今年的写全年份 */
   readonly label: string;
   readonly total: number;
 }
@@ -197,16 +199,19 @@ export function DailyChart({
   sub,
   drill,
   height,
+  today,
 }: {
   days: readonly ReportDay[];
   sub: string;
   drill: DailyDrill | null;
+  /** 服务端的今天（横轴日期不在今年时写全年份） */
+  today: string;
   /** 绘图区高（原型客服主管 300） */
   height: number;
 }) {
   const rows: Row[] = days.map((day) => ({
     ...day,
-    label: day.date.slice(5),
+    label: dayWords(day.date, today),
     total: day.amazon + day.shopify_email,
   }));
   const ticks = dailyTicks(Math.max(0, ...rows.map((row) => row.total)));
@@ -229,8 +234,8 @@ export function DailyChart({
             onClick={
               drill
                 ? (state) => {
-                    const row = rows.find((r) => r.label === state.activeLabel);
-                    if (row) drill.day(row.date);
+                    // 横轴按日期（自定义区间跨年时「月-日」会重复，不按写出来的字找）
+                    if (typeof state.activeLabel === 'string') drill.day(state.activeLabel);
                   }
                 : undefined
             }
@@ -238,7 +243,8 @@ export function DailyChart({
           >
             <CartesianGrid vertical={false} stroke="var(--border-soft)" />
             <XAxis
-              dataKey="label"
+              dataKey="date"
+              tickFormatter={(date: string) => dayWords(date, today)}
               tickLine={false}
               axisLine={{ stroke: 'var(--border)' }}
               tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}

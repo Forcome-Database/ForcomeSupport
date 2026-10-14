@@ -59,6 +59,8 @@ import {
 /** 超过这么久没返回显示骨架、转加载失败（K3） */
 const SKELETON_AFTER_MS = 300;
 const FAIL_AFTER_MS = 10_000;
+/** 每日工单量与右侧售后成本卡（原型 p17_p1()：1.25fr / 1fr，间距 14，顶端对齐） */
+const WITH_COST_GRID = 'grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] items-start gap-3.5';
 
 /** 正在为当前条件取数时，过了多久（换了条件或重试从 0 算起）：超过 300ms 显示骨架，超过 10 秒转加载失败 */
 function useWaiting(waiting: boolean, key: string): { slow: boolean; failed: boolean } {
@@ -132,8 +134,9 @@ export function ReportsPage() {
     await report.refetch();
   };
 
+  // 下钻的期间、店铺、站点都按画面上这一份数据的条件；换了条件、新的还没返回时不可下钻（不拼出新旧混搭的条件）
   const drillTo = (target: ReportDrillTarget) => {
-    if (!data) return;
+    if (!data || waiting) return;
     void navigate({
       to: pages.tickets.path,
       search: reportDrillQuery(
@@ -144,7 +147,7 @@ export function ReportsPage() {
     });
   };
   const dailyDrill: DailyDrill | null =
-    drillable && data
+    drillable && data && !waiting
       ? {
           day: (date) => drillTo({ from: 'daily-bar', date }),
           channel: (channel) => drillTo({ from: 'daily-legend', channel }),
@@ -158,6 +161,7 @@ export function ReportsPage() {
         }
       : null;
 
+  const canDrill = drillable && !waiting;
   // 换了条件、还没超过 300ms 时照旧显示上一份；超过了显示骨架
   const shown = waiting && slow ? null : data;
   const empty = shown !== null && isEmptyTicketReport(shown);
@@ -181,7 +185,7 @@ export function ReportsPage() {
         value: String(r.current.volume),
         delta: volumeDelta(r.current.volume, r.prior.volume, r.range),
         sub: KPI.volumeSub(period),
-        onDrill: drillable ? () => drillTo({ from: 'metric-volume' }) : null,
+        onDrill: canDrill ? () => drillTo({ from: 'metric-volume' }) : null,
       },
       {
         label: KPI.firstResponse,
@@ -189,7 +193,7 @@ export function ReportsPage() {
         delta: firstResponseDelta(r.current.firstResponseMs, r.prior.firstResponseMs, r.range),
         sub: KPI.firstResponseSub,
         onDrill:
-          drillable && firstResponse !== KPI.none
+          canDrill && r.current.firstResponseMs !== null
             ? () => drillTo({ from: 'metric-first-response' })
             : null,
       },
@@ -198,7 +202,8 @@ export function ReportsPage() {
         value: rate,
         delta: slaDelta(r.current.sla, r.prior.sla, r.range),
         sub: slaSubWords(r.current.sla, r.unassignedMissed),
-        onDrill: drillable && rate !== KPI.none ? () => drillTo({ from: 'metric-sla' }) : null,
+        onDrill:
+          canDrill && r.current.sla.counted > 0 ? () => drillTo({ from: 'metric-sla' }) : null,
       },
     ];
   };
@@ -234,6 +239,7 @@ export function ReportsPage() {
         sub={DAILY.sub(period, dailyDrill !== null)}
         drill={dailyDrill}
         height={300}
+        today={today}
       />
     )
   ) : null;
@@ -265,13 +271,7 @@ export function ReportsPage() {
         ) : waiting && slow ? (
           <>
             <KpiSkeleton />
-            <div
-              className={
-                withCost
-                  ? 'grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] items-start gap-3.5'
-                  : 'grid grid-cols-1 gap-3.5'
-              }
-            >
+            <div className={withCost ? WITH_COST_GRID : 'grid grid-cols-1 gap-3.5'}>
               <ChartSkeleton />
               {withCost && <ChartSkeleton />}
             </div>
@@ -280,7 +280,7 @@ export function ReportsPage() {
           <>
             <KpiRow kpis={kpis(shown)} />
             {withCost ? (
-              <div className="grid grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] items-start gap-3.5">
+              <div className={WITH_COST_GRID}>
                 {daily}
                 {/* 售后成本按责任类型（本月，不随时间筛选）：待办 25 接上 */}
                 <div data-testid="report-cost-slot" />

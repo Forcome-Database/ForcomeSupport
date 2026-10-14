@@ -48,9 +48,6 @@ export const KPI = {
 
 /** 与上一周期的对比（Q2）：前缀随期间，「持平」，SLA 写「个百分点」 */
 export const COMPARE = {
-  /** 副标题里的期间：近 7 天、本月（自定义写起止，Q7） */
-  weekPeriod: '近 7 天',
-  monthPeriod: '本月',
   week: '较前 7 天',
   month: '较上月同期',
   days: (n: number) => `较前 ${n} 天`,
