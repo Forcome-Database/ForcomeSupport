@@ -32,6 +32,7 @@ import {
   teamSchema,
   ticketDetailSchema,
   ticketListSchema,
+  ticketReportSchema,
   unassignedMailListSchema,
   type AdminContacts,
   type AftersalesDetail,
@@ -80,6 +81,8 @@ import {
   type TicketDetail,
   type TicketList,
   type TicketListQuery,
+  type ReportQuery,
+  type TicketReport,
   type UnassignedMailList,
 } from '@forcome/contracts';
 import type { z } from 'zod';
@@ -209,13 +212,18 @@ async function call<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): 
  */
 const backgroundRequest: RequestInit = { headers: { [BACKGROUND_REQUEST_HEADER]: '1' } };
 
-/** 是不是后台请求（推送触发的重新拉取由查询的 queryFn 判断后传进来） */
+/**
+ * 是不是后台请求（推送触发的重新拉取由查询的 queryFn 判断后传进来）；signal 是查询的中止信号（传了的，查询取消或重新取时
+ * 中止还没返回的请求，例如 P17 加载超过 10 秒后点「重试」，待办 24）
+ */
 export interface FetchMode {
   readonly background: boolean;
+  readonly signal?: AbortSignal;
 }
 
 function modeInit(mode: FetchMode | undefined): RequestInit | undefined {
-  return mode?.background ? backgroundRequest : undefined;
+  const init = mode?.background ? backgroundRequest : undefined;
+  return mode?.signal ? { ...init, signal: mode.signal } : init;
 }
 
 function jsonBody(method: string, body: unknown): RequestInit {
@@ -357,6 +365,12 @@ export const api = {
       ticketListSchema,
       modeInit(mode),
     ),
+
+  /**
+   * P17 报表的工单部分（店铺范围内，按期间、店铺、站点，待办 24）；店铺筛选选了范围外的店铺抛 403
+   */
+  ticketReport: (query: ReportQuery, mode?: FetchMode): Promise<TicketReport> =>
+    call(`/api/reports/tickets${queryString(query)}`, ticketReportSchema, modeInit(mode)),
 
   /** P05 工单详情（店铺范围外 403、没有 404） */
   ticketDetail: (number: string, mode?: FetchMode): Promise<TicketDetail> =>

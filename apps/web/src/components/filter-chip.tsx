@@ -156,16 +156,19 @@ export interface DateRange {
 
 /**
  * 区间日历（放在浮层里）：点第一天开始新的区间，点第二天即选好（起止颠倒时对调）。
- * start 是已点的第一天（由使用方保存，浮层关闭时清掉）
+ * start 是已点的第一天（由使用方保存，浮层关闭时清掉）；latest 是能选的最后一天（P17 不能选今天之后，待办 24 Q3），之后的日子置灰，
+ * 没有已选的区间时打开在它所在的月份（按服务端的今天，开发测试环境 CLOCK_START 时与浏览器不同）
  */
 export function RangeCalendar({
   range,
   start,
+  latest,
   onStart,
   onPick,
 }: {
   range: DateRange | null;
   start: string | null;
+  latest?: string;
   onStart: (day: string) => void;
   onPick: (range: DateRange) => void;
 }) {
@@ -179,7 +182,8 @@ export function RangeCalendar({
       mode="range"
       classNames={RANGE_DAYS}
       selected={shown}
-      defaultMonth={shown?.from}
+      defaultMonth={shown?.from ?? (latest ? toDate(latest) : undefined)}
+      {...(latest ? { disabled: { after: toDate(latest) } } : {})}
       onSelect={(_range, day) => {
         const picked = toValue(day);
         if (!start) {

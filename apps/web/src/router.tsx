@@ -8,7 +8,7 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router';
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { AppShell } from '@/components/app-shell';
 import { Forbidden } from '@/components/forbidden';
 import { Toaster, UndoToaster } from '@/components/ui/sonner';
@@ -38,6 +38,8 @@ import { DevLoginPage } from '@/pages/dev-login';
 import { LogoutPage } from '@/pages/logout';
 import { LoginCallbackPage } from '@/pages/login/login-callback';
 import { LoginPage, loginSearchSchema } from '@/pages/login/login-page';
+import { ReportsPage } from '@/pages/reports/reports-page';
+import { reportsSearchSchema } from '@/pages/reports/reports-search';
 import { ChannelsPage, channelsSearchSchema } from '@/pages/settings/channels-page';
 import { TeamPage, teamSearchSchema } from '@/pages/settings/team-page';
 import { TicketDetailPage } from '@/pages/tickets/ticket-detail-page';
@@ -49,8 +51,8 @@ import { ticketsSearchSchema } from '@/pages/tickets/tickets-search';
  * 没登录（含会话 7 天无操作过期）时，开启了开发登录（非生产环境）就去开发登录页，否则去钉钉扫码登录页（G11，/login；
  * 过期的先显示 G12「已退出登录」）；扫码确认后钉钉把浏览器带到 /login/dingtalk 换会话（待办 05）。
  * 「/」按角色进入默认首页（PRD 4.1）；各页面按能力把关，没有权限时在原地址显示 G2。
- * 第一期各页面的内容随各自的待办加进来（P17 24），在那之前内容区为空；P27 已有（30）、P20 已有（06）、P05 已有（17）；
- * P18 已有（07），P04 已是第一期完整版（18），P13 已是第一期完整版（19–22）。
+ * 第一期各页面的内容随各自的待办加进来；P27 已有（30）、P20 已有（06）、P05 已有（17）；
+ * P18 已有（07），P04 已是第一期完整版（18），P13 已是第一期完整版（19–22），P17 已有工单部分（24，售后成本卡与导出随 25）。
  */
 
 interface RouterContext {
@@ -171,17 +173,6 @@ function PageGate({ page, children }: { page: PageDefinition; children?: ReactNo
   return children ?? null;
 }
 
-function pageRoute<TPath extends string>(
-  page: PageDefinition & { readonly path: TPath },
-  Content?: ComponentType,
-) {
-  return createRoute({
-    getParentRoute: () => appRoute,
-    path: page.path,
-    component: () => <PageGate page={page}>{Content && <Content />}</PageGate>,
-  });
-}
-
 /** P04 工单列表：筛选、报表下钻、排序与页码写在地址栏（待办 18）；view=unassigned 打开未归属店铺队列（I17，待办 15） */
 const ticketsRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -244,6 +235,18 @@ const teamRoute = createRoute({
   ),
 });
 
+/** P17 报表（第一阶段的工单部分，待办 24）：筛选条件在地址栏（PRD P17「第一阶段」） */
+const reportsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: pages.reports.path,
+  validateSearch: reportsSearchSchema,
+  component: () => (
+    <PageGate page={pages.reports}>
+      <ReportsPage />
+    </PageGate>
+  ),
+});
+
 /** P27 审计日志：筛选条件在地址栏（PRD P27） */
 const auditRoute = createRoute({
   getParentRoute: () => appRoute,
@@ -283,7 +286,7 @@ const routeTree = rootRoute.addChildren([
     ticketDetailRoute,
     aftersalesRoute,
     ledgerRoute,
-    pageRoute(pages.reports),
+    reportsRoute,
     settingsRoute,
     channelsRoute,
     teamRoute,

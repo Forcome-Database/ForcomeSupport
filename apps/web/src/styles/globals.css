@@ -40,6 +40,7 @@
   --primary-soft-active: #dcd9f9; /* 浅色强调按钮按下 */
   --primary-active: #3730a3; /* 主按钮按下（ui.BTN_HOVER） */
   --ring: #4f46e5;
+  --primary-on-dark: #c7d2fe; /* 深色浮层上的主色字（原型 drill_tip()「点击查看明细 →」，P17 待办 24） */
   --brand-2: #06b6d4; /* cyan，渐变第二色 */
 
   /* 语义色：*-text 浅底上的字，实心色（无后缀）用于白字实心底与圆点 */
@@ -135,6 +136,7 @@
   --color-input: var(--input);
   --color-input-hover: var(--input-hover);
   --color-ink-2: var(--ink-2);
+  --color-primary-on-dark: var(--primary-on-dark);
   --color-subtle-foreground: var(--subtle-foreground);
   --color-placeholder: var(--placeholder);
   --color-primary: var(--primary);
