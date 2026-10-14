@@ -45,11 +45,15 @@ const SEGMENT_GAP = 2;
 const PLOT_TOP = 6;
 const X_AXIS_HEIGHT = 24;
 
-/** 纵轴：0 起、约 4 格的整齐刻度，最高一格高过最高的柱（柱顶的合计写得下；原型 73 → 0 · 20 · 40 · 60 · 80） */
+/**
+ * 纵轴：0 起、约 4 格的整齐刻度，最高一格高过最高的柱（柱顶的合计写得下；原型 73 → 0 · 20 · 40 · 60 · 80）。
+ * 工单量是整数，一格至少 1（柱很矮时不出 0.5 这样的刻度）
+ */
 export function dailyTicks(max: number): number[] {
   const rough = Math.max(max, 1) / 4;
   const power = 10 ** Math.floor(Math.log10(rough));
-  const step = [1, 2, 5, 10].map((m) => m * power).find((s) => s >= rough) ?? 10 * power;
+  const nice = [1, 2, 5, 10].map((m) => m * power).find((s) => s >= rough) ?? 10 * power;
+  const step = Math.max(1, nice);
   const top = (Math.floor(max / step) + 1) * step;
   return Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step);
 }

@@ -71,7 +71,7 @@ export function ChartTip({
 }) {
   return (
     <div
-      className="flex flex-col gap-px rounded-md bg-foreground px-2.5 py-1.75 text-12 leading-normal whitespace-nowrap text-primary-foreground shadow-md"
+      className="flex flex-col gap-px rounded-md bg-foreground px-2.5 py-1.75 text-left text-12 leading-normal whitespace-nowrap text-primary-foreground shadow-md"
       data-testid={testId}
     >
       <div className="font-semibold">{title}</div>
