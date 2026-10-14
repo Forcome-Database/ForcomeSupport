@@ -1,151 +1,204 @@
-import { can, type TicketListItem } from '@forcome/contracts';
-import { useQuery } from '@tanstack/react-query';
+import { businessDate } from '@forcome/calendar';
+import {
+  can,
+  ticketDrillOf,
+  type TicketDrill,
+  type TicketList,
+  type TicketListSort,
+} from '@forcome/contracts';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { Search } from 'lucide-react';
-import { z } from 'zod';
-import { EmptyState } from '@/components/empty-state';
+import { RefreshCw, X } from 'lucide-react';
+import { useEffect, type ReactNode } from 'react';
+import { DisabledReason } from '@/components/disabled-reason';
 import { LoadError } from '@/components/load-error';
 import { PageHead } from '@/components/page-head';
-import {
-  TicketChannelStore,
-  TicketSourceLabel,
-  TicketStatusBadge,
-} from '@/components/ticket-badges';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { storeOptionsQuery } from '@/lib/channel';
 import { useCurrentMember } from '@/lib/current-member';
 import { pages } from '@/lib/pages';
-import { formatLastInbound, ticketListQuery } from '@/lib/tickets';
-import { cn } from '@/lib/utils';
-import { A11Y, COLUMNS, EMPTY_TITLE, EMPTY_VALUE, PAGE_DESCRIPTION, PAGE_TITLE } from './p04-copy';
+import { ticketListQuery, useServerNow } from '@/lib/tickets';
+import { EMPTY, FILTERS, LIVE_NOTE, PAGE_DESCRIPTION, PAGE_TITLE, PAGER } from './p04-copy';
+import { drillCountWords, drillNoteWords, filterSummary } from './p04-words';
+import { TicketFilterBar } from './tickets-filters';
+import {
+  clearedSearch,
+  currentSort,
+  isDefaultSearch,
+  sortedBy,
+  ticketQueryOf,
+  ticketsSearchSchema,
+  type TicketsSearch,
+} from './tickets-search';
+import { TicketsTable } from './tickets-table';
 import { UnassignedEntry, UnassignedQueue, useUnassignedCount } from './unassigned-queue';
 
 /*
- * P04 工单列表（第一阶段，PRD P04「第一阶段」、I16；参照图 design/spec/shots/phase1/P04_Tickets.png）。
- * 现在是最简列表：页头 + 表格（工单号 · 主题 · 来源 · 渠道与店铺 · 客户 · 订单号 · 状态 · 最近来信，来源列自待办 10、
- * 订单号列自待办 14），按待回复 → 等客户 → 已解决 → 已关闭、组内最近来信倒序（后端排好）。筛选行与「未归属店铺」入口、
- * SLA 剩余列、SLA 排序与分页、「只读 · 数据变化时自动刷新」与 SSE、点击行进入 P05 随 16、17、18 号待办。
- * 筛选行右侧的「未归属店铺 N」入口只对客服主管显示（I17，待办 15）：切换按钮，条件写在地址栏（?view=unassigned），
- * 打开时列表区换成队列、筛选行只留入口（工单的筛选随 18 加在左侧，不作用于队列）。
- * 表格照原型 tk_table()：外框圆角 8、表头 11 / 700 次要色、行上下 7；列宽照 P1_TPL 换算（含单元格内边距）。
+ * P04 工单列表（第一阶段，PRD P04「第一阶段」v2.32、I16、I10；参照图 design/spec/shots/phase1/P04_Tickets.png、
+ * P04_Tickets_drill.png）：只读工作台。页头（右侧「只读 · 数据变化时自动刷新」）→ 筛选行（条件写在地址栏，右侧客服主管的
+ * 「未归属店铺 N」入口，I17，待办 15）→ 下钻时的计数行 → 表格 → 分页。没有指标行、快捷视图、批量条、选择框、优先级、意图、
+ * 情绪、标签、负责人、导出、新建工单。店铺范围由后端强制过滤；数据变化经实时推送在后台重新拉取（lib/live-updates.ts）。
  */
 
-const LOADING_ROWS = 8;
-
-function TicketRow({ ticket, now }: { ticket: TicketListItem; now: Date }) {
+/** 下钻时筛选行下方的计数行（原型 p04_p1(drill=True)：「共 73 条」13 / 600、说明 12 次要色，右侧「清除筛选」） */
+function DrillCount({
+  drill,
+  data,
+  today,
+  onClear,
+}: {
+  drill: TicketDrill;
+  data: TicketList;
+  today: string;
+  onClear: () => void;
+}) {
+  if (!data.drill) return null;
   return (
-    <TableRow data-testid="ticket-row">
-      <TableCell className="py-1.75">
-        <span className="text-body font-medium whitespace-nowrap text-primary">
-          {ticket.number}
+    <div className="flex items-center justify-between gap-3" data-testid="drill-count">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="text-13 font-semibold whitespace-nowrap text-foreground">
+          {drillCountWords(data.drill)}
         </span>
-      </TableCell>
-      <TableCell className="py-1.75">
-        <div className="truncate text-body font-medium text-foreground" title={ticket.subject}>
-          {ticket.subject || EMPTY_VALUE}
-        </div>
-      </TableCell>
-      <TableCell className="py-1.75">
-        <TicketSourceLabel source={ticket.source} />
-      </TableCell>
-      <TableCell className="py-1.75">
-        <TicketChannelStore channel={ticket.channel} site={ticket.site} store={ticket.store.name} />
-      </TableCell>
-      <TableCell className="py-1.75">
-        <div className="truncate text-body text-foreground" title={ticket.customer.name}>
-          {ticket.customer.name}
-        </div>
-      </TableCell>
-      <TableCell className="py-1.75">
-        {/* 原型 p1_row：12 / 400、不折行；有订单为次要正文色 ink2，没有关联订单写「—」、ink4 */}
-        <span
-          className={cn(
-            'text-minor whitespace-nowrap',
-            ticket.orderNumber ? 'text-ink-2' : 'text-subtle-foreground',
-          )}
-          data-testid="ticket-order"
+        <span className="truncate text-12 text-muted-foreground">
+          {drillNoteWords(drill, today)}
+        </span>
+      </div>
+      <Button variant="text-link" size="text" onClick={onClear}>
+        {FILTERS.clear}
+      </Button>
+    </div>
+  );
+}
+
+/** 表下的分页（原型：「共 16 条 · 每页 20 条 · 已超时在前…」，上一页 · 1 / 1 · 下一页，禁用时悬停写原因） */
+function Pager({
+  data,
+  defaultOrder,
+  onPage,
+}: {
+  data: TicketList;
+  defaultOrder: boolean;
+  onPage: (page: number) => void;
+}) {
+  const pageCount = Math.max(1, Math.ceil(data.total / data.pageSize));
+  const summary = PAGER.summary(data.total, data.pageSize);
+  return (
+    <div className="flex items-center justify-between gap-3" data-testid="ticket-pager">
+      <span className="text-12 text-muted-foreground">
+        {defaultOrder ? `${summary} · ${PAGER.defaultOrder}` : summary}
+      </span>
+      <div className="flex shrink-0 items-center gap-2">
+        <DisabledReason reason={data.page <= 1 ? PAGER.first : null}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={data.page <= 1}
+            onClick={() => onPage(data.page - 1)}
+          >
+            {PAGER.prev}
+          </Button>
+        </DisabledReason>
+        <span className="text-12 text-ink-2 tabular-nums">
+          {PAGER.position(data.page, pageCount)}
+        </span>
+        <DisabledReason
+          reason={data.page >= pageCount ? PAGER.last(data.total, data.pageSize) : null}
         >
-          {ticket.orderNumber ?? EMPTY_VALUE}
-        </span>
-      </TableCell>
-      <TableCell className="py-1.75">
-        <TicketStatusBadge status={ticket.status} />
-      </TableCell>
-      <TableCell className="py-1.75">
-        <span className="text-minor whitespace-nowrap text-muted-foreground">
-          {formatLastInbound(ticket.lastInboundAt, now)}
-        </span>
-      </TableCell>
-    </TableRow>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={data.page >= pageCount}
+            onClick={() => onPage(data.page + 1)}
+          >
+            {PAGER.next}
+          </Button>
+        </DisabledReason>
+      </div>
+    </div>
   );
 }
 
-function TicketsTable({ tickets }: { tickets: readonly TicketListItem[] | null }) {
-  const now = new Date();
+function TicketList({ search, entry }: { search: TicketsSearch; entry: ReactNode }) {
+  const navigate = useNavigate();
+  const query = ticketQueryOf(search);
+  const list = useQuery({ ...ticketListQuery(query), placeholderData: keepPreviousData });
+  const stores = useQuery(storeOptionsQuery);
+  const data = list.data ?? null;
+  const now = useServerNow(data?.now ?? null);
+  const today = businessDate(now);
+  const drill = ticketDrillOf(query);
+  const clearable = !isDefaultSearch(search);
+  const empty = data !== null && data.tickets.length === 0;
+  // 列表为空时「清除筛选后查看全部 N 张」：N 是清除后（默认的近 30 天、其余不选）会列出的张数
+  const fallback = useQuery({
+    ...ticketListQuery(ticketQueryOf(clearedSearch(search))),
+    enabled: clearable && empty,
+  });
+  const storeOptions = (stores.data ?? []).map((store) => ({ value: store.id, label: store.name }));
+  const sort = currentSort(search);
+
+  const go = (next: TicketsSearch) => void navigate({ to: pages.tickets.path, search: next });
+  const clear = () => go(clearedSearch(search));
+
+  // 地址栏的页码超出了（筛选后少了、数据变了）：回到最后一页
+  const pageCount = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : null;
+  useEffect(() => {
+    if (pageCount !== null && (search.page ?? 1) > pageCount) {
+      void navigate({
+        to: pages.tickets.path,
+        search: { ...search, page: pageCount > 1 ? pageCount : undefined },
+        replace: true,
+      });
+    }
+  }, [navigate, pageCount, search]);
+
   return (
-    <Table aria-label={A11Y.table} aria-busy={tickets === null} containerClassName="rounded-md">
-      <colgroup>
-        <col className="w-36.5" />
-        <col />
-        <col className="w-21" />
-        <col className="w-52" />
-        <col className="w-31" />
-        <col className="w-40" />
-        <col className="w-20.5" />
-        <col className="w-24.5" />
-      </colgroup>
-      <TableHeader>
-        <TableRow>
-          {Object.values(COLUMNS).map((title) => (
-            <TableHead key={title} className="font-bold text-muted-foreground">
-              {title}
-            </TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {tickets === null ? (
-          Array.from({ length: LOADING_ROWS }, (_, i) => (
-            <TableRow key={i}>
-              {Object.keys(COLUMNS).map((column) => (
-                <TableCell key={column} className="py-2.5">
-                  <Skeleton className="h-3.5 rounded-sm" />
-                </TableCell>
-              ))}
-            </TableRow>
-          ))
-        ) : tickets.length === 0 ? (
-          <TableRow>
-            <TableCell colSpan={Object.keys(COLUMNS).length} className="p-0">
-              <EmptyState icon={Search} title={EMPTY_TITLE} />
-            </TableCell>
-          </TableRow>
-        ) : (
-          tickets.map((ticket) => <TicketRow key={ticket.id} ticket={ticket} now={now} />)
-        )}
-      </TableBody>
-    </Table>
-  );
-}
-
-/** P04 的地址参数：view=unassigned 打开未归属店铺队列（只对客服主管有效，其余成员照常看工单列表） */
-export const ticketsSearchSchema = z.object({
-  view: z.literal('unassigned').optional().catch(undefined),
-});
-
-function TicketList() {
-  const tickets = useQuery(ticketListQuery);
-  return tickets.isError ? (
-    <LoadError onRetry={() => void tickets.refetch()} />
-  ) : (
-    <TicketsTable tickets={tickets.isPending ? null : tickets.data} />
+    <>
+      <TicketFilterBar
+        search={search}
+        inbound={data?.inbound ?? null}
+        drill={drill}
+        today={today}
+        stores={storeOptions}
+        clearable={clearable && !drill}
+        entry={entry}
+        onChange={go}
+        onClear={clear}
+      />
+      {list.isError ? (
+        <LoadError onRetry={() => void list.refetch()} />
+      ) : (
+        <div className="flex flex-col gap-2">
+          {data && drill && <DrillCount drill={drill} data={data} today={today} onClear={clear} />}
+          <TicketsTable
+            tickets={data?.tickets ?? null}
+            now={now}
+            sort={sort}
+            onSort={(column: TicketListSort) => go(sortedBy(search, column))}
+            empty={{
+              description: EMPTY.description(
+                filterSummary(search, data?.inbound ?? null, storeOptions, drill, today),
+                clearable,
+                fallback.data?.total ?? 0,
+              ),
+              action: clearable ? (
+                <Button variant="outline" onClick={clear}>
+                  <X />
+                  {FILTERS.clear}
+                </Button>
+              ) : undefined,
+            }}
+          />
+        </div>
+      )}
+      {data && data.total > 0 && (!drill || data.total > data.pageSize) && (
+        <Pager
+          data={data}
+          defaultOrder={sort.sort === 'sla' && sort.dir === 'asc'}
+          onPage={(page) => go({ ...search, page: page > 1 ? page : undefined })}
+        />
+      )}
+    </>
   );
 }
 
@@ -156,25 +209,40 @@ export function TicketsPage() {
   const supervisor = can(member.roles, 'ticket.assign_store');
   const queueOpen = supervisor && search.view === 'unassigned';
   const count = useUnassignedCount(supervisor);
+  const entry = supervisor ? (
+    <UnassignedEntry
+      count={count}
+      open={queueOpen}
+      onToggle={() =>
+        void navigate({
+          to: pages.tickets.path,
+          search: queueOpen ? {} : { view: 'unassigned' },
+        })
+      }
+    />
+  ) : null;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PageHead title={PAGE_TITLE} description={PAGE_DESCRIPTION} />
+      <PageHead
+        title={PAGE_TITLE}
+        description={PAGE_DESCRIPTION}
+        actions={
+          <span className="inline-flex items-center gap-1.5 text-12 whitespace-nowrap text-muted-foreground">
+            <RefreshCw className="size-3.5 text-subtle-foreground" />
+            {LIVE_NOTE}
+          </span>
+        }
+      />
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 pt-3.5 pb-3">
-        {supervisor && (
-          <div className="flex min-h-7 items-center justify-end gap-3">
-            <UnassignedEntry
-              count={count}
-              open={queueOpen}
-              onToggle={() =>
-                void navigate({
-                  to: pages.tickets.path,
-                  search: queueOpen ? {} : { view: 'unassigned' },
-                })
-              }
-            />
-          </div>
+        {queueOpen ? (
+          <>
+            {/* 队列视图：筛选行只留右侧入口（工单的筛选不作用于队列，PRD v2.30） */}
+            <div className="flex min-h-7 items-center justify-end gap-3">{entry}</div>
+            <UnassignedQueue />
+          </>
+        ) : (
+          <TicketList search={search} entry={entry} />
         )}
-        {queueOpen ? <UnassignedQueue /> : <TicketList />}
       </div>
     </div>
   );

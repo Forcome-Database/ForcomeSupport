@@ -27,6 +27,7 @@ import {
   type Tx,
 } from '../core';
 import { queueAmazonSync, queueShopifySync, resetOrderSync } from '../order';
+import type { StoreAccessTarget } from '../org';
 import { storeConnections, type ConnectionSnapshot } from './connections';
 import { storeChangedJob } from './jobs';
 import { store, storeMailbox } from './schema';
@@ -155,6 +156,19 @@ export async function storeNamesById(
     .from(store)
     .where(inArray(store.id, [...new Set(ids)]));
   return new Map(rows.map((row) => [row.id, row.name]));
+}
+
+/**
+ * 选了某个店铺（P13 台账与 P04 工单的店铺筛选、新建登记或改店铺）时交给 access.requireStores 的对象：越权时审计的对象名写店铺名
+ * （P27「对象」列与对象编号搜索按它；只在越权时才查店铺名）
+ */
+export function storeAccessTarget(db: DbExecutor, storeId: string): StoreAccessTarget {
+  return {
+    storeIds: [storeId],
+    objectType: 'store',
+    objectId: storeId,
+    objectLabel: async () => (await storeNamesById(db, [storeId])).get(storeId) ?? null,
+  };
 }
 
 /** 店铺的接口输出（contracts 的 Store）；「状态」列按这一刻的同步记录算（connections.ts） */

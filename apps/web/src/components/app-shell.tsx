@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { avatarText } from '@/lib/avatar';
+import { useLiveUpdates } from '@/lib/live-updates';
 import { pages, sectionPaths } from '@/lib/pages';
 import { LOGOUT_PATH, useSaveDensity } from '@/lib/session';
 import { Brand } from './brand';
@@ -35,8 +36,10 @@ import { NotificationBell } from './notification-bell';
  * 登录后的外壳（原型 app() 与 _topbar()，第一阶段：PRD 4.1）：56px 白色顶栏 + 浅灰内容区。
  * 顶栏：品牌标 · 分段导航（按角色，/api/me 的 nav）· 右侧密度按钮、站内通知铃铛（G10）、当前成员（头像菜单）。
  * 第一阶段不显示店铺范围切换、全局搜索与导航角标。顶栏下方：渠道连接异常时的全站红色横幅（G4，待办 09）。
+ * 登录期间连着实时推送（待办 18）：数据变化时对应的页面在后台重新拉取。
  */
 export function AppShell({ member, children }: { member: CurrentMember; children: ReactNode }) {
+  useLiveUpdates();
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-card px-4">

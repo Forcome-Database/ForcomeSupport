@@ -12,6 +12,7 @@ import {
 } from '@forcome/contracts';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import {
+  announceChange,
   recordAudit,
   systemActor,
   transaction,
@@ -100,6 +101,8 @@ export async function notifyUnassignedMail(
   tx: Tx,
   mail: { readonly id: string; readonly customer: MailAddress; readonly basis: Recipient },
 ): Promise<void> {
+  // 队列变了（P04 入口计数与队列经 SSE 自动刷新，待办 18）
+  await announceChange(tx, { topic: 'unassigned_mail' });
   const copy = unassignedNotificationCopy.arrived;
   await notifyMembers(tx, {
     type: 'unassigned_mail',
@@ -222,6 +225,8 @@ async function place(
       senderName: recognized.sender.name,
     })
     .where(eq(message.id, row.id));
+  // 离开队列（指定店铺、自动归位）：P04 入口计数与队列经 SSE 自动刷新（待办 18）
+  await announceChange(tx, { topic: 'unassigned_mail' });
   const basis = basisOf(row);
   const shared = { recipient: basis.address, recipientHeader: basis.header, subject: row.subject };
   await recordAudit(tx, how.actor, {

@@ -9,6 +9,7 @@ import {
   AccessDeniedError,
   FieldValidationError,
   OptimisticLockError,
+  type ChangeFeed,
   type Logger,
   type Runtime,
 } from './modules/core';
@@ -18,6 +19,7 @@ import {
   createDevLoginRoutes,
   createDevNotificationRoutes,
   createDingtalkLoginRoutes,
+  createLiveRoutes,
   createNotificationRoutes,
   createOrgRoutes,
   createTeamRoutes,
@@ -66,12 +68,19 @@ async function databaseIsUp(runtime: Runtime, logger: Logger): Promise<boolean> 
   }
 }
 
+/** HTTP 应用另需的依赖：数据变化的来源（实时推送 /api/live，待办 18；只在 api 进程里有，worker 不用） */
+export interface AppDeps extends ServerDeps {
+  readonly changes: ChangeFeed;
+  /** 实时推送的心跳间隔（默认 LIVE_HEARTBEAT_MS；测试里调短） */
+  readonly liveHeartbeatMs?: number;
+}
+
 /**
  * HTTP 应用（ADR 0006）：接口用 contracts 的 zod 模式声明并生成 OpenAPI 文档；各模块的接口从模块的
  * index.ts 取来挂上。入口 api.ts 用它起服务；测试在进程内直接调用 app.request（规格「测试接缝」主接缝）。
  */
-export function createApp(deps: ServerDeps) {
-  const { runtime, logger, config, clients } = deps;
+export function createApp(deps: AppDeps) {
+  const { runtime, logger, config, clients, changes } = deps;
   const app = new OpenAPIHono({
     // 请求参数不符合 contracts 的模式：400，写明哪里不对
     defaultHook: (result, c) => {
@@ -104,6 +113,16 @@ export function createApp(deps: ServerDeps) {
   app.route('/', createDingtalkLoginRoutes({ runtime, appEnv: config.appEnv, clients, logger }));
   // 站内通知（G10）的铃铛面板：只看自己的通知，在 org（会话与店铺范围）；写入与查询在 core
   app.route('/', createNotificationRoutes({ runtime, appEnv: config.appEnv }));
+  // 实时推送（SSE）：数据变化时推「某类对象变了」，浏览器重新拉取（按会话与成员决定推什么，所以在 org）
+  app.route(
+    '/',
+    createLiveRoutes({
+      runtime,
+      appEnv: config.appEnv,
+      changes,
+      heartbeatMs: deps.liveHeartbeatMs,
+    }),
+  );
   app.route('/', createChannelRoutes({ runtime, appEnv: config.appEnv, clients, logger }));
   app.route('/', createTicketRoutes({ runtime, appEnv: config.appEnv }));
   app.route('/', createAftersalesRoutes({ runtime, appEnv: config.appEnv }));

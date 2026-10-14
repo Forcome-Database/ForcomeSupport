@@ -96,6 +96,8 @@ describe('来信到工单', () => {
         status: 'awaiting_reply',
         closeReason: null,
         lastInboundAt: '2026-09-10T00:15:00.000Z',
+        // P04 的 SLA 剩余（18）：直邮是内部目标，截止为到达 + 24 小时
+        sla: { target: 'internal', dueAt: '2026-09-11T00:15:00.000Z' },
       },
     ]);
   });

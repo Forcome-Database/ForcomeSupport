@@ -25,7 +25,7 @@ import { and, asc, eq, getViewSelectedFields, gte, lte, ne, sql, type SQL } from
 import { storeNamesById } from '../channel';
 import { isStoreInScope, storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
 import { listParts } from '../factory';
-import { listAftersalesOwners, memberNamesById, type Access, type StoreAccessTarget } from '../org';
+import { listAftersalesOwners, memberNamesById, type Access } from '../org';
 import { feesOf } from './fees';
 import { aftersales, aftersalesCost } from './schema';
 
@@ -426,19 +426,6 @@ export function findOwnedAftersales(
       objectLabel: row.number,
     }),
   );
-}
-
-/**
- * 选了某个店铺（台账的店铺筛选、新建登记或改店铺）时交给 access.requireStores 的对象：越权时审计的对象名写店铺名
- * （P27「对象」列与对象编号搜索按它；只在越权时才查店铺名）
- */
-export function storeAccessTarget(db: DbExecutor, storeId: string): StoreAccessTarget {
-  return {
-    storeIds: [storeId],
-    objectType: 'store',
-    objectId: storeId,
-    objectLabel: async () => (await storeNamesById(db, [storeId])).get(storeId) ?? null,
-  };
 }
 
 /** 按售后单号取一张（店铺范围内；不在范围内或没有为 null） */

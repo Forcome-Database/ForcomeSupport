@@ -29,6 +29,7 @@ import {
   type MirroredOrder,
   type OrderStore,
 } from '../order';
+import { ticketsChanged } from './changes';
 import { lockReplyLinks, retryWaitingReplies } from './replies';
 import { customer, customerIdentity, ticket, ticketMessage } from './schema';
 import { firstReplyAfter, inboundSlaColumns } from './sla';
@@ -337,6 +338,7 @@ export async function mergeInbound(
       }),
       createdAt: tx.now,
     });
+    await ticketsChanged(tx);
     await retryWaitingReplies(tx, mail);
     if (autoPlaced) {
       const copy = unassignedNotificationCopy.placed;

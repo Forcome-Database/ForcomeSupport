@@ -1,4 +1,4 @@
-import type { Tx } from '../core';
+import { announceChange, type Tx } from '../core';
 import { mailboxSync, message } from './schema';
 
 /**
@@ -10,5 +10,6 @@ export async function clearInboundMail(tx: Tx): Promise<{ messages: number; mail
   // 一条语句删全部邮件：副本指向准的那封（duplicate_of_id），外键在语句结束时检查
   const messages = await tx.db.delete(message).returning({ id: message.id });
   const mailboxes = await tx.db.delete(mailboxSync).returning({ id: mailboxSync.id });
+  await announceChange(tx, { topic: 'unassigned_mail' });
   return { messages: messages.length, mailboxes: mailboxes.length };
 }

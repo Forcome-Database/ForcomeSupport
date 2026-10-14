@@ -1,6 +1,7 @@
 import { slaDueAt, slaResultOf, type SlaResult, type TicketSource } from '@forcome/contracts';
 import { and, eq, gt, isNull, lt, min, sql } from 'drizzle-orm';
 import type { Tx } from '../core';
+import { ticketsChanged } from './changes';
 import { ticketMessage } from './schema';
 
 /*
@@ -96,6 +97,7 @@ export async function markOverdue(tx: Tx, now: Date): Promise<number> {
     .set({ slaResult: 'missed' })
     .where(and(eq(ticketMessage.slaResult, 'pending'), lt(ticketMessage.slaDueAt, now)))
     .returning({ id: ticketMessage.id });
+  if (rows.length > 0) await ticketsChanged(tx);
   return rows.length;
 }
 

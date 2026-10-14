@@ -1,7 +1,13 @@
 // 入口：api（HTTP 服务）。只插入后台任务，不消费（ADR 0005、0008）。
 import { serve } from '@hono/node-server';
 import { createApp } from './app';
-import { createLogger, loadConfig, startingAt, startRuntime } from './modules/core';
+import {
+  createChangeFeed,
+  createLogger,
+  loadConfig,
+  startingAt,
+  startRuntime,
+} from './modules/core';
 import {
   createIntegrationClients,
   databaseCallRecorder,
@@ -24,7 +30,9 @@ const clients = createIntegrationClients(config, {
   credentialVault: databaseCredentialVault(runtime, config.credentialMasterKey),
   clock: runtime.clock,
 });
-const app = createApp({ runtime, logger, config, clients });
+// 数据变化的通知：一条专门的连接 LISTEN（有浏览器连上 /api/live 时才连），经 SSE 推给浏览器（待办 18）
+const changes = createChangeFeed(config.databaseUrl, logger);
+const app = createApp({ runtime, logger, config, clients, changes });
 const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   logger.info(
     {
@@ -38,6 +46,7 @@ const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
 });
 
 onShutdown(logger, async () => {
+  await changes.close();
   await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())));
   await stop();
 });

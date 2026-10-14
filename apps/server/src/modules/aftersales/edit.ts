@@ -32,13 +32,8 @@ import type { Access } from '../org';
 import type { TicketReference } from '../ticket';
 import { actorName, auditSnapshot, ownerNameOf } from './audit';
 import { convertFees, feeColumnValues } from './fees';
-import {
-  factoryRatiosOfRow,
-  findOwnedAftersales,
-  missingOf,
-  storeAccessTarget,
-  type AftersalesRow,
-} from './ledger';
+import { factoryRatiosOfRow, findOwnedAftersales, missingOf, type AftersalesRow } from './ledger';
+import { storeAccessTarget } from '../channel';
 import { applyRateChanges, feeValuesOf } from './rates';
 import {
   findSourceTicket,

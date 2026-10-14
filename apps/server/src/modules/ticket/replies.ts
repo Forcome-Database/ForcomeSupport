@@ -19,6 +19,7 @@ import {
   type StoreScope,
   type Tx,
 } from '../core';
+import { ticketsChanged } from './changes';
 import { pendingReply, ticket, ticketMessage } from './schema';
 import { endTimersBefore, hasUnrepliedInbound } from './sla';
 import { applyTransition } from './ticket-status';
@@ -222,6 +223,7 @@ export async function attributeReply(
       autoReply: reply.autoReply,
       createdAt: tx.now,
     });
+    await ticketsChanged(tx);
     await tx.db.delete(pendingReply).where(eq(pendingReply.channelMessageId, messageId));
     if (reply.autoReply) {
       logger.info({ messageId, ticket: current.number }, '自动回复已归到工单，不算回复');

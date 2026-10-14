@@ -12,7 +12,7 @@ import {
   type RegistrationOptions,
   type StoreOption,
 } from '@forcome/contracts';
-import { listStoreOptions } from '../channel';
+import { listStoreOptions, storeAccessTarget } from '../channel';
 import {
   FieldValidationError,
   nextBusinessNumber,
@@ -27,7 +27,7 @@ import { listAftersalesOwners, type Access } from '../org';
 import { findTicketReference, type TicketReference } from '../ticket';
 import { actorName, auditSnapshot } from './audit';
 import { convertFees, feeColumnValues, type FeeValue } from './fees';
-import { ownerWithinScope, storeAccessTarget, type AftersalesRow } from './ledger';
+import { ownerWithinScope, type AftersalesRow } from './ledger';
 import { ledgerTransition } from './lifecycle';
 import { aftersales, responsibilityRatio } from './schema';
 

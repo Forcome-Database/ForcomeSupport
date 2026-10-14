@@ -15,7 +15,7 @@ import { findOrderStore, listMessageSummaries, storeNamesById } from '../channel
 import { exchangeRateOn, toMilliseconds, type DbExecutor, type StoreScope } from '../core';
 import { findMirroredOrder, type MirroredOrder } from '../order';
 import { transition } from './lifecycle';
-import { toListItem, type TicketRow } from './queries';
+import { pendingSla, toListItem, type TicketRow } from './queries';
 import { noReplyEvent, ticketMessage } from './schema';
 import { listStatusChanges } from './ticket-status';
 import { IDLE_LIMITS } from './time-limits';
@@ -228,7 +228,7 @@ export async function ticketDetail(
 
   const firstInbound = messages.find((m) => m.direction === 'inbound');
   return {
-    ticket: toListItem(row, names),
+    ticket: toListItem(row, names, await pendingSla(db, row)),
     mailbox: firstInbound?.mailbox ?? messages[0]?.mailbox ?? '',
     now: now.toISOString(),
     autoClose,

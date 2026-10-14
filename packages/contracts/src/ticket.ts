@@ -123,7 +123,7 @@ export type MessageDirection = z.infer<typeof messageDirectionSchema>;
 /** 工单号 T-日期-4 位当日序号（11.2；日期取首封来信日期，北京时间） */
 export const ticketNumberSchema = z.string().regex(/^T-\d{8}-\d{4}$/, '工单号的格式是 T-日期-序号');
 
-/** P04 工单列表的一行（第一阶段；SLA 剩余随 18） */
+/** P04 工单列表的一行（第一阶段） */
 export const ticketListItemSchema = z.object({
   id: z.uuid(),
   number: ticketNumberSchema,
@@ -148,12 +148,13 @@ export const ticketListItemSchema = z.object({
   closeReason: ticketCloseReasonSchema.nullable(),
   /** 工单内最近一封来信的到达时间（Gmail internalDate） */
   lastInboundAt: z.iso.datetime({ offset: true }),
+  /**
+   * P04 的 SLA 剩余（P04「第一阶段」，待办 18）：待回复的工单取最早一封未回复的应回复来信（来源为客户、没有首次回复、没被标记
+   * 无需回复）的截止与目标（按这封来信自己的渠道），界面按服务端当前时刻写剩余或「已超时」；没有这样的来信、或工单不是待回复为空
+   */
+  sla: z.object({ target: slaTargetSchema, dueAt: z.iso.datetime({ offset: true }) }).nullable(),
 });
 export type TicketListItem = z.infer<typeof ticketListItemSchema>;
-
-/** GET /api/tickets：店铺范围内的工单 */
-export const ticketListSchema = z.object({ tickets: z.array(ticketListItemSchema) });
-export type TicketList = z.infer<typeof ticketListSchema>;
 
 /**
  * 一封应回复来信（来源为客户）的 SLA（R-SL-01–R-SL-03、R-SL-08，16）：目标种类（亚马逊为平台 SLA，Shopify 与邮件为内部目标）、

@@ -5,7 +5,8 @@ import { UNASSIGNED } from './p04-copy';
 import { api, ApiRequestError } from '@/lib/api';
 import { dismissToast, showError, showUndo } from '@/lib/notify';
 import { endSessionIfUnauthenticated, onSessionEnd } from '@/lib/session';
-import { TICKETS_QUERY_KEY } from '@/lib/tickets';
+import { isBackgroundFetch } from '@/lib/background-fetch';
+import { TICKETS_QUERY_KEY, UNASSIGNED_MAIL_QUERY_KEY } from '@/lib/tickets';
 
 /*
  * P04 未归属店铺来信队列（I17，待办 15）：队列的查询，与「指定店铺」的撤销窗口——点「指定」后该行立即移出、弹 5 秒撤销浮层，
@@ -18,12 +19,10 @@ import { TICKETS_QUERY_KEY } from '@/lib/tickets';
  * 会话结束（退出登录、会话失效、换人）时，还在撤销窗口里的指定一律撤销，不拿下一位成员的会话提交。
  */
 
-export const UNASSIGNED_MAIL_QUERY_KEY = ['unassigned-mail'] as const;
-
 /** 队列（只给有「指定店铺」能力的客服主管查） */
 export const unassignedMailQuery = queryOptions({
   queryKey: UNASSIGNED_MAIL_QUERY_KEY,
-  queryFn: api.unassignedMail,
+  queryFn: ({ queryKey }) => api.unassignedMail({ background: isBackgroundFetch(queryKey) }),
 });
 
 /** 等着提交或正在提交的指定：来信 → 到点提交的计时器（提交中为 null） */

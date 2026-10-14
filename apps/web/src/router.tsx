@@ -41,7 +41,8 @@ import { LoginPage, loginSearchSchema } from '@/pages/login/login-page';
 import { ChannelsPage, channelsSearchSchema } from '@/pages/settings/channels-page';
 import { TeamPage, teamSearchSchema } from '@/pages/settings/team-page';
 import { TicketDetailPage } from '@/pages/tickets/ticket-detail-page';
-import { TicketsPage, ticketsSearchSchema } from '@/pages/tickets/tickets-page';
+import { TicketsPage } from '@/pages/tickets/tickets-page';
+import { ticketsSearchSchema } from '@/pages/tickets/tickets-search';
 
 /*
  * 路由（ADR 0007：TanStack Router，代码定义）。登录后的页面都挂在 app 布局下：
@@ -49,7 +50,7 @@ import { TicketsPage, ticketsSearchSchema } from '@/pages/tickets/tickets-page';
  * 过期的先显示 G12「已退出登录」）；扫码确认后钉钉把浏览器带到 /login/dingtalk 换会话（待办 05）。
  * 「/」按角色进入默认首页（PRD 4.1）；各页面按能力把关，没有权限时在原地址显示 G2。
  * 第一期各页面的内容随各自的待办加进来（P17 24），在那之前内容区为空；P27 已有（30）、P20 已有（06）、P05 已有（17）；
- * P18 已有（07），P04 先是最简列表（08，完整版随 18），P13 已是第一期完整版（19–22）。
+ * P18 已有（07），P04 已是第一期完整版（18），P13 已是第一期完整版（19–22）。
  */
 
 interface RouterContext {
@@ -181,7 +182,7 @@ function pageRoute<TPath extends string>(
   });
 }
 
-/** P04 工单列表：地址栏可带 view=unassigned 打开未归属店铺队列（I17，待办 15；筛选条件随 18） */
+/** P04 工单列表：筛选、报表下钻、排序与页码写在地址栏（待办 18）；view=unassigned 打开未归属店铺队列（I17，待办 15） */
 const ticketsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: pages.tickets.path,

@@ -1,11 +1,13 @@
 import {
   apiErrorSchema,
   ticketDetailSchema,
+  ticketListQuerySchema,
   ticketListSchema,
   ticketNumberSchema,
 } from '@forcome/contracts';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
+import { storeAccessTarget } from '../channel';
 import type { AppEnv, Runtime } from '../core';
 import { requireCapability, requireSession, type Access, type AccessVariables } from '../org';
 import { ticketDetail } from './detail';
@@ -27,11 +29,14 @@ const notFound = json(apiErrorSchema, '没有这张工单，或工单里没有�
 const listRoute = createRoute({
   method: 'get',
   path: '/api/tickets',
-  summary: 'P04 工单列表（第一阶段最简版：店铺范围内的工单；筛选、SLA 与分页随待办 18）',
+  summary:
+    'P04 工单列表（PRD P04「第一阶段」v2.32）：店铺范围内按筛选（状态、渠道、店铺、站点、来源、最近来信，默认近 30 天）与报表下钻条件筛出的一页工单，带 SLA 剩余；默认按 SLA 剩余排序',
+  request: { query: ticketListQuerySchema },
   responses: {
-    200: json(ticketListSchema, '按 待回复 → 等客户 → 已解决 → 已关闭、组内最近来信倒序'),
+    200: json(ticketListSchema, '一页工单、总条数、这次按的最近来信、下钻的数量与服务端当前时刻'),
+    400: json(apiErrorSchema, '查询条件不对'),
     401: unauthenticated,
-    403: forbidden,
+    403: json(apiErrorSchema, '没有「查看工单」能力，或店铺筛选选了范围外的店铺（E-24，记审计）'),
   },
 });
 
@@ -125,9 +130,13 @@ export function createTicketRoutes(deps: { runtime: Runtime; appEnv: AppEnv }) {
     return c.json(await ticketDetail(runtime.db, access.stores, found, runtime.clock.now()), 200);
   }
 
-  routes.openapi(listRoute, async (c) =>
-    c.json({ tickets: await listTickets(runtime.db, c.get('access').stores) }, 200),
-  );
+  routes.openapi(listRoute, async (c) => {
+    const access = c.get('access');
+    const query = c.req.valid('query');
+    // 店铺筛选：范围外的店铺记越权审计并 403（E-24）
+    if (query.store) await access.requireStores(storeAccessTarget(runtime.db, query.store));
+    return c.json(await listTickets(runtime.db, access.stores, query, runtime.clock.now()), 200);
+  });
 
   routes.openapi(detailRoute, (c) => detailResponse(c, c.req.valid('param').number));
 

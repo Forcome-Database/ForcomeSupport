@@ -74,7 +74,8 @@ import {
   type TeamMember,
   type TeamMemberAdd,
   type TicketDetail,
-  type TicketListItem,
+  type TicketList,
+  type TicketListQuery,
   type UnassignedMailList,
 } from '@forcome/contracts';
 import type { z } from 'zod';
@@ -199,10 +200,19 @@ async function call<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): 
 }
 
 /**
- * 后台请求（铃铛的轮询、以后 SSE 推送后的重新拉取）：不是人的操作，服务端照常校验会话但不续期，
+ * 后台请求（铃铛的兜底轮询、实时推送触发的重新拉取，待办 18 的 lib/live-updates.ts）：不是人的操作，服务端照常校验会话但不续期，
  * 否则开着页面会话就永远不会过期（ADR 0010 修订「7 天无操作过期」）
  */
 const backgroundRequest: RequestInit = { headers: { [BACKGROUND_REQUEST_HEADER]: '1' } };
+
+/** 是不是后台请求（推送触发的重新拉取由查询的 queryFn 判断后传进来） */
+export interface FetchMode {
+  readonly background: boolean;
+}
+
+function modeInit(mode: FetchMode | undefined): RequestInit | undefined {
+  return mode?.background ? backgroundRequest : undefined;
+}
 
 function jsonBody(method: string, body: unknown): RequestInit {
   return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
@@ -217,8 +227,11 @@ function queryString(query: Readonly<Record<string, string | undefined>>): strin
 }
 
 export const api = {
-  /** 当前登录的成员（含导航、默认首页与密度）；未登录或会话过期时抛 401 */
-  me: (): Promise<CurrentMember> => call('/api/me', currentMemberSchema),
+  /**
+   * 当前登录的成员（含导航、默认首页与密度）；未登录或会话过期时抛 401。实时推送连不上时核对会话用后台请求（不续期）
+   */
+  me: (mode?: FetchMode): Promise<CurrentMember> =>
+    call('/api/me', currentMemberSchema, modeInit(mode)),
 
   /** 开发登录可选的成员；没开启开发登录（含生产环境）时抛 404 */
   devMembers: async (): Promise<DevMember[]> =>
@@ -320,13 +333,19 @@ export const api = {
   storeOptions: async (): Promise<StoreOption[]> =>
     (await call('/api/channel/store-options', storeOptionsSchema)).stores,
 
-  /** P04 工单列表（店铺范围内） */
-  tickets: async (): Promise<TicketListItem[]> =>
-    (await call('/api/tickets', ticketListSchema)).tickets,
+  /**
+   * P04 工单列表（店铺范围内，按筛选、下钻、排序取一页，待办 18）；店铺筛选选了范围外的店铺抛 403
+   */
+  tickets: (query: TicketListQuery, mode?: FetchMode): Promise<TicketList> =>
+    call(
+      `/api/tickets${queryString({ ...query, page: query.page === undefined ? undefined : String(query.page) })}`,
+      ticketListSchema,
+      modeInit(mode),
+    ),
 
   /** P05 工单详情（店铺范围外 403、没有 404） */
-  ticketDetail: (number: string): Promise<TicketDetail> =>
-    call(`/api/tickets/${encodeURIComponent(number)}`, ticketDetailSchema),
+  ticketDetail: (number: string, mode?: FetchMode): Promise<TicketDetail> =>
+    call(`/api/tickets/${encodeURIComponent(number)}`, ticketDetailSchema, modeInit(mode)),
 
   /**
    * 标记无需回复（P05「第一阶段」）：返回标记后的详情。工单已关闭、来信已被回复 400，已被别人标记 409（message 写是谁），
@@ -348,8 +367,8 @@ export const api = {
     ),
 
   /** P04 未归属店铺来信队列（I17，只给客服主管；不受店铺范围限制）与服务端当前时刻 */
-  unassignedMail: (): Promise<UnassignedMailList> =>
-    call('/api/channel/unassigned-mail', unassignedMailListSchema),
+  unassignedMail: (mode?: FetchMode): Promise<UnassignedMailList> =>
+    call('/api/channel/unassigned-mail', unassignedMailListSchema, modeInit(mode)),
 
   /**
    * 指定店铺（I17，5 秒撤销窗口结束后才调用）：来信已不在队列里（别人先指定或已自动归位）抛 409 not_in_queue，

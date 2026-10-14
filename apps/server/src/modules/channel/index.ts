@@ -31,5 +31,6 @@ export {
   listOrderStores,
   listStoreChoices,
   listStoreOptions,
+  storeAccessTarget,
   storeNamesById,
 } from './stores';

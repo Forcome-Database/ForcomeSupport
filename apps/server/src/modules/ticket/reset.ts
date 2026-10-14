@@ -7,6 +7,7 @@ import {
   ticket,
   ticketMessage,
 } from './schema';
+import { ticketsChanged } from './changes';
 import { clearStatusChanges } from './ticket-status';
 
 /**
@@ -22,5 +23,6 @@ export async function clearTickets(tx: Tx): Promise<{ tickets: number; customers
   const tickets = await tx.db.delete(ticket).returning({ id: ticket.id });
   await tx.db.delete(customerIdentity);
   const customers = await tx.db.delete(customer).returning({ id: customer.id });
+  await ticketsChanged(tx);
   return { tickets: tickets.length, customers: customers.length };
 }

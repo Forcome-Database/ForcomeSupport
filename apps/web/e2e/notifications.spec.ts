@@ -3,7 +3,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /*
  * 站内通知（待办 31；全局状态 G10、PRD 11.4）：顶栏铃铛的未读数、360px 面板（全部 · 未读）、点一条跳到对象并标为已读、
- * 打不开目标页的只标为已读、全部已读、空状态、轮询带回新通知、标为已读失败的浮层（G5）。
+ * 打不开目标页的只标为已读、全部已读、空状态、实时推送带回新通知（待办 18；5 分钟的兜底轮询是后台请求）、标为已读失败的浮层（G5）。
  * 产生通知的业务（渠道连接、未归属来信等）随后续待办，这里经开发登录环境的「示例通知」接口（POST /api/dev/notifications，
  * 与业务调用方同一个按 11.4 取接收人的写入）发通知。开发测试环境长期运行、通知会累积：每条用例的通知带时间戳，
  * 未读数只核对相对的变化。接口调用在页面里 fetch（与页面同一套证书校验）。
@@ -98,8 +98,7 @@ test('铃铛未读数 → 打开面板 → 点一条跳到对象并变为已读�
   const body = `${stamp()} Harris · amz-ca2@forcome.com 未登记`;
 
   await send(page, { type: 'unassigned_mail', body });
-  // 新通知经 SSE 推送（待办 18）落地前，铃铛 30 秒轮询一次
-  await page.clock.fastForward(30_000);
+  // 新通知经实时推送（待办 18）到达：不用等轮询（页面时钟是假的，定时器不走），铃铛与未读数随即更新
   await expect(badge(page)).toHaveText(String(before + 1));
   await expect(bell(page)).toHaveAccessibleName(bellName(before + 1));
 
@@ -114,7 +113,8 @@ test('铃铛未读数 → 打开面板 → 点一条跳到对象并变为已读�
   await expect.poll(() => listRequests).toEqual([null]);
   // 等这次列表取回来再快进：取数还没回来时 TanStack Query 会跳过这一轮定时重新拉取（待办 06 发现的偶发失败）
   await expect(panel(page).getByTestId('notification-item').first()).toContainText(body);
-  await page.clock.fastForward(30_000);
+  // 5 分钟的兜底轮询（推送断开时）
+  await page.clock.fastForward(5 * 60_000);
   await expect.poll(() => listRequests).toEqual([null, '1']);
   await expect(panel(page).getByRole('tab', { name: '全部' })).toHaveAttribute(
     'aria-selected',

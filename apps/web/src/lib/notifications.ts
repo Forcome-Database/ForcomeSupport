@@ -13,12 +13,12 @@ import { canOpenPage, pages, type PageDefinition } from './pages';
 
 /*
  * 站内通知（G10，待办 31）：铃铛的未读数、面板的两个页签、标为已读（提交与缓存），以及每种通知的图标与跳转目标
- * （面板在 components/notification-bell.tsx）。新通知经 SSE 推送是待办 18 的事；在那之前铃铛与打开的面板定时重新拉取
- * （后台请求，不续期会话）。18 落地后，推送「通知变了」时让 notificationsKey 下的缓存失效即可，轮询可以去掉。
+ * （面板在 components/notification-bell.tsx）。新通知与别的标签页里的已读经实时推送「通知变了」让 notificationsKey 下的缓存失效
+ * （lib/live-updates.ts，待办 18）；铃铛与打开的面板另每 5 分钟兜底重新拉取一次（推送断开又没重连上时），都是后台请求，不续期会话。
  */
 
-/** 轮询间隔：SSE 推送（待办 18）落地前先轮询 */
-export const NOTIFICATION_POLL_MS = 30_000;
+/** 兜底轮询的间隔：新通知靠实时推送，这里只防推送断开时一直不更新（待办 18 前为 30 秒） */
+export const NOTIFICATION_POLL_MS = 5 * 60_000;
 
 /** 通知相关缓存的前缀（未读数与各页签） */
 export const notificationsKey = ['notifications'] as const;

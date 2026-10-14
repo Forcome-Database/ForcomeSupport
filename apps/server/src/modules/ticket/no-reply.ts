@@ -17,6 +17,7 @@ import {
   type Runtime,
   type Tx,
 } from '../core';
+import { ticketsChanged } from './changes';
 import { noReplyEvent, ticket, ticketMessage } from './schema';
 import { hasUnrepliedInbound } from './sla';
 import { applyTransition } from './ticket-status';
@@ -110,6 +111,7 @@ async function record(
     toStatus: change.transitioned ? change.after.status : null,
     occurredAt: tx.now,
   });
+  await ticketsChanged(tx);
   await recordAudit(tx, actor, {
     action: change.action === 'mark' ? 'ticket.mark_no_reply' : 'ticket.undo_no_reply',
     objectType: 'ticket',

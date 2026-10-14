@@ -9,7 +9,7 @@ import {
 import { getDemoFixture } from '@forcome/fixtures';
 import type { Hono } from 'hono';
 import type { JobOptions } from 'pg-boss';
-import { createApp } from '../src/app';
+import { createApp, type AppDeps } from '../src/app';
 import type { ServerDeps } from '../src/deps';
 import { fixtureSteps } from '../src/fixture-steps';
 import { runImportAftersalesCommand } from '../src/import-aftersales-command';
@@ -32,6 +32,7 @@ import {
 } from '../src/modules/channel';
 import { findAuditRecords, type AuditQuery, type AuditRecord } from '../src/modules/core/audit';
 import {
+  createChangeFeed,
   ensureQueues,
   loadFixtures,
   ManualClock,
@@ -135,6 +136,8 @@ export interface StartTestHarnessOptions {
    * 验证还没有业务接口使用的公共工具，例如店铺范围与财务字段过滤（access-tools.int.test.ts）
    */
   readonly routes?: (deps: ServerDeps) => Hono<{ Variables: AccessVariables }>;
+  /** 实时推送（/api/live）的心跳间隔，默认同生产（25 秒）；测试会话在推送中途结束时调短 */
+  readonly liveHeartbeatMs?: number;
 }
 
 /**
@@ -240,8 +243,11 @@ export async function startTestHarness(
     throw error;
   });
   const { runtime } = started;
+  // 数据变化的通知（/api/live）：与 api 进程一样用一条专门的连接 LISTEN 本测试的库，有人连上推送时才连
+  const changes = createChangeFeed(database.url, silentLogger, { retryMs: 200 });
   async function close(): Promise<void> {
     try {
+      await changes.close();
       await started.stop({ graceful: false });
     } finally {
       await database.drop();
@@ -265,12 +271,16 @@ export async function startTestHarness(
   let handlers: readonly AnyJobHandler[];
   let feeds: readonly Feed[];
   try {
-    const main = createApp(deps);
+    const appDeps: AppDeps = { ...deps, changes, liveHeartbeatMs: options.liveHeartbeatMs };
+    const main = createApp(appDeps);
     if (options.routes) main.route('/', options.routes(deps));
     app = main;
     if (appEnv === 'production') {
       // 生产配置的应用没有开发登录：/api/dev/* 交给同一个库上的非生产实例，换出的会话两边通用
-      const login = createApp({ ...deps, config: { appEnv: setupEnv, devLoginEnabled: true } });
+      const login = createApp({
+        ...appDeps,
+        config: { appEnv: setupEnv, devLoginEnabled: true },
+      });
       app = {
         request: (input, init) =>
           input.startsWith('/api/dev/') ? login.request(input, init) : main.request(input, init),

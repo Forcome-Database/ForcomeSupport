@@ -2,6 +2,16 @@
 // 示例数据加载器（只用于非生产环境）、店铺数据范围与无权限错误。
 // 其他模块只能经本文件使用 core；core 不依赖任何业务模块。
 export { AccessDeniedError } from './access-denied';
+export {
+  announceChange,
+  CHANGE_CHANNEL,
+  createChangeFeed,
+  type Change,
+  type ChangeEvent,
+  type ChangeFeed,
+  type ChangeFeedOptions,
+  type ChangeSubscription,
+} from './changes';
 export { xlsxDownloadHeaders } from './download';
 export { FieldValidationError } from './field-validation';
 export {

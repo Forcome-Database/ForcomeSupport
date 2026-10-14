@@ -19,7 +19,7 @@ import {
   versionInputSchema,
 } from '@forcome/contracts';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
-import { storeNamesById } from '../channel';
+import { storeAccessTarget, storeNamesById } from '../channel';
 import { exchangeRatesOn, xlsxDownloadHeaders, type AppEnv, type Runtime } from '../core';
 import { listParts } from '../factory';
 import {
@@ -37,7 +37,6 @@ import {
   ledgerItemOf,
   ledgerOptions,
   listLedger,
-  storeAccessTarget,
   toDetail,
   type AftersalesRow,
 } from './ledger';

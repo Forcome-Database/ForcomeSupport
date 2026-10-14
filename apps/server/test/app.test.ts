@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createApp } from '../src/app';
+import { createApp, type AppDeps } from '../src/app';
 import type { ServerDeps } from '../src/deps';
-import { ManualClock, OptimisticLockError, silentLogger, type Runtime } from '../src/modules/core';
+import {
+  createChangeFeed,
+  ManualClock,
+  OptimisticLockError,
+  silentLogger,
+  type Runtime,
+} from '../src/modules/core';
 import { IntegrationClients } from '../src/modules/integration';
 
 // 不连数据库的场景：用一个总是失败的数据库句柄
@@ -13,13 +19,15 @@ function runtimeWithBrokenDatabase(): Runtime {
   } as unknown as Runtime;
 }
 
-function deps(config: Partial<ServerDeps['config']> = {}): ServerDeps {
+function deps(config: Partial<ServerDeps['config']> = {}): AppDeps {
   const appEnv = config.appEnv ?? 'test';
   return {
     runtime: runtimeWithBrokenDatabase(),
     logger: silentLogger,
     config: { appEnv, devLoginEnabled: config.devLoginEnabled ?? false },
     clients: new IntegrationClients({ appEnv }),
+    // 没有人订阅就不连数据库
+    changes: createChangeFeed('postgres://unused', silentLogger),
   };
 }
 

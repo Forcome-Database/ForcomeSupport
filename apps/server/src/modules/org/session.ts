@@ -63,7 +63,14 @@ export async function lookupSession(
   db: DbExecutor,
   token: string,
   now: Date,
-  options: { readonly renew: boolean },
+  options: {
+    readonly renew: boolean;
+    /**
+     * 过期的会话不删（实时推送的连接用：EventSource 读不到 401 的说明，留给浏览器随后的请求删掉并拿到 session_expired，
+     * 好显示 G12「7 天未操作，已退出登录」）
+     */
+    readonly keepExpired?: boolean;
+  },
 ): Promise<SessionLookup> {
   const [row] = await db
     .select({ session, member })
@@ -74,7 +81,7 @@ export async function lookupSession(
   if (!row) return { status: 'missing' };
   const idle = now.getTime() - row.session.lastActiveAt.getTime();
   if (idle >= SESSION_IDLE_TIMEOUT_MS) {
-    await db.delete(session).where(eq(session.id, row.session.id));
+    if (!options.keepExpired) await db.delete(session).where(eq(session.id, row.session.id));
     return { status: 'expired' };
   }
   const renewed = options.renew && idle >= RENEW_INTERVAL_MS;

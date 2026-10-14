@@ -162,20 +162,24 @@ function buildAccess(runtime: Runtime, c: Context, sessionId: string, row: Membe
  * 受保护的接口：没有有效会话返回 401。7 天无操作的会话过期（401 session_expired，G12「会话过期」）；
  * 成员已停用或不再能进入（loginDenial）时会话作废（401 unauthenticated）。
  * 每次请求都算一次操作，会话随之续期；带 BACKGROUND_REQUEST_HEADER 的请求（轮询、实时推送触发的重新拉取）
- * 不是人的操作，照常校验但不续期，否则开着页面就永远不会过期。
+ * 不是人的操作，照常校验但不续期，否则开着页面就永远不会过期。background 的接口（实时推送的连接：EventSource 带不了请求头）
+ * 一律不续期，过期的会话也不删（返回 401，留给浏览器随后的请求拿到 session_expired）。
  */
 export function requireSession(
   runtime: Runtime,
   appEnv: AppEnv,
+  options: { readonly background?: boolean } = {},
 ): MiddlewareHandler<{ Variables: AccessVariables }> {
   return async (c, next) => {
     const token = sessionToken(c);
     if (!token) return unauthenticated(c);
     const found = await lookupSession(runtime.db, token, runtime.clock.now(), {
-      renew: c.req.header(BACKGROUND_REQUEST_HEADER) !== '1',
+      renew: !options.background && c.req.header(BACKGROUND_REQUEST_HEADER) !== '1',
+      keepExpired: options.background,
     });
     if (found.status === 'expired') {
-      clearSessionCookie(c, appEnv);
+      // 过期的会话留着时 Cookie 也留着：随后的请求才能拿到 session_expired
+      if (!options.background) clearSessionCookie(c, appEnv);
       return c.json({ error: 'session_expired', message: '7 天未操作，已退出登录' }, 401);
     }
     if (found.status === 'missing' || loginDenial(found.member) !== null) {

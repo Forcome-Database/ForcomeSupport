@@ -6,6 +6,7 @@ import {
   type NotificationView,
 } from '@forcome/contracts';
 import { and, count, desc, eq, isNull, or, type SQL } from 'drizzle-orm';
+import { announceChange } from './changes';
 import type { DbExecutor } from './db';
 import type { Tx } from './runtime';
 import { notification } from './schema';
@@ -47,6 +48,8 @@ export async function sendNotification(tx: Tx, draft: NotificationDraft): Promis
       createdAt: tx.now,
     })),
   );
+  // 铃铛与面板经 SSE 自动刷新（待办 18）：只推给接收人
+  await announceChange(tx, { topic: 'notifications', memberIds: recipients });
   return recipients;
 }
 
@@ -123,6 +126,8 @@ export async function markNotificationRead(
       .update(notification)
       .set({ readAt: tx.now })
       .where(and(eq(notification.id, id), isNull(notification.readAt)));
+    // 同一成员开着的其他标签页跟着刷新
+    await announceChange(tx, { topic: 'notifications', memberIds: [viewer.memberId] });
   }
   return true;
 }
@@ -140,5 +145,8 @@ export async function markAllNotificationsRead(
     .set({ readAt: tx.now })
     .where(and(visibleTo(viewer), isNull(notification.readAt)))
     .returning({ id: notification.id });
+  if (rows.length > 0) {
+    await announceChange(tx, { topic: 'notifications', memberIds: [viewer.memberId] });
+  }
   return rows.length;
 }
