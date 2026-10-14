@@ -1,4 +1,5 @@
 import {
+  slaDueAt,
   ticketDetailSchema,
   ticketListSchema,
   type TicketDetail,
@@ -281,7 +282,7 @@ describe('来源识别与亚马逊站点', () => {
     ]);
   });
 
-  it('amz-direct@forcome.com 收到发件域 amazon.com.mx 的买家来信 → Forcome Direct、站点 MX、渠道亚马逊（AC-TK-14）', async () => {
+  it('amz-direct@forcome.com 收到买家消息中转域 marketplace.amazon.com.mx 的来信 → Forcome Direct、站点 MX、渠道亚马逊，建工单并开始 SLA 计时（AC-TK-14）', async () => {
     expect(DIRECT.mailbox).toBe('amz-direct@forcome.com');
     gmail.deliver({
       to: DIRECT.mailbox,
@@ -292,7 +293,8 @@ describe('来源识别与亚马逊站点', () => {
     });
     await t.runJobs();
 
-    expect(await ticketsOf('Mateo Rivas')).toEqual([
+    const tickets = await ticketsOf('Mateo Rivas');
+    expect(tickets).toEqual([
       expect.objectContaining({
         store: { id: DIRECT.id, name: 'Forcome Direct' },
         site: 'MX',
@@ -301,6 +303,13 @@ describe('来源识别与亚马逊站点', () => {
         status: 'awaiting_reply',
       }),
     ]);
+    // 开始 SLA 计时：亚马逊按平台目标，从到达时刻起 24 小时，演示时刻（09-11 10:20）尚未到期
+    const [letter] = (await ticketDetail(agent, tickets[0]!.number)).messages;
+    expect(letter!.sla).toEqual({
+      target: 'platform',
+      dueAt: slaDueAt(new Date('2026-09-10T11:15:00+08:00')).toISOString(),
+      result: 'pending',
+    });
   });
 
   it('亚马逊买家消息的中转域（marketplace.amazon.com / .ca）不会被平台通知规则归档：照常建工单，站点按域（协调者 10-05）', async () => {
