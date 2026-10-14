@@ -88,7 +88,9 @@ test('AC-RP-01（界面）：客服主管的成本卡卡头与接口、P13 合�
   page,
 }) => {
   await loginAs(page, '周敏');
-  await registerQualityCase(page, 'Cost Drill', '12.34');
+  // 开发测试环境长期运行：客户名带上时刻，重复执行时只认这一次登记的单
+  const customer = `Cost Drill ${Date.now()}`;
+  await registerQualityCase(page, customer, '12.34');
   const cost = await apiCost(page);
   const today = beijingToday();
   expect(cost.range).toEqual({ from: `${today.slice(0, 8)}01`, to: today });
@@ -125,7 +127,7 @@ test('AC-RP-01（界面）：客服主管的成本卡卡头与接口、P13 合�
   const totals = page.getByTestId('ledger-totals');
   await expect(totals).toContainText(`合计 · ${quality.count} 单`);
   await expect(totals).toContainText(formatMoney(quality.totalUsd, 'USD'));
-  await expect(page.getByTestId('ledger-row').filter({ hasText: 'Cost Drill' })).toHaveCount(1);
+  await expect(page.getByTestId('ledger-row').filter({ hasText: customer })).toHaveCount(1);
 });
 
 test('「查看明细」进入 P13 本月、不带责任：合计与卡头一致', async ({ page }) => {
