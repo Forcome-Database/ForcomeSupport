@@ -185,6 +185,19 @@ describe('售后成本按责任类型（待办 25，PRD P17「第一阶段」v2.
     ]);
   });
 
+  it('同额按责任类型的顺序（不随数据库返回的顺序变化）', () => {
+    const bars = [
+      { responsibility: 'other' as const, totalUsd: '5.00' },
+      { responsibility: 'customer_use' as const, totalUsd: '5.00' },
+      { responsibility: 'logistics' as const, totalUsd: '5.00' },
+    ];
+    expect(sortCostBars(bars).map((bar) => bar.responsibility)).toEqual([
+      'customer_use',
+      'logistics',
+      'other',
+    ]);
+  });
+
   it('下钻到 P13：费用发生日为卡上的本月、带店铺；点条另带责任，「查看明细」不带', () => {
     const range = { from: '2026-09-01', to: TODAY };
     expect(reportCostDrillQuery(range, { responsibility: 'product_quality' })).toEqual({

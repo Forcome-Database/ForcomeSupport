@@ -629,6 +629,7 @@ export {
 } from './report';
 export {
   REPORT_COMPARE,
+  REPORT_COST,
   REPORT_KPI,
   comparePrefix,
   firstResponseDelta,

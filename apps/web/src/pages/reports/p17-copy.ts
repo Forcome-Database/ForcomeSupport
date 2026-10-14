@@ -31,6 +31,8 @@ export const FILTERS = {
   loading: '正在加载',
 } as const;
 
+import { REPORT_COST, reportChannelGroupLabels } from '@forcome/contracts';
+
 /** 三张指标（原型 p17_p1_kpis()）与对比（Q2）：画面与导出共用，在 contracts 的 report-words.ts */
 export { REPORT_COMPARE as COMPARE, REPORT_KPI as KPI } from '@forcome/contracts';
 
@@ -42,8 +44,8 @@ export const DAILY = {
     `按渠道堆叠 · ${period}${drillable ? ' · 点柱下钻' : ''}`,
   detail: '查看明细',
   /** 图例与悬停的两组渠道（同 P04 下钻芯片的叫法） */
-  amazon: '亚马逊',
-  shopifyEmail: 'Shopify 与邮件',
+  amazon: reportChannelGroupLabels.amazon,
+  shopifyEmail: reportChannelGroupLabels.shopify_email,
   /** 管理员（没有工单页权限）：卡头右侧 */
   noDrill: '没有工单页权限 · 不可下钻',
   /** 悬停：「09-10 · 73 单」「亚马逊 52 · Shopify 与邮件 21」「点击查看明细 → P04 工单（09-10 新建或重开 · 客户来信）」 */
@@ -79,13 +81,14 @@ export const A11Y = {
  * 卡头总额即售后成本；悬停与原型 Reports 的 drill_tip() 一致；责任类型为空的单列「未登记责任」、不可点（悬停没有下钻那一行）
  */
 export const COST = {
-  title: '售后成本按责任类型',
-  tag: '本月 · 不随时间筛选',
-  sub: '产品成本 + 运费 + 额外赔偿 + 其他',
+  /** 标题、带锁的标签、副标题与来源说明：画面与导出共用（contracts 的 REPORT_COST） */
+  title: REPORT_COST.title,
+  tag: REPORT_COST.tag,
+  sub: REPORT_COST.sub,
   detail: '查看明细',
   /** 卡头总额旁：「售后成本 · 12 单 · 来自登记台账，不含待确认 · 点条下钻」；没有可点的条时没有「· 点条下钻」 */
   totalNote: (count: number, drillable: boolean) =>
-    `售后成本 · ${count} 单 · 来自登记台账，不含待确认${drillable ? ' · 点条下钻' : ''}`,
+    `售后成本 · ${count} 单 · ${REPORT_COST.source}${drillable ? ' · 点条下钻' : ''}`,
   /** 本月没有时（补充小样⑦） */
   empty: '本月还没有登记的售后成本',
   /** 悬停：「产品质量问题 · $118.89」「本月登记台账，不含待确认」「点击查看明细 → P13 登记台账（已按责任筛选）」 */

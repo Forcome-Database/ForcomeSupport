@@ -46,7 +46,7 @@ import { formatMoney } from './money';
 import { roleLabels, roles } from './roles';
 import { storeScopeWords } from './team';
 import { ticketChannelLabels, ticketStatusLabels } from './ticket';
-import { reportPeriodLabels, reportPeriodSchema } from './report';
+import { reportPeriodLabels } from './report';
 import { recipientHeaderLabels } from './unassigned-mail';
 
 /*
@@ -373,11 +373,8 @@ function reportFilterWords(value: unknown, ctx: FormatContext): string {
   if (!parsed.success) return EMPTY;
   const filter = parsed.data;
   const range = dateRangeWords(filter.from, filter.to);
-  const period = reportPeriodSchema.safeParse(filter.period);
   const time =
-    period.success && period.data !== 'custom'
-      ? `${reportPeriodLabels[period.data]}（${range}）`
-      : range;
+    filter.period === 'custom' ? range : `${reportPeriodLabels[filter.period]}（${range}）`;
   const parts = [time, filter.store ? storeName(filter.store, ctx) : '全部店铺'];
   if (filter.site) parts.push(filter.site);
   return parts.join(' · ');

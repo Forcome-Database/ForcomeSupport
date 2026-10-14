@@ -336,7 +336,6 @@ describe('报表导出（K5、PRD P17「第一阶段」v2.35）', () => {
 
     const metrics = file.sheets.get('指标')!;
     expect(conditionOf(metrics, '期间')).toBe('2026-09-05 至 2026-09-11（近 7 天）');
-    expect(conditionOf(metrics, '上一周期')).toBe('2026-08-29 至 2026-09-04');
     expect(conditionOf(metrics, '店铺')).toBe('全部');
     expect(conditionOf(metrics, '站点')).toBe('全部');
     expect(conditionOf(metrics, '导出时间')).toBe('2026-09-11 10:20:00');
@@ -363,7 +362,9 @@ describe('报表导出（K5、PRD P17「第一阶段」v2.35）', () => {
     ]);
 
     const costSheet = file.sheets.get('售后成本按责任类型')!;
-    expect(conditionOf(costSheet, '期间')).toBe('2026-09-01 至 2026-09-11（本月 · 不随时间筛选）');
+    expect(conditionOf(costSheet, '期间')).toBe(
+      '本月 2026-09-01 至 2026-09-11 · 不随时间筛选 · 产品成本 + 运费 + 额外赔偿 + 其他',
+    );
     const costHeader = costSheet.findIndex((r) => r[0] === '责任类型');
     expect(costSheet.slice(costHeader)).toEqual([
       ['责任类型', '售后成本（USD）', '单数'],

@@ -2,6 +2,7 @@ import { addDays } from '@forcome/calendar';
 import { z } from 'zod';
 import {
   defaultFeeDateRange,
+  responsibilities,
   responsibilitySchema,
   type LedgerQuery,
   type Responsibility,
@@ -270,12 +271,21 @@ export function reportCostRange(today: string): ReportDateRange {
   return defaultFeeDateRange(today);
 }
 
-/** 条的顺序：金额从大到小（同额按责任类型的顺序），未登记责任排在最后 */
+/** 条的顺序：金额从大到小，同额按责任类型的顺序（contracts 的 responsibilities），未登记责任排在最后 */
 export function sortCostBars<T extends Pick<ReportCostBar, 'responsibility' | 'totalUsd'>>(
   bars: readonly T[],
 ): T[] {
-  const rank = (bar: T) => (bar.responsibility === null ? 1 : 0);
-  return [...bars].sort((a, b) => rank(a) - rank(b) || Number(b.totalUsd) - Number(a.totalUsd));
+  const rank = (bar: T) =>
+    bar.responsibility === null
+      ? responsibilities.length
+      : responsibilities.indexOf(bar.responsibility);
+  const unregistered = (bar: T) => (bar.responsibility === null ? 1 : 0);
+  return [...bars].sort(
+    (a, b) =>
+      unregistered(a) - unregistered(b) ||
+      Number(b.totalUsd) - Number(a.totalUsd) ||
+      rank(a) - rank(b),
+  );
 }
 
 /** 画面上出条的：金额不为 0 的（Q3） */

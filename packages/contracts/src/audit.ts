@@ -15,6 +15,7 @@ import { memberStatusSchema, storeScopeSchema } from './auth';
 import { connectionStatusSchema, platformSchema, siteSchema } from './channel';
 import { financeField } from './finance';
 import { adapterModeSchema } from './integration';
+import { reportPeriodSchema } from './report';
 import { roleSchema } from './roles';
 import { ticketChannelSchema, ticketStatusSchema } from './ticket';
 import { recipientHeaderSchema } from './unassigned-mail';
@@ -140,7 +141,7 @@ export const ledgerExportAuditSnapshotSchema = z.object({
 export const reportExportAuditSnapshotSchema = z.object({
   fileName: z.string(),
   filters: z.object({
-    period: z.string(),
+    period: reportPeriodSchema,
     from: z.string(),
     to: z.string(),
     store: z.string().optional(),

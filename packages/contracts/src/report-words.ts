@@ -127,3 +127,17 @@ export function slaSubWords(counts: ReportSlaCounts, unassignedMissed: number): 
     ? `${missed} · ${REPORT_KPI.slaUnassigned(unassignedMissed)}`
     : missed;
 }
+
+/**
+ * 售后成本按责任类型的写法里画面与导出共用的部分（原型 p17_p1_cost()，PRD P17「第一阶段」v2.35）：标签、副标题（即售后成本的口径）、
+ * 来源说明
+ */
+const NOT_FILTERED = '不随时间筛选';
+export const REPORT_COST = {
+  title: '售后成本按责任类型',
+  /** 卡头标签「本月 · 不随时间筛选」 */
+  tag: `本月 · ${NOT_FILTERED}`,
+  notFiltered: NOT_FILTERED,
+  sub: '产品成本 + 运费 + 额外赔偿 + 其他',
+  source: '来自登记台账，不含待确认',
+} as const;

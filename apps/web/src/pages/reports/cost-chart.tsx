@@ -104,7 +104,7 @@ function CostRow({
     </>
   );
   const className = cn(
-    '-mx-1.5 -my-0.75 flex w-[calc(100%+0.75rem)] items-center gap-2.5 rounded-md px-1.5 py-0.75 outline-none',
+    '-mx-1.5 -my-0.75 flex w-[calc(100%+0.75rem)] items-center gap-2.5 rounded-sm px-1.5 py-0.75 outline-none',
     active && 'bg-primary-soft',
   );
   const hover = {

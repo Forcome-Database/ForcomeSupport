@@ -4,6 +4,7 @@ import {
   firstResponseWords,
   isEmptyTicketReport,
   rateWords,
+  REPORT_COST,
   REPORT_KPI,
   reportChannelGroupLabels,
   reportPeriodLabels,
@@ -28,7 +29,7 @@ import { ticketReport } from './tickets';
 /*
  * P17 报表导出（PRD P17「第一阶段」v2.35、K5，待办 25）：按当前筛选（期间、店铺、站点）与字段权限，服务端用 exceljs 同步生成一个
  * xlsx 后直接下载，不留存文件；导出记审计（动作 report.export，对象类型「导出」，同台账导出）。三张表：
- * - 「指标」：条件（期间、上一周期、店铺、站点、更新于、导出时间）与三个指标的本期 · 上一周期 · 对比 · 说明，写法与画面一致
+ * - 「指标」：条件（期间、店铺、站点、更新于、导出时间）与三个指标的本期 · 上一周期 · 对比 · 说明，写法与画面一致
  *   （contracts 的 report-words.ts，画面同一份）；无数据（K4）时本期写「—」、说明写「所选范围无数据」；
  * - 「每日工单量」：期间内每天两组渠道与合计，末行合计；
  * - 「售后成本按责任类型」：只在有财务权限时有（没有时文件里没有任何成本字段，AC-P1-09），本月、随店铺不随时间与站点，
@@ -121,15 +122,15 @@ async function workbookOf(
   metrics.columns = [{ width: 22 }, { width: 28 }, { width: 14 }, { width: 28 }, { width: 40 }];
   addConditions(metrics, [
     ['期间', `${rangeText(report.range)}（${reportPeriodLabels[report.range.period]}）`],
-    ['上一周期', rangeText(report.previous)],
     ['店铺', scope.store],
     ['站点', scope.site],
     ['更新于', report.updatedAt ? businessDateTime(new Date(report.updatedAt)) : REPORT_KPI.none],
     ['导出时间', businessDateTime(now)],
   ]);
   addHeader(metrics, ['指标', '本期', '上一周期', '对比', '说明']);
-  for (const row of metricRows(report)) metrics.addRow(row);
-  rows += 3;
+  const metricLines = metricRows(report);
+  for (const row of metricLines) metrics.addRow(row);
+  rows += metricLines.length;
 
   const daily = workbook.addWorksheet(REPORT_EXPORT_SHEETS.daily, {
     views: [{ state: 'frozen', ySplit: 1 }],
@@ -153,10 +154,10 @@ async function workbookOf(
   if (cost) {
     const sheet = workbook.addWorksheet(REPORT_EXPORT_SHEETS.cost);
     sheet.columns = [{ width: 22 }, { width: 40 }, { width: 10 }];
+    // 「本月 2026-09-01 至 2026-09-11 · 不随时间筛选 · 产品成本 + 运费 + 额外赔偿 + 其他」与店铺（PRD v2.35，协调者 Q5）
     addConditions(sheet, [
-      ['期间', `${rangeText(cost.range)}（本月 · 不随时间筛选）`],
+      ['期间', `本月 ${rangeText(cost.range)} · ${REPORT_COST.notFiltered} · ${REPORT_COST.sub}`],
       ['店铺', scope.store],
-      ['口径', '产品成本 + 运费 + 额外赔偿 + 其他 · 来自登记台账，不含待确认'],
     ]);
     addHeader(sheet, ['责任类型', '售后成本（USD）', '单数']);
     for (const bar of cost.bars) {

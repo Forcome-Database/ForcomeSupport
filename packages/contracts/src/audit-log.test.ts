@@ -83,7 +83,11 @@ describe('动作筛选', () => {
   });
 
   it('一项对应的动作；认不出的键为空', () => {
-    expect(auditActionsOfFilter('export')).toEqual(['ledger.export', 'audit.export']);
+    expect(auditActionsOfFilter('export')).toEqual([
+      'ledger.export',
+      'audit.export',
+      'report.export',
+    ]);
     expect(auditActionsOfFilter('aftersales.complete')).toEqual(['aftersales.complete']);
     expect(auditActionsOfFilter('导出 Excel')).toEqual([]);
   });
