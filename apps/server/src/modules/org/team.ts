@@ -1,5 +1,7 @@
 import {
   roles as allRoles,
+  disableBlockedReason,
+  handoverError,
   isTeamMember,
   orderedRoles,
   sameRoles,
@@ -11,11 +13,15 @@ import {
   teamRoles,
   type AuditAction,
   type FieldErrors,
+  type HandoverAssignment,
+  type HandoverCase,
   type Role,
   type StoreScopeValue,
   type Team,
   type TeamCandidate,
   type TeamChange,
+  type TeamDisable,
+  type TeamHandover,
   type TeamMember,
   type TeamMemberAdd,
   type TeamStore,
@@ -32,9 +38,10 @@ import {
   type Tx,
 } from '../core';
 import { dingtalkSyncHealth } from './dingtalk-sync';
-import { memberAuditSnapshot, memberScopeValue } from './members';
+import { memberDisabledJob } from './events';
+import { listAftersalesOwners, memberAuditSnapshot, memberScopeValue } from './members';
 import { member } from './schema';
-import type { MemberRow } from './session';
+import { closeMemberSessions, type MemberRow } from './session';
 
 /*
  * P20 团队与权限（PRD P20「第一阶段」、K6、G7，待办 06）：成员表、「从钉钉添加」、修改角色与店铺数据范围。
@@ -279,4 +286,116 @@ export async function saveTeam(
       after: memberAuditSnapshot(updated),
     });
   }
+}
+
+// ---------------------------------------------------------------- 停用成员（K10 第一阶段，待办 23）
+
+/**
+ * 停用成员时他负责的售后单：aftersales 的查询与改派，由 app.ts 注入（org 不依赖 aftersales，也不读写售后单表，ADR 0005）。
+ * 改派要与停用在同一事务（AC-ST-02），所以是注入的同步调用；之后仍发「成员已停用」事件，漏掉的单（并发新登记的）由它进改派队列
+ */
+export interface MemberHandover {
+  /** 他负责的进行中售后单（按单号），带店铺名与版本 */
+  openCases(db: DbExecutor, memberId: string): Promise<HandoverCase[]>;
+  /** 在停用的事务里把这些单改派给选好的接手人（版本对不上抛 OptimisticLockError），每张记审计「改派负责人」 */
+  reassign(
+    tx: Tx,
+    actor: Actor,
+    cases: readonly HandoverCase[],
+    assignments: readonly HandoverAssignment[],
+  ): Promise<void>;
+}
+
+/** 在职的售后负责人（不含 memberId 这个人）：停用弹窗的接手人候选 */
+async function otherOwners(db: DbExecutor, memberId: string) {
+  return (await listAftersalesOwners(db)).filter((owner) => owner.id !== memberId);
+}
+
+function handoverMemberOf(row: MemberRow): TeamHandover['member'] {
+  return {
+    id: row.id,
+    name: row.name,
+    version: row.version,
+    aftersalesOwner: row.roles.includes('aftersales_owner'),
+  };
+}
+
+/** 成员表里的人（有客服系统角色的成员）；不是的为 null */
+async function teamMemberRow(db: DbExecutor, id: string): Promise<MemberRow | null> {
+  const [row] = await db.select().from(member).where(eq(member.id, id)).limit(1);
+  return row && isTeamMember(row.roles) ? row : null;
+}
+
+/** 在职管理员的人数（「至少要有一位在职的管理员」） */
+async function activeAdminCount(db: DbExecutor): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(member)
+    .where(and(eq(member.status, 'active'), arrayContains(member.roles, ['admin'])));
+  return row?.count ?? 0;
+}
+
+/**
+ * 停用弹窗的内容（K10 第一阶段）：成员与版本、他负责的进行中售后单、其他在职售后负责人与店铺范围；不在成员表里为 null。
+ * 怎么选接手人、能不能停用由 contracts 的 handoverPlan 判断（前后端同一个）
+ */
+export async function teamHandover(
+  db: DbExecutor,
+  handover: MemberHandover,
+  memberId: string,
+): Promise<TeamHandover | null> {
+  const row = await teamMemberRow(db, memberId);
+  if (!row) return null;
+  const [cases, owners] = await Promise.all([
+    handover.openCases(db, row.id),
+    otherOwners(db, row.id),
+  ]);
+  return { member: handoverMemberOf(row), cases, owners };
+}
+
+/**
+ * 「改派并停用」（AC-ST-02、K10 第一阶段）：同一事务里改派他负责的进行中售后单并停用（原因「管理员停用」，通讯录同步不会恢复）、
+ * 删掉他的会话、审计「停用成员」，发「成员已停用」事件。先比版本号（G7，409），再看能不能停用（已停用、自己、最后一位在职管理员：
+ * 报在 member 上）与接手人（没人可接手、没选、选的人不能接：报在 handover 上，400）。不在成员表里为 null
+ */
+export async function disableTeamMember(
+  tx: Tx,
+  actor: Actor,
+  memberId: string,
+  input: TeamDisable,
+  handover: MemberHandover,
+): Promise<TeamMember | null> {
+  await advisoryLock(tx, TEAM_LOCK);
+  const row = await teamMemberRow(tx.db, memberId);
+  if (!row) return null;
+  if (row.version !== input.version) throw new OptimisticLockError('org.member', row.id);
+
+  const selfId = actor.kind === 'member' ? actor.memberId : '';
+  const blocked = disableBlockedReason(toTeamMember(row), selfId, await activeAdminCount(tx.db));
+  if (blocked) throw new FieldValidationError({ member: blocked });
+  const cases = await handover.openCases(tx.db, row.id);
+  const owners = await otherOwners(tx.db, row.id);
+  const error = handoverError({ member: handoverMemberOf(row), cases, owners }, input.assignments);
+  if (error) throw new FieldValidationError({ handover: error });
+
+  const updated = await updateWithVersion(tx, member, row, {
+    status: 'disabled',
+    disabledReason: 'manual',
+    disabledAt: tx.now,
+    changedAt: tx.now,
+    changedByName: changedByName(actor),
+    updatedAt: tx.now,
+  });
+  await closeMemberSessions(tx.db, row.id);
+  await recordAudit(tx, actor, {
+    action: 'member.disable',
+    objectType: 'member',
+    objectId: row.id,
+    objectLabel: row.name,
+    before: memberAuditSnapshot(row),
+    after: memberAuditSnapshot(updated),
+  });
+  if (cases.length > 0) await handover.reassign(tx, actor, cases, input.assignments);
+  await tx.enqueue(memberDisabledJob, { memberId: row.id, reason: 'manual' });
+  return toTeamMember(updated);
 }

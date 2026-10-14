@@ -279,6 +279,14 @@ export const auditActions = {
     snapshot: 'aftersales',
   },
   'aftersales.cancel': { label: '取消', objectType: 'aftersales', snapshot: 'aftersales' },
+  // 改派负责人（待办 23，协调者 2026-10-14 决定 Q9）：P13 改派与管理员停用成员时在弹窗里改派（每张单一条）；
+  // 钉钉离职自动停用后进入改派队列（操作人「系统」，负责人写「待分配」）
+  'aftersales.reassign': { label: '改派负责人', objectType: 'aftersales', snapshot: 'aftersales' },
+  'aftersales.reassign_queue': {
+    label: '进入改派队列',
+    objectType: 'aftersales',
+    snapshot: 'aftersales',
+  },
   'ledger.export': {
     label: '导出 Excel',
     objectType: 'export',
@@ -305,6 +313,8 @@ export const auditActions = {
     objectType: 'member',
     snapshot: 'member',
   },
+  // P20 停用成员（待办 23）：改派与停用同一次提交，改派的单各记一条「改派负责人」
+  'member.disable': { label: '停用成员', objectType: 'member', snapshot: 'member' },
   'auth.logout': { label: '退出登录', objectType: 'login', snapshot: 'empty' },
   // 渠道连接（待办 09）：某个 Gmail 邮箱连续 3 次失败进入连接异常、之后同步成功恢复连接，操作人「系统」（2026-10-06 用户确认）
   'channel.disconnected': { label: '连接异常', objectType: 'channel', snapshot: 'channel' },

@@ -147,6 +147,13 @@ export {
   type Shipper,
   type SourceTicket,
   type VersionInput,
+  PENDING_OWNER,
+  PENDING_OWNER_WORDS,
+  reassignCandidates,
+  reassignInputSchema,
+  reassignMessages,
+  reassignQueueNotificationCopy,
+  type ReassignInput,
 } from './aftersales';
 export { apiErrorSchema, type ApiError } from './api';
 export {
@@ -481,6 +488,20 @@ export {
   type TeamRole,
   type TeamSave,
   type TeamStore,
+  disableBlockedReason,
+  disableMessages,
+  handoverAssignmentSchema,
+  handoverCaseSchema,
+  handoverError,
+  handoverPlan,
+  teamDisableSchema,
+  teamHandoverSchema,
+  type HandoverAssignment,
+  type HandoverCase,
+  type HandoverGroup,
+  type HandoverPlan,
+  type TeamDisable,
+  type TeamHandover,
 } from './team';
 export {
   canMarkNoReply,

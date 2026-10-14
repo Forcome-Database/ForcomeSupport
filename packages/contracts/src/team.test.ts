@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  disableBlockedReason,
+  disableMessages,
+  handoverError,
+  handoverPlan,
   isTeamMember,
   lastLoginWords,
   orderedRoles,
@@ -131,5 +135,100 @@ describe('写法', () => {
     expect(syncedAtWords('2026-09-11T10:00:00+08:00', now)).toBe('10:00 同步');
     expect(syncedAtWords('2026-09-10T23:00:00+08:00', now)).toBe('09-10 23:00 同步');
     expect(syncedAtWords(null, now)).toBe('尚未同步');
+  });
+});
+
+describe('停用弹窗的接手人（K10 第一阶段，待办 23，协调者 2026-10-14 决定 Q1、Q3）', () => {
+  const AUTO = '0199a0a0-0000-7000-8000-00000000000a';
+  const member = { id: FD, name: '王磊', version: 1, aftersalesOwner: true };
+  const one = (id: string, storeId: string, storeName: string) => ({
+    id,
+    number: `S-${id.slice(-4)}`,
+    status: 'in_progress' as const,
+    store: { id: storeId, name: storeName },
+    version: 0,
+  });
+  const C1 = '0199a0a0-0000-7000-8000-0000000000c1';
+  const C2 = '0199a0a0-0000-7000-8000-0000000000c2';
+  const cases = [one(C1, AUTO, 'Forcome Auto'), one(C2, FD, 'Forcome Direct')];
+  const all = { id: 'o-all', name: '赵倩', stores: { all: true as const } };
+  const autoOnly = {
+    id: 'o-auto',
+    name: '陈晨',
+    stores: { all: false as const, storeIds: [AUTO] },
+  };
+  const directOnly = { id: 'o-fd', name: '周敏', stores: { all: false as const, storeIds: [FD] } };
+
+  it('没有进行中售后单：不用选接手人', () => {
+    expect(handoverPlan({ member, cases: [], owners: [] })).toEqual({ kind: 'none' });
+    expect(handoverError({ member, cases: [], owners: [] }, [])).toBeNull();
+  });
+
+  it('一个下拉，只列店铺范围覆盖全部店铺的售后负责人', () => {
+    const plan = handoverPlan({ member, cases, owners: [all, autoOnly] });
+    expect(plan).toEqual({
+      kind: 'choose',
+      groups: [{ store: null, caseIds: [C1, C2], candidates: [all] }],
+    });
+  });
+
+  it('没有一人覆盖全部店铺、但每个店铺各有人可接：按店铺各一个下拉', () => {
+    const plan = handoverPlan({ member, cases, owners: [autoOnly, directOnly] });
+    expect(
+      plan.kind === 'choose' &&
+        plan.groups.map((g) => [g.store?.name, g.candidates.map((c) => c.name)]),
+    ).toEqual([
+      ['Forcome Auto', ['陈晨']],
+      ['Forcome Direct', ['周敏']],
+    ]);
+  });
+
+  it('不可用：没有其他售后负责人；被停用的人不是售后负责人；缺店铺范围', () => {
+    expect(handoverPlan({ member, cases, owners: [] })).toEqual({
+      kind: 'blocked',
+      reason: '王磊是唯一的售后负责人，没有其他人可接手',
+      fix: '请先在成员表为其他成员分配售后负责人角色',
+    });
+    expect(
+      handoverPlan({ member: { ...member, aftersalesOwner: false }, cases, owners: [] }),
+    ).toMatchObject({ reason: '没有在职的售后负责人可接手' });
+    expect(handoverPlan({ member, cases, owners: [directOnly] })).toEqual({
+      kind: 'blocked',
+      reason: '其他售后负责人都没有 Forcome Auto 的数据范围',
+      fix: '请先在成员表为其他售后负责人加上该店铺的数据范围',
+    });
+  });
+
+  it('校验：每张都要选、选的人要有该单店铺的范围', () => {
+    const handover = { member, cases, owners: [autoOnly, directOnly] };
+    expect(handoverError(handover, [{ caseId: C1, ownerId: 'o-auto' }])).toBe(
+      disableMessages.ownerRequired,
+    );
+    expect(
+      handoverError(handover, [
+        { caseId: C1, ownerId: 'o-auto' },
+        { caseId: C2, ownerId: 'o-auto' },
+      ]),
+    ).toBe(disableMessages.ownerNotEligible);
+    expect(
+      handoverError(handover, [
+        { caseId: C1, ownerId: 'o-auto' },
+        { caseId: C2, ownerId: 'o-fd' },
+      ]),
+    ).toBeNull();
+    expect(handoverError({ member, cases, owners: [] }, [])).toBe(
+      '王磊是唯一的售后负责人，没有其他人可接手',
+    );
+  });
+
+  it('行尾「停用」不可用的原因：已停用、自己、最后一位在职管理员', () => {
+    const someone = { id: FC, status: 'active' as const, roles: ['agent' as const] };
+    expect(disableBlockedReason(someone, FD, 1)).toBeNull();
+    expect(disableBlockedReason({ ...someone, status: 'disabled' }, FD, 1)).toBe('这位成员已停用');
+    expect(disableBlockedReason(someone, FC, 2)).toBe('不能停用自己');
+    expect(disableBlockedReason({ ...someone, roles: ['admin'] }, FD, 1)).toBe(
+      '至少要有一位在职的管理员',
+    );
+    expect(disableBlockedReason({ ...someone, roles: ['admin'] }, FD, 2)).toBeNull();
   });
 });

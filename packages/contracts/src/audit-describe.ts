@@ -7,6 +7,8 @@ import {
   feeItemLabels,
   feeSchema,
   handlingMethodLabels,
+  PENDING_OWNER,
+  PENDING_OWNER_WORDS,
   ratiosSchema,
   ratioWords,
   registrationFieldLabels,
@@ -333,7 +335,8 @@ function ledgerFilterWords(value: unknown, ctx: FormatContext): string {
   if (filter.method) parts.push(handlingMethodLabels[filter.method]);
   if (filter.responsibility) parts.push(responsibilityLabels[filter.responsibility]);
   if (filter.status) parts.push(aftersalesStatusLabels[filter.status]);
-  if (filter.owner) parts.push(`负责人 ${memberName(filter.owner, ctx)}`);
+  if (filter.owner === PENDING_OWNER) parts.push(`负责人 ${PENDING_OWNER_WORDS}`);
+  else if (filter.owner) parts.push(`负责人 ${memberName(filter.owner, ctx)}`);
   return parts.join(' · ');
 }
 
@@ -664,7 +667,7 @@ function collectIds(
     case 'ledgerFilters':
       if (isPlainObject(value)) {
         add(ids.storeIds, value.store);
-        add(ids.memberIds, value.owner);
+        if (value.owner !== PENDING_OWNER) add(ids.memberIds, value.owner);
       }
       break;
     case 'auditFilters':

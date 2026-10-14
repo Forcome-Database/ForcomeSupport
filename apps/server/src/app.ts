@@ -3,7 +3,7 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import type { ServerDeps } from './deps';
-import { createAftersalesRoutes } from './modules/aftersales';
+import { aftersalesHandover, createAftersalesRoutes } from './modules/aftersales';
 import { createChannelRoutes, listStoreChoices, storeNamesById } from './modules/channel';
 import {
   AccessDeniedError,
@@ -104,10 +104,16 @@ export function createApp(deps: AppDeps) {
   });
 
   app.route('/', createOrgRoutes({ runtime, appEnv: config.appEnv }));
-  // P20 团队与权限在 org；授权可选的全部店铺由这里注入 channel 的查询（org 不依赖 channel）
+  // P20 团队与权限在 org；授权可选的全部店铺由这里注入 channel 的查询（org 不依赖 channel），停用成员时他负责的售后单
+  // 由这里注入 aftersales 的查询与改派（改派与停用同一事务，org 不依赖 aftersales、不读写售后单表）
   app.route(
     '/',
-    createTeamRoutes({ runtime, appEnv: config.appEnv, storeChoices: listStoreChoices }),
+    createTeamRoutes({
+      runtime,
+      appEnv: config.appEnv,
+      storeChoices: listStoreChoices,
+      handover: aftersalesHandover,
+    }),
   );
   // 钉钉扫码登录（G11、G12）：换出与开发登录同一种会话
   app.route('/', createDingtalkLoginRoutes({ runtime, appEnv: config.appEnv, clients, logger }));

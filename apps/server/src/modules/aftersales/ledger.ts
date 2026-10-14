@@ -4,6 +4,7 @@ import {
   defaultFeeDateRange,
   feeItems,
   missingFields,
+  PENDING_OWNER,
   ratioPairsOf,
   type AftersalesDetail,
   type Completion,
@@ -21,7 +22,19 @@ import {
   type RegistrationRecord,
 } from '@forcome/contracts';
 import Big from 'big.js';
-import { and, asc, eq, getViewSelectedFields, gte, lte, ne, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  eq,
+  getViewSelectedFields,
+  gte,
+  isNotNull,
+  lte,
+  min,
+  ne,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { storeNamesById } from '../channel';
 import { isStoreInScope, storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
 import { listParts } from '../factory';
@@ -162,6 +175,7 @@ export function toLedgerItem(row: AftersalesRow, cost: CostRow, names: LedgerNam
     registeredById: row.registeredById,
     ownerId: row.ownerId,
     ownerName: row.ownerId ? (names.members.get(row.ownerId) ?? null) : null,
+    ownerPending: row.reassignQueuedAt !== null,
     missing: missingOf(row),
     version: row.version,
     fees: feesOf(row),
@@ -282,7 +296,7 @@ export function ownerWithinScope(owner: OwnerOption, scope: StoreScope): OwnerOp
 }
 
 /**
- * P13 筛选行的选项：负责人筛选列出查看者店铺范围内在职的售后负责人（与新建登记的可选负责人同一批人；「待分配」随待办 23）
+ * P13 筛选行的选项：负责人筛选列出查看者店铺范围内在职的售后负责人（与新建登记的可选负责人同一批人；「待分配」是界面固定的一项）
  */
 export async function ledgerOptions(db: DbExecutor, scope: StoreScope): Promise<LedgerOptions> {
   const owners = await listAftersalesOwners(db);
@@ -353,13 +367,33 @@ export function defaultFeeDateRangeAt(now: Date): FeeDateRange {
   return defaultFeeDateRange(businessDate(now));
 }
 
+/** 待分配的单（钉钉离职进入改派队列，待办 23） */
+const pendingOwner = isNotNull(aftersales.reassignQueuedAt);
+
 /**
- * 这次按的费用发生日起止：没给的一端取本月的那一端（北京时间，按注入的时钟；S13 补充小样）；筛出缺字段时不按日期，为 null
+ * 这次按的费用发生日起止：没给的一端取本月的那一端（北京时间，按注入的时钟；S13 补充小样）；筛出缺字段时不按日期，为 null。
+ * 负责人选「待分配」且没给起始日时，从（店铺范围与店铺筛选内）待分配单里最早的费用发生日起，队列里的单都列得出来
+ * （协调者 2026-10-14 决定 Q6）；没有待分配的单时照常取本月 1 日
  */
-export function feeDateRangeOf(query: LedgerQuery, now: Date): FeeDateRange | null {
+export async function feeDateRangeOf(
+  db: DbExecutor,
+  scope: StoreScope,
+  query: LedgerQuery,
+  now: Date,
+): Promise<FeeDateRange | null> {
   if (query.missing) return null;
   const fallback = defaultFeeDateRangeAt(now);
-  return { from: query.from ?? fallback.from, to: query.to ?? fallback.to };
+  let from = query.from ?? fallback.from;
+  if (query.owner === PENDING_OWNER && !query.from) {
+    const [earliest] = await db
+      .select({ feeDate: min(aftersales.feeDate) })
+      .from(aftersales)
+      .where(
+        and(storeScopeCondition(scope, aftersales.storeId), storeFilter(query.store), pendingOwner),
+      );
+    if (earliest?.feeDate && earliest.feeDate <= fallback.to) from = earliest.feeDate;
+  }
+  return { from, to: query.to ?? fallback.to };
 }
 
 /** 筛选行的条件（费用发生日起止、处理方式、责任、状态、负责人；店铺另行施加） */
@@ -370,7 +404,11 @@ function rowFilters(query: LedgerQuery, range: FeeDateRange): (SQL | undefined)[
     query.method ? eq(aftersales.method, query.method) : undefined,
     query.responsibility ? eq(aftersales.responsibility, query.responsibility) : undefined,
     query.status ? eq(aftersales.status, query.status) : undefined,
-    query.owner ? eq(aftersales.ownerId, query.owner) : undefined,
+    query.owner === PENDING_OWNER
+      ? pendingOwner
+      : query.owner
+        ? eq(aftersales.ownerId, query.owner)
+        : undefined,
   ];
 }
 
@@ -386,7 +424,7 @@ export async function listLedger(
   query: LedgerQuery,
   now: Date,
 ): Promise<{ items: LedgerItem[]; totals: LedgerTotals; range: FeeDateRange | null }> {
-  const range = feeDateRangeOf(query, now);
+  const range = await feeDateRangeOf(db, scope, query, now);
   const rows = await db
     .select({ row: aftersales, cost: getViewSelectedFields(aftersalesCost) })
     .from(aftersales)

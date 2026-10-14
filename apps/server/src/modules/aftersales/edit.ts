@@ -255,7 +255,11 @@ export async function updateRegistration(
             customerId: found.customerId,
           }
         : sourceTicketColumns(null);
-    const fieldValues = registrationColumns(input, ratios, fees, ticketColumns);
+    // 改了负责人的待分配单出了改派队列（待办 23）
+    const fieldValues = {
+      ...registrationColumns(input, ratios, fees, ticketColumns),
+      ...(input.ownerId !== found.ownerId ? { reassignQueuedAt: null } : {}),
+    };
     const updated = await updateWithVersion(
       tx,
       aftersales,

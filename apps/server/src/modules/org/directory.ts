@@ -2,6 +2,7 @@ import { SYSTEM_ACTOR_NAME } from '@forcome/contracts';
 import { and, eq, isNotNull, isNull, lte, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import { advisoryLock, recordAudit, systemActor, type DbExecutor, type Tx } from '../core';
 import type { DingtalkDepartment, DingtalkDirectory, DingtalkUser } from '../integration';
+import { memberDisabledJob } from './events';
 import { department, member } from './schema';
 import { closeMemberSessions, type MemberRow } from './session';
 import { memberAuditSnapshot } from './members';
@@ -10,7 +11,8 @@ import { memberAuditSnapshot } from './members';
  * 钉钉通讯录 → 成员与部门（规格 org「钉钉 Stream 通讯录事件 + 每小时全量对账，同步成员与部门（只读）」，PRD D-16、11.1，待办 05）：
  * - 新出现的人建成员（没有角色、没有店铺范围，管理员在 P20 分配后才能进入，G12「未分配角色」）；
  * - 姓名、部门、邮箱随钉钉；
- * - 不在通讯录里了（离职）：停用（原因「钉钉离职」）、立即删掉他的会话，审计「钉钉离职停用」（AC-ST-05；负责的售后单进改派队列随待办 23）；
+ * - 不在通讯录里了（离职）：停用（原因「钉钉离职」）、立即删掉他的会话，审计「钉钉离职停用」，发「成员已停用」事件
+ *   （AC-ST-05：aftersales 把他负责的进行中售后单放进改派队列，待办 23）；
  * - 钉钉离职停用的又出现在通讯录里：恢复在职，但角色与店铺范围清空，等管理员重新分配（审计「钉钉恢复在职」）；
  *   管理员停用的不随通讯录变化。
  * 全量对账与事件都在同一把咨询锁下写；对账先取快照、后写库，取快照之后由事件更新过的行不用旧快照覆盖或停用。
@@ -252,8 +254,8 @@ async function refreshFromDirectory(
 }
 
 /**
- * 钉钉离职：停用、立即删掉他的会话（不能再登录，现有会话立即失效，AC-ST-05），审计「钉钉离职停用」。
- * 待办 23 在这里（同一事务）发「成员已停用」事件，让 aftersales 把他负责的进行中售后单放进改派队列。
+ * 钉钉离职：停用、立即删掉他的会话（不能再登录，现有会话立即失效，AC-ST-05），审计「钉钉离职停用」，
+ * 同一事务里发「成员已停用」事件，让 aftersales 把他负责的进行中售后单放进改派队列（org 不读写售后单，ADR 0005）。
  */
 async function leaveFromDirectory(tx: Tx, row: MemberRow): Promise<void> {
   await tx.db
@@ -278,6 +280,7 @@ async function leaveFromDirectory(tx: Tx, row: MemberRow): Promise<void> {
     before: memberAuditSnapshot(row),
     after: memberAuditSnapshot({ ...row, status: 'disabled' }),
   });
+  await tx.enqueue(memberDisabledJob, { memberId: row.id, reason: 'dingtalk_left' });
 }
 
 /** 没被事件在快照之后更新过的行（对账用旧快照只改这些） */

@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  aftersalesStatusSchema,
+  ownerOptionSchema,
+  ownersForStore,
+  type OwnerOption,
+} from './aftersales';
 import { relativeTimeWords } from './audit-log';
 import { memberStatusSchema, storeScopeSchema, type StoreScopeValue } from './auth';
 import type { FieldErrors } from './channel';
@@ -203,4 +209,170 @@ export type TeamSave = z.infer<typeof teamSaveSchema>;
 /** 保存修改时某位成员某一项的字段路径（接口的 fields 与表格格子的对应） */
 export function teamFieldPath(memberId: string, field: 'roles' | 'stores'): string {
   return `${memberId}.${field}`;
+}
+
+// ---------------------------------------------------------------- 停用成员（K10 第一阶段，待办 23）
+
+/**
+ * 停用成员的报错与不可用的原因（PRD P20「第一阶段」与 K10 第一阶段补充小样，协调者 2026-10-14 决定 Q1–Q4）。
+ * 行尾「更多」的「停用」不可用时悬停写 self / disabled / lastAdmin；弹窗里没人可接手时字段下写 onlyOwner / noOwner / scopeMissing，
+ * 底部写 noOwnerFix / scopeFix
+ */
+export const disableMessages = {
+  self: '不能停用自己',
+  disabled: '这位成员已停用',
+  lastAdmin: teamMessages.lastAdmin,
+  ownerRequired: '请选择接手人',
+  ownerNotEligible: '只能选有该店铺数据范围的售后负责人',
+  onlyOwner: (name: string) => `${name}是唯一的售后负责人，没有其他人可接手`,
+  noOwner: '没有在职的售后负责人可接手',
+  noOwnerFix: '请先在成员表为其他成员分配售后负责人角色',
+  scopeMissing: (stores: readonly string[]) =>
+    `其他售后负责人都没有 ${stores.join('、')} 的数据范围`,
+  scopeFix: '请先在成员表为其他售后负责人加上该店铺的数据范围',
+} as const;
+
+/** 停用弹窗里的一张进行中售后单 */
+export const handoverCaseSchema = z.object({
+  id: z.uuid(),
+  number: z.string(),
+  status: aftersalesStatusSchema,
+  store: z.object({ id: z.uuid(), name: z.string() }),
+  /** 乐观锁版本：改派时带上（G7） */
+  version: z.int(),
+});
+export type HandoverCase = z.infer<typeof handoverCaseSchema>;
+
+/**
+ * 停用弹窗的内容（GET /api/org/team/members/{id}/handover）：成员与版本、他负责的进行中售后单（按单号）、
+ * 在职的售后负责人与店铺范围（不含他自己）。第一阶段只检查进行中售后单（工单没有负责人）
+ */
+export const teamHandoverSchema = z.object({
+  member: z.object({
+    id: z.uuid(),
+    name: z.string(),
+    version: z.int().nonnegative(),
+    /** 他自己是不是售后负责人（没人可接手时的写法不同） */
+    aftersalesOwner: z.boolean(),
+  }),
+  cases: z.array(handoverCaseSchema),
+  owners: z.array(ownerOptionSchema),
+});
+export type TeamHandover = z.infer<typeof teamHandoverSchema>;
+
+/** 一张单交给谁；没选为 null */
+export const handoverAssignmentSchema = z.object({
+  caseId: z.uuid(),
+  ownerId: z.uuid().nullable(),
+});
+export type HandoverAssignment = z.infer<typeof handoverAssignmentSchema>;
+
+/**
+ * 「改派并停用」（POST /api/org/team/members/{id}/disable）：打开弹窗时读到的成员版本（G7）与每张进行中售后单的接手人。
+ * 改派与停用同一事务；字段错误的键是 handover（没人可接手、没选、选的人不能接）与 member（不能停用这个人）
+ */
+export const teamDisableSchema = z.object({
+  version: z.int().nonnegative(),
+  assignments: z.array(handoverAssignmentSchema),
+});
+export type TeamDisable = z.infer<typeof teamDisableSchema>;
+
+/** 接手人的一组候选：全部单一个下拉（store 为 null），或按店铺各一个 */
+export interface HandoverGroup {
+  readonly store: { readonly id: string; readonly name: string } | null;
+  /** 这一组的单 */
+  readonly caseIds: readonly string[];
+  readonly candidates: readonly OwnerOption[];
+}
+
+/** 停用弹窗怎么选接手人：没有进行中售后单 · 选接手人（一组或按店铺几组）· 没人可接手（原因与怎么办） */
+export type HandoverPlan =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'choose'; readonly groups: readonly HandoverGroup[] }
+  | { readonly kind: 'blocked'; readonly reason: string; readonly fix: string };
+
+/**
+ * 停用弹窗的接手人（协调者 2026-10-14 决定 Q1、Q3）：平时一个「接手人」下拉，候选为店铺范围覆盖这些单全部店铺的在职售后负责人
+ * （owners 已不含被停用的人）；没有一人覆盖全部店铺、但每个店铺各有人可接时按店铺各一个（按店铺名排序）；
+ * 有店铺没人可接时不可用：一位售后负责人都没有写「X是唯一的售后负责人」或「没有在职的售后负责人」，否则写缺哪些店铺的范围
+ */
+export function handoverPlan(
+  handover: Pick<TeamHandover, 'member' | 'cases' | 'owners'>,
+): HandoverPlan {
+  const { member, cases, owners } = handover;
+  if (cases.length === 0) return { kind: 'none' };
+  if (owners.length === 0) {
+    return {
+      kind: 'blocked',
+      reason: member.aftersalesOwner
+        ? disableMessages.onlyOwner(member.name)
+        : disableMessages.noOwner,
+      fix: disableMessages.noOwnerFix,
+    };
+  }
+  const stores = new Map<string, { id: string; name: string }>();
+  for (const item of cases) stores.set(item.store.id, item.store);
+  const byStore = [...stores.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+  const uncovered = byStore.filter((store) => ownersForStore(owners, store.id).length === 0);
+  if (uncovered.length > 0) {
+    return {
+      kind: 'blocked',
+      reason: disableMessages.scopeMissing(uncovered.map((store) => store.name)),
+      fix: disableMessages.scopeFix,
+    };
+  }
+  const covering = owners.filter((owner) =>
+    byStore.every((store) => ownersForStore([owner], store.id).length > 0),
+  );
+  if (covering.length > 0) {
+    return {
+      kind: 'choose',
+      groups: [{ store: null, caseIds: cases.map((item) => item.id), candidates: covering }],
+    };
+  }
+  return {
+    kind: 'choose',
+    groups: byStore.map((store) => ({
+      store,
+      caseIds: cases.filter((item) => item.store.id === store.id).map((item) => item.id),
+      candidates: ownersForStore(owners, store.id),
+    })),
+  };
+}
+
+/**
+ * 「改派并停用」的接手人校验（前后端同一个）：没人可接手时报原因；每张单都要有接手人，且是有该单店铺范围的在职售后负责人。
+ * 返回报错（键 handover），没问题为 null
+ */
+export function handoverError(
+  handover: Pick<TeamHandover, 'member' | 'cases' | 'owners'>,
+  assignments: readonly HandoverAssignment[],
+): string | null {
+  const plan = handoverPlan(handover);
+  if (plan.kind === 'none') return null;
+  if (plan.kind === 'blocked') return plan.reason;
+  const chosen = new Map(assignments.map((item) => [item.caseId, item.ownerId]));
+  for (const item of handover.cases) {
+    const ownerId = chosen.get(item.id);
+    if (!ownerId) return disableMessages.ownerRequired;
+    if (!ownersForStore(handover.owners, item.store.id).some((owner) => owner.id === ownerId)) {
+      return disableMessages.ownerNotEligible;
+    }
+  }
+  return null;
+}
+
+/**
+ * 行尾「更多」的「停用」不可用的原因（K10 第一阶段补充小样 ⑤）：已停用的成员、当前登录的管理员自己、最后一位在职管理员；
+ * 可以停用为 null。activeAdmins 是在职管理员的人数
+ */
+export function disableBlockedReason(
+  target: Pick<TeamMember, 'id' | 'status' | 'roles'>,
+  selfId: string,
+  activeAdmins: number,
+): string | null {
+  if (target.status !== 'active') return disableMessages.disabled;
+  if (target.id === selfId) return disableMessages.self;
+  if (target.roles.includes('admin') && activeAdmins <= 1) return disableMessages.lastAdmin;
+  return null;
 }

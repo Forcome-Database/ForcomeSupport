@@ -3,6 +3,7 @@ import {
   aftersalesActions,
   completionLabel,
   ownsRegistration,
+  reassignCandidates,
   type AftersalesActions,
   type AftersalesStatus,
 } from './aftersales';
@@ -28,6 +29,7 @@ const NOTHING: AftersalesActions = {
   cancel: false,
   backfill: false,
   changeRate: false,
+  reassign: false,
 };
 
 describe('台账一张单上能做的事（PRD 10.1、6.5）', () => {
@@ -38,39 +40,51 @@ describe('台账一张单上能做的事（PRD 10.1、6.5）', () => {
       edit: true,
       complete: true,
       cancel: true,
+      reassign: true,
     });
     expect(aftersalesActions(supervisor, row('in_progress'))).toEqual({
       ...NOTHING,
       cancel: true,
+      reassign: true,
     });
-    // AC-P1-19：已完成的单客服主管没有补登入口
-    expect(aftersalesActions(supervisor, row('completed', { registeredById: ME }))).toEqual(
-      NOTHING,
-    );
+    // AC-P1-19：已完成的单客服主管没有补登入口；改派负责人照常可以（S15 补充小样）
+    expect(aftersalesActions(supervisor, row('completed', { registeredById: ME }))).toEqual({
+      ...NOTHING,
+      reassign: true,
+    });
   });
 
   it('售后负责人：自己登记或负责的进行中单可编辑、设为已完成；进行中可取消、可改汇率', () => {
     const owner = viewer('aftersales_owner');
-    const full = { ...NOTHING, edit: true, complete: true, cancel: true, changeRate: true };
+    const full = {
+      ...NOTHING,
+      edit: true,
+      complete: true,
+      cancel: true,
+      changeRate: true,
+      reassign: true,
+    };
     expect(aftersalesActions(owner, row('in_progress', { registeredById: ME }))).toEqual(full);
     expect(aftersalesActions(owner, row('in_progress', { ownerId: ME }))).toEqual(full);
-    // 别人登记、别人负责：只能取消与改汇率
+    // 别人登记、别人负责：只能取消、改汇率与改派
     expect(aftersalesActions(owner, row('in_progress'))).toEqual({
       ...NOTHING,
       cancel: true,
       changeRate: true,
+      reassign: true,
     });
   });
 
-  it('已完成：只有售后负责人可补登与改汇率，不能再设为已完成或取消', () => {
+  it('已完成：只有售后负责人可补登与改汇率，不能再设为已完成或取消；仍可改派负责人', () => {
     expect(aftersalesActions(viewer('aftersales_owner'), row('completed'))).toEqual({
       ...NOTHING,
       backfill: true,
       changeRate: true,
+      reassign: true,
     });
   });
 
-  it('已取消：只读，谁都不能再改', () => {
+  it('已取消：只读，谁都不能再改（含改派负责人）', () => {
     for (const roles of [['supervisor'], ['aftersales_owner']] as Role[][]) {
       expect(
         aftersalesActions(viewer(...roles), row('cancelled', { registeredById: ME, ownerId: ME })),
@@ -92,7 +106,26 @@ describe('台账一张单上能做的事（PRD 10.1、6.5）', () => {
         viewer('supervisor', 'aftersales_owner'),
         row('in_progress', { ownerId: ME }),
       ),
-    ).toEqual({ ...NOTHING, edit: true, complete: true, cancel: true, changeRate: true });
+    ).toEqual({
+      ...NOTHING,
+      edit: true,
+      complete: true,
+      cancel: true,
+      changeRate: true,
+      reassign: true,
+    });
+  });
+});
+
+describe('改派负责人可选的接手人（待办 23）', () => {
+  const owners = [
+    { id: ME, name: '王磊', stores: { all: true as const } },
+    { id: OTHER, name: '赵倩', stores: { all: false as const, storeIds: ['s1'] } },
+  ];
+  it('有该店铺范围的在职售后负责人，去掉现负责人', () => {
+    expect(reassignCandidates(owners, 's1', ME).map((o) => o.name)).toEqual(['赵倩']);
+    expect(reassignCandidates(owners, 's2', ME)).toEqual([]);
+    expect(reassignCandidates(owners, 's1', null).map((o) => o.name)).toEqual(['王磊', '赵倩']);
   });
 });
 

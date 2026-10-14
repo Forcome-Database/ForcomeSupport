@@ -705,18 +705,31 @@ export function defaultOwnerId(
   return candidates.length === 1 ? (candidates[0]?.id ?? null) : null;
 }
 
+/**
+ * 改派负责人可选的接手人（P13「改派负责人」，待办 23）：有该店铺数据范围的在职售后负责人，去掉现负责人
+ * （待分配的单现负责人已停用，本来就不在 owners 里）
+ */
+export function reassignCandidates(
+  owners: readonly OwnerOption[],
+  storeId: string,
+  currentOwnerId: string | null,
+): OwnerOption[] {
+  return ownersForStore(owners, storeId).filter((owner) => owner.id !== currentOwnerId);
+}
+
 // ---------------------------------------------------------------- 状态与权限（6.5「第一阶段台账状态」、10.1）
 
 /** 设为已完成后可撤销的秒数（S15 ①、G5 撤销浮层；服务端另留网络延迟的余量） */
 export const COMPLETE_UNDO_SECONDS = 5;
 
-/** 一张单上能做的事：编辑（进行中）· 设为已完成 · 取消 · 补登（已完成）· 修改汇率 */
+/** 一张单上能做的事：编辑（进行中）· 设为已完成 · 取消 · 补登（已完成）· 修改汇率 · 改派负责人 */
 export interface AftersalesActions {
   readonly edit: boolean;
   readonly complete: boolean;
   readonly cancel: boolean;
   readonly backfill: boolean;
   readonly changeRate: boolean;
+  readonly reassign: boolean;
 }
 
 /** 判断权限要看的：单的状态、登记人与负责人 */
@@ -747,6 +760,7 @@ export function ownsRegistration(
  * 这张单上查看者能做的事（PRD 10.1、6.5「第一阶段台账状态」；前端据此显示入口，后端据此强制）：
  * 进行中——登记人或负责人可编辑、设为已完成；客服主管或售后负责人可取消。已完成——只有售后负责人补登缺失的字段。
  * 已完成、已取消为终态：不能再设为已完成或取消。修改汇率只有售后负责人，进行中与已完成可改，已取消只读。
+ * 改派负责人：客服主管或售后负责人，店铺范围内任何单，进行中与已完成可改派，已取消只读（S15 补充小样，协调者 2026-10-14 决定 Q7）。
  */
 export function aftersalesActions(
   viewer: { readonly id: string; readonly roles: readonly Role[] },
@@ -760,6 +774,7 @@ export function aftersalesActions(
     cancel: open && can(viewer.roles, 'aftersales.cancel'),
     backfill: target.status === 'completed' && can(viewer.roles, 'aftersales.backfill'),
     changeRate: target.status !== 'cancelled' && can(viewer.roles, 'aftersales.backfill'),
+    reassign: target.status !== 'cancelled' && can(viewer.roles, 'aftersales.reassign_owner'),
   };
 }
 
@@ -940,8 +955,10 @@ export const ledgerItemSchema = z.object({
   /** 登记人与负责人（行尾「更多」与编辑登记按它们判断权限，aftersalesActions） */
   registeredById: z.uuid().nullable(),
   ownerId: z.uuid().nullable(),
-  /** 负责人姓名（「负责人」列；离职的也取得到） */
+  /** 负责人姓名（「负责人」列；离职的也取得到）。待分配的单为原负责人 */
   ownerName: z.string().nullable(),
+  /** 待分配：原负责人钉钉离职自动停用后进入改派队列（负责人列写「待分配」，悬停写原负责人；改派后清除，待办 23） */
+  ownerPending: z.boolean(),
   /** 缺失的适用字段（R-AS-08，按抽屉顺序；齐全为空） */
   missing: z.array(registrationFieldSchema),
   /** 乐观锁版本（编辑登记、补登、设为已完成、取消、修改汇率时带上，G7） */
@@ -1102,16 +1119,19 @@ export const ledgerQuerySchema = z.object({
   method: handlingMethodSchema.optional(),
   responsibility: responsibilitySchema.optional(),
   status: aftersalesStatusSchema.optional(),
-  /** 负责人（成员 ID；「待分配」随待办 23） */
-  owner: z.uuid().optional(),
+  /** 负责人：成员 ID，或 PENDING_OWNER「待分配」（钉钉离职进入改派队列的单；没给日期时从最早的待分配单起，待办 23） */
+  owner: z.union([z.uuid(), z.literal('pending')]).optional(),
   missing: z.literal('1').optional(),
 });
 export type LedgerQuery = z.infer<typeof ledgerQuerySchema>;
 
+/** 负责人筛选「待分配」在地址栏与接口里的值 */
+export const PENDING_OWNER = 'pending';
+
 /** 一个人（登记人、负责人）：成员 ID 与姓名 */
 const personSchema = z.object({ id: z.uuid(), name: z.string() });
 
-/** P13 筛选行的选项：负责人（查看者店铺范围内在职的售后负责人；「待分配」随待办 23）。店铺取 channel 的店铺选项 */
+/** P13 筛选行的选项：负责人（查看者店铺范围内在职的售后负责人；「待分配」是界面固定的一项）。店铺取 channel 的店铺选项 */
 export const ledgerOptionsSchema = z.object({ owners: z.array(personSchema) });
 export type LedgerOptions = z.infer<typeof ledgerOptionsSchema>;
 
@@ -1255,6 +1275,38 @@ export const ledgerActionMessages = {
   backfillDenied: '只有售后负责人可以补登已完成的单',
   rateDenied: '只有售后负责人可以修改汇率',
 } as const;
+
+// ---------------------------------------------------------------- 改派负责人（待办 23）
+
+/** 改派负责人（S15 补充小样）：接手人与读到的版本（G7）；没选为 null */
+export const reassignInputSchema = z.object({
+  version: z.int(),
+  ownerId: z.uuid().nullable(),
+});
+export type ReassignInput = z.infer<typeof reassignInputSchema>;
+
+/** 改派负责人的报错（字段 ownerId；status 是整张单的状态不对）与不能改派的原因 */
+export const reassignMessages = {
+  ownerMissing: '请选择接手人',
+  /** 这张单的店铺没有别的售后负责人可接手（下拉置灰，「改派」置灰） */
+  noCandidate: '没有其他有该店铺范围的售后负责人可接手',
+  ownerNotEligible: registrationMessages.ownerNotEligible,
+  /** 选的就是现负责人（只有直接调接口时会出现，界面不列现负责人） */
+  sameOwner: '接手人就是现在的负责人',
+  cancelled: '这张单已取消',
+  denied: '只有客服主管或售后负责人可以改派负责人',
+} as const;
+
+/** 改派队列的站内通知（11.4，协调者 2026-10-14 决定 Q9）：按店铺各发一条，对象是停用的成员 */
+export const reassignQueueNotificationCopy = {
+  title: '售后单待改派',
+  body: (name: string, store: string, count: number) =>
+    `${name}已停用（钉钉离职），${store} 有 ${count} 张进行中的售后单待分配负责人`,
+  label: 'P13 · 待分配',
+} as const;
+
+/** 审计与负责人列里「待分配」的写法 */
+export const PENDING_OWNER_WORDS = '待分配';
 
 /** 新建登记抽屉要用的选项：可选的负责人、责任类型的默认比例（种子数据）、生产厂、配件与所属生产厂 */
 export const registrationOptionsSchema = z.object({

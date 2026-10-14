@@ -10,6 +10,7 @@ import {
   ledgerQuerySchema,
   ledgerSchema,
   rateChangeInputSchema,
+  reassignInputSchema,
   registrationInputSchema,
   registrationMessages,
   registrationOptionsSchema,
@@ -42,6 +43,7 @@ import {
 } from './ledger';
 import { exportLedger } from './export';
 import { changeFeeRates } from './rates';
+import { reassignAftersales } from './reassign';
 import { createRegistration, findSourceTicket, registrationOptions } from './registration';
 import { cancelAftersales, completeAftersales, undoComplete } from './status';
 
@@ -205,6 +207,25 @@ const cancelRoute = createRoute({
   },
 });
 
+const reassignRoute = createRoute({
+  method: 'post',
+  path: '/api/aftersales/{number}/reassign',
+  summary:
+    '改派负责人（S15 补充小样，待办 23：客服主管或售后负责人，改给有该店铺范围的在职售后负责人；进行中、已完成可改派；不改状态，清掉待分配；记审计）',
+  request: { ...numberParam, ...body(reassignInputSchema) },
+  responses: {
+    200: json(ledgerItemSchema, '已改派'),
+    400: json(
+      apiErrorSchema,
+      '已取消的单（fields.status），或接手人没选、不能接、就是现负责人、没有可接手的人（fields.ownerId）',
+    ),
+    401: unauthenticated,
+    403: forbidden,
+    404: notFound,
+    409: conflict,
+  },
+});
+
 const optionsRoute = createRoute({
   method: 'get',
   path: '/api/aftersales/registration-options',
@@ -276,18 +297,27 @@ export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv 
     routes.use(path, requireCapability('aftersales.register'));
   }
   // 抽屉的选项与即时折算：新建登记、编辑进行中的单、补登与改汇率的人都要用
-  for (const path of ['/api/aftersales/registration-options', '/api/aftersales/exchange-rates']) {
-    routes.use(
-      path,
-      requireCapability('aftersales.register', 'aftersales.edit_open', 'aftersales.backfill'),
-    );
-  }
+  // 改派负责人的弹窗也取可选负责人（10.1「改派售后单负责人」：客服主管、售后负责人）
+  routes.use(
+    '/api/aftersales/registration-options',
+    requireCapability(
+      'aftersales.register',
+      'aftersales.edit_open',
+      'aftersales.backfill',
+      'aftersales.reassign_owner',
+    ),
+  );
+  routes.use(
+    '/api/aftersales/exchange-rates',
+    requireCapability('aftersales.register', 'aftersales.edit_open', 'aftersales.backfill'),
+  );
   // 修改汇率与补登同一项能力（10.1「登记台账补登（已完成的单）、修改汇率」，只有售后负责人）
   routes.use('/api/aftersales/:number/rates', requireCapability('aftersales.backfill'));
   // 设为已完成与撤销：10.1「编辑进行中的手工登记单、设为已完成」（○ 登记人或负责人，归属由 aftersalesActions 再判断）
   routes.use('/api/aftersales/:number/complete', requireCapability('aftersales.edit_open'));
   routes.use('/api/aftersales/:number/undo-complete', requireCapability('aftersales.edit_open'));
   routes.use('/api/aftersales/:number/cancel', requireCapability('aftersales.cancel'));
+  routes.use('/api/aftersales/:number/reassign', requireCapability('aftersales.reassign_owner'));
 
   /** 一行台账（财务字段按查看者的权限过滤） */
   async function itemOf(access: Access, row: AftersalesRow) {
@@ -429,6 +459,18 @@ export function createAftersalesRoutes(deps: { runtime: Runtime; appEnv: AppEnv 
       return c.json(await itemOf(access, row), 200);
     });
   }
+
+  routes.openapi(reassignRoute, async (c) => {
+    const access = c.get('access');
+    const row = await reassignAftersales(
+      runtime,
+      access,
+      c.req.valid('param').number,
+      c.req.valid('json'),
+    );
+    if (!row) return c.json({ error: 'not_found', message: '没有这张售后单' }, 404);
+    return c.json(await itemOf(access, row), 200);
+  });
 
   routes.openapi(cancelRoute, async (c) => {
     const access = c.get('access');

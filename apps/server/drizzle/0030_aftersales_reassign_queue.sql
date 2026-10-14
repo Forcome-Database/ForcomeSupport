@@ -1,0 +1,2 @@
+ALTER TABLE "aftersales"."aftersales" ADD COLUMN "reassign_queued_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "aftersales_owner_id_idx" ON "aftersales"."aftersales" USING btree ("owner_id");

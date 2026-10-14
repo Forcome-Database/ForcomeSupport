@@ -33,6 +33,7 @@ export { orgMembersFixtureStep } from './fixtures';
 export { createMember, listAftersalesOwners, memberNamesById, type NewMember } from './members';
 export { createNotificationRoutes, notifyMembers } from './notifications';
 export { createOrgRoutes } from './routes';
-export { type TeamStoreChoices } from './team';
+export { memberDisabledJob } from './events';
+export { type MemberHandover, type TeamStoreChoices } from './team';
 export { createTeamRoutes } from './team-routes';
 export { SESSION_COOKIE, SESSION_IDLE_TIMEOUT_MS } from './session';

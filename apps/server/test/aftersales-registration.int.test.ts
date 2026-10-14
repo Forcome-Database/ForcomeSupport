@@ -192,6 +192,7 @@ describe('新建登记（待办 19）', () => {
           'origin',
           'ownerId',
           'ownerName',
+          'ownerPending',
           'part',
           'registeredById',
           'responsibility',

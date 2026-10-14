@@ -1,20 +1,25 @@
 import {
   apiErrorSchema,
   teamCandidatesSchema,
+  teamDisableSchema,
+  teamHandoverSchema,
   teamMemberAddSchema,
   teamMemberSchema,
   teamSaveSchema,
   teamSchema,
 } from '@forcome/contracts';
-import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
+import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { transaction, type AppEnv, type Runtime } from '../core';
 import { requireCapability, requireSession, type AccessVariables } from './access';
 import { forbidden, json, unauthenticated } from './openapi';
 import {
   addTeamMember,
+  disableTeamMember,
   listTeam,
   listTeamCandidates,
   saveTeam,
+  teamHandover,
+  type MemberHandover,
   type TeamStoreChoices,
 } from './team';
 
@@ -78,12 +83,52 @@ const saveRoute = createRoute({
   },
 });
 
+const memberParam = { params: z.object({ id: z.uuid() }) };
+const notFound = json(apiErrorSchema, '成员表里没有这个人');
+
+const handoverRoute = createRoute({
+  method: 'get',
+  path: '/api/org/team/members/{id}/handover',
+  summary:
+    '停用弹窗（K10 第一阶段）：他负责的进行中售后单、其他在职售后负责人与店铺范围（接手人怎么选由 contracts 的 handoverPlan 判断）',
+  request: memberParam,
+  responses: {
+    200: json(teamHandoverSchema, '停用弹窗的内容'),
+    401: unauthenticated,
+    403: forbidden,
+    404: notFound,
+  },
+});
+
+const disableRoute = createRoute({
+  method: 'post',
+  path: '/api/org/team/members/{id}/disable',
+  summary:
+    '改派并停用（AC-ST-02）：同一事务里把他负责的进行中售后单改派给选好的接手人并停用，会话立即失效；记审计「停用成员」「改派负责人」',
+  request: {
+    ...memberParam,
+    body: { content: { 'application/json': { schema: teamDisableSchema } }, required: true },
+  },
+  responses: {
+    200: json(teamSchema, '已停用，返回最新的成员表'),
+    400: json(
+      apiErrorSchema,
+      '不能停用这个人（fields.member：已停用、自己、最后一位在职管理员）或接手人不对（fields.handover：没人可接手、没选、选的人没有该店铺范围）',
+    ),
+    401: unauthenticated,
+    403: forbidden,
+    404: notFound,
+    409: json(apiErrorSchema, '这位成员或他负责的售后单刚被别人改过（G7），没有停用'),
+  },
+});
+
 export function createTeamRoutes(deps: {
   runtime: Runtime;
   appEnv: AppEnv;
   storeChoices: TeamStoreChoices;
+  handover: MemberHandover;
 }) {
-  const { runtime, appEnv, storeChoices } = deps;
+  const { runtime, appEnv, storeChoices, handover } = deps;
   const routes = new OpenAPIHono<{ Variables: AccessVariables }>();
   for (const path of ['/api/org/team', '/api/org/team/*']) {
     routes.use(path, requireSession(runtime, appEnv), requireCapability('settings.channels_team'));
@@ -108,6 +153,22 @@ export function createTeamRoutes(deps: {
     const { changes } = c.req.valid('json');
     const actor = c.get('access').actor;
     await transaction(runtime, (tx) => saveTeam(tx, actor, changes, storeChoices));
+    return c.json(await listTeam(runtime.db, storeChoices, runtime.clock.now()), 200);
+  });
+
+  routes.openapi(handoverRoute, async (c) => {
+    const found = await teamHandover(runtime.db, handover, c.req.valid('param').id);
+    if (!found) return c.json({ error: 'not_found', message: '成员表里没有这个人' }, 404);
+    return c.json(found, 200);
+  });
+
+  routes.openapi(disableRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const actor = c.get('access').actor;
+    const disabled = await transaction(runtime, (tx) =>
+      disableTeamMember(tx, actor, id, c.req.valid('json'), handover),
+    );
+    if (!disabled) return c.json({ error: 'not_found', message: '成员表里没有这个人' }, 404);
     return c.json(await listTeam(runtime.db, storeChoices, runtime.clock.now()), 200);
   });
 

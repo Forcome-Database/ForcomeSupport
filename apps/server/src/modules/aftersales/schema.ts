@@ -67,6 +67,12 @@ export const aftersales = aftersalesSchema.table(
     registeredByName: text('registered_by_name'),
     /** 负责人：有该店铺数据范围的售后负责人（D-24） */
     ownerId: uuid('owner_id'),
+    /**
+     * 待分配（改派队列，待办 23）：负责人钉钉离职自动停用后，他负责的进行中售后单在这里记进入队列的时刻（归属标记，不改业务状态；
+     * 负责人仍是原负责人，台账「负责人」列写「待分配」、悬停写原负责人）。改派、或在编辑登记里改了负责人后清空。
+     * 负责人为空的历史导入单不算待分配（这里为空）
+     */
+    reassignQueuedAt: timestamptz('reassign_queued_at'),
     /** 费用发生日（北京时间的日期）：售后成本按它归期，汇率按它取（R-AS-08） */
     feeDate: date('fee_date', { mode: 'string' }),
     /** 完成时间：设为已完成时记（待办 21；撤销时清空），完整率按它归月（北京时间） */
@@ -115,6 +121,8 @@ export const aftersales = aftersalesSchema.table(
     index('aftersales_store_fee_date_idx').on(t.storeId, t.feeDate),
     // 当月登记完整率按完成时间取已完成的单（R-AS-08）
     index('aftersales_completed_at_idx').on(t.completedAt),
+    // 负责人的进行中售后单（停用弹窗、成员已停用时进改派队列）
+    index('aftersales_owner_id_idx').on(t.ownerId),
     pctCheck('aftersales_product_factory_pct_check', t.productFactoryPct),
     pctCheck('aftersales_freight_factory_pct_check', t.freightFactoryPct),
     pctCheck('aftersales_other_factory_pct_check', t.otherFactoryPct),

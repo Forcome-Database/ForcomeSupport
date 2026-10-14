@@ -5,6 +5,7 @@
 // 常驻拉取（Gmail 推送等）加到 createFeeds：worker 为每个起一个循环，测试的「跑完任务」每轮先拉一次。
 import { getDemoFixture } from '@forcome/fixtures';
 import type { ServerDeps } from './deps';
+import { createAftersalesJobHandlers } from './modules/aftersales';
 import {
   createChannelFeeds,
   createChannelJobHandlers,
@@ -31,6 +32,7 @@ import {
   createOrgJobHandlers,
   dingtalkEventJob,
   dingtalkReconcileJob,
+  memberDisabledJob,
 } from './modules/org';
 import {
   amazonOrderChangedJob,
@@ -51,6 +53,7 @@ export const jobDefinitions: readonly AnyJobDefinition[] = [
   sendWorkNotificationsJob,
   dingtalkReconcileJob,
   dingtalkEventJob,
+  memberDisabledJob,
   storeChangedJob,
   placeUnassignedJob,
   gmailSyncJob,
@@ -79,6 +82,8 @@ export function createJobHandlers(deps: ServerDeps): readonly AnyJobHandler[] {
     }),
     ...createOrgJobHandlers({ dingtalk: () => deps.clients.global(dingtalkClient) }),
     ...createChannelJobHandlers(deps),
+    // 「成员已停用」→ 售后单进入改派队列（待办 23）
+    ...createAftersalesJobHandlers(),
     // 订单同步要的店铺来自 channel 的店铺配置（order 不依赖 channel）
     ...createOrderJobHandlers({ clients: deps.clients, stores: listOrderStores }),
     // 按订单归并：镜像没有时经 order 去平台补拉，用同一组外部客户端；非生产环境的示例回放另按示例数据标记无需回复（待办 17）
