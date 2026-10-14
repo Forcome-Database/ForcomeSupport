@@ -1,5 +1,4 @@
 import {
-  slaDueAt,
   ticketDetailSchema,
   ticketListSchema,
   type TicketDetail,
@@ -307,7 +306,7 @@ describe('来源识别与亚马逊站点', () => {
     const [letter] = (await ticketDetail(agent, tickets[0]!.number)).messages;
     expect(letter!.sla).toEqual({
       target: 'platform',
-      dueAt: slaDueAt(new Date('2026-09-10T11:15:00+08:00')).toISOString(),
+      dueAt: '2026-09-11T03:15:00.000Z',
       result: 'pending',
     });
   });
