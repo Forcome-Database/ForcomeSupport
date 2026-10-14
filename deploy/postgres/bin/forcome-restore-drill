@@ -30,9 +30,24 @@ forcome-restore prepare --data "$DATA" ${target:+--target-time "$target"}
 fetched=$(date +%s)
 
 log "起临时库（不归档、只听本地套接字），重放 WAL 到 ${target:-最新}"
-pg_ctl -D "$DATA" -l "$LOGFILE" -w -t 14400 \
-  -o "-c archive_mode=off -c listen_addresses='' -c unix_socket_directories=/var/run/postgresql" start
-until [ "$(psql -X -At -h /var/run/postgresql -U "$POSTGRES_USER" -d postgres -c 'SELECT pg_is_in_recovery()')" = f ]; do
+if ! pg_ctl -D "$DATA" -l "$LOGFILE" -w -t 14400 \
+  -o "-c archive_mode=off -c listen_addresses='' -c unix_socket_directories=/var/run/postgresql" start; then
+  tail -n 20 "$LOGFILE" >&2
+  echo "RESTORE_RESULT=postgres_failed_to_start"
+  exit 1
+fi
+# 等 promote：临时库中途退出（重放失败）时立即结束，最多等 4 小时（RTO）
+deadline=$(($(date +%s) + 14400))
+until [ "$(psql -X -At -h /var/run/postgresql -U "$POSTGRES_USER" -d postgres -c 'SELECT pg_is_in_recovery()' 2>/dev/null)" = f ]; do
+  if ! pg_ctl -D "$DATA" status >/dev/null; then
+    tail -n 20 "$LOGFILE" >&2
+    echo "RESTORE_RESULT=postgres_exited"
+    exit 1
+  fi
+  if [ "$(date +%s)" -gt "$deadline" ]; then
+    echo "RESTORE_RESULT=timeout"
+    exit 1
+  fi
   sleep 1
 done
 promoted=$(date +%s)

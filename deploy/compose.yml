@@ -161,7 +161,7 @@ services:
     image: forcome-postgres:18
     pull_policy: never
     profiles: [restore]
-    user: postgres
+    # root：数据目录的上一级是数据库镜像的入口以 root 建的，把原数据目录改名留着要 root；WAL-G 与写数据目录以 postgres 身份
     environment:
       <<: *backup-env
     volumes:

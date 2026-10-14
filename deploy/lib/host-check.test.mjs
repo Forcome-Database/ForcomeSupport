@@ -3,7 +3,7 @@ import { formatHostAlert, hostFindings, parseHeartbeatRow, planHostAlerts } from
 
 /*
  * 宿主机检查（待办 28；ADR 0013 修订「worker 存活检查」，协调者 2026-10-14 决定 Q1–Q4）：「进程退出」与「进程在但心跳停」
- * 两种都告警，上线切换回放中不判断 worker；去重、再提醒与恢复同 worker 自检。
+ * 两种都告警；上线切换回放中靠维护标记暂停（标记过期后照常告警并注明还在回放）；去重、再提醒与恢复同 worker 自检。
  */
 
 const at = (time) => new Date(`2026-10-14T${time}:00+08:00`);
@@ -55,10 +55,16 @@ describe('hostFindings', () => {
     );
   });
 
-  it('上线切换回放中：worker 是有意停掉的，不判断（待办 26）', () => {
+  it('上线切换回放中 worker 停着：回放命令的维护标记有效时整次不告警；标记过期仍停着照常告警并注明（待办 26）', () => {
     expect(
       hostFindings({ ...healthy, workerState: 'exited', cutover: 'replaying' }, SETTINGS),
-    ).toEqual([]);
+    ).toEqual([
+      {
+        key: 'worker:down',
+        subject: 'worker',
+        problem: '容器不在运行（状态 exited；上线切换的回放还没完成）',
+      },
+    ]);
   });
 
   it('数据库连不上：告警，不再据心跳判断', () => {

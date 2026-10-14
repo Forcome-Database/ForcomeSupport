@@ -41,6 +41,7 @@
 //
 // 只依赖 Node（≥ 22）、git 与 Docker（含 compose），不需要 pnpm install；Linux 服务器与 Windows 本机通用。
 // 环境文件默认 deploy/.env.<环境>，可用 FORCOME_ENV_FILE 指到别处；部署产物（根证书、报告）在 deploy/.state/<环境>/。
+import { spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID, X509Certificate } from 'node:crypto';
 import {
   appendFileSync,
@@ -131,7 +132,11 @@ const hostCheckStateFile = process.env.FORCOME_HOST_CHECK_STATE ?? `${stateDir}/
 function ensureEnvFile() {
   if (existsSync(envFile)) return;
   if (process.env.FORCOME_ENV_FILE || environment.appEnv === 'production') {
-    throw new Error(`找不到环境文件 ${envFile}：按 deploy/.env.example 填写（权限 600）`);
+    const example =
+      environment.appEnv === 'production'
+        ? 'deploy/.env.production.example'
+        : 'deploy/.env.example';
+    throw new Error(`找不到环境文件 ${envFile}：按 ${example} 填写（权限 600）`);
   }
   const secrets = Object.fromEntries(
     GENERATED_SECRETS.map((name) => [
@@ -189,6 +194,12 @@ function composeFor(deployEnv, release) {
     /** 执行，返回退出码 */
     status: (...rest) => run('docker', args(rest), { env }),
     capture: (...rest) => capture('docker', args(rest), { env }),
+    /** 执行并取回全部输出与退出码（失败时也要输出里的内容，如恢复脚本的 RESTORE_* 行） */
+    output: (...rest) => {
+      const result = spawnSync('docker', args(rest), { env, encoding: 'utf8' });
+      if (result.error) throw result.error;
+      return { status: result.status, text: `${result.stdout}${result.stderr}` };
+    },
   };
 }
 
@@ -578,9 +589,17 @@ async function hostCheck(args) {
     );
     return true;
   }
-  const state = existsSync(hostCheckStateFile)
-    ? JSON.parse(readFileSync(hostCheckStateFile, 'utf8'))
-    : {};
+  let state = {};
+  try {
+    if (existsSync(hostCheckStateFile))
+      state = JSON.parse(readFileSync(hostCheckStateFile, 'utf8'));
+  } catch {
+    console.warn(`状态文件 ${hostCheckStateFile} 读不懂，当作没有正在告警的项`);
+  }
+  // 连不上数据库时看不到心跳：原来在告警的「心跳停止」照旧算在告警，不误报「已恢复」
+  if (!observed.databaseReachable && state['worker:heartbeat']) {
+    findings.push({ key: 'worker:heartbeat', ...state['worker:heartbeat'] });
+  }
   const repeatMs = Number(vars.ALERT_REPEAT_HOURS || 2) * 3_600_000;
   const plan = planHostAlerts(findings, state, now, repeatMs);
   if (!plan.send) return true;
@@ -691,9 +710,16 @@ async function restore(planned) {
     compose.run('stop', 'postgres');
   });
   await step('取回基础备份（forcome-restore prepare）', () => {
-    const output = compose.capture('run', '--rm', '--no-deps', 'restore', ...planned.prepare);
-    console.log(output);
-    base = restoreResults(output);
+    const { status, text } = compose.output(
+      'run',
+      '--rm',
+      '--no-deps',
+      'restore',
+      ...planned.prepare,
+    );
+    console.log(text);
+    base = restoreResults(text);
+    if (status !== 0) throw new Error(`forcome-restore prepare 退出码 ${status}`);
   });
   await step(`起数据库，重放 WAL 到 ${planned.targetTime ?? '最新'}（promote）`, async () => {
     compose.run('up', '-d', '--wait', '--no-deps', 'postgres');
@@ -789,7 +815,7 @@ async function restoreDrill(planned) {
       );
     }
     console.log(`WAL 切段并等它归档：${await switchAndWaitArchived(compose, deployEnv)}`);
-    output = compose.capture(
+    const drill = compose.output(
       'run',
       '--rm',
       '--no-deps',
@@ -799,7 +825,9 @@ async function restoreDrill(planned) {
       target,
       ...(marker ? ['--expect-marker', 'before'] : []),
     );
+    output = drill.text;
     console.log(output);
+    if (drill.status !== 0) throw new Error(`forcome-restore-drill 退出码 ${drill.status}`);
     ok = true;
   } catch (error) {
     console.error(`恢复演练失败：${error.message}`);

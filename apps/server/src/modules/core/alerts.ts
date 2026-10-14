@@ -1,4 +1,5 @@
 import { businessDateTime } from '@forcome/calendar';
+import type { ConnectionStatus } from '@forcome/contracts';
 import type { AppEnv } from './config';
 
 /*
@@ -148,7 +149,7 @@ export function alertTestMessage(
  * 「超过 10 分钟没有同步成功（最近成功 10-14 10:02）」「连续 3 次同步失败（自 10-14 10:05 起，最近成功 10-14 10:02）」
  */
 export function syncAlertProblem(
-  status: 'connected' | 'delayed' | 'error' | 'not_connected',
+  status: ConnectionStatus,
   health: {
     readonly lastSuccessAt: Date | null;
     readonly consecutiveFailures: number;
@@ -173,6 +174,12 @@ function durationWords(ms: number): string {
   if (minutes % (24 * 60) === 0) return `${minutes / (24 * 60)} 天`;
   if (minutes % 60 === 0) return `${minutes / 60} 小时`;
   return `${minutes} 分钟`;
+}
+
+/** 错误说明等只留一段写进告警（一条钉钉消息最多 20,000 字节） */
+export function alertClip(text: string): string {
+  const line = text.replace(/\s+/g, ' ').trim();
+  return line.length > 200 ? `${line.slice(0, 200)}…` : line;
 }
 
 /** 告警的发送方（integration 的钉钉群机器人；core 不依赖 integration，由入口注入，同工作通知） */

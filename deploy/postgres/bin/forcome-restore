@@ -9,7 +9,8 @@
 #       随后起数据库即开始恢复，到点后自动 promote 成新的时间线。
 #   forcome-restore finish
 #       在恢复好（已 promote）的数据库容器里执行：清掉恢复参数（ALTER SYSTEM RESET），之后照常运行。
-# 以 postgres 身份运行（compose 的 restore、restore-drill 服务；finish 在 postgres 服务里）。
+# compose 的 restore 服务以 root 运行（数据目录的上一级 18/ 是镜像的入口以 root 建的，改名要 root），WAL-G 与写数据目录以
+# postgres 身份；restore-drill 服务直接以 postgres 运行（临时卷里的目录都是自己建的）；finish 在 postgres 服务里执行。
 set -Eeuo pipefail
 
 PGDATA="${PGDATA:-/var/lib/postgresql/18/docker}"
@@ -18,6 +19,10 @@ log() { printf '%s %s\n' "$(date '+%F %T %Z')" "$*"; }
 die() {
   log "错误：$*" >&2
   exit 1
+}
+# 以 postgres 身份执行（本身就是 postgres 时直接执行）
+as_postgres() {
+  if [ "$(id -u)" = 0 ]; then gosu postgres "$@"; else "$@"; fi
 }
 
 # 基础备份：每行「名字 结束时刻（秒） 结束时刻（原文）」，按结束时刻升序
@@ -81,16 +86,18 @@ prepare() {
   rm -rf "$PGDATA"
   mkdir -p "$PGDATA"
   chmod 700 "$PGDATA"
+  if [ "$(id -u)" = 0 ]; then chown postgres:postgres "$PGDATA"; fi
 
   log "取回基础备份 $name（结束于 $(date -d "@$finish_epoch" '+%F %T %Z')）"
-  wal-g backup-fetch "$PGDATA" "$name"
-  touch "$PGDATA/recovery.signal"
+  as_postgres wal-g backup-fetch "$PGDATA" "$name"
+  as_postgres touch "$PGDATA/recovery.signal"
   {
     echo "# forcome-restore $(date '+%F %T %Z')：从基础备份 $name 恢复到 ${target:-最新}；恢复完成后由 forcome-restore finish 清掉"
     echo "restore_command = '/usr/local/bin/wal-g wal-fetch \"%f\" \"%p\"'"
     echo "recovery_target_action = 'promote'"
-    if [ -n "$target" ]; then echo "recovery_target_time = '$target'"; fi
-  } >>"$PGDATA/postgresql.auto.conf"
+    # recovery_target_time 不认时区缩写（2026-10-14T02:20:00Z 的 Z 也算）：换成 UTC 与数字时区，保留微秒
+    if [ -n "$target" ]; then echo "recovery_target_time = '$(date -u -d "$target" '+%Y-%m-%d %H:%M:%S.%6N+00')'"; fi
+  } | as_postgres tee -a "$PGDATA/postgresql.auto.conf" >/dev/null
   log "已准备好：起数据库后重放 WAL 到 ${target:-最新}，到点自动 promote"
   echo "RESTORE_BASE_BACKUP=$name"
   echo "RESTORE_BASE_FINISHED=$(date -u -d "@$finish_epoch" +%Y-%m-%dT%H:%M:%SZ)"

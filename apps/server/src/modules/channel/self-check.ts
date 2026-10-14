@@ -13,6 +13,9 @@ import { listAllStores } from './stores';
  * 订单通知队列（SQS）与回补、对账在 order 的自检项里。
  */
 
+/** 还没同步过的邮箱或店铺：空记录（状态为未连接，不告警） */
+const NO_HEALTH = { lastSuccessAt: null, consecutiveFailures: 0, failingSince: null };
+
 const PLATFORM_LABELS: Record<Platform, string> = { amazon: '亚马逊订单', shopify: 'Shopify 订单' };
 
 export const channelSelfCheckProbe: SelfCheckProbe = {
@@ -25,11 +28,7 @@ export const channelSelfCheckProbe: SelfCheckProbe = {
     if ((await mailCutoverStatus(db, appEnv)) === 'live') {
       const addresses = [...new Set(stores.flatMap((store) => store.mailboxes))].sort();
       for (const address of addresses) {
-        const health = snapshot.mailboxes.get(address) ?? {
-          lastSuccessAt: null,
-          consecutiveFailures: 0,
-          failingSince: null,
-        };
+        const health = snapshot.mailboxes.get(address) ?? NO_HEALTH;
         const problem = syncAlertProblem(mailboxStatus(health, now), health, SYNC_DELAY_MS.gmail);
         if (problem) {
           findings.push({ key: `gmail:${address}`, subject: `Gmail ${address}`, problem });
@@ -38,11 +37,7 @@ export const channelSelfCheckProbe: SelfCheckProbe = {
     }
 
     for (const store of stores) {
-      const health = snapshot.orders[store.platform].get(store.id) ?? {
-        lastSuccessAt: null,
-        consecutiveFailures: 0,
-        failingSince: null,
-      };
+      const health = snapshot.orders[store.platform].get(store.id) ?? NO_HEALTH;
       const problem = syncAlertProblem(orderSyncStatus(health, now), health, SYNC_DELAY_MS.orders);
       if (problem) {
         findings.push({

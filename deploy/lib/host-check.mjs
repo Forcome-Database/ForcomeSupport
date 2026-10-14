@@ -1,6 +1,7 @@
 // 宿主机检查（待办 28；ADR 0013 修订「worker 存活检查」，协调者 2026-10-14 决定 Q1–Q4；docs/运维手册.md 第 6 节）：
 // 不经 worker、由宿主机每分钟执行一次（systemd 定时器模板 deploy/host/，或 node deploy/deploy.mjs <环境> host-check），
 // 看 worker 容器在不在运行、worker 写的心跳（core.worker_heartbeat，每分钟的自检任务写）有没有停，异常发钉钉群机器人。
+// 计划内维护（部署、上线切换回放、恢复）期间靠维护标记暂停告警（maintenance.mjs）。
 // 这里只放判断与写法（纯函数，有单测）；取 Docker 与数据库状态、读写状态文件、发消息在 deploy.mjs。
 // 去重与再提醒同 worker 自检（apps/server/src/modules/core/alerts.ts）：按键、持续每 ALERT_REPEAT_HOURS 再提醒、恢复发「已恢复」。
 
@@ -50,7 +51,8 @@ const TITLES = {
  */
 
 /**
- * 这次检查发现的异常。回放中（上线切换，worker 被有意停掉）不判断 worker（待办 26 的衔接）
+ * 这次检查发现的异常。上线切换回放中 worker 被有意停掉（待办 26 的衔接）：回放命令写的维护标记有效时整次检查不告警，
+ * 过期后仍在回放中照常告警并注明
  * @param {HostObservation} observed
  * @param {{ heartbeatMinutes: number }} settings
  * @returns {{ key: string, subject: string, problem: string }[]}
@@ -64,15 +66,15 @@ export function hostFindings(observed, settings) {
       problem: `连不上，读不到 worker 心跳（${observed.databaseError ?? '原因不明'}）`,
     });
   }
-  if (observed.cutover === 'replaying') return findings;
-
   if (observed.workerState !== 'running' && observed.workerState !== 'paused') {
+    // 上线切换回放中 worker 是有意停掉的：回放命令写着维护标记，标记有效时不告警；标记过期了还在回放中，说明回放卡住或失败了
+    const replaying = observed.cutover === 'replaying' ? '；上线切换的回放还没完成' : '';
     findings.push({
       key: 'worker:down',
       subject: 'worker',
       problem: observed.workerState
-        ? `容器不在运行（状态 ${observed.workerState}）`
-        : '没有 worker 容器（没部署或被删掉了）',
+        ? `容器不在运行（状态 ${observed.workerState}${replaying}）`
+        : `没有 worker 容器（没部署或被删掉了${replaying}）`,
     });
     return findings;
   }

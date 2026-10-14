@@ -269,4 +269,32 @@ describe('worker 每分钟自检', () => {
     expect(message?.markdown).toContain('- **新** ');
     expect((await rows(sql`SELECT key FROM core.alert`)).length).toBeGreaterThan(0);
   });
+
+  it('某个自检项出错：告警「自检项出错」，它原来在告警的项照旧算在告警，不误报「已恢复」', async () => {
+    const before = await rows<{ key: string }>(
+      sql`SELECT key FROM core.alert WHERE key LIKE 'sqs:%'`,
+    );
+    expect(before.length).toBeGreaterThan(0);
+    await t.runtime.db.execute(sql`ALTER TABLE "order".order_queue RENAME TO order_queue_hidden`);
+    try {
+      const message = await selfCheck();
+      expect(message?.markdown).toContain('- **新** 自检项「订单通知队列（SQS）」：执行出错：');
+      expect(message?.markdown).not.toContain('**已恢复**');
+      expect(await rows(sql`SELECT key FROM core.alert WHERE key LIKE 'sqs:%'`)).toEqual(
+        expect.arrayContaining(before),
+      );
+    } finally {
+      await t.runtime.db.execute(sql`ALTER TABLE "order".order_queue_hidden RENAME TO order_queue`);
+    }
+  });
+
+  it('汇率从没同步成功过（第一次部署时来源就不通）：有失败就告警，不等 1 天', async () => {
+    await t.runtime.db.execute(sql`
+      UPDATE core.exchange_rate_sync SET last_success_at = NULL, consecutive_failures = 2,
+        last_error = '汇率主源（欧洲央行）与备用源（Frankfurter）都取不到'`);
+    const message = await selfCheck();
+    expect(message?.markdown).toContain(
+      '- **新** 汇率：还没有同步成功过（连续 2 次失败；最近的错误：汇率主源（欧洲央行）与备用源（Frankfurter）都取不到）',
+    );
+  });
 });

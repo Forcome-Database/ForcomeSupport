@@ -3,7 +3,7 @@
 // 其他模块只能经本文件使用 core；core 不依赖任何业务模块。
 export { AccessDeniedError } from './access-denied';
 export {
-  alertBrand,
+  alertClip,
   alertTestMessage,
   alertTime,
   formatAlertMessage,
@@ -135,13 +135,7 @@ export {
   type WorkerOptions,
 } from './jobs';
 export { createLogger, silentLogger, type Logger } from './logger';
-export {
-  DINGTALK_MONTHLY_QUOTA,
-  selfCheckJob,
-  type SelfCheckContext,
-  type SelfCheckProbe,
-  type SelfCheckReport,
-} from './self-check';
+export { selfCheckJob, type SelfCheckContext, type SelfCheckProbe } from './self-check';
 export {
   queueWorkNotifications,
   sendWorkNotificationsJob,

@@ -1,6 +1,12 @@
 import { CONNECTION_FAILURE_LIMIT, ORDER_QUEUE_BACKLOG_LIMIT } from '@forcome/contracts';
 import { and, isNotNull, isNull, lte } from 'drizzle-orm';
-import { alertTime, type AlertFinding, type DbExecutor, type SelfCheckProbe } from '../core';
+import {
+  alertClip as clip,
+  alertTime,
+  type AlertFinding,
+  type DbExecutor,
+  type SelfCheckProbe,
+} from '../core';
 import { orderQueue, orderSweep } from './schema';
 
 /*
@@ -103,9 +109,4 @@ export function createOrderSelfCheckProbes(deps: {
   };
 
   return [queueProbe, sweepProbe];
-}
-
-function clip(text: string): string {
-  const line = text.replace(/\s+/g, ' ').trim();
-  return line.length > 200 ? `${line.slice(0, 200)}…` : line;
 }

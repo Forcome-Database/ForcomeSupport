@@ -4,6 +4,7 @@ import { SYNC_DELAY_MS } from '@forcome/contracts';
 import { and, countDistinct, desc, eq, gte, isNotNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
+  alertClip as clip,
   alertTime,
   formatAlertMessage,
   planAlerts,
@@ -95,20 +96,27 @@ export async function runSelfCheck(
     settings: deps.settings,
   };
   const findings: AlertFinding[] = [];
+  let probeFailed = false;
   for (const probe of deps.probes) {
     try {
       findings.push(...(await probe.check(probeContext)));
     } catch (error) {
+      probeFailed = true;
       context.logger.error({ err: error, probe: probe.name }, '自检项出错');
       findings.push({
         key: `self_check:${probe.name}`,
         subject: `自检项「${probe.name}」`,
-        problem: `执行出错：${shortError(error)}`,
+        problem: `执行出错：${clip(error instanceof Error ? error.message : String(error))}`,
       });
     }
   }
 
   const current: FiringAlert[] = await runtime.db.select().from(alertState);
+  // 有自检项出错时，这一项原来在告警的异常这次看不到：照旧算在告警，不误报「已恢复」
+  if (probeFailed) {
+    const seen = new Set(findings.map((f) => f.key));
+    findings.push(...current.filter((alert) => !seen.has(alert.key)));
+  }
   const plan = planAlerts(findings, current, now, deps.settings.repeatMs);
   if (!plan.send) return { findings, notified: false, sendFailed: false };
 
@@ -143,11 +151,6 @@ export async function runSelfCheck(
     }
   });
   return { findings, notified: true, sendFailed: false };
-}
-
-function shortError(error: unknown): string {
-  const text = error instanceof Error ? error.message : String(error);
-  return text.length > 200 ? `${text.slice(0, 200)}…` : text;
 }
 
 // ---------------------------------------------------------------- core 自己的自检项
@@ -243,7 +246,20 @@ const exchangeRateProbe: SelfCheckProbe = {
   name: '汇率同步',
   async check({ db, now }) {
     const [row] = await db.select().from(exchangeRateSync).limit(1);
-    if (!row?.lastSuccessAt) return [];
+    if (!row) return [];
+    const lastError = row.lastError ? `；最近的错误：${clip(row.lastError)}` : '';
+    // 从没同步成功过（例如第一次部署时代理没放行欧洲央行）：有失败就告警，不等 1 天
+    if (!row.lastSuccessAt) {
+      return row.consecutiveFailures > 0
+        ? [
+            {
+              key: 'sync:exchange_rate',
+              subject: '汇率',
+              problem: `还没有同步成功过（连续 ${row.consecutiveFailures} 次失败${lastError}）`,
+            },
+          ]
+        : [];
+    }
     if (
       now.getTime() - row.lastSuccessAt.getTime() <=
       SYNC_DELAY_MS.exchangeRate + EXCHANGE_RATE_GRACE_MS
@@ -254,7 +270,7 @@ const exchangeRateProbe: SelfCheckProbe = {
       {
         key: 'sync:exchange_rate',
         subject: '汇率',
-        problem: `超过 1 天没有同步成功（最近成功 ${alertTime(row.lastSuccessAt)}${row.lastError ? `；最近的错误：${clip(row.lastError)}` : ''}）`,
+        problem: `超过 1 天没有同步成功（最近成功 ${alertTime(row.lastSuccessAt)}${lastError}）`,
       },
     ];
   },
@@ -397,10 +413,4 @@ function minutes(seconds: number): number {
 
 function hours(ms: number): number {
   return Math.round((ms / 3_600_000) * 10) / 10;
-}
-
-/** 错误说明只留一段（一条钉钉消息最多 20,000 字节） */
-function clip(text: string): string {
-  const line = text.replace(/\s+/g, ' ').trim();
-  return line.length > 200 ? `${line.slice(0, 200)}…` : line;
 }
