@@ -628,14 +628,30 @@ def p17_p1_daily(P, drill=True, h=220):
     return P.chart_card('每日工单量', '按渠道堆叠 · 近 7 天' + (' · 点柱下钻' if drill else ''), body, extra=extra)
 
 
-def p17_p1_cost(P):
+def p17_p1_cost(P, extra=(), hover=None, tip=''):
+    """售后成本按责任类型（本月，不随时间筛选；随店铺筛选、不随站点）。extra：排在最后的「未登记责任」（名称, 金额, 单数）；hover / tip 同 hbars"""
     cbr = cost_by_resp()
-    order = sorted(cbr.items(), key=lambda x: -x[1])
+    order = sorted(cbr.items(), key=lambda x: -x[1]) + [(n, v) for n, v, _ in extra]
     lt = ledger_totals()
-    tot = round(sum(cbr.values()), 2)
+    tot = round(sum(v for _, v in order), 2)
+    count = lt['count'] + sum(c for _, _, c in extra)
     return P.chart_card('售后成本按责任类型', '产品成本 + 运费 + 额外赔偿 + 其他',
-                        between(row(text(money(tot), 20, T['ink'], 700) + muted('售后成本 · %d 单 · 来自登记台账，不含待确认 · 点条下钻' % lt['count'], 12), 8, 'baseline'), '') +
-                        P.hbars(order, money, 130, T['accent'], 96, 12, 14), tag=P.lock_tag())
+                        between(row(text(money(tot), 20, T['ink'], 700) + muted('售后成本 · %d 单 · 来自登记台账，不含待确认 · 点条下钻' % count, 12), 8, 'baseline'), '') +
+                        P.hbars(order, money, 130, T['accent'], 96, 12, 14, hover=hover, tip=tip), tag=P.lock_tag())
+
+
+def p17_p1_cost_empty(P):
+    """本月还没有登记的售后成本（不含待确认）：卡头 $0.00 · 0 单，没有条，「查看明细」照常进 P13 本月"""
+    return P.chart_card('售后成本按责任类型', '产品成本 + 运费 + 额外赔偿 + 其他',
+                        row(text(money(0), 20, T['ink'], 700) + muted('售后成本 · 0 单 · 来自登记台账，不含待确认', 12), 8, 'baseline') +
+                        muted(COST_EMPTY_NOTE, 12), tag=P.lock_tag())
+
+
+def plain_tip(title, lines):
+    """悬停提示（不可下钻的条）：同 drill_tip，没有「点击查看明细」一行"""
+    body = ''.join('<div style="color: rgba(255,255,255,0.82);">%s</div>' % l for l in lines)
+    return '<div style="background: %s; color: #ffffff; font-size: 12px; line-height: 1.5; border-radius: 8px; padding: 7px 10px; box-shadow: %s; white-space: nowrap; display: flex; flex-direction: column; gap: 1px;"><div style="font-weight: 600;">%s</div>%s</div>' % (
+        T['ink'], SHADOW_MD, title, body)
 
 
 def p17_p1_notes():
@@ -694,8 +710,26 @@ def k19_more(P):
                   filter_chip('店铺', '全部') + filter_chip('站点', '全部') + row(spinner(14) + nowrap('正在加载 · 更新于 %s' % report_updated(), 12, T['ink3']), 6), 8)
     k3p1 = frame(cap('⑤ 加载中（K3 第一阶段）：超过 300ms 未返回显示骨架，超过 10 秒转加载失败') + loading + ks +
                  grid(ch_() + ch_(), template='minmax(0, 1.25fr) minmax(0, 1fr)', gap=14), w=WW)
-    return col(cmp_ + none_ + unassigned + k4p1 + k3p1, 16)
+    # 待办 25 · 协调者 10-14 决定 Q1–Q5：责任类型为空的金额单列「未登记责任」（不可点）、本月没有售后成本、导出（K5）
+    un, uv, uc = R_COST_UNREGISTERED
+    half = (WW - 16) // 2
+    cost_un = frame(cap('⑥ 售后成本：责任类型为空的单（历史导入缺责任、进行中的手工登记还没填）单列「未登记责任」排在最后，金额照常计入卡头（与 P13 合计同一视图）；'
+                        'P13 没有「未登记」的责任筛选，这一条不可点，悬停不写下钻。成本卡随店铺筛选（下钻带店铺），不随时间与站点') +
+                    p17_p1_cost(P, extra=[R_COST_UNREGISTERED], hover=4, tip=plain_tip('%s · %s' % (un, money(uv)), ['%d 单 · 责任类型未登记' % uc])), w=half)
+    cost_none = frame(cap('⑦ 本月还没有登记的售后成本（不含待确认）：卡头 $0.00 · 0 单，没有条；「查看明细」照常进 P13 本月') + p17_p1_cost_empty(P), w=half)
+    busy = page_head('报表', nowrap('数据来源：工单（Gmail）、平台订单、登记台账 · 更新于 %s' % report_updated(), 13, T['ink3']),
+                     btn('正在生成，约 3 秒', 'secondary', 'md', loading=True))
+    done = '<div style="display: flex; justify-content: flex-end;">%s</div>' % toast('success', '已导出 ' + EXPORT_FILE, '已记入审计日志')
+    export = frame(cap('⑧ 导出（K5）：按当前筛选（期间、店铺、站点）与字段权限同步生成一个 xlsx——「指标」（条件与三个指标的本期、上一周期、对比）、「每日工单量」、'
+                       '「售后成本按责任类型」（只在有财务权限时有，没有时文件里没有任何成本字段）；文件名 近 7 天「报表_近7天_0905-0911」、本月「报表_本月_0901-0911」、'
+                       '自定义「报表_0901-0903」；生成中与完成，失败按 G5「导出失败：原因」+「立即重试」') + busy + done, w=WW)
+    pair = '<div style="display: flex; gap: 16px; align-items: stretch;">%s%s</div>' % (cost_un, cost_none)
+    return col(cmp_ + none_ + unassigned + k4p1 + k3p1 + pair + export, 16)
 
+
+# 补充小样⑥ 的数字：未登记责任的金额与单数（示例；示例数据里没有历史导入的单）
+R_COST_UNREGISTERED = ('未登记责任', 36.50, 3)
+COST_EMPTY_NOTE = '本月还没有登记的售后成本'
 
 # 补充小样③ 的数字：达标率与未达标封数、其中未归属店铺的封数
 R_SLA_UNASSIGNED = ('96.4%', 11, 2)
@@ -854,7 +888,10 @@ SPEC = {
            '对比：近 7 天「较前 7 天」、本月「较上月同期」、自定义「较前 N 天」；工单量写相对变化取整（持平写「持平」）、一律中性色，首响写差值（缩短绿色、变长红色），'
            'SLA 写差值「个百分点」保留一位（升高绿色、降低红色）；上一周期没有可比的值或本期为「—」时不写。随期间变化的副标题写「近 7 天」「本月」或起止。'
            '首响不足 1 小时写「35m」，其余写「2h 14m」（超过 24 小时照写小时）。自定义不能选今天之后，不设最长，柱多时横轴日期抽稀、超过 14 根柱不标合计。'
-           '下钻链接另带报表当前的店铺与站点筛选。界面不显示「指标为示例数据」（原型数字为示例）。下方补充小样见待办 24 协调者 10-14 决定 Q1–Q7。' % report_updated(),
+           '下钻链接另带报表当前的店铺与站点筛选。界面不显示「指标为示例数据」（原型数字为示例）。下方补充小样①–⑤见待办 24 协调者 10-14 决定 Q1–Q7。'
+           '售后成本卡（待办 25 协调者 10-14 决定 Q1–Q5，补充小样⑥–⑧）：本月（费用发生日本月 1 日至今天）、随店铺筛选（下钻带店铺），不随时间与站点；条按金额从大到小，金额为 0 的不出条，'
+           '责任类型为空的单列「未登记责任」排在最后、不可点；单数与 P13 合计行「合计 · N 单」同口径；点条进 P13（本月 + 该责任 + 店铺），「查看明细」不带责任；本月没有时卡头 $0.00 · 0 单。'
+           '导出一个 xlsx：「指标」「每日工单量」与（有财务权限时）「售后成本按责任类型」三张表，没有财务权限时文件里没有任何成本字段。' % report_updated(),
     'K20': '刘洋视角，第一阶段外壳：亚马逊 SP-API（订单同步与 SQS 状态、订单回补 %d 天已完成）、Shopify Admin API（回补 %d 天 · 未开通 read_all_orders）、Gmail（4 个邮箱，收件与「已发送」）、钉钉（同步延迟 · 最近同步 %s，超过 2 小时，只提醒管理员、不出全站横幅；通讯录每个整点全量对账一次、失败不重试，每次失败算一次：上次成功超过 2 小时为同步延迟，连续 3 次失败为连接异常，待办 05 · 10-06）；积加、易仓为灰色虚线卡「第二阶段接入」，没有同步时间与测试连接；不显示 17TRACK。店铺表没有覆盖项列，没有吸底保存栏。下方为卡头小样（已连接 · 同步延迟 · 连接异常 · 未连接 · 模拟数据）、店铺表状态列写法与钉钉卡第一阶段已连接时的说明行（没有钉钉内免登）；补充小样（待办 09，10-06 用户确认）：Gmail 卡同步延迟（每个延迟的邮箱一行，其余说明行照常）与连接异常（每个异常的邮箱一行原因与恢复指引、来信暂存、「重新检测」；第一阶段不发信、没有错误日志页）、钉钉卡连接异常（从没同步成功过写「通讯录尚未同步成功」）、几个邮箱同时异常（每个一行、次数为实际的连续失败次数，暂存说明只写一次，延迟行在后；协调者 10-06 决定），以及 Gmail、钉钉两张卡「测试连接」的结果浮层（测试连接不改状态，Gmail 测完立即同步一次）。卡片状态按各邮箱的同步记录：Gmail 卡取各邮箱中最差的状态、最近同步取各邮箱中最旧的一次。补充小样（待办 11、12，协调者 10-06 决定，套用 Gmail 已确认的写法、按店铺）：Shopify 与亚马逊卡同步延迟与连接异常、「测试连接」浮层、几个渠道同时异常时的横幅叠放（Gmail、亚马逊、Shopify）、连接异常与恢复的站内通知与 P27 写法；亚马逊卡另有「订单通知队列（SQS）」一行的四种写法（正常 · 积压 N / 积压 N 条 / 拉取失败 / 未连接），只影响这一行。补充小样（待办 13，协调者 10-06 决定）：订单回补行的四种写法（未开始 / 进行中 · 已回补 N 笔 / 已完成 / 未开通 read_all_orders），只汇总连接上的店铺、天数取最短的；该平台没有连接上的店铺、卡片连接异常时不显示，部分店铺未连接时照写；新加的店铺、改了平台、平台标识或数据来源的店铺回到未开始。' % (BS.AMZ_BACKFILL_DAYS, SHOPIFY_BACKFILL_DAYS, BS.DINGTALK_LATE_SYNC),
     'K21': '左侧 12 个意图（每项写发布版本，「未收到与异常」选中并标「草稿 v5 未发布」）；上方「发布版本 v4 · 09-08 周敏 · 草稿 v5（未发布）」与店铺下拉；中间四段说明，「何时给哪种方案」一段标「Forcome Direct 覆盖」；右栏结构化部分（只读，代码执行）与回归结果「v5 草稿：18 / 20 通过」，展开 1 条未通过样例（期望「先补发」，实际「先查件」）；「发布 v5」置灰，悬停「还有 2 条回归样例未通过，全部通过后才能发布」。每次发布记入审计，可查看历史版本与对比（D-21）。',
     'K22': '首次回复时限：亚马逊 24 小时（自然小时，平台考核，锁定只读）；Shopify 与邮件内部目标 24 小时（1–72 的整数小时）+ 店铺覆盖表（继承 / 覆盖值，示例 forcome.mx 覆盖为 12 小时，data.SLA_OVERRIDES）。工作时间：周一至周五 09:00–18:00（北京时间），不扣节假日，1 个工作日 = 9 个工作小时，算例「周五 16:00 起 4 个工作小时 → 下周一 11:00」（R-CL-01、R-CL-02）。修改进吸底保存栏，记审计。',
