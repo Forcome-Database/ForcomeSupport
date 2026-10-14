@@ -358,13 +358,13 @@ def report_desc():
 
 def p17():
     head = page_head('报表', report_desc(), btn('导出', 'secondary', 'md', 'download'))
-    filt = between(row(seg(['近 7 天', '本月', '自定义'], '近 7 天') + nowrap('09-05 至 09-11', 12, T['ink3']) + divider(True, 16) +
-                       filter_chip('店铺', '全部') + filter_chip('站点', '全部') + filter_chip('标签'), 8),
-                   chip('指标为示例数据', 'warning', 11, 'info'))
+    # 指标数字为示例；界面不显示「指标为示例数据」（图注，待办 24 协调者 10-14 决定 Q1）
+    filt = row(seg(['近 7 天', '本月', '自定义'], '近 7 天') + nowrap('09-05 至 09-11', 12, T['ink3']) + divider(True, 16) +
+               filter_chip('店铺', '全部') + filter_chip('站点', '全部') + filter_chip('标签'), 8)
     R = REPORT
     kpis = grid(kpi('工单量', str(R['tickets_week']), R['tickets_delta'], 'muted', '近 7 天 · 客户来信新建或重开') +
                 kpi('首响中位数', R['frt_median'], R['frt_delta'], 'success', '来信到首次回复 · 按来信到达归期') +
-                kpi('SLA 达标率（亚马逊）', R['sla_rate'], None, 'muted', '未达标 %d 封' % R['sla_miss']) +
+                kpi('SLA 达标率（亚马逊）', R['sla_rate'], R['sla_delta'], 'success', '未达标 %d 封' % R['sla_miss']) +
                 kpi('草稿采纳率', R['adopt_rate'], None, 'muted', R['adopt_split']) +
                 kpi('自动发送占比', R['auto_rate'], None, 'muted', R['auto_note']), 5, 12)
 

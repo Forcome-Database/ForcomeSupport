@@ -689,11 +689,11 @@ KB_ASSETS = [('拆下并清洗 HEPA 滤芯', 'IMG-V2-014', 15, ['Twist the dust 
                                                 'Tug it gently to check it is locked.']),
              ('软管接口重新安装', 'IMG-V2-021', 6, ['Press the release button and pull the hose off.', 'Push the hose back in until the latch clicks.'])]
 
-# ---------------------------------------------------------------- 报表示例（近 7 天 09-05 至 09-11，标注为示例数据）
+# ---------------------------------------------------------------- 报表示例（近 7 天 09-05 至 09-11；数字为示例，界面不显示「指标为示例数据」，待办 24 Q1）
 REPORT = {
     'tickets_week': 357, 'tickets_delta': '较前 7 天 +8%', 'daily_series': ('亚马逊', 'Shopify 与邮件'),
     'frt_median': '2h 14m', 'frt_delta': '较前 7 天 -35m',
-    'sla_rate': '96.4%', 'sla_miss': 11,
+    'sla_rate': '96.4%', 'sla_delta': '较前 7 天 +1.2 个百分点', 'sla_miss': 11,
     'adopt_rate': '41%', 'adopt_split': '未修改直接发送；另有修改后发送 27%',
     'auto_rate': '12%', 'auto_note': '订单查询、发票与收据',
     'daily': [('09-05', 38, 14), ('09-06', 41, 17), ('09-07', 29, 9), ('09-08', 22, 8), ('09-09', 45, 19), ('09-10', 52, 21), ('09-11', 30, 12)],
