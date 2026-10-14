@@ -97,7 +97,16 @@ test('P20 成员表（参照图 P20_SettingsTeam）：页头、页签、示例�
   await expect(page.getByRole('tab', { name: /成员 \d+/ })).toHaveAttribute('data-state', 'active');
   await expect(page.getByText(/^\d+ 人 · 来自钉钉通讯录，(\S+ )?\d{2}:\d{2} 同步$/)).toBeVisible();
   const headers = page.getByTestId('team-table').getByRole('columnheader');
-  await expect(headers).toHaveText(['成员', '钉钉部门', '角色', '数据范围', '状态', '最近登录']);
+  // 行尾「更多」一列没有表头（待办 23）
+  await expect(headers).toHaveText([
+    '成员',
+    '钉钉部门',
+    '角色',
+    '数据范围',
+    '状态',
+    '最近登录',
+    '',
+  ]);
 
   const liting = row(page, '李婷');
   await expect(liting).toContainText('liting@forcome.com');
