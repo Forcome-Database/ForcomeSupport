@@ -181,12 +181,14 @@ function TicketList({ search, entry }: { search: TicketsSearch; entry: ReactNode
                 clearable,
                 fallback.data?.total ?? 0,
               ),
-              action: clearable ? (
-                <Button variant="outline" onClick={clear}>
-                  <X />
-                  {FILTERS.clear}
-                </Button>
-              ) : undefined,
+              // 清除后也一张都没有时只写「换个条件试试。」、不给清除筛选（协调者 2026-10-14 决定 Q6）
+              action:
+                clearable && (fallback.data?.total ?? 0) > 0 ? (
+                  <Button variant="outline" onClick={clear}>
+                    <X />
+                    {FILTERS.clear}
+                  </Button>
+                ) : undefined,
             }}
           />
         </div>
