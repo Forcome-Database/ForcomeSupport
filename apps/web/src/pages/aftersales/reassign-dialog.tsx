@@ -155,7 +155,8 @@ export function ReassignDialog({ item, onClose }: { item: LedgerItem; onClose: (
                 >
                   <SelectTrigger
                     id={ownerId}
-                    aria-invalid={shownError ? true : undefined}
+                    // 没有可选的人时是置灰的下拉（原型 select_box 的 disabled），原因只写在字段下方
+                    aria-invalid={shownError && !noOne ? true : undefined}
                     aria-describedby={shownError ? `${ownerId}-error` : undefined}
                   >
                     <SelectValue placeholder={noOne ? REASSIGN.none : REASSIGN.placeholder} />

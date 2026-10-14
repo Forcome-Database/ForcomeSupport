@@ -221,7 +221,10 @@ function HandoverForm({ handover, onClose }: { handover: TeamHandover; onClose: 
                     error={blocked.reason}
                   >
                     <Select disabled>
-                      <SelectTrigger id={fieldId('all')} aria-invalid>
+                      <SelectTrigger
+                        id={fieldId('all')}
+                        aria-describedby={`${fieldId('all')}-error`}
+                      >
                         <SelectValue placeholder={DISABLE.none} />
                       </SelectTrigger>
                     </Select>
