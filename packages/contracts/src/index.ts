@@ -589,8 +589,17 @@ export {
 } from './ticket-list';
 export {
   DEFAULT_REPORT_PERIOD,
+  UNREGISTERED_RESPONSIBILITY,
+  costBarsShown,
+  costReportSchema,
   isEmptyTicketReport,
+  reportChannelGroupLabels,
   reportChannelGroups,
+  reportCostBarSchema,
+  reportCostDrillQuery,
+  reportCostRange,
+  reportCostSchema,
+  sortCostBars,
   reportDateRangeSchema,
   reportDaySchema,
   reportDrillQuery,
@@ -605,7 +614,10 @@ export {
   reportSlaCountsSchema,
   slaRate,
   ticketReportSchema,
+  type CostReport,
   type ReportChannelGroup,
+  type ReportCost,
+  type ReportCostBar,
   type ReportDateRange,
   type ReportDay,
   type ReportDrillTarget,
@@ -615,6 +627,19 @@ export {
   type ReportSlaCounts,
   type TicketReport,
 } from './report';
+export {
+  REPORT_COMPARE,
+  REPORT_KPI,
+  comparePrefix,
+  firstResponseDelta,
+  firstResponseWords,
+  rateWords,
+  slaDelta,
+  slaSubWords,
+  volumeDelta,
+  type DeltaTone,
+  type DeltaWords,
+} from './report-words';
 export {
   NO_REPLY_UNDO_SECONDS,
   noReplyActions,

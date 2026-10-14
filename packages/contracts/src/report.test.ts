@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  costBarsShown,
   isEmptyTicketReport,
+  reportCostDrillQuery,
+  reportCostRange,
   reportDrillQuery,
   reportPreviousRange,
   reportRange,
   slaRate,
+  sortCostBars,
 } from './report';
 import { ticketDrillOf, ticketInboundRange, ticketListQuerySchema } from './ticket-list';
 
@@ -14,6 +18,7 @@ import { ticketDrillOf, ticketInboundRange, ticketListQuerySchema } from './tick
  */
 
 const TODAY = '2026-09-11';
+const STORE = '01920000-0000-7000-8000-00000000d003';
 
 describe('期间（近 7 天默认 · 本月 · 自定义）', () => {
   it('近 7 天含今天；本月从 1 日到今天', () => {
@@ -150,6 +155,47 @@ describe('下钻到 P04 的条件（与指标同口径，参数是 P04 的 ticke
       period: 'custom',
       from: '2026-08-12',
       to: TODAY,
+    });
+  });
+});
+
+describe('售后成本按责任类型（待办 25，PRD P17「第一阶段」v2.35）', () => {
+  it('期间：本月 1 日至今天（同 P13 默认的费用发生日）', () => {
+    expect(reportCostRange(TODAY)).toEqual({ from: '2026-09-01', to: TODAY });
+  });
+
+  it('条的顺序：金额从大到小，未登记责任排在最后；金额为 0 的不出条（导出照列）', () => {
+    const bars = [
+      { responsibility: 'customer_use' as const, totalUsd: '9.40', count: 1 },
+      { responsibility: null, totalUsd: '120.00', count: 2 },
+      { responsibility: 'logistics' as const, totalUsd: '0.00', count: 1 },
+      { responsibility: 'product_quality' as const, totalUsd: '118.89', count: 5 },
+    ];
+    const sorted = sortCostBars(bars);
+    expect(sorted.map((bar) => bar.responsibility)).toEqual([
+      'product_quality',
+      'customer_use',
+      'logistics',
+      null,
+    ]);
+    expect(costBarsShown(sorted).map((bar) => bar.responsibility)).toEqual([
+      'product_quality',
+      'customer_use',
+      null,
+    ]);
+  });
+
+  it('下钻到 P13：费用发生日为卡上的本月、带店铺；点条另带责任，「查看明细」不带', () => {
+    const range = { from: '2026-09-01', to: TODAY };
+    expect(reportCostDrillQuery(range, { responsibility: 'product_quality' })).toEqual({
+      from: '2026-09-01',
+      to: TODAY,
+      responsibility: 'product_quality',
+    });
+    expect(reportCostDrillQuery(range, { store: STORE })).toEqual({
+      from: '2026-09-01',
+      to: TODAY,
+      store: STORE,
     });
   });
 });

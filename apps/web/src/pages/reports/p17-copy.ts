@@ -30,30 +30,8 @@ export const FILTERS = {
   loading: '正在加载',
 } as const;
 
-/** 三张指标（原型 p17_p1_kpis()） */
-export const KPI = {
-  volume: '工单量',
-  firstResponse: '首响中位数',
-  sla: 'SLA 达标率（亚马逊）',
-  /** 工单量的副标题：「近 7 天 · 客户来信新建或重开」，期间随筛选（本月、起止，Q7） */
-  volumeSub: (period: string) => `${period} · 客户来信新建或重开`,
-  firstResponseSub: '来信到首次回复 · 按来信到达归期',
-  /** 「未达标 11 封」；店铺为全部且有未归属的未达标来信时「未达标 11 封 · 其中 2 封未归属店铺」（Q4） */
-  slaSub: (missed: number) => `未达标 ${missed} 封`,
-  slaUnassigned: (count: number) => `其中 ${count} 封未归属店铺`,
-  /** 无数据（K4）：数值「—」，副标题「所选范围无数据」 */
-  none: '—',
-  noData: '所选范围无数据',
-} as const;
-
-/** 与上一周期的对比（Q2）：前缀随期间，「持平」，SLA 写「个百分点」 */
-export const COMPARE = {
-  week: '较前 7 天',
-  month: '较上月同期',
-  days: (n: number) => `较前 ${n} 天`,
-  flat: '持平',
-  points: '个百分点',
-} as const;
+/** 三张指标（原型 p17_p1_kpis()）与对比（Q2）：画面与导出共用，在 contracts 的 report-words.ts */
+export { REPORT_COMPARE as COMPARE, REPORT_KPI as KPI } from '@forcome/contracts';
 
 /** 每日工单量（原型 p17_p1_daily()） */
 export const DAILY = {

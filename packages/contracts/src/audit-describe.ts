@@ -46,6 +46,7 @@ import { formatMoney } from './money';
 import { roleLabels, roles } from './roles';
 import { storeScopeWords } from './team';
 import { ticketChannelLabels, ticketStatusLabels } from './ticket';
+import { reportPeriodLabels, reportPeriodSchema } from './report';
 import { recipientHeaderLabels } from './unassigned-mail';
 
 /*
@@ -99,6 +100,7 @@ type ValueKind =
   | 'boolean'
   | 'ledgerFilters'
   | 'auditFilters'
+  | 'reportFilters'
   | 'backfill'
   | 'trigger'
   | 'sameDayTime'
@@ -178,6 +180,12 @@ const snapshotFields: Record<AuditSnapshotKind, readonly FieldDefinition[]> = {
     field('fileName', '文件名'),
     field('filters', '筛选', 'auditFilters'),
     field('rows', '行数'),
+  ],
+  reportExport: [
+    field('fileName', '文件名'),
+    field('filters', '筛选', 'reportFilters'),
+    field('rows', '行数'),
+    field('financeFields', '含财务字段', 'boolean'),
   ],
   login: [field('method', '登录方式', 'text', loginMethodLabels)],
   member: [
@@ -359,6 +367,22 @@ function auditFilterWords(value: unknown, ctx: FormatContext): string {
   return [time, ...auditConditionWords({ ...filter, actorName })].join(' · ');
 }
 
+/** 报表导出的筛选：「近 7 天（2026-09-05 至 09-11）· 全部店铺 · US」（自定义只写起止） */
+function reportFilterWords(value: unknown, ctx: FormatContext): string {
+  const parsed = auditSnapshotSchemas.reportExport.shape.filters.safeParse(value);
+  if (!parsed.success) return EMPTY;
+  const filter = parsed.data;
+  const range = dateRangeWords(filter.from, filter.to);
+  const period = reportPeriodSchema.safeParse(filter.period);
+  const time =
+    period.success && period.data !== 'custom'
+      ? `${reportPeriodLabels[period.data]}（${range}）`
+      : range;
+  const parts = [time, filter.store ? storeName(filter.store, ctx) : '全部店铺'];
+  if (filter.site) parts.push(filter.site);
+  return parts.join(' · ');
+}
+
 /**
  * 恢复连接时补拉了多少：Gmail 原型「3 封来信（10:05–10:13 到达，SLA 按原到达时间）」，Shopify「2 笔订单（10:05–10:13 更新）」
  */
@@ -426,6 +450,8 @@ function valueWords(definition: FieldDefinition, value: unknown, ctx: FormatCont
       return ledgerFilterWords(value, ctx);
     case 'auditFilters':
       return auditFilterWords(value, ctx);
+    case 'reportFilters':
+      return reportFilterWords(value, ctx);
     case 'backfill':
       return backfillWords(value, ctx);
     case 'sameDayTime': {
@@ -452,7 +478,7 @@ function fieldAt(kind: AuditSnapshotKind, path: string): FieldDefinition {
 }
 
 /** 导出记录的摘要「筛选：…· N 行」（原型「筛选：9 月 · 全部店铺 · 12 行」） */
-function exportSummary(kind: 'ledgerExport' | 'auditExport') {
+function exportSummary(kind: 'ledgerExport' | 'auditExport' | 'reportExport') {
   return (after: unknown, ctx: FormatContext) => {
     if (!isPlainObject(after)) return EMPTY;
     const rows = typeof after.rows === 'number' ? ` · ${after.rows} 行` : '';
@@ -484,6 +510,7 @@ const snapshotSummaries: Partial<
   empty: () => EMPTY,
   ledgerExport: exportSummary('ledgerExport'),
   auditExport: exportSummary('auditExport'),
+  reportExport: exportSummary('reportExport'),
   accessDenied: (after, ctx) =>
     isPlainObject(after) && Array.isArray(after.storeIds)
       ? `店铺 ${valueWords(fieldAt('accessDenied', 'storeIds'), after.storeIds, ctx)} 不在授权范围内（R-ST-06）`
@@ -672,6 +699,9 @@ function collectIds(
       break;
     case 'auditFilters':
       if (isPlainObject(value)) add(ids.memberIds, value.actor);
+      break;
+    case 'reportFilters':
+      if (isPlainObject(value)) add(ids.storeIds, value.store);
       break;
     default:
   }

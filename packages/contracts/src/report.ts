@@ -1,12 +1,20 @@
 import { addDays } from '@forcome/calendar';
 import { z } from 'zod';
+import {
+  defaultFeeDateRange,
+  responsibilitySchema,
+  type LedgerQuery,
+  type Responsibility,
+} from './aftersales';
 import { siteSchema } from './channel';
+import { financeField } from './finance';
 import type { TicketDrillChannel, TicketDrillOrigin, TicketListQuery } from './ticket-list';
 
 /*
  * P17 报表的工单部分（PRD P17「指标口径」「第一阶段」v2.34、K19，待办 24）：筛选（近 7 天 / 本月 / 自定义、店铺、站点，地址栏与接口
  * 同名）、期间与对比的上一周期、接口的输出，以及下钻到 P04 的条件（按 ticket-list.ts 的参数拼，P04 条数与指标一致）。
- * 界面上的写法（对比、首响时长、「更新于」）在前端 pages/reports/p17-words.ts。售后成本卡与导出随待办 25。
+ * 三个指标的写法（对比、首响时长）在 report-words.ts（画面与导出共用），其余界面写法在前端 pages/reports/p17-words.ts。
+ * 售后成本按责任类型（待办 25）：本月、随店铺不随时间与站点，与 P13 合计同一个视图；下钻到 P13 的条件（reportCostDrillQuery）。
  */
 
 // ---------------------------------------------------------------- 筛选
@@ -96,6 +104,10 @@ export const reportChannelGroups = [
   'shopify_email',
 ] as const satisfies readonly TicketDrillChannel[];
 export type ReportChannelGroup = (typeof reportChannelGroups)[number];
+export const reportChannelGroupLabels: Record<ReportChannelGroup, string> = {
+  amazon: '亚马逊',
+  shopify_email: 'Shopify 与邮件',
+};
 
 /** 「每日工单量」的一天：两组渠道各自的客户来信触发的新建或重开次数 */
 export const reportDaySchema = z.object({
@@ -213,4 +225,76 @@ export function reportDrillQuery(
     return { ...query, inbound: 'custom', from: range.from, to: today };
   }
   return query;
+}
+
+// ---------------------------------------------------------------- 售后成本按责任类型（待办 25）
+
+/**
+ * 责任类型为空的单（历史导入缺责任、进行中的手工登记还没填）单列这一条，排在最后、不可点（P13 没有「未登记」的责任筛选）；
+ * 金额照常计入卡头（协调者 2026-10-14 决定 Q1，PRD P17「第一阶段」v2.35）
+ */
+export const UNREGISTERED_RESPONSIBILITY = '未登记责任';
+
+/** 一条：责任类型（为空 = 未登记责任）、计入售后成本的美元合计（两位小数）与单数 */
+export const reportCostBarSchema = z.object({
+  responsibility: responsibilitySchema.nullable(),
+  totalUsd: z.string(),
+  count: z.int().nonnegative(),
+});
+export type ReportCostBar = z.infer<typeof reportCostBarSchema>;
+
+/**
+ * 本月的售后成本（与 P13 合计行同一个视图 aftersales.aftersales_cost、同一口径，AC-RP-01）：费用发生日本月 1 日至今天，
+ * 店铺范围与店铺筛选内（不随时间与站点，Q2）。合计即卡头总额；单数与 P13「合计 · N 单」同口径（含费用为 0 的单，Q3）；
+ * bars 是本月有单的每个责任类型（sortCostBars 的顺序：金额从大到小，未登记责任排在最后）；金额为 0 的画面上不出条（costBarsShown），
+ * 导出照列，各行单数之和即合计的单数
+ */
+export const reportCostSchema = z.object({
+  range: reportDateRangeSchema,
+  totalUsd: z.string(),
+  count: z.int().nonnegative(),
+  bars: z.array(reportCostBarSchema),
+});
+export type ReportCost = z.infer<typeof reportCostSchema>;
+
+/** GET /api/reports/cost：成本是财务字段，没有财务权限的角色（知识库负责人、管理员）不返回（AC-P1-09） */
+export const costReportSchema = z.object({
+  cost: financeField(reportCostSchema),
+  /** 服务端当前时刻（本月按它） */
+  now: z.iso.datetime({ offset: true }),
+});
+export type CostReport = z.infer<typeof costReportSchema>;
+
+/** 售后成本卡统计的期间：本月 1 日至今天（同 P13 默认的费用发生日） */
+export function reportCostRange(today: string): ReportDateRange {
+  return defaultFeeDateRange(today);
+}
+
+/** 条的顺序：金额从大到小（同额按责任类型的顺序），未登记责任排在最后 */
+export function sortCostBars<T extends Pick<ReportCostBar, 'responsibility' | 'totalUsd'>>(
+  bars: readonly T[],
+): T[] {
+  const rank = (bar: T) => (bar.responsibility === null ? 1 : 0);
+  return [...bars].sort((a, b) => rank(a) - rank(b) || Number(b.totalUsd) - Number(a.totalUsd));
+}
+
+/** 画面上出条的：金额不为 0 的（Q3） */
+export function costBarsShown<T extends Pick<ReportCostBar, 'totalUsd'>>(bars: readonly T[]): T[] {
+  return bars.filter((bar) => Number(bar.totalUsd) !== 0);
+}
+
+/**
+ * 下钻到 P13 的条件：费用发生日为卡上的本月、带报表的店铺；点条另带该责任，「查看明细」不带（Q3）。
+ * 未登记责任不可点，没有对应的条件
+ */
+export function reportCostDrillQuery(
+  range: ReportDateRange,
+  filters: { readonly store?: string; readonly responsibility?: Responsibility },
+): Pick<LedgerQuery, 'from' | 'to' | 'store' | 'responsibility'> {
+  return {
+    from: range.from,
+    to: range.to,
+    ...(filters.responsibility ? { responsibility: filters.responsibility } : {}),
+    ...(filters.store ? { store: filters.store } : {}),
+  };
 }

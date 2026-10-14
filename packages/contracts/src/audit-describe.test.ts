@@ -363,6 +363,53 @@ describe('P27 一条审计记录的写法（PRD P27、10.2、K18）', () => {
     );
   });
 
+  it('报表导出：摘要写期间、店铺、站点与行数；展开写含不含财务字段（待办 25）', () => {
+    const after: AuditSnapshot<'report.export'> = {
+      fileName: '报表_近7天_0905-0911.xlsx',
+      filters: { period: '7d', from: '2026-09-05', to: '2026-09-11' },
+      rows: 14,
+      financeFields: true,
+    };
+    const entry = describeAuditRecord(
+      record({
+        action: 'report.export',
+        objectType: 'export',
+        objectId: 'report.reports',
+        objectLabel: '报表',
+        storeId: null,
+        before: null,
+        after,
+      }),
+      { financeVisible: true, names },
+    );
+    expect(entry).toMatchObject({
+      actionLabel: '导出 Excel',
+      summary: '筛选：近 7 天（2026-09-05 至 09-11） · 全部店铺 · 14 行',
+    });
+    expect(field(entry, '含财务字段')?.after).toBe('是');
+    const customRecord = record({
+      action: 'report.export',
+      objectType: 'export',
+      before: null,
+      after: {
+        ...after,
+        filters: {
+          period: 'custom',
+          from: '2026-09-10',
+          to: '2026-09-10',
+          store: STORE_MX,
+          site: 'MX',
+        },
+        rows: 4,
+        financeFields: false,
+      },
+    });
+    const custom = describeAuditRecord(customRecord, { financeVisible: false, names });
+    expect(custom.summary).toBe('筛选：2026-09-10 · forcome.mx · MX · 4 行');
+    // 筛选里的店铺要查名字
+    expect(auditNameIds([customRecord]).storeIds).toContain(STORE_MX);
+  });
+
   it('登录：对象写登录方式，摘要「会话有效期 7 天（无操作）」（原型）', () => {
     const entry = describeAuditRecord(
       record({

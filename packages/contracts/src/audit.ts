@@ -133,6 +133,23 @@ export const ledgerExportAuditSnapshotSchema = z.object({
   financeFields: z.boolean(),
 });
 
+/**
+ * 报表导出（P17、K5，待办 25）：文件名、筛选条件（期间与起止、店铺、站点）、各表的数据行数之和、是否含财务字段
+ * （有财务权限时文件里有「售后成本按责任类型」，PRD P17「第一阶段」v2.35）
+ */
+export const reportExportAuditSnapshotSchema = z.object({
+  fileName: z.string(),
+  filters: z.object({
+    period: z.string(),
+    from: z.string(),
+    to: z.string(),
+    store: z.string().optional(),
+    site: siteSchema.optional(),
+  }),
+  rows: z.int(),
+  financeFields: z.boolean(),
+});
+
 /** 审计日志导出（P27「导出」，按当前筛选）：文件名、筛选条件、行数 */
 export const auditExportAuditSnapshotSchema = z.object({
   fileName: z.string(),
@@ -233,6 +250,7 @@ export const auditSnapshotSchemas = {
   aftersales: aftersalesAuditSnapshotSchema,
   ledgerExport: ledgerExportAuditSnapshotSchema,
   auditExport: auditExportAuditSnapshotSchema,
+  reportExport: reportExportAuditSnapshotSchema,
   login: loginAuditSnapshotSchema,
   member: memberAuditSnapshotSchema,
   accessDenied: accessDeniedAuditSnapshotSchema,
@@ -297,6 +315,13 @@ export const auditActions = {
     label: '导出 Excel',
     objectType: 'export',
     snapshot: 'auditExport',
+    filter: 'export',
+  },
+  // P17 报表导出（待办 25）：同台账导出，按导出时选的店铺归属（10.2）
+  'report.export': {
+    label: '导出 Excel',
+    objectType: 'export',
+    snapshot: 'reportExport',
     filter: 'export',
   },
   'access.denied': { label: '越权访问被拒', objectType: null, snapshot: 'accessDenied' },
