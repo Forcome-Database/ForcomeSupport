@@ -5,4 +5,4 @@ export { findTicketReference, ticketNumbersOfMessages, type TicketReference } fr
 export { attributeReplyJob } from './replies';
 export { clearTickets } from './reset';
 export { createTicketRoutes } from './routes';
-export { ticketTimeLimitsJob } from './time-limits';
+export { nextTimeLimitAt, scanTimeLimits, ticketTimeLimitsJob } from './time-limits';

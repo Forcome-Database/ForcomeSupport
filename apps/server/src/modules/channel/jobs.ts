@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { defineJob, handleJob, type AnyJobHandler, type Feed } from '../core';
+import { defineJob, handleJob, type AnyJobHandler, type AppEnv, type Feed } from '../core';
 import type { IntegrationClients } from '../integration';
 import {
   createGmailPushFeed,
@@ -35,8 +35,14 @@ export const storeChangedJob = defineJob(
   z.object({ storeId: z.uuid(), addedMailboxes: z.array(z.string()) }),
 );
 
-/** channel 的后台任务处理器（由 apps/server/src/jobs.ts 汇总）；「来信已接收」由 ticket 处理 */
-export function createChannelJobHandlers(deps: { clients: IntegrationClients }): AnyJobHandler[] {
+/**
+ * channel 的后台任务处理器（由 apps/server/src/jobs.ts 汇总）；「来信已接收」由 ticket 处理。
+ * 运行环境决定没有切换记录时实时收信开不开（生产环境待切换，待办 26 的 mail-cutover.ts）
+ */
+export function createChannelJobHandlers(deps: {
+  clients: IntegrationClients;
+  config: { appEnv: AppEnv };
+}): AnyJobHandler[] {
   return [
     // 有新登记的进线邮箱时，未归属队列里收件地址匹配的来信自动归位（待办 15）
     handleJob(storeChangedJob, async (payload, { runtime, logger }) => {
@@ -48,7 +54,9 @@ export function createChannelJobHandlers(deps: { clients: IntegrationClients }):
       const placed = await placeMatchingMail(runtime, logger);
       if (placed > 0) logger.info({ placed }, '兜底扫描：未归属来信自动归位');
     }),
-    handleJob(gmailSyncJob, (payload, context) => syncMailbox(deps.clients, payload, context)),
+    handleJob(gmailSyncJob, (payload, context) =>
+      syncMailbox(deps.clients, deps.config.appEnv, payload, context),
+    ),
     handleJob(gmailPollJob, (_payload, { runtime, logger }) => pollMailboxes(runtime, logger)),
     handleJob(gmailRenewWatchJob, (_payload, context) => renewWatches(deps.clients, context)),
     // AC-P1-14 的验收夹具（只在非生产环境由开发接口排入，待办 24）

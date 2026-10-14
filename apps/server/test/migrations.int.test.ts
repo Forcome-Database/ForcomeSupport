@@ -26,6 +26,10 @@ const TABLES_WITHOUT_UUID_ID = new Set([
   'core.business_number_counter',
   // 钉钉通讯录同步的状态只有一行（id 固定为 directory），不是业务实体
   'org.dingtalk_sync',
+  // 上线切换的状态只有一行（id 固定为 1，待办 26），不是业务实体
+  'channel.mail_cutover',
+  // 历史邮件回放的清单按（邮箱，Gmail 消息 ID）唯一，是一次性命令的工作清单，不是业务实体
+  'channel.mail_replay_item',
 ]);
 const NUMERIC_COLUMNS_NOT_MONEY = new Set<string>([
   // 汇率 numeric(12,6)：1 USD = 汇率 原币（R-FL-06），不是金额

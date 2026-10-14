@@ -204,6 +204,32 @@ describe('Gmail 接口', () => {
     await expect(gmail().listMessages(MAILBOX, { after })).resolves.toEqual(['a', 'b', 'c']);
   });
 
+  it('历史回放列清单：q=after:<秒> before:<秒>（before 向上取整到秒）', async () => {
+    tokenExchange();
+    const after = new Date('2026-06-13T02:00:00Z');
+    const before = new Date('2026-09-11T02:00:00.500Z');
+    const q = encodeURIComponent(
+      `after:${after.getTime() / 1000} before:${Math.ceil(before.getTime() / 1000)}`,
+    ).replace(/%20/g, '+');
+    googleapis()
+      .intercept({ path: `${USER}/messages?q=${q}&maxResults=500` })
+      .reply(200, { messages: [{ id: 'a' }] });
+    await expect(gmail().listMessages(MAILBOX, { after, before })).resolves.toEqual(['a']);
+  });
+
+  it('messages.get 取 format=minimal 概要：标签与 internalDate，不取原文', async () => {
+    tokenExchange();
+    googleapis()
+      .intercept({ path: `${USER}/messages/m1?format=minimal` })
+      .reply(200, { id: 'm1', threadId: 't1', labelIds: ['INBOX'], internalDate: '1789000000000' });
+    await expect(gmail().getMessageInfo(MAILBOX, 'm1')).resolves.toEqual({
+      id: 'm1',
+      threadId: 't1',
+      labelIds: ['INBOX'],
+      internalDate: new Date(1_789_000_000_000),
+    });
+  });
+
   it('messages.get 取 format=raw 原文：base64url 解码、标签与 internalDate', async () => {
     tokenExchange();
     const raw = 'Subject: Hi\r\n\r\nHello ✓';

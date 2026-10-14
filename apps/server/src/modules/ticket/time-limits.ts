@@ -1,5 +1,5 @@
 import type { TicketEvent, TicketStatus } from '@forcome/contracts';
-import { and, eq, lte, or } from 'drizzle-orm';
+import { and, eq, gt, gte, lte, min, or } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   defineJob,
@@ -8,12 +8,13 @@ import {
   systemActor,
   toMilliseconds,
   transaction,
+  type DbExecutor,
   type Logger,
   type Runtime,
   type Tx,
 } from '../core';
-import { expireWaitingReplies } from './replies';
-import { ticket } from './schema';
+import { expireWaitingReplies, REPLY_WAIT_HOURS } from './replies';
+import { pendingReply, ticket, ticketMessage } from './schema';
 import { markOverdue, missUnrepliedOnClose } from './sla';
 import { applyTransition } from './ticket-status';
 
@@ -127,4 +128,44 @@ export async function scanTimeLimits(
     logger.info({ overdue, closed, expiredReplies }, '时限扫描：SLA 到期、按时关闭与不再等的回复');
   }
   return { overdue, closed, expiredReplies };
+}
+
+/**
+ * 最早什么时候又有时限要到（历史回放，待办 26）：给出 after 之后最早的「到了这一刻扫描就会改东西」的时刻，没有为 null。
+ * 回放不逐分钟扫 90 天，而是按它把扫描放在实时 worker 会扫到的那一分钟（调用方取整到分钟），结果与逐分钟扫描相同：
+ * - 应回复来信：截止之后（markOverdue 是「截止早于当前时间」，所以是截止 + 1 毫秒）；
+ * - 按时关闭：各状态最近来信 + 7 / 14 天（IDLE_LIMITS，「满」即关）；
+ * - 等来信的我方回复：开始等 + 24 小时。
+ * 只看 after 之后的：之前到点、扫描时没改动的（例如锁住后重判时刚追加了来信）实时 worker 也不会再改。
+ */
+export async function nextTimeLimitAt(db: DbExecutor, after: Date): Promise<Date | null> {
+  const candidates: Date[] = [];
+  const [sla] = await db
+    .select({ at: min(ticketMessage.slaDueAt) })
+    .from(ticketMessage)
+    .where(and(eq(ticketMessage.slaResult, 'pending'), gte(ticketMessage.slaDueAt, after)));
+  if (sla?.at) candidates.push(new Date(sla.at.getTime() + 1));
+  for (const [status, limit] of Object.entries(IDLE_LIMITS)) {
+    const ms = toMilliseconds({ days: limit.days });
+    const [idle] = await db
+      .select({ at: min(ticket.lastInboundAt) })
+      .from(ticket)
+      .where(
+        and(
+          storeScopeCondition(SYSTEM_STORE_SCOPE, ticket.storeId),
+          eq(ticket.status, status as TicketStatus),
+          gt(ticket.lastInboundAt, new Date(after.getTime() - ms)),
+        ),
+      );
+    if (idle?.at) candidates.push(new Date(idle.at.getTime() + ms));
+  }
+  const waitMs = toMilliseconds({ hours: REPLY_WAIT_HOURS });
+  const [waiting] = await db
+    .select({ at: min(pendingReply.waitingSince) })
+    .from(pendingReply)
+    .where(gt(pendingReply.waitingSince, new Date(after.getTime() - waitMs)));
+  if (waiting?.at) candidates.push(new Date(waiting.at.getTime() + waitMs));
+  return candidates.length === 0
+    ? null
+    : new Date(Math.min(...candidates.map((at) => at.getTime())));
 }

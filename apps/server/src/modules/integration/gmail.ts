@@ -17,8 +17,8 @@ import { fixtureMails, type ReplayMail } from './gmail-replay';
  * 都经出站 HTTP 客户端工厂（代理、限流、调用记录）。没配置 Google 凭据时调用以「未配置」失败，生产环境不会悄悄退回 Fake。
  */
 
-/** 一封邮件的原始内容（messages.get format=raw） */
-export interface GmailRawMessage {
+/** 一封邮件的概要（messages.get format=minimal）：历史邮件回放列清单时按到达时间排序用（待办 26） */
+export interface GmailMessageInfo {
   /** Gmail 消息 ID（同一邮箱内唯一，E-15 按「邮箱 + 它」去重） */
   readonly id: string;
   readonly threadId: string;
@@ -26,6 +26,10 @@ export interface GmailRawMessage {
   readonly labelIds: readonly string[];
   /** 到达时间（Gmail internalDate），SLA 与「最近来信」都以它为准 */
   readonly internalDate: Date;
+}
+
+/** 一封邮件的原始内容（messages.get format=raw） */
+export interface GmailRawMessage extends GmailMessageInfo {
   /** RFC 822 原文（真实现把 base64url 解码成字节） */
   readonly raw: Uint8Array;
 }
@@ -44,10 +48,13 @@ export interface GmailClient {
     startHistoryId: string,
   ): Promise<{ messageIds: string[]; historyId: string }>;
   /**
-   * 某个时刻之后到达的全部消息（users.messages.list，q=after:<秒>，不按标签过滤、不含垃圾邮件与已删除，分页在实现里取完）：
-   * 游标过期后的区间补拉用
+   * 某个时刻之后（给了 before 时到它之前）到达的全部消息（users.messages.list，q=after:<秒> [before:<秒>]，不按标签过滤、
+   * 不含垃圾邮件与已删除，分页在实现里取完）：游标过期后的区间补拉、历史邮件回放列清单（待办 26）用。
+   * Gmail 按秒比较，边界上的那一秒由调用方再按 internalDate 筛
    */
-  listMessages(mailbox: string, range: { after: Date }): Promise<string[]>;
+  listMessages(mailbox: string, range: { after: Date; before?: Date }): Promise<string[]>;
+  /** 一封邮件的概要（users.messages.get，format=minimal，不取原文）；邮件已不存在（404）同 getMessage */
+  getMessageInfo(mailbox: string, messageId: string): Promise<GmailMessageInfo>;
   /** 一封邮件的原文（users.messages.get，format=raw）；邮件已不存在（404）抛带状态码 404 的 ExternalCallFailedError */
   getMessage(mailbox: string, messageId: string): Promise<GmailRawMessage>;
 }
@@ -288,18 +295,32 @@ export class FakeGmail implements FakeClient<GmailClient> {
           historyId: String(Math.max(box.historyId, start)),
         };
       },
-      listMessages: async (mailbox, { after }) => {
+      listMessages: async (mailbox, { after, before }) => {
         await this.faults.check('users.messages.list');
         const seen = new Set<string>();
         return this.#mailbox(mailbox)
           .messages.filter(
             (m) =>
               m.internalDate.getTime() >= after.getTime() &&
+              (!before || m.internalDate.getTime() < before.getTime()) &&
               !m.labelIds.some((label) => EXCLUDED_FROM_LIST.has(label)) &&
               !seen.has(m.id) &&
               seen.add(m.id),
           )
           .map((m) => m.id);
+      },
+      getMessageInfo: async (mailbox, messageId) => {
+        await this.faults.check('users.messages.get');
+        const found = this.#mailbox(mailbox).messages.find((m) => m.id === messageId);
+        if (!found) {
+          throw new ExternalCallFailedError('gmail', 'users.messages.get', { status: 404 });
+        }
+        return {
+          id: found.id,
+          threadId: found.threadId,
+          labelIds: found.labelIds,
+          internalDate: found.internalDate,
+        };
       },
       getMessage: async (mailbox, messageId) => {
         await this.faults.check('users.messages.get');

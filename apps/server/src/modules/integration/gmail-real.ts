@@ -7,7 +7,13 @@ import {
   ExternalCallFailedError,
   ExternalTimeoutError,
 } from './faults';
-import type { GmailClient, GmailNotification, GmailPushClient, GmailRawMessage } from './gmail';
+import type {
+  GmailClient,
+  GmailMessageInfo,
+  GmailNotification,
+  GmailPushClient,
+  GmailRawMessage,
+} from './gmail';
 import { createGoogleTokens, type GoogleTokens } from './google-auth';
 import { createHttpClient, type HttpClient, type RateLimit } from './http';
 
@@ -50,13 +56,13 @@ const messageListSchema = z.object({
   messages: z.array(z.object({ id: z.string() })).optional(),
   nextPageToken: z.string().optional(),
 });
-const rawMessageSchema = z.object({
+const messageInfoSchema = z.object({
   id: z.string(),
   threadId: z.string(),
   labelIds: z.array(z.string()).optional(),
   internalDate: z.coerce.number(),
-  raw: z.string(),
 });
+const rawMessageSchema = messageInfoSchema.extend({ raw: z.string() });
 const pullSchema = z.object({
   receivedMessages: z
     .array(z.object({ ackId: z.string(), message: z.object({ data: z.string().optional() }) }))
@@ -173,13 +179,17 @@ export function createRealGmailClient(
       } while (pageToken);
       return { messageIds, historyId };
     },
-    async listMessages(mailbox, { after }) {
+    async listMessages(mailbox, { after, before }) {
       const operation = 'users.messages.list';
       const ids: string[] = [];
       let pageToken: string | undefined;
       do {
         const query = new URLSearchParams({
-          q: `after:${Math.floor(after.getTime() / 1000)}`,
+          q: [
+            `after:${Math.floor(after.getTime() / 1000)}`,
+            // before 按秒向上取整：边界那一秒的信也列出来，调用方再按 internalDate 筛
+            ...(before ? [`before:${Math.ceil(before.getTime() / 1000)}`] : []),
+          ].join(' '),
           maxResults: String(PAGE_SIZE),
           ...(pageToken ? { pageToken } : {}),
         });
@@ -193,6 +203,25 @@ export function createRealGmailClient(
         pageToken = page.nextPageToken;
       } while (pageToken);
       return ids;
+    },
+    async getMessageInfo(mailbox, messageId): Promise<GmailMessageInfo> {
+      const operation = 'users.messages.get';
+      const message = parse(
+        'gmail',
+        operation,
+        messageInfoSchema,
+        await get(
+          mailbox,
+          `${user(mailbox)}/messages/${encodeURIComponent(messageId)}?format=minimal`,
+          operation,
+        ),
+      );
+      return {
+        id: message.id,
+        threadId: message.threadId,
+        labelIds: message.labelIds ?? [],
+        internalDate: new Date(message.internalDate),
+      };
     },
     async getMessage(mailbox, messageId): Promise<GmailRawMessage> {
       const operation = 'users.messages.get';
@@ -309,7 +338,7 @@ export function createRealGmail(context: RealClientContext): GmailClient {
       });
       return createRealGmailClient(http, tokensFor(credentials, context), credentials.pubsubTopic);
     },
-    ['watch', 'profile', 'listHistory', 'listMessages', 'getMessage'],
+    ['watch', 'profile', 'listHistory', 'listMessages', 'getMessageInfo', 'getMessage'],
   );
 }
 

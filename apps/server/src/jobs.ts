@@ -105,3 +105,13 @@ export function createFeeds(deps: ServerDeps): readonly Feed[] {
     ...createOrderFeeds({ clients: deps.clients, stores: listOrderStores }),
   ];
 }
+
+/**
+ * 历史邮件回放的流水线（待办 26）：回放每推进一封邮件，就在回放的运行时里把这几个队列跑到空闲——来信归并、我方发信与等着的回复
+ * 识别。其余队列（订单同步、钉钉、汇率等）留给 worker，回放不碰
+ */
+export const mailReplayPipelineJobs: readonly string[] = [
+  inboundReceivedJob.name,
+  outboundSyncedJob.name,
+  attributeReplyJob.name,
+];

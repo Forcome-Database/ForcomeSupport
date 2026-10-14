@@ -24,8 +24,12 @@ export type ChangeEvent = Change | { readonly topic: 'resync' };
 /** NOTIFY 的内容上限是 8000 字节：接收人多时分几条发（成员 id 36 字符，100 个约 4 KB） */
 const MEMBER_IDS_PER_NOTIFY = 100;
 
-/** 在事务里登记一次变化，随事务提交送出 */
+/**
+ * 在事务里登记一次变化，随事务提交送出。历史回放里不送（tx.replay，待办 26）：几千封邮件逐封回放时开着的页面会一直刷新；
+ * 回放命令完成时另送一次「工单」「未归属店铺来信」的变化
+ */
 export async function announceChange(tx: Tx, change: Change): Promise<void> {
+  if (tx.replay) return;
   const payloads =
     change.topic === 'notifications'
       ? Array.from(

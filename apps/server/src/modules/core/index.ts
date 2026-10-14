@@ -83,6 +83,13 @@ export {
   type FixtureStep,
   type LoadFixturesOptions,
 } from './fixtures';
+export {
+  drainJobs,
+  requeueInterruptedJobs,
+  type DrainJobsOptions,
+  type DrainJobsReport,
+  type FailedDrainJob,
+} from './drain-jobs';
 export { createCoreJobHandlers } from './job-handlers';
 export { coreNotificationsFixtureStep } from './notification-fixtures';
 export {

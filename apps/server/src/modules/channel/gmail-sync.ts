@@ -15,6 +15,7 @@ import {
   transaction,
   type DbExecutor,
   type Feed,
+  type AppEnv,
   type JobContext,
   type Logger,
   type Runtime,
@@ -32,6 +33,7 @@ import {
   type IntegrationClients,
 } from '../integration';
 import { inboundReceivedJob, outboundSyncedJob } from './events';
+import { liveMailOpen } from './mail-cutover';
 import { recordMailboxFailure, recordMailboxSuccess, type SyncedMail } from './mailbox-health';
 import {
   provisionalStore,
@@ -59,6 +61,8 @@ import { customerOf, mailboxStores, notifyUnassignedMail, type PlacementStore } 
  *    补拉中途失败下次接着补，补拉完成前「最近同步成功的时间」不前移（报表的「更新于」不谎报新鲜度）；
  * 5. 外部调用失败记进同步记录（mailbox-health.ts）：连续 3 次为连接异常（通知、审计、全站横幅），之后同步成功即恢复并补拉。
  * 来信的店铺按收件地址识别（Delivered-To、To、Cc，待办 15）：收件地址都没登记的进未归属店铺队列（unassigned.ts）。
+ * 上线切换（待办 26，mail-cutover.ts）：切换完成前（生产环境待切换、任何环境回放中）同步任务不入库，watch 照常建立游标；
+ * 历史邮件回放（mail-replay.ts）逐封调这里的 ingestById，与实时同步同一条入库路径。
  */
 
 /** 同步一个邮箱：每个邮箱最多一个在排队、一个在跑（stately），通知再多也不会堆积 */
@@ -99,7 +103,7 @@ export const gmailRenewWatchJob = defineJob(
 );
 
 /** 一个进线邮箱与它所属的店铺（按店铺的数据来源取 Gmail 客户端） */
-interface MailboxTarget {
+export interface MailboxTarget {
   readonly address: string;
   readonly storeId: string;
   readonly adapterMode: AdapterMode;
@@ -116,7 +120,7 @@ const mailboxTargetColumns = {
 };
 
 /** 进线邮箱与所属店铺（按地址排序）：可只取某个地址，或只取已 watch（有游标）/ 还没 watch 的 */
-async function mailboxTargets(
+export async function mailboxTargets(
   db: DbExecutor,
   filter: { readonly address?: string; readonly watched?: boolean } = {},
 ): Promise<MailboxTarget[]> {
@@ -135,11 +139,14 @@ async function mailboxTargets(
     .orderBy(storeMailbox.address);
 }
 
-async function mailboxTarget(db: DbExecutor, address: string): Promise<MailboxTarget | null> {
+export async function mailboxTarget(
+  db: DbExecutor,
+  address: string,
+): Promise<MailboxTarget | null> {
   return (await mailboxTargets(db, { address }))[0] ?? null;
 }
 
-function gmailFor(clients: IntegrationClients, target: MailboxTarget): GmailClient {
+export function gmailFor(clients: IntegrationClients, target: MailboxTarget): GmailClient {
   return clients.forStore(gmailClient, { id: target.storeId, adapterMode: target.adapterMode });
 }
 
@@ -203,8 +210,11 @@ async function ensureWatches(
   }
 }
 
-/** 给一个邮箱 watch：写下游标与推送到期时间，并立即排一次同步。watch 失败照常抛出 */
-async function startWatching(
+/**
+ * 给一个邮箱 watch：写下游标与推送到期时间，并立即排一次同步（切换完成前同步不入库，见 syncMailbox）。
+ * 第一次建立游标时记下时刻（watched_at，历史回放的 T0 不能早于它）。watch 失败照常抛出
+ */
+export async function startWatching(
   runtime: Runtime,
   gmail: GmailClient,
   target: MailboxTarget,
@@ -218,6 +228,7 @@ async function startWatching(
         address: target.address,
         historyId: watch.historyId,
         watchExpiresAt: watch.expiration,
+        watchedAt: tx.now,
         createdAt: tx.now,
         updatedAt: tx.now,
       })
@@ -226,6 +237,7 @@ async function startWatching(
         // 已有游标就不动它（续订不能跳过还没同步的消息）
         set: {
           historyId: sql`coalesce(${mailboxSync.historyId}, excluded.history_id)`,
+          watchedAt: sql`coalesce(${mailboxSync.watchedAt}, excluded.watched_at)`,
           watchExpiresAt: sql`excluded.watch_expires_at`,
           updatedAt: sql`excluded.updated_at`,
         },
@@ -311,7 +323,7 @@ export async function renewWatches(
 }
 
 /** Gmail 标签判断方向：「已发送」为我方发出，草稿、垃圾邮件、已删除不收，其余为来信 */
-function directionOf(labelIds: readonly string[]): MessageDirection | null {
+export function directionOf(labelIds: readonly string[]): MessageDirection | null {
   if (labelIds.some((l) => l === 'DRAFT' || l === 'SPAM' || l === 'TRASH' || l === 'CHAT')) {
     return null;
   }
@@ -355,7 +367,7 @@ function messageIdOf(value: string | undefined): string | null {
  * - 我方发出（「已发送」）：店铺就是发件邮箱的店铺，不识别来源；在同一事务里发出「我方发信已同步」（ticket 识别回复，16）。
  */
 /** 一封邮件入库的结果：新的一封、别的邮箱已收过的同一封（只记「同时发送到」）、同一邮箱里重复投递的（丢弃） */
-type IngestResult = 'created' | 'copy' | 'duplicate';
+export type IngestResult = 'created' | 'copy' | 'duplicate';
 
 async function ingestMessage(
   runtime: Runtime,
@@ -483,6 +495,61 @@ async function ingestMessage(
   });
 }
 
+/**
+ * 一封邮件取原文、解析、入库的结果：入库了（见 IngestResult，带方向与到达时间），或没有入库——库里已有（stored，重复投递）、
+ * Gmail 里已不存在（gone）、草稿或垃圾邮件（skipped）
+ */
+export type MailOutcome =
+  | {
+      readonly result: IngestResult;
+      readonly direction: MessageDirection;
+      readonly internalDate: Date;
+    }
+  | { readonly result: 'stored' | 'gone' | 'skipped' };
+
+/** 按 Gmail 消息 ID 取一封邮件的原文、解析、入库（实时同步与历史回放共用） */
+export async function ingestById(
+  runtime: Runtime,
+  gmail: GmailClient,
+  target: MailboxTarget,
+  rules: readonly SenderRule[],
+  id: string,
+  logger: Logger,
+): Promise<MailOutcome> {
+  const address = target.address;
+  const [stored] = await runtime.db
+    .select({ id: message.id })
+    .from(message)
+    .where(and(eq(message.mailbox, address), eq(message.gmailMessageId, id)))
+    .limit(1);
+  if (stored) {
+    logger.info({ mailbox: address, gmailMessageId: id }, '重复消息，已丢弃（E-15）');
+    return { result: 'stored' };
+  }
+  let raw: GmailRawMessage;
+  try {
+    raw = await gmail.getMessage(address, id);
+  } catch (error) {
+    // history 里有、之后又被删掉的邮件：Gmail 返回 404，跳过（不是连接问题）
+    if (error instanceof ExternalCallFailedError && error.status === 404) {
+      logger.info({ mailbox: address, gmailMessageId: id }, '邮件已不存在，跳过');
+      return { result: 'gone' };
+    }
+    throw error;
+  }
+  const direction = directionOf(raw.labelIds);
+  if (!direction) {
+    logger.debug(
+      { mailbox: address, gmailMessageId: id, labelIds: raw.labelIds },
+      '草稿或垃圾邮件，跳过',
+    );
+    return { result: 'skipped' };
+  }
+  const parsed = await PostalMime.parse(raw.raw);
+  const result = await ingestMessage(runtime, target, rules, raw, parsed, direction, logger);
+  return { result, direction, internalDate: raw.internalDate };
+}
+
 /** 逐封取原文、解析、入库；返回这次新入库的来信（几封、到达时间的起止） */
 async function ingestAll(
   runtime: Runtime,
@@ -491,47 +558,18 @@ async function ingestAll(
   ids: readonly string[],
   logger: Logger,
 ): Promise<SyncedMail> {
-  const address = target.address;
   const rules = await loadSenderRules(runtime.db);
   let count = 0;
   let from: Date | null = null;
   let to: Date | null = null;
   for (const id of new Set(ids)) {
-    const [stored] = await runtime.db
-      .select({ id: message.id })
-      .from(message)
-      .where(and(eq(message.mailbox, address), eq(message.gmailMessageId, id)))
-      .limit(1);
-    if (stored) {
-      logger.info({ mailbox: address, gmailMessageId: id }, '重复消息，已丢弃（E-15）');
-      continue;
-    }
-    let raw: GmailRawMessage;
-    try {
-      raw = await gmail.getMessage(address, id);
-    } catch (error) {
-      // history 里有、之后又被删掉的邮件：Gmail 返回 404，跳过（不是连接问题）
-      if (error instanceof ExternalCallFailedError && error.status === 404) {
-        logger.info({ mailbox: address, gmailMessageId: id }, '邮件已不存在，跳过');
-        continue;
-      }
-      throw error;
-    }
-    const direction = directionOf(raw.labelIds);
-    if (!direction) {
-      logger.debug(
-        { mailbox: address, gmailMessageId: id, labelIds: raw.labelIds },
-        '草稿或垃圾邮件，跳过',
-      );
-      continue;
-    }
-    const parsed = await PostalMime.parse(raw.raw);
-    const result = await ingestMessage(runtime, target, rules, raw, parsed, direction, logger);
+    const outcome = await ingestById(runtime, gmail, target, rules, id, logger);
     // 补拉了几封来信：新入库的来信（含归档的平台通知），别的邮箱已收过的副本不算
-    if (result === 'created' && direction === 'inbound') {
+    if (outcome.result === 'created' && outcome.direction === 'inbound') {
+      const at = outcome.internalDate;
       count += 1;
-      if (!from || raw.internalDate < from) from = raw.internalDate;
-      if (!to || raw.internalDate > to) to = raw.internalDate;
+      if (!from || at < from) from = at;
+      if (!to || at > to) to = at;
     }
   }
   return { count, from, to };
@@ -605,14 +643,21 @@ async function backfill(
 
 /**
  * 同步一个邮箱：取游标之后新到的消息逐封入库，全部成功后推进游标并记同步成功；中途失败则任务重试，已入库的按去重跳过。
- * 外部调用失败记进同步记录（连续 3 次为连接异常）
+ * 外部调用失败记进同步记录（连续 3 次为连接异常）。
+ * 上线切换完成前（mail-cutover.ts：生产环境待切换、任何环境回放中）什么也不做：不调 Gmail、不记同步成功或失败（P18 为未连接，
+ * 不出同步延迟与连接异常），游标留在 watch 的那一刻，切换完成后从那里接着收
  */
 export async function syncMailbox(
   clients: IntegrationClients,
+  appEnv: AppEnv,
   { mailbox }: { mailbox: string },
   { runtime, logger }: JobContext,
 ): Promise<void> {
   const address = mailbox.toLowerCase();
+  if (!(await liveMailOpen(runtime.db, appEnv))) {
+    logger.debug({ mailbox: address }, '上线切换还没完成，不实时收信（待办 26）');
+    return;
+  }
   const target = await mailboxTarget(runtime.db, address);
   if (!target) {
     logger.warn({ mailbox: address }, '不是登记的进线邮箱，忽略这条推送');

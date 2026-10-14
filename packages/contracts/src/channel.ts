@@ -309,6 +309,8 @@ export function orderQueueStatus(health: OrderQueueHealth): OrderQueue {
 
 /** 订单回补的天数（规格「回补 90 天」，待办 13）；Shopify 没开通 read_all_orders 时只能回补 60 天 */
 export const ORDER_BACKFILL_DAYS = 90;
+/** 历史邮件回放的天数（规格「历史导入与切换」，待办 26）：回放 [T0 − 90 × 24 小时, T0) 到达的邮件 */
+export const MAIL_REPLAY_DAYS = 90;
 /** 订单回补的状态（P18 回补行，待办 13）：未开始 / 进行中 / 已完成 */
 export const orderBackfillStates = ['not_started', 'running', 'completed'] as const;
 /**

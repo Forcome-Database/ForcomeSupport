@@ -51,6 +51,7 @@ export {
   type GmailClient,
   type GmailNotification,
   type GmailPushClient,
+  type GmailMessageInfo,
   type GmailRawMessage,
 } from './gmail';
 export { type FakeMailInput } from './gmail-mime';

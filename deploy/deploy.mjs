@@ -20,6 +20,9 @@
 //   node deploy/deploy.mjs staging order-backfill [--store <店铺名>]… [--again]
 //                                               用当前部署的版本开始订单回补（待办 13；近 90 天，worker 在后台逐页做，
 //                                               上线前、选定 T0 之前执行，docs/部署说明.md 第 15 节）
+//   node deploy/deploy.mjs staging mail-replay [--t0 <时刻>] [--confirm]
+//                                               用当前部署的版本回放近 90 天邮件并切换到实时处理（待办 26；不加 --confirm
+//                                               只看计划；加了先停 worker、回放完成后再起，docs/部署说明.md 第 16 节）
 //
 // 只依赖 Node（≥ 22）、git 与 Docker（含 compose），不需要 pnpm install；Linux 服务器与 Windows 本机通用。
 // 环境文件默认 deploy/.env.<环境>，可用 FORCOME_ENV_FILE 指到别处；部署产物（根证书、报告）在 deploy/.state/<环境>/。
@@ -39,6 +42,7 @@ import { createEnvFile, readDeployEnv } from './lib/env-file.mjs';
 import { ENVIRONMENTS } from './lib/environments.mjs';
 import { httpsGet, verifyCertificate } from './lib/https-check.mjs';
 import { IMPORT_AFTERSALES_SYNOPSIS, importAftersalesRun } from './lib/import-aftersales.mjs';
+import { MAIL_REPLAY_SYNOPSIS, mailReplayRun } from './lib/mail-replay.mjs';
 import { ORDER_BACKFILL_SYNOPSIS, orderBackfillRun } from './lib/order-backfill.mjs';
 import { capture, mustRun, run } from './lib/process.mjs';
 import { SP_API_TOKEN_SYNOPSIS, spApiTokenRun } from './lib/sp-api-token.mjs';
@@ -46,7 +50,8 @@ import { formatReport, summarizePlaywright } from './lib/report.mjs';
 
 const ROOT_CERT_IN_CADDY = '/data/caddy/pki/authorities/local/root.crt';
 const USAGE = `用法：node deploy/deploy.mjs <环境> [deploy [--reset-inbound] | smoke | cert | compose <参数…> | down | reset-inbound
-  | ${IMPORT_AFTERSALES_SYNOPSIS} | ${SP_API_TOKEN_SYNOPSIS} | ${ORDER_BACKFILL_SYNOPSIS}]
+  | ${IMPORT_AFTERSALES_SYNOPSIS} | ${SP_API_TOKEN_SYNOPSIS} | ${ORDER_BACKFILL_SYNOPSIS}
+  | ${MAIL_REPLAY_SYNOPSIS}]
 环境：${Object.keys(ENVIRONMENTS).join('、')}`;
 
 // 命令行里给的文件（售后登记表导入）按调用者所在的目录解析：pnpm 运行脚本时把它放在 INIT_CWD
@@ -390,6 +395,29 @@ async function main() {
       }
       const compose = composeFor(loadDeployEnv(), deployedRelease());
       return compose.status('run', '--rm', '--no-deps', 'migrate', ...planned.command) === 0;
+    }
+    case 'mail-replay': {
+      // 历史邮件回放与 T0 切换（待办 26）：不加 --confirm 只看计划；加了先停 worker，完成后再起
+      const planned = mailReplayRun(commandArgs);
+      if ('error' in planned) {
+        console.error(planned.error);
+        return false;
+      }
+      const compose = composeFor(loadDeployEnv(), deployedRelease());
+      if (!planned.confirm) {
+        return compose.status('run', '--rm', '--no-deps', 'migrate', ...planned.command) === 0;
+      }
+      compose.run('stop', 'worker');
+      if (compose.status('run', '--rm', '--no-deps', 'migrate', ...planned.command) !== 0) {
+        console.error(
+          '回放没有完成，worker 保持停止（回放排的任务只能由回放自己跑完）：按上面的提示处理后再执行同一命令接着回放（docs/部署说明.md 第 16 节）',
+        );
+        return false;
+      }
+      // 与部署时一样用 up --no-deps 起 worker（start 会因一次性的 migrate 已删除报缺依赖）
+      compose.run('up', '-d', '--wait', '--no-deps', 'worker');
+      console.log('worker 已启动：实时处理开启，T0 之后的邮件几分钟内同步进来');
+      return true;
     }
     default:
       console.error(USAGE);

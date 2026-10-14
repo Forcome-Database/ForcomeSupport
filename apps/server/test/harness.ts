@@ -13,7 +13,8 @@ import { createApp, type AppDeps } from '../src/app';
 import type { ServerDeps } from '../src/deps';
 import { fixtureSteps } from '../src/fixture-steps';
 import { runImportAftersalesCommand } from '../src/import-aftersales-command';
-import { createFeeds, createJobHandlers } from '../src/jobs';
+import { createFeeds, createJobHandlers, mailReplayPipelineJobs } from '../src/jobs';
+import { runMailReplayCommand } from '../src/mail-replay-command';
 import {
   importAftersalesHistory,
   parseHistoryMapping,
@@ -221,6 +222,18 @@ export interface TestHarness {
   runImportCommand(
     argv: readonly string[],
   ): Promise<{ exitCode: number; stdout: string; stderr: string }>;
+  /**
+   * 按命令行参数执行历史邮件回放命令（入口 mail-replay 的同一个函数，待办 26）：连本测试的库，用本测试的外部客户端（Fake Gmail）
+   * 与任务处理器；实时的「当前时间」取手动时钟。测试里没有常驻的 worker（runJobs 只在调用时跑），workerRunning 模拟有 worker 连着。
+   * 返回退出码与输出
+   */
+  runMailReplay(
+    argv: readonly string[],
+    options?: {
+      readonly workerRunning?: boolean | (() => boolean);
+      readonly pageSize?: number;
+    },
+  ): Promise<{ exitCode: number; stdout: string; stderr: string }>;
   /** 关闭连接并删除本测试的库 */
   close(): Promise<void>;
 }
@@ -404,6 +417,37 @@ export async function startTestHarness(
             })
           : sheetOfRows(source.rows, mapping);
       return importAftersalesHistory(runtime, sheet, mapping, { dryRun: importOptions.dryRun });
+    },
+
+    async runMailReplay(argv, replayOptions = {}) {
+      let stdout = '';
+      let stderr = '';
+      const exitCode = await runMailReplayCommand(argv, {
+        startRuntime: () =>
+          Promise.resolve({
+            runtime,
+            clients,
+            handlers,
+            logger: silentLogger,
+            stop: () => Promise.resolve(),
+          }),
+        io: {
+          stdout: (text) => {
+            stdout += text;
+          },
+          stderr: (text) => {
+            stderr += text;
+          },
+        },
+        pipelineJobs: mailReplayPipelineJobs,
+        workerRunning: () => {
+          const running = replayOptions.workerRunning ?? false;
+          return Promise.resolve(typeof running === 'function' ? running() : running);
+        },
+        sleep: () => Promise.resolve(),
+        pageSize: replayOptions.pageSize,
+      });
+      return { exitCode, stdout, stderr };
     },
 
     async runImportCommand(argv) {

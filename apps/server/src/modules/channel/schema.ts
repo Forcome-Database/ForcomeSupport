@@ -8,10 +8,12 @@ import {
 } from '@forcome/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  check,
   index,
   integer,
   jsonb,
   pgSchema,
+  primaryKey,
   text,
   unique,
   uniqueIndex,
@@ -90,6 +92,11 @@ export const mailboxSync = channelSchema.table(
     historyId: text('history_id'),
     /** 推送（watch）的到期时间 */
     watchExpiresAt: timestamptz('watch_expires_at'),
+    /**
+     * 第一次 watch 成功（游标建立）的时刻：之后到达的信都在 history 里。历史邮件回放的 T0 不能早于它（待办 26：
+     * T0 到它之间的信既不回放、也不在增量里）；之前已有游标的邮箱由迁移按 created_at 补
+     */
+    watchedAt: timestamptz('watched_at'),
     /** 最近一次同步成功（取完游标之后的全部消息并入库）的时间；从没成功过为空 */
     lastSuccessAt: timestamptz('last_success_at'),
     /** 连续失败的次数（watch 与同步的外部调用失败都算）；成功一次清零，满 3 次为连接异常 */
@@ -203,5 +210,55 @@ export const senderRule = channelSchema.table(
   },
   (t) => [
     uniqueIndex('sender_rule_match_key').on(t.kind, t.pattern, sql`coalesce(${t.headerValue}, '')`),
+  ],
+);
+
+/**
+ * 上线切换（规格「历史导入与切换」，待办 26；协调者 2026-10-14 决定 Q1–Q4）：整个环境一行，由历史邮件回放命令写入。
+ * - 没有这一行：生产环境为「待切换」——worker 照常给进线邮箱 watch（T0 前启动 watch），但不同步入库、不建工单；
+ *   非生产环境视为已切换，照常实时收信；
+ * - 有这一行、completed_at 为空：正在回放（T0 已定），实时收信暂停（回放期间 worker 必须停，命令检查）；
+ * - completed_at 有值：已切换，实时收信从各邮箱 watch 的游标接着收，交界处按「邮箱 + Gmail 消息 ID」去重。
+ * 健康判断与 worker 自检（待办 28）读它：待切换、回放中不算同步故障。
+ */
+export const mailCutover = channelSchema.table(
+  'mail_cutover',
+  {
+    /** 只有一行：固定为 1 */
+    id: integer('id').primaryKey().default(1),
+    /** 切换时刻：internalDate 早于它的邮件回放，不早于它的交给实时收信 */
+    t0: timestamptz('t0').notNull(),
+    /** 回放区间的起点：T0 − 90 × 24 小时 */
+    replayFrom: timestamptz('replay_from').notNull(),
+    /** 各进线邮箱要回放的邮件都已列进回放清单（mail_replay_item）的时刻；还没列完为空，续跑时重新列 */
+    listedAt: timestamptz('listed_at'),
+    /** 回放完成、开启实时处理的时刻 */
+    completedAt: timestamptz('completed_at'),
+    createdAt: timestamptz('created_at').notNull(),
+    updatedAt: timestamptz('updated_at').notNull(),
+  },
+  (t) => [check('mail_cutover_single_row_check', sql`${t.id} = 1`)],
+);
+
+/**
+ * 回放清单（待办 26）：要回放的每封邮件（进线邮箱 + Gmail 消息 ID + 到达时间），按到达时间升序单线程回放；
+ * 回放完一封（入库、归并与回复识别都跑完）记下 replayed_at，中断后从第一封没记的接着回放（断点续跑）。
+ * 同一封再列一次不重复（主键），已入库的按 message 的「邮箱 + Gmail 消息 ID」去重（重跑幂等）。
+ */
+export const mailReplayItem = channelSchema.table(
+  'mail_replay_item',
+  {
+    mailbox: text('mailbox').notNull(),
+    gmailMessageId: text('gmail_message_id').notNull(),
+    /** 到达时间（Gmail internalDate）：回放的顺序与注入的「当前时间」 */
+    internalDate: timestamptz('internal_date').notNull(),
+    /** 回放完的时刻（处理时刻）；还没回放为空 */
+    replayedAt: timestamptz('replayed_at'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.mailbox, t.gmailMessageId] }),
+    index('mail_replay_item_pending_idx')
+      .on(t.internalDate, t.mailbox, t.gmailMessageId)
+      .where(sql`${t.replayedAt} IS NULL`),
   ],
 );

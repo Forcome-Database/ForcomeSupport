@@ -24,6 +24,27 @@ export {
 } from './messages';
 export { type MailAddress, type Recognition, type SenderRule } from './recognition';
 export { mailboxHealths, type MailboxHealth } from './mailbox-health';
+export {
+  cutoverStatusOf,
+  mailCutoverStatus,
+  readMailCutover,
+  type MailCutover,
+  type MailCutoverStatus,
+} from './mail-cutover';
+export {
+  beginCutover,
+  completeCutover,
+  listReplayMail,
+  markReplayed,
+  nextReplayItems,
+  replayMail,
+  replayProgress,
+  watchedMailboxes,
+  watchMailboxes,
+  type ReplayItem,
+  type WatchedMailbox,
+} from './mail-replay';
+export { type MailOutcome } from './gmail-sync';
 export { clearInboundMail } from './reset';
 export { createChannelRoutes } from './routes';
 export { assignStore, listUnassignedMail, placeMatchingMail } from './unassigned';
