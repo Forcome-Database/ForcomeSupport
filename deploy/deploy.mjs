@@ -249,13 +249,16 @@ async function checkHttps(deployEnv, ca) {
   throw new Error(`HTTPS 核对失败：${lastError.code ?? ''} ${lastError.message}`.trim());
 }
 
-/** 核对 api、worker、caddy 都在运行，且用的是本次构建的镜像；备份服务（数据库镜像，不随版本变）也在运行 */
+/**
+ * 核对 api、worker、caddy 都在运行，且用的是本次构建的镜像；备份服务也在运行。备份服务是数据库镜像（固定标签 forcome-postgres:18）：
+ * 内容没变时重新构建也会换一个镜像 ID（构建证明的时刻不同），标签移走、Compose 不重建容器（内容相同），ps 里就只剩 ID，所以只核对在运行
+ */
 function checkRunningRelease(compose, release) {
   const expected = {
     api: `forcome-server:${release}`,
     worker: `forcome-server:${release}`,
     caddy: `forcome-web:${release}`,
-    backup: 'forcome-postgres:18',
+    backup: null,
   };
   const lines = compose
     .capture('ps', '--format', 'json', 'api', 'worker', 'caddy', 'backup')
@@ -263,9 +266,9 @@ function checkRunningRelease(compose, release) {
   const running = lines.filter(Boolean).map((line) => JSON.parse(line));
   for (const [service, image] of Object.entries(expected)) {
     const container = running.find((c) => c.Service === service);
-    if (!container || container.State !== 'running' || container.Image !== image) {
+    if (!container || container.State !== 'running' || (image && container.Image !== image)) {
       const actual = container ? `${container.State} ${container.Image}` : '没有容器';
-      throw new Error(`${service} 没有以 ${image} 运行（${actual}）`);
+      throw new Error(`${service} 没有${image ? `以 ${image} ` : ''}运行（${actual}）`);
     }
   }
 }
