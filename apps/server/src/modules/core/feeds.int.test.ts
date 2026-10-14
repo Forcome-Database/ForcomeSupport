@@ -14,6 +14,11 @@ import { defineFeed, silentLogger, startFeeds, type RunningFeeds } from './index
  */
 
 const TIMING = { waitSeconds: 0, idleMs: 20, standbyMs: 50, heartbeatMs: 50 };
+/**
+ * 等拉取发生的上限：vi.waitFor 默认 1 秒，全量集成测试时本机负载高，第一次拿咨询锁可能超过 1 秒（待办 26、28 都遇到过）；
+ * 只是上限，正常时几十毫秒就满足
+ */
+const WAIT = { timeout: 10_000, interval: 20 };
 
 let database: TestDatabase;
 let a: TestRuntime;
@@ -56,7 +61,7 @@ describe('独占的常驻拉取：多个 worker 时只有一个在拉', () => {
     const onA = workerFeeds(true);
     const onB = workerFeeds(true);
     const runningA = startFeeds(a.runtime, [onA.feed], { logger: silentLogger, timing: TIMING });
-    await vi.waitFor(() => expect(onA.stats.pulls).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(onA.stats.pulls).toBeGreaterThan(0), WAIT);
     const runningB = startFeeds(b.runtime, [onB.feed], { logger: silentLogger, timing: TIMING });
     let stopped: RunningFeeds | null = null;
     try {
@@ -68,7 +73,7 @@ describe('独占的常驻拉取：多个 worker 时只有一个在拉', () => {
       stopped = runningA;
       expect(onA.stats.releases).toBe(1);
       const pullsOfA = onA.stats.pulls;
-      await vi.waitFor(() => expect(onB.stats.pulls).toBeGreaterThan(0));
+      await vi.waitFor(() => expect(onB.stats.pulls).toBeGreaterThan(0), WAIT);
       expect(onA.stats.pulls).toBe(pullsOfA);
     } finally {
       if (!stopped) await runningA.stop();
@@ -81,7 +86,7 @@ describe('独占的常驻拉取：多个 worker 时只有一个在拉', () => {
     const onA = workerFeeds(true);
     const onB = workerFeeds(true);
     const runningA = startFeeds(a.runtime, [onA.feed], { logger: silentLogger, timing: TIMING });
-    await vi.waitFor(() => expect(onA.stats.pulls).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(onA.stats.pulls).toBeGreaterThan(0), WAIT);
     const runningB = startFeeds(b.runtime, [onB.feed], { logger: silentLogger, timing: TIMING });
     const holders = async () => {
       // 只看应用连接池上的（pg-boss 自己的连接名是 forcome-worker-pgboss，它也会短暂持有咨询锁）
@@ -98,10 +103,13 @@ describe('独占的常驻拉取：多个 worker 时只有一个在拉', () => {
       // 从 B 的连接上断掉持有咨询锁的那条连接
       await b.runtime.db.$client.query('SELECT pg_terminate_backend($1)', [holder]);
       // A 发现持有权没了：停拉、断开长连接
-      await vi.waitFor(() => expect(onA.stats.releases).toBe(1));
+      await vi.waitFor(() => expect(onA.stats.releases).toBe(1), WAIT);
       // 之后由重新选出的一个（A 或 B）接着拉，锁只在一条连接上
       const before = onA.stats.pulls + onB.stats.pulls;
-      await vi.waitFor(() => expect(onA.stats.pulls + onB.stats.pulls).toBeGreaterThan(before));
+      await vi.waitFor(
+        () => expect(onA.stats.pulls + onB.stats.pulls).toBeGreaterThan(before),
+        WAIT,
+      );
       const after = await holders();
       expect(after).toHaveLength(1);
       expect(after[0]).not.toBe(holder);
@@ -120,7 +128,7 @@ describe('独占的常驻拉取：多个 worker 时只有一个在拉', () => {
       await vi.waitFor(() => {
         expect(onA.stats.pulls).toBeGreaterThan(0);
         expect(onB.stats.pulls).toBeGreaterThan(0);
-      });
+      }, WAIT);
     } finally {
       await runningA.stop();
       await runningB.stop();
