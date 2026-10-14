@@ -91,8 +91,9 @@ test('客服主管：标题下数据来源与「更新于」、两条注，三�
 test('AC-P1-14：验收日「每日工单量」的柱为 73，点柱进入 P04，「来自报表」芯片、计数行「共 73 条」，列表逐页合计 73 张', async ({
   page,
 }) => {
-  // 收信与归并逐封处理（每封之间等任务轮询的 2 秒），73 封第一次投要几分钟；重复投递去重，之后立即返回
-  test.setTimeout(480_000);
+  // 收信与归并逐封处理（每封之间等任务轮询的 2 秒），73 封第一次投要几分钟（本机约 3 分钟，开发测试环境的主机慢，约 10 分钟）；
+  // 重复投递去重，之后立即返回
+  test.setTimeout(1_080_000);
   await loginAs(page, '周敏');
   const delivered = await page.request.post('/api/dev/report-acceptance');
   expect(delivered.status()).toBe(202);
@@ -102,8 +103,8 @@ test('AC-P1-14：验收日「每日工单量」的柱为 73，点柱进入 P04�
   // worker 收信、归并成工单
   await expect
     .poll(async () => (await apiReport(page, query)).daily.at(-1), {
-      timeout: 300_000,
-      intervals: [5_000],
+      timeout: 900_000,
+      intervals: [10_000],
     })
     .toEqual({ date, amazon: ACCEPTANCE.amazon, shopify_email: ACCEPTANCE.shopifyEmail });
 

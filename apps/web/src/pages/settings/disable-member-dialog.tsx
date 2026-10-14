@@ -222,7 +222,8 @@ function HandoverForm({ handover, onClose }: { handover: TeamHandover; onClose: 
               </div>
             ) : (
               <>
-                <ul className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+                {/* 单多时（开发测试环境的数据会累积）在区块里滚动，弹窗不超出窗口、按钮始终看得见（待办 24 部署时发现） */}
+                <ul className="grid max-h-60 grid-cols-2 gap-x-2 gap-y-1.5 overflow-y-auto">
                   {handover.cases.map((item) => (
                     <li key={item.id} className="flex items-center gap-1.5">
                       <span className="text-12 font-semibold text-primary">{item.number}</span>
