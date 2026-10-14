@@ -40,6 +40,7 @@ import {
   type Tx,
 } from '../core';
 import { dingtalkSyncHealth } from './dingtalk-sync';
+import { lockDirectory } from './directory';
 import { memberDisabledJob } from './events';
 import {
   listAftersalesOwners,
@@ -380,6 +381,8 @@ export async function disableTeamMember(
   handover: MemberHandover,
 ): Promise<TeamMember | null> {
   await advisoryLock(tx, TEAM_LOCK);
+  // 先拿通讯录写入的咨询锁再锁成员行：钉钉同步在这把锁下逐个改成员行，不先拿它，停用持着的行锁与同步的行更新可能互等成死锁
+  await lockDirectory(tx);
   const row = await teamMemberRow(tx.db, memberId, true);
   if (!row) return null;
   if (row.version !== input.version) throw new OptimisticLockError('org.member', row.id);
@@ -393,12 +396,13 @@ export async function disableTeamMember(
   if (blocked) throw new FieldValidationError({ member: blocked });
   const cases = await handover.openCases(tx.db, row.id);
   const owners = await otherOwners(tx.db, row.id);
-  const current = { member: handoverMemberOf(row), cases, owners };
-  const plan = handoverPlan(current);
-  if (plan.kind === 'blocked') throw new FieldValidationError({ handover: plan.reason });
+  // 弹窗里的单变了先报 409（弹窗刷新后才看得到现在能不能停用），再看有没有人可接手
   if (handoverStale(cases, input.assignments)) {
     throw new OptimisticLockError('aftersales', row.id);
   }
+  const current = { member: handoverMemberOf(row), cases, owners };
+  const plan = handoverPlan(current);
+  if (plan.kind === 'blocked') throw new FieldValidationError({ handover: plan.reason });
   const error = handoverError(current, input.assignments);
   if (error) throw new FieldValidationError({ handover: error });
 

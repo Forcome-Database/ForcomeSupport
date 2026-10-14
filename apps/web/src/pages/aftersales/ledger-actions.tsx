@@ -17,7 +17,7 @@ import {
 } from '@forcome/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, CircleCheck, CircleX, Users } from 'lucide-react';
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useState } from 'react';
 import { FormField, useFocusField } from '@/components/form-field';
 import {
   AlertDialog,

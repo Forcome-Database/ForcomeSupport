@@ -16,8 +16,9 @@ import {
   transaction,
   updateWithVersion,
   type Runtime,
+  type Tx,
 } from '../core';
-import type { Access } from '../org';
+import { listAftersalesOwners, lockMembersForShare, type Access } from '../org';
 import { actorName, auditSnapshot, ownerNameOf } from './audit';
 import { keptFeeColumns } from './fees';
 import { findOwnedAftersales, type AftersalesRow } from './ledger';
@@ -68,14 +69,16 @@ function changeStatus(
   access: Access,
   found: AftersalesRow,
   action: 'aftersales.complete' | 'aftersales.undo_complete' | 'aftersales.cancel',
-  values: (now: Date) => Partial<typeof aftersales.$inferInsert>,
+  values: (
+    tx: Tx,
+  ) => Partial<typeof aftersales.$inferInsert> | Promise<Partial<typeof aftersales.$inferInsert>>,
 ): Promise<AftersalesRow> {
   return transaction(runtime, async (tx) => {
     const updated = await updateWithVersion(
       tx,
       aftersales,
       { id: found.id, version: found.version },
-      { ...values(tx.now), updatedAt: tx.now, updatedByName: actorName(access) },
+      { ...(await values(tx)), updatedAt: tx.now, updatedByName: actorName(access) },
     );
     const ownerName = await ownerNameOf(tx.db, found.ownerId);
     await recordAudit(tx, access.actor, {
@@ -102,15 +105,16 @@ export async function completeAftersales(
   if (!found) return null;
   const status = targetOf(runtime, found, 'complete');
   if (!aftersalesActions(access.member, found).complete) throw new AccessDeniedError(m.editDenied);
-  return changeStatus(runtime, access, found, 'aftersales.complete', (now) => ({
+  return changeStatus(runtime, access, found, 'aftersales.complete', (tx) => ({
     status,
-    completedAt: now,
+    completedAt: tx.now,
   }));
 }
 
 /**
  * 撤销「设为已完成」（S15 ①「撤销」）：只在刚设为已完成的时限内，由能设为已完成的人（登记人或负责人）撤销，
- * 回到进行中、清掉完成时间
+ * 回到进行中、清掉完成时间。负责人在这期间被停用了（不再是在职的售后负责人）：回到进行中的同时标为待分配，进改派队列
+ * （停用后不留无人负责的进行中单；先给负责人的成员行加共享锁再看，与停用串行，协调者 2026-10-14 决定 R2）
  */
 export async function undoComplete(
   runtime: Runtime,
@@ -123,10 +127,13 @@ export async function undoComplete(
   // 先看是不是这张单的登记人或负责人（与状态无关），再问迁移表
   if (!ownsRegistration(access.member, found)) throw new AccessDeniedError(m.editDenied);
   const status = targetOf(runtime, found, 'undo_complete');
-  return changeStatus(runtime, access, found, 'aftersales.undo_complete', () => ({
-    status,
-    completedAt: null,
-  }));
+  return changeStatus(runtime, access, found, 'aftersales.undo_complete', async (tx) => {
+    const ownerId = found.ownerId;
+    if (!ownerId || found.reassignQueuedAt) return { status, completedAt: null };
+    await lockMembersForShare(tx.db, [ownerId]);
+    const active = (await listAftersalesOwners(tx.db)).some((owner) => owner.id === ownerId);
+    return { status, completedAt: null, ...(active ? {} : { reassignQueuedAt: tx.now }) };
+  });
 }
 
 /**
@@ -154,10 +161,10 @@ export async function cancelAftersales(
   }
   if (Object.keys(errors).length > 0) throw new FieldValidationError(errors);
 
-  return changeStatus(runtime, access, found, 'aftersales.cancel', (now) => ({
+  return changeStatus(runtime, access, found, 'aftersales.cancel', (tx) => ({
     status,
     cancelReason: reason,
-    cancelledAt: now,
+    cancelledAt: tx.now,
     // 已登记的项记保留与否，没登记的项为空
     ...keptFeeColumns(
       (item) => found[item] !== null,

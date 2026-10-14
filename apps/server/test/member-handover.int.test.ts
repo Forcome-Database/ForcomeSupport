@@ -130,7 +130,14 @@ describe('P20 停用成员：弹窗里选接手人，改派与停用同一事务
     expect(handover.cases.every((c) => c.status === 'in_progress')).toBe(true);
     expect(handover.owners).toEqual([]);
 
-    const fields = await fieldsOf(await disable(admin, WANG, handover.member.version, []));
+    const fields = await fieldsOf(
+      await disable(
+        admin,
+        WANG,
+        handover.member.version,
+        handover.cases.map((c) => ({ caseId: c.id, version: c.version, ownerId: null })),
+      ),
+    );
     expect(fields).toEqual({ handover: '王磊是唯一的售后负责人，没有其他人可接手' });
     expect(await memberStatus(admin, WANG)).toBe('active');
     expect((await caseOf(supervisor, 'S-20260911-0018')).ownerId).toBe(WANG);
@@ -194,16 +201,16 @@ describe('P20 停用成员：弹窗里选接手人，改派与停用同一事务
     expect(disabled).toMatchObject({
       actorName: '刘洋',
       objectLabel: '赵六',
-      before: expect.objectContaining({ status: 'active' }),
-      after: expect.objectContaining({ status: 'disabled' }),
+      before: { status: 'active' },
+      after: { status: 'disabled' },
     });
     const reassigned = await t.auditRecords({ action: 'aftersales.reassign' });
     expect(reassigned.map((r) => r.objectLabel).sort()).toEqual([first.number, second.number]);
     for (const record of reassigned) {
       expect(record).toMatchObject({
         actorName: '刘洋',
-        before: expect.objectContaining({ ownerName: '赵六', status: 'in_progress' }),
-        after: expect.objectContaining({ ownerName: '孙杰', status: 'in_progress' }),
+        before: { ownerName: '赵六', status: 'in_progress' },
+        after: { ownerName: '孙杰', status: 'in_progress' },
       });
     }
 
@@ -319,8 +326,8 @@ describe('钉钉离职自动停用：售后单进入改派队列（AC-ST-05）�
     expect(queued.map((r) => r.objectLabel).sort()).toEqual(WANG_CASES);
     expect(queued[0]).toMatchObject({
       actorType: 'system',
-      before: expect.objectContaining({ ownerName: '王磊' }),
-      after: expect.objectContaining({ ownerName: '待分配' }),
+      before: { ownerName: '王磊' },
+      after: { ownerName: '待分配' },
     });
 
     const list = async (client: ApiClient) =>
@@ -445,8 +452,8 @@ describe('钉钉离职自动停用：售后单进入改派队列（AC-ST-05）�
     });
     expect(audit).toMatchObject({
       actorName: '周敏',
-      before: expect.objectContaining({ ownerName: '待分配', status: 'in_progress' }),
-      after: expect.objectContaining({ ownerName: '孙杰', status: 'in_progress' }),
+      before: { ownerName: '待分配', status: 'in_progress' },
+      after: { ownerName: '孙杰', status: 'in_progress' },
     });
     // 出了改派队列
     expect((await ledger(supervisor, '?owner=pending')).items.map((i) => i.number)).not.toContain(
@@ -600,6 +607,29 @@ describe('停用与登记、改派串行：停用后不留无人负责的进行�
     await holder.done;
     const res = await registering;
     expect(await fieldsOf(res)).toMatchObject({ ownerId: '只能选有该店铺数据范围的售后负责人' });
+  });
+
+  it('设为已完成后负责人被停用，5 秒内撤销：回到进行中并标为待分配（不留无人负责的进行中单）', async () => {
+    const { id, item } = await ownerWithCase('蒋四');
+    const done = await supervisor.post(`/api/aftersales/${item.number}/complete`, {
+      version: item.version,
+    });
+    expect(done.status, await done.clone().text()).toBe(200);
+    const completed = ledgerItemSchema.parse(await done.json());
+    // 已完成的单不在停用弹窗里：直接停用
+    const handover = await handoverOf(admin, id);
+    expect(handover.cases).toEqual([]);
+    expect((await disable(admin, id, handover.member.version, [])).status).toBe(200);
+
+    const undone = await supervisor.post(`/api/aftersales/${item.number}/undo-complete`, {
+      version: completed.version,
+    });
+    expect(undone.status, await undone.clone().text()).toBe(200);
+    expect(ledgerItemSchema.parse(await undone.json())).toMatchObject({
+      status: 'in_progress',
+      ownerId: id,
+      ownerPending: true,
+    });
   });
 
   it('改派给正在被停用的人：等停用提交后被拒绝', async () => {

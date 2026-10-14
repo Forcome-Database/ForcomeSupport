@@ -177,7 +177,7 @@ test('P20 停用：选好接手人后「改派并停用」，成员表随之更�
   await loginAs(page, '刘洋');
   await page.goto('/settings/team');
   const team = teamSchema.parse(
-    await page.evaluate(async () => (await fetch('/api/org/team')).json()),
+    await page.evaluate(async () => (await fetch('/api/org/team')).json() as Promise<unknown>),
   );
   const chenchen = team.members.find((m) => m.name === '陈晨')!;
   const [auto, direct] = ['Forcome Auto', 'Forcome Direct'].map((name) =>

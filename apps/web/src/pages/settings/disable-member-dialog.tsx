@@ -185,7 +185,11 @@ function HandoverForm({ handover, onClose }: { handover: TeamHandover; onClose: 
       }
       if (error instanceof ApiRequestError && (error.status === 409 || error.fields?.member)) {
         // 成员或他的单刚被别人改过：弹窗与成员表按最新的刷新，重新选接手人；成员已不能停用（例如已被停用）时关掉弹窗
-        if (error.fields?.member) onClose();
+        const latest = await queryClient
+          .fetchQuery({ ...teamQuery, staleTime: 0 })
+          .catch(() => null);
+        const now = latest?.members.find((m) => m.id === handover.member.id);
+        if (error.fields?.member || (now && now.status !== 'active')) onClose();
         await queryClient.invalidateQueries({ queryKey: teamQuery.queryKey });
         showError({
           id: DISABLE_TOAST,
