@@ -238,6 +238,7 @@ export async function mergeInbound(
     logger.warn({ messageId }, '来信没有识别出店铺，暂不归并');
     return;
   }
+  // 以上与下面的识别结果、客户渠道身份几条，是 channel 的 listMergeableInboundIds 的条件（按时关闭等「要归并的来信」，待办 33），改一处要改另一处
   const { channel, site, source, sender } = recognition;
   if (!isTicketSource(source)) {
     // channel 不会为归档的来信发「来信已接收」；万一收到也不建工单

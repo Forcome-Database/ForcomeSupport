@@ -70,12 +70,19 @@ export function idleCloseOf(
 
 type TicketRow = typeof ticket.$inferSelect;
 
+/**
+ * 入库后最多等它归并多久：归并通常几秒，大批补拉后的积压也在几十分钟内；入库超过 1 小时仍没归并的（归并任务重试用完失败了，
+ * 另有 worker 自检的失败任务告警）不再挡住按时关闭，免得一封信让整个店铺的工单一直不关
+ */
+const MERGE_WAIT_MS = toMilliseconds({ hours: 1 });
+
 /** 按时关闭被挡住超过这么久（到期之后）记一条警告：多半是邮箱同步一直失败或有来信归并不了，要人去看 */
 const HELD_WARN_MS = toMilliseconds({ hours: 1 });
 
 /**
  * 到期前的来信是否都已看到（见文件头）：店铺的进线邮箱都同步到了到期时刻（回放里按回放时钟，回放逐封入库、跑完流水线才扫描，
- * 不看同步记录），且店铺在 (最近来信, 到期) 之间到达、要归并的来信都已在工单里。只看店铺：还没归并的信归哪张工单要归并了才知道
+ * 不看同步记录），且店铺在 (最近来信, 到期) 之间到达、要归并的来信都已在工单里（入库超过 MERGE_WAIT_MS 仍没归并的不等）。
+ * 只看店铺：还没归并的信归哪张工单要归并了才知道
  */
 async function mailSeenBefore(
   tx: Tx,
@@ -86,10 +93,12 @@ async function mailSeenBefore(
   if (!tx.replay && !(await mailSyncedThrough(tx.db, appEnv, current.storeId, dueAt))) {
     return false;
   }
-  const ids = await listMergeableInboundIds(tx.db, current.storeId, {
-    after: current.lastInboundAt,
-    before: dueAt,
-  });
+  const ids = await listMergeableInboundIds(
+    tx.db,
+    current.storeId,
+    { after: current.lastInboundAt, before: dueAt },
+    new Date(tx.now.getTime() - MERGE_WAIT_MS),
+  );
   if (ids.length === 0) return true;
   const merged = await tx.db
     .select({ id: ticketMessage.channelMessageId })

@@ -1,5 +1,5 @@
 {
-  "id": "d37958b9-736d-41bf-86da-ba1bccfd50a1",
+  "id": "12c68069-2d84-4f18-9501-2bad96f40567",
   "prevId": "d7d90a16-48db-4250-992e-a8e2dec7020b",
   "version": "7",
   "dialect": "postgresql",
@@ -886,6 +886,12 @@
         },
         "last_success_at": {
           "name": "last_success_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "synced_through": {
+          "name": "synced_through",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -3791,12 +3797,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "status_change_due_at": {
-          "name": "status_change_due_at",
-          "value": "(\"ticket\".\"status_change\".\"event\" IN ('idle_7_days', 'idle_14_days')) = (\"ticket\".\"status_change\".\"due_at\" IS NOT NULL) AND \"ticket\".\"status_change\".\"due_at\" <= \"ticket\".\"status_change\".\"occurred_at\""
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "ticket.ticket": {

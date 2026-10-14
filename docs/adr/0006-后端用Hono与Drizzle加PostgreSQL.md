@@ -139,3 +139,7 @@ status: accepted
 - **报表口径视图与部分索引**：`ticket.customer_trigger_event`、`ticket.customer_letter`（迁移 0031，见 ADR 0005「待办 24 落地」）。报表按到达时间取一段期间，配两个部分索引：`ticket_message (received_at) WHERE direction = 'inbound' AND source = 'customer'`、`status_change (channel_message_id) WHERE` 新建或重开。视图只放口径、不做聚合；以后变慢再改物化视图（规格 report 一节）。
 - **带参数的表达式不能在 GROUP BY 里重写一遍**：drizzle 把 `to_char(received_at AT TIME ZONE $1, …)` 这类表达式在 SELECT 与 GROUP BY 里各编一次参数号（`$1`、`$5`），PostgreSQL 认不出是同一列而报「must appear in the GROUP BY clause」。按选出的列分组时写序号（`groupBy(sql\`1, 2\`)`，`report/tickets.ts` 的每日工单量），或把时区等常量写成字面量。
 - **日界**：报表按北京时间的日期归期，期间换成 [起始日 0 点, 截止日次日 0 点) 的时刻比较（`@forcome/calendar` 的 `startOfBusinessDate`），每日的分组用 `to_char(… AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD')`。
+
+## 修订（2026-10-14，待办 33 落地）
+
+- **迁移 0034–0036**（按时关闭的到期时刻与邮箱同步到的时刻，ADR 0008「待办 33 落地」）：照「给已有数据的表加列分三步」——0034 生成迁移加 `ticket.status_change.due_at` 与 `channel.mailbox_sync.synced_through`（都可空），0035 用 `--custom` 回填已有按时关闭的到期时刻（`synced_through` 不回填，下次同步成功时写上），0036 生成迁移加约束「按时关闭 ⇔ 有到期时刻、不晚于发生时刻」。

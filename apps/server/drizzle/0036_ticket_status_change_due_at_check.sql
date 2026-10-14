@@ -1,0 +1,1 @@
+ALTER TABLE "ticket"."status_change" ADD CONSTRAINT "status_change_due_at" CHECK (("ticket"."status_change"."event" IN ('idle_7_days', 'idle_14_days')) = ("ticket"."status_change"."due_at" IS NOT NULL) AND "ticket"."status_change"."due_at" <= "ticket"."status_change"."occurred_at");

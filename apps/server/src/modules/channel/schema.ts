@@ -99,6 +99,11 @@ export const mailboxSync = channelSchema.table(
     watchedAt: timestamptz('watched_at'),
     /** 最近一次同步成功（取完游标之后的全部消息并入库）的时间；从没成功过为空 */
     lastSuccessAt: timestamptz('last_success_at'),
+    /**
+     * 最近一次同步成功取清单（history.list，或区间补拉的 messages.list）的时刻：那之前到达的信都已入库，入库期间新到的不在这次清单里。
+     * 按时关闭据此判断邮箱同步到了哪里（待办 33）；P18 的连接状态仍按最近同步成功。迁移 0034 之前没有，下一次同步成功时写上
+     */
+    syncedThrough: timestamptz('synced_through'),
     /** 连续失败的次数（watch 与同步的外部调用失败都算）；成功一次清零，满 3 次为连接异常 */
     consecutiveFailures: integer('consecutive_failures').notNull().default(0),
     /** 这一串连续失败的第 1 次的时间（K7「10:05 起连续 3 次」、G4「10:05 起未收取」）；没在失败为空 */

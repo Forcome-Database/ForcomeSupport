@@ -8,7 +8,7 @@ import {
 import { getDemoFixture } from '@forcome/fixtures';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { gmailPollJob, gmailSyncJob } from '../src/modules/channel';
+import { gmailPollJob, gmailSyncJob, mailSyncedThrough } from '../src/modules/channel';
 import { toMilliseconds } from '../src/modules/core';
 import {
   amazonOrdersClient,
@@ -240,6 +240,40 @@ describe('按时关闭前确认邮箱已同步、到期前的来信已归并（�
       ['idle_7_days', iso('2026-09-11T13:00:00+08:00'), iso('2026-09-11T10:00:00+08:00')],
       ['inbound_reopen', iso('2026-09-11T14:00:00+08:00'), null],
     ]);
+  });
+
+  it('到期前的来信入库超过 1 小时仍没归并（归并卡住）：不再挡住，照常关闭', async () => {
+    await awaitingCustomer('Rex Stuck', '2026-09-05T10:00:00+08:00');
+    gmail.deliver(letter('Rex Stuck', 2, '2026-09-12T09:30:00+08:00'));
+    // 09-12 10:05 同步入库，「来信已接收」一直没跑（模拟归并任务失败）
+    await travel('2026-09-12T10:05:00+08:00');
+    await t.enqueue(gmailPollJob, {});
+    await t.runJobs({ only: [gmailPollJob.name, gmailSyncJob.name] });
+    const scanOnly = async (at: string) => {
+      await travel(at);
+      await t.enqueue(ticketTimeLimitsJob, {});
+      await t.runJobs({ only: [gmailPollJob.name, gmailSyncJob.name, ticketTimeLimitsJob.name] });
+    };
+    await scanOnly('2026-09-12T11:04:00+08:00');
+    expect((await detailOf(agent, 'Rex Stuck')).ticket.status).toBe('awaiting_customer');
+    await scanOnly('2026-09-12T11:05:00+08:00');
+    expect((await detailOf(agent, 'Rex Stuck')).ticket.status).toBe('closed');
+    await t.runJobs();
+  });
+
+  it('邮箱同步的判断只看已开始监听的进线邮箱：watch 一直失败的（例如别名）不挡；开始监听后还没同步成功的挡', async () => {
+    await travel('2026-09-12T12:00:00+08:00');
+    await t.scanTimeLimits();
+    const at = new Date('2026-09-12T11:00:00+08:00');
+    expect(await mailSyncedThrough(t.runtime.db, 'test', AUTO.id, at)).toBe(true);
+    await t.runtime.db.execute(sql`
+      INSERT INTO channel.store_mailbox (store_id, address, position, created_at)
+      VALUES (${AUTO.id}, 'auto-alias@forcome.com', 9, now())`);
+    expect(await mailSyncedThrough(t.runtime.db, 'test', AUTO.id, at)).toBe(true);
+    await t.runtime.db.execute(sql`
+      INSERT INTO channel.mailbox_sync (address, history_id, watched_at, created_at, updated_at)
+      VALUES ('auto-alias@forcome.com', '1000', now(), now(), now())`);
+    expect(await mailSyncedThrough(t.runtime.db, 'test', AUTO.id, at)).toBe(false);
   });
 });
 

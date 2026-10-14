@@ -5,7 +5,7 @@ import {
   type ConnectionStatus,
   type SyncHealth,
 } from '@forcome/contracts';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import {
   recordAudit,
   systemActor,
@@ -26,8 +26,8 @@ import { mailboxSync, storeMailbox } from './schema';
  *   连续 3 次失败为连接异常，从没成功过为未连接，超过 10 分钟没同步成功为同步延迟）；
  * - 失败：watch、续订与同步的外部调用失败都记一次；连续第 3 次时转为连接异常——给在职的管理员与客服主管发站内通知
  *   （连接异常另排钉钉工作通知，org 的 notifyMembers 按 11.4 自动），记审计「连接异常」，全站横幅随之出现（alerts）；
- * - 成功：一次同步把游标之后的消息全部入库（游标过期时是区间补拉全部完成）才算，清零失败次数、记下这次取清单的时刻
- *   （那之前到达的信都已入库；按时关闭据此判断邮箱同步到了哪里，待办 33）；
+ * - 成功：一次同步把游标之后的消息全部入库（游标过期时是区间补拉全部完成）才算，清零失败次数、记下时间，另记这次取清单的时刻
+ *   （synced_through：那之前到达的信都已入库，按时关闭据此判断邮箱同步到了哪里，待办 33）；
  *   之前是连接异常的，发「Gmail 已恢复」（写补拉了几封来信）并记审计「恢复连接」，横幅随之消失。
  * 我们自己的错误（数据库、解析）不算连接失败：游标不前进，超过 10 分钟就显示同步延迟。
  */
@@ -60,9 +60,11 @@ export async function mailboxHealths(db: DbExecutor): Promise<MailboxHealth[]> {
 
 /**
  * 一个店铺的来信是否已经全部同步到某个时刻（ticket 按时关闭的前提「没看到全部来信前不关」，待办 33、ADR 0008 修订）：
- * 店铺的每个进线邮箱最近一次同步成功都不早于这个时刻（同步成功记的是这次取清单的时刻，那之前到达的信都已入库）。
- * 实时收信还没开（上线切换前，mail-cutover.ts：同步不入库、不记成败）、有邮箱从没同步成功过的，都算没同步到。
- * 店铺没有进线邮箱：不会再收到它的信，算已同步。历史回放不看这里（回放按到达时间逐封入库，回放时钟之前的信都已入库）
+ * 店铺每个已开始监听（有增量游标）的进线邮箱，最近一次同步成功取清单的时刻（synced_through，那之前到达的信都已入库）都不早于
+ * 这个时刻；开始监听之后还没同步成功过的算没同步到。还没开始监听的邮箱（watch 一直失败，例如 Gmail 不让 watch 的别名）不算在内：
+ * 它的信要等开始监听之后才收，那时只收之后到达的（上线后新加的邮箱不回放历史邮件），挡住关单也等不来；它的状态由 P18 的连接状态提示。
+ * 实时收信还没开（上线切换前，mail-cutover.ts：同步不入库、不记成败）一律算没同步到。
+ * 历史回放不看这里（回放按到达时间逐封入库，回放时钟之前的信都已入库）
  */
 export async function mailSyncedThrough(
   db: DbExecutor,
@@ -72,11 +74,11 @@ export async function mailSyncedThrough(
 ): Promise<boolean> {
   if (!(await liveMailOpen(db, appEnv))) return false;
   const rows = await db
-    .select({ lastSuccessAt: mailboxSync.lastSuccessAt })
+    .select({ syncedThrough: mailboxSync.syncedThrough })
     .from(storeMailbox)
-    .leftJoin(mailboxSync, eq(mailboxSync.address, storeMailbox.address))
-    .where(eq(storeMailbox.storeId, storeId));
-  return rows.every((row) => row.lastSuccessAt !== null && row.lastSuccessAt >= at);
+    .innerJoin(mailboxSync, eq(mailboxSync.address, storeMailbox.address))
+    .where(and(eq(storeMailbox.storeId, storeId), isNotNull(mailboxSync.historyId)));
+  return rows.every((row) => row.syncedThrough !== null && row.syncedThrough >= at);
 }
 
 /** 邮箱的连接状态（6.9：Gmail 超过 10 分钟没同步成功为同步延迟） */
@@ -171,8 +173,9 @@ export interface SyncedMail {
 }
 
 /**
- * 记一次同步成功（与推进游标在同一个事务里）：清零失败次数、记下这次取清单（history.list 或区间补拉的 messages.list）的时刻——
- * 不是入库完的时刻：入库期间新到的信不在这次的清单里。之前是连接异常的，发「Gmail 已恢复」并记审计
+ * 记一次同步成功（与推进游标在同一个事务里）：清零失败次数、记下时间，另记这次取清单（history.list 或区间补拉的 messages.list）
+ * 的时刻 listedAt（synced_through，按时关闭用：入库期间新到的信不在这次的清单里，所以不取入库完的时刻）。
+ * 之前是连接异常的，发「Gmail 已恢复」并记审计
  */
 export async function recordMailboxSuccess(
   tx: Tx,
@@ -191,7 +194,8 @@ export async function recordMailboxSuccess(
   await tx.db
     .update(mailboxSync)
     .set({
-      lastSuccessAt: listedAt,
+      lastSuccessAt: tx.now,
+      syncedThrough: listedAt,
       consecutiveFailures: 0,
       failingSince: null,
       lastError: null,
@@ -219,7 +223,7 @@ export async function recordMailboxSuccess(
     },
     after: {
       status: 'connected',
-      lastSuccessAt: listedAt.toISOString(),
+      lastSuccessAt: tx.now.toISOString(),
       backfilled:
         synced.count > 0 && synced.from && synced.to
           ? { count: synced.count, from: synced.from.toISOString(), to: synced.to.toISOString() }
