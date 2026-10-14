@@ -395,6 +395,15 @@ def notifications():
     return out
 
 
+def report_acceptance():
+    """AC-P1-14 的验收日（待办 24）：P17「每日工单量」下钻示例那天（P1_DRILL，09-10）两组渠道的单数（亚马逊 52、Shopify 与邮件 21）。
+    示例工单里那天只有几张，验收时另按这两个数构造客户来信（apps/server 的 reportAcceptanceMails），每封新建一张工单。"""
+    day = d.P1_DRILL['label'][:5]
+    _, amazon, others = [x for x in d.REPORT['daily'] if x[0] == day][0]
+    assert amazon + others == d.P1_DRILL['count']
+    return {'date': date(day), 'amazon': amazon, 'shopifyEmail': others}
+
+
 def build():
     return {
         'meta': {
@@ -423,6 +432,7 @@ def build():
         'amazonOrders': amazon_orders(),
         'unassignedMail': unassigned_mail(),
         'notifications': notifications(),
+        'reportAcceptance': report_acceptance(),
     }
 
 

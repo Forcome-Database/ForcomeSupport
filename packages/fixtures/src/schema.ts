@@ -292,6 +292,15 @@ export const demoFixtureSchema = z.object({
   shopifyReadAllOrders: z.boolean(),
   amazonOrders: z.array(fixtureAmazonOrderSchema),
   unassignedMail: z.array(fixtureUnassignedMailSchema),
+  /**
+   * AC-P1-14 的验收日（待办 24）：P17「每日工单量」下钻示例那天与两组渠道的单数（亚马逊 52、Shopify 与邮件 21，共 73）。
+   * 示例工单里那天只有几张，验收时按这两个数另行构造客户来信（每封新建一张工单，当天没有重复重开）
+   */
+  reportAcceptance: z.object({
+    date: day,
+    amazon: z.int().positive(),
+    shopifyEmail: z.int().positive(),
+  }),
 });
 
 export type DemoFixture = z.infer<typeof demoFixtureSchema>;

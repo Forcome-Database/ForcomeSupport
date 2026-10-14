@@ -230,3 +230,74 @@ function ticketMails(fixture: DemoFixture): ReplayMail[] {
     return mails;
   });
 }
+
+/** 验收日的来信从当天几点开始、每封隔几分钟（73 封落在 09:00–17:24，都在同一个北京时间的日子里） */
+const ACCEPTANCE_START = 'T09:00:00+08:00';
+const ACCEPTANCE_STEP_MS = 7 * 60_000;
+
+/**
+ * AC-P1-14 的验收夹具（待办 24）：在验收日（fixture.reportAcceptance，示例的 09-10）构造亚马逊 52、Shopify 与邮件 21 封客户来信，
+ * 每封来自不同的客户、不带订单号，归并后各新建一张工单——当天客户来信触发的新建正好 73 次，没有同一工单的重复重开。
+ * 亚马逊的轮流寄到两个亚马逊店铺（Forcome Direct 按 US / CA / MX 三个站点的中转域，Forcome Auto 只有 US）；其余的一半做成
+ * Shopify 联系表单通知、一半是直邮，轮流寄到两个 Shopify 店铺。客户邮箱、Message-ID 与 Gmail 消息 ID 都带验收日，
+ * 重复投递按 Gmail 消息 ID 去重（开发测试环境的冒烟每次部署都会投一次），也不会与示例来信的客户撞上
+ */
+export function reportAcceptanceMails(fixture: DemoFixture): ReplayMail[] {
+  const { date, amazon, shopifyEmail } = fixture.reportAcceptance;
+  const storeOf = (key: string) => {
+    const store = fixture.stores.find((s) => s.key === key);
+    if (!store) throw new Error(`验收夹具要的店铺 ${key} 不在夹具里`);
+    return store;
+  };
+  const amazonStores = [storeOf('amz-direct'), storeOf('amz-auto')];
+  const shopifyStores = [storeOf('shop-com'), storeOf('shop-mx')];
+  const tag = date.replaceAll('-', '');
+  const start = Date.parse(`${date}${ACCEPTANCE_START}`);
+  return Array.from({ length: amazon + shopifyEmail }, (_, i): ReplayMail => {
+    const n = String(i + 1).padStart(2, '0');
+    const name = `Acceptance ${tag} Buyer ${n}`;
+    const at = new Date(start + i * ACCEPTANCE_STEP_MS).toISOString();
+    const ids = {
+      messageId: `<report-acceptance-${tag}-${n}@demo.forcome.invalid>`,
+      gmailId: `report-acceptance-${tag}-${n}`,
+    };
+    if (i < amazon) {
+      const store = amazonStores[i % amazonStores.length]!;
+      const site = store.sites[Math.floor(i / amazonStores.length) % store.sites.length]!;
+      const from = { name, address: fixtureCustomerAddress(name, amazonDomains[site].relay) };
+      return {
+        mailbox: store.mailbox,
+        sent: false,
+        mail: {
+          to: store.mailbox,
+          from,
+          subject: `Question about my vacuum (${n})`,
+          text: amazonRelayText('Hello, I have a question about my vacuum.', null),
+          at,
+          ...ids,
+        },
+      };
+    }
+    const j = i - amazon;
+    const store = shopifyStores[j % shopifyStores.length]!;
+    const from = { name, address: fixtureCustomerAddress(name) };
+    const body = 'Hello, I have a question about my vacuum.';
+    return {
+      mailbox: store.mailbox,
+      sent: false,
+      mail: {
+        to: store.mailbox,
+        ...(j % 2 === 0
+          ? {
+              from: { name: store.name, address: SHOPIFY_CONTACT_FORM_SENDER },
+              headers: { 'Reply-To': from.address },
+              text: contactFormText(from, store.defaultSite, body, null),
+            }
+          : { from, text: body }),
+        subject: `Question about my vacuum (${n})`,
+        at,
+        ...ids,
+      },
+    };
+  });
+}

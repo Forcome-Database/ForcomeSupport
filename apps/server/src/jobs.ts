@@ -16,6 +16,7 @@ import {
   listOrderStores,
   outboundSyncedJob,
   placeUnassignedJob,
+  reportAcceptanceJob,
   storeChangedJob,
 } from './modules/channel';
 import {
@@ -56,6 +57,7 @@ export const jobDefinitions: readonly AnyJobDefinition[] = [
   memberDisabledJob,
   storeChangedJob,
   placeUnassignedJob,
+  reportAcceptanceJob,
   gmailSyncJob,
   gmailPollJob,
   gmailRenewWatchJob,

@@ -10,6 +10,7 @@ import {
   renewWatches,
   syncMailbox,
 } from './gmail-sync';
+import { deliverReportAcceptance, reportAcceptanceJob } from './dev-acceptance';
 import { placeMatchingMail } from './unassigned';
 
 /**
@@ -50,6 +51,11 @@ export function createChannelJobHandlers(deps: { clients: IntegrationClients }):
     handleJob(gmailSyncJob, (payload, context) => syncMailbox(deps.clients, payload, context)),
     handleJob(gmailPollJob, (_payload, { runtime, logger }) => pollMailboxes(runtime, logger)),
     handleJob(gmailRenewWatchJob, (_payload, context) => renewWatches(deps.clients, context)),
+    // AC-P1-14 的验收夹具（只在非生产环境由开发接口排入，待办 24）
+    handleJob(reportAcceptanceJob, (_payload, context) => {
+      deliverReportAcceptance(deps.clients, context);
+      return Promise.resolve();
+    }),
   ];
 }
 

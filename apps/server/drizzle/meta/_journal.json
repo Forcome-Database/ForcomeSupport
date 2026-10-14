@@ -218,6 +218,13 @@
       "when": 1791969434845,
       "tag": "0030_aftersales_reassign_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791976716076,
+      "tag": "0031_report_ticket_views",
+      "breakpoints": true
     }
   ]
 }

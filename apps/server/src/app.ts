@@ -4,7 +4,12 @@ import { sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import type { ServerDeps } from './deps';
 import { aftersalesHandover, createAftersalesRoutes } from './modules/aftersales';
-import { createChannelRoutes, listStoreChoices, storeNamesById } from './modules/channel';
+import {
+  createChannelRoutes,
+  createDevAcceptanceRoutes,
+  listStoreChoices,
+  storeNamesById,
+} from './modules/channel';
 import {
   AccessDeniedError,
   FieldValidationError,
@@ -26,6 +31,7 @@ import {
   devDingtalkScanAvailable,
   devLoginAvailable,
 } from './modules/org';
+import { createReportRoutes } from './modules/report';
 import { createTicketRoutes, ticketNumbersOfMessages } from './modules/ticket';
 
 const DATABASE_CHECK_TIMEOUT_MS = 3_000;
@@ -132,6 +138,7 @@ export function createApp(deps: AppDeps) {
   app.route('/', createChannelRoutes({ runtime, appEnv: config.appEnv, clients, logger }));
   app.route('/', createTicketRoutes({ runtime, appEnv: config.appEnv }));
   app.route('/', createAftersalesRoutes({ runtime, appEnv: config.appEnv }));
+  app.route('/', createReportRoutes({ runtime, appEnv: config.appEnv }));
   // P27 审计日志在 org（查看范围看角色、店铺范围与财务权限）；店铺名与来信所在的工单号由这里注入 channel、ticket 的查询
   // （org 不依赖它们）
   app.route(
@@ -147,6 +154,8 @@ export function createApp(deps: AppDeps) {
     app.route('/', createDevLoginRoutes({ runtime, appEnv: config.appEnv }));
     // 示例通知与开发登录同一个开关（产生通知的业务上线前，演示与 Playwright 用）
     app.route('/', createDevNotificationRoutes({ runtime, appEnv: config.appEnv }));
+    // AC-P1-14 的验收夹具（P17 的 Playwright 用，待办 24）：worker 在验收日投 73 封客户来信
+    app.route('/', createDevAcceptanceRoutes({ runtime, appEnv: config.appEnv }));
   }
   if (devDingtalkScanAvailable(config, clients)) {
     // 钉钉的开发工具（钉钉用 Fake 时）：模拟扫码走扫码登录的回调页；模拟回到通讯录（P20 的 e2e 可重复执行）

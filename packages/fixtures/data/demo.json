@@ -2116,5 +2116,10 @@
       "at": "2026-09-11T10:05:00+08:00",
       "read": false
     }
-  ]
+  ],
+  "reportAcceptance": {
+    "date": "2026-09-10",
+    "amazon": 52,
+    "shopifyEmail": 21
+  }
 }

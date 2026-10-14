@@ -150,6 +150,10 @@ export const ticketMessage = ticketSchema.table(
   (t) => [
     uniqueIndex('ticket_message_channel_message_key').on(t.channelMessageId),
     index('ticket_message_ticket_idx').on(t.ticketId, t.receivedAt),
+    // 报表与 P04 下钻按到达时间取客户来信（customer_letter、customer_trigger_event 视图，24）
+    index('ticket_message_customer_received_idx')
+      .on(t.receivedAt)
+      .where(sql`${t.direction} = 'inbound' AND ${t.source} = 'customer'`),
     // 每分钟扫描：过了截止仍未到期的改为未达标
     index('ticket_message_sla_pending_idx')
       .on(t.slaDueAt)
@@ -217,8 +221,69 @@ export const statusChange = ticketSchema.table(
     channelMessageId: uuid('channel_message_id'),
     occurredAt: timestamptz('occurred_at').notNull(),
   },
-  (t) => [index('status_change_ticket_idx').on(t.ticketId, t.occurredAt)],
+  (t) => [
+    index('status_change_ticket_idx').on(t.ticketId, t.occurredAt),
+    // 新建与重开按触发的来信找（customer_trigger_event 视图，24）
+    index('status_change_trigger_message_idx')
+      .on(t.channelMessageId)
+      .where(
+        sql`${t.event} = 'inbound_reopen' OR (${t.event} = 'inbound' AND ${t.fromStatus} IS NULL)`,
+      ),
+  ],
 );
+
+/**
+ * 客户来信触发的新建与重开（工单量的事件，PRD P17「指标口径」、D-24）：每个事件一行——新建（从「无」迁出的 inbound）与重开
+ * （inbound_reopen）的状态变更记录，按触发的来信（channel_message_id）关联工单消息，只取来源为客户的；归期取触发那封来信的到达时间
+ * （业务时刻，ADR 0008「待办 18 落地」），渠道是那封来信自己的渠道，店铺与站点取工单的。
+ * P04 按事件下钻（ticket-status.ts 的 customerTriggerEvents）与报表的工单量、「每日工单量」的柱（report，待办 24）都从这一个视图数，
+ * 两处的条数因此一致（AC-P1-14）。读它的查询都要显式施加店铺范围（store_id；ADR 0010，报表绕过了仓储层的编译期保护）
+ */
+export const customerTriggerEvent = ticketSchema
+  .view('customer_trigger_event', {
+    statusChangeId: uuid('status_change_id').notNull(),
+    ticketId: uuid('ticket_id').notNull(),
+    storeId: uuid('store_id').notNull(),
+    site: text('site', { enum: sites }).notNull(),
+    receivedAt: timestamptz('received_at').notNull(),
+    channel: text('channel', { enum: ticketChannels }).notNull(),
+  })
+  .as(
+    sql`SELECT ${statusChange.id} AS status_change_id, ${statusChange.ticketId} AS ticket_id,
+  ${ticket.storeId} AS store_id, ${ticket.site} AS site,
+  ${ticketMessage.receivedAt} AS received_at, ${ticketMessage.channel} AS channel
+FROM ${statusChange}
+JOIN ${ticketMessage} ON ${ticketMessage.channelMessageId} = ${statusChange.channelMessageId}
+JOIN ${ticket} ON ${ticket.id} = ${statusChange.ticketId}
+WHERE (${statusChange.event} = 'inbound_reopen' OR (${statusChange.event} = 'inbound' AND ${statusChange.fromStatus} IS NULL))
+  AND ${ticketMessage.direction} = 'inbound' AND ${ticketMessage.source} = 'customer'`,
+  );
+
+/**
+ * 客户来信（首响中位数、SLA 达标率按封计，PRD P17「指标口径」、R-SL-08）：工单里来源为客户的每封来信一行，按到达时间归期；
+ * 已回复 = 有首次回复，SLA 结果 达标 / 未达标 / 未到期 / 无需回复；渠道是来信自己的渠道，店铺与站点取工单的。
+ * P04 按封下钻（queries.ts）与报表的首响中位数、SLA 达标率（report，待办 24）都从这一个视图数。还没归并的未归属店铺来信不在这里
+ * （在 channel.message，报表的「全部店铺」口径另计，协调者 2026-10-14 决定 Q4）。读它的查询都要显式施加店铺范围
+ */
+export const customerLetter = ticketSchema
+  .view('customer_letter', {
+    ticketMessageId: uuid('ticket_message_id').notNull(),
+    ticketId: uuid('ticket_id').notNull(),
+    storeId: uuid('store_id').notNull(),
+    site: text('site', { enum: sites }).notNull(),
+    receivedAt: timestamptz('received_at').notNull(),
+    channel: text('channel', { enum: ticketChannels }),
+    firstReplyAt: timestamptz('first_reply_at'),
+    slaResult: text('sla_result', { enum: slaResults }),
+  })
+  .as(
+    sql`SELECT ${ticketMessage.id} AS ticket_message_id, ${ticketMessage.ticketId} AS ticket_id,
+  ${ticket.storeId} AS store_id, ${ticket.site} AS site, ${ticketMessage.receivedAt} AS received_at,
+  ${ticketMessage.channel} AS channel, ${ticketMessage.firstReplyAt} AS first_reply_at, ${ticketMessage.slaResult} AS sla_result
+FROM ${ticketMessage}
+JOIN ${ticket} ON ${ticket.id} = ${ticketMessage.ticketId}
+WHERE ${ticketMessage.direction} = 'inbound' AND ${ticketMessage.source} = 'customer'`,
+  );
 
 /**
  * 还没找到工单的我方回复（R-SL-08 乱序：回复先于它所回复的来信入库，16）：回复识别按 In-Reply-To、References、Gmail 线程

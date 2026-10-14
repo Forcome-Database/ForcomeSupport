@@ -4,11 +4,11 @@ import {
   type TicketEvent,
   type TicketTrigger,
 } from '@forcome/contracts';
-import { and, asc, desc, eq, gte, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import { updateWithVersion, type Actor, type DbExecutor, type Tx } from '../core';
 import { ticketsChanged } from './changes';
 import { transition, type Transition } from './lifecycle';
-import { statusChange, ticket, ticketMessage } from './schema';
+import { customerTriggerEvent, statusChange, ticket } from './schema';
 
 /*
  * 工单状态的唯一写入口（ADR 0008「状态迁移只能经迁移表完成」）：新建与迁移都先问迁移表（lifecycle.ts），
@@ -159,11 +159,10 @@ export async function listStatusChanges(db: DbExecutor, ticketId: string) {
 }
 
 /**
- * 客户来信触发的新建与重开（工单量的事件，PRD P17「指标口径」、D-24；P04 按事件下钻，待办 18）：新建（从「无」迁出的 inbound）
- * 与重开（inbound_reopen）的状态变更记录，按触发的来信关联工单消息，只计来源为客户的；归期按业务时刻——触发那封来信的到达时间
- * （同 P05 状态流转的写法，ADR 0008「待办 18 落地」修订：Gmail 中断后补拉、示例回放把几天的邮件压在一刻处理时，处理时刻会把事件
- * 全挤到处理的那一天），渠道看触发那封来信自己的渠道。按工单汇总成子查询（ticketId、count），由列表查询连接，店铺范围与其余筛选
- * 在那边施加。报表（待办 24）按同一口径计数
+ * 客户来信触发的新建与重开（工单量的事件，PRD P17「指标口径」、D-24；P04 按事件下钻，待办 18）：从视图 customer_trigger_event
+ * （schema.ts，迁移 0031）数——新建（从「无」迁出的 inbound）与重开（inbound_reopen）、触发来信来源为客户，归期按业务时刻（触发那封来信的
+ * 到达时间，ADR 0008「待办 18 落地」修订），渠道看触发那封来信自己的渠道。报表（report，待办 24）的工单量与「每日工单量」的柱从同一个
+ * 视图数（AC-P1-14）。按工单汇总成子查询（ticketId、count），由列表查询连接，店铺范围与其余筛选在那边施加
  */
 export function customerTriggerEvents(
   db: DbExecutor,
@@ -172,24 +171,18 @@ export function customerTriggerEvents(
 ) {
   return db
     .select({
-      ticketId: statusChange.ticketId,
+      ticketId: customerTriggerEvent.ticketId,
       count: sql<number>`count(*)::int`.as('drill_count'),
     })
-    .from(statusChange)
-    .innerJoin(ticketMessage, eq(ticketMessage.channelMessageId, statusChange.channelMessageId))
+    .from(customerTriggerEvent)
     .where(
       and(
-        or(
-          and(eq(statusChange.event, 'inbound'), isNull(statusChange.fromStatus)),
-          eq(statusChange.event, 'inbound_reopen'),
-        ),
-        eq(ticketMessage.source, 'customer'),
-        gte(ticketMessage.receivedAt, window.start),
-        lt(ticketMessage.receivedAt, window.end),
-        channels ? inArray(ticketMessage.channel, [...channels]) : undefined,
+        gte(customerTriggerEvent.receivedAt, window.start),
+        lt(customerTriggerEvent.receivedAt, window.end),
+        channels ? inArray(customerTriggerEvent.channel, [...channels]) : undefined,
       ),
     )
-    .groupBy(statusChange.ticketId)
+    .groupBy(customerTriggerEvent.ticketId)
     .as('drill');
 }
 

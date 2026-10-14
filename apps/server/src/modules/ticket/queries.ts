@@ -28,7 +28,7 @@ import {
 } from 'drizzle-orm';
 import { storeNamesById } from '../channel';
 import { storeScopeCondition, type DbExecutor, type StoreScope } from '../core';
-import { customer, ticket, ticketMessage } from './schema';
+import { customer, customerLetter, ticket, ticketMessage } from './schema';
 import { customerTriggerEvents } from './ticket-status';
 
 /*
@@ -138,36 +138,35 @@ function windowOf(range: { readonly from: string; readonly to: string }) {
 }
 
 /**
- * 下钻的子查询（ticketId、count）：按事件计为客户来信触发的新建或重开（ticket-status.ts），按封计为到达的客户来信
- * （首响中位数的「已回复」= 有首次回复，SLA 达标率按 SLA 结果）；渠道看被计数的来信自己的渠道
+ * 下钻的子查询（ticketId、count）：按事件计为客户来信触发的新建或重开（ticket-status.ts，视图 customer_trigger_event），按封计为到达的
+ * 客户来信（视图 customer_letter；首响中位数的「已回复」= 有首次回复，SLA 达标率按 SLA 结果）；渠道看被计数的来信自己的渠道。
+ * 报表（report，待办 24）从同两个视图数，两处条数一致
  */
 function drillSubquery(db: DbExecutor, drill: TicketDrill) {
   const window = windowOf(drill.range);
   const channels = drill.channel ? ticketDrillChannelMembers[drill.channel] : null;
   if (drill.kind === 'triggered') return customerTriggerEvents(db, window, channels);
   const letter: Record<NonNullable<TicketDrill['letter']>, SQL> = {
-    replied: isNotNull(ticketMessage.firstReplyAt),
-    met: eq(ticketMessage.slaResult, 'met'),
-    missed: eq(ticketMessage.slaResult, 'missed'),
-    pending: eq(ticketMessage.slaResult, 'pending'),
+    replied: isNotNull(customerLetter.firstReplyAt),
+    met: eq(customerLetter.slaResult, 'met'),
+    missed: eq(customerLetter.slaResult, 'missed'),
+    pending: eq(customerLetter.slaResult, 'pending'),
   };
   return db
     .select({
-      ticketId: ticketMessage.ticketId,
+      ticketId: customerLetter.ticketId,
       count: sql<number>`count(*)::int`.as('drill_count'),
     })
-    .from(ticketMessage)
+    .from(customerLetter)
     .where(
       and(
-        eq(ticketMessage.direction, 'inbound'),
-        eq(ticketMessage.source, 'customer'),
-        gte(ticketMessage.receivedAt, window.start),
-        lt(ticketMessage.receivedAt, window.end),
-        channels ? inArray(ticketMessage.channel, [...channels]) : undefined,
+        gte(customerLetter.receivedAt, window.start),
+        lt(customerLetter.receivedAt, window.end),
+        channels ? inArray(customerLetter.channel, [...channels]) : undefined,
         drill.letter ? letter[drill.letter] : undefined,
       ),
     )
-    .groupBy(ticketMessage.ticketId)
+    .groupBy(customerLetter.ticketId)
     .as('drill');
 }
 
