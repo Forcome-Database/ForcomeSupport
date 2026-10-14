@@ -143,4 +143,4 @@ status: accepted
 
 ## 修订（2026-10-14，待办 23 落地）
 
-- **领域事件「成员已停用」**（`org.member_disabled`，重试 5 次、退避）：钉钉离职停用与 P20 停用的事务里排入，`aftersales` 处理（改派队列，见 ADR 0005 修订）。处理器只标还没标过的进行中单（`reassign_queued_at IS NULL`，`FOR UPDATE`），任务重试或重复的事件不重复审计、不重复通知。
+- **领域事件「成员已停用」**（`org.member_disabled`，重试 5 次、退避）：钉钉离职停用与 P20 停用的事务里排入，`aftersales` 处理（改派队列，见 ADR 0005 修订）。处理器只处理钉钉离职的（手工停用已在同一事务里改派），只标还没标过的进行中单（`reassign_queued_at IS NULL`，`FOR UPDATE`），任务重试或重复的事件不重复审计、不重复通知。

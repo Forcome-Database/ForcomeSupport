@@ -23,7 +23,7 @@ import {
   type StoreScope,
 } from '../core';
 import { listFactories, listParts } from '../factory';
-import { listAftersalesOwners, type Access } from '../org';
+import { listAftersalesOwners, lockMembersForShare, type Access } from '../org';
 import { findTicketReference, type TicketReference } from '../ticket';
 import { actorName, auditSnapshot } from './audit';
 import { convertFees, feeColumnValues, type FeeValue } from './fees';
@@ -124,6 +124,10 @@ export async function registrationLookups(
 ): Promise<RegistrationLookups> {
   const m = registrationMessages;
   const errors: FieldErrors = {};
+  // 选的负责人的成员行先加共享锁，再读在职的售后负责人：与停用串行（协调者 2026-10-14 决定 R2）
+  if (input.ownerId && (changed('ownerId') || changed('storeId'))) {
+    await lockMembersForShare(db, [input.ownerId]);
+  }
   const [stores, owners, factories, parts] = await Promise.all([
     listStoreOptions(db, access.stores),
     listAftersalesOwners(db),

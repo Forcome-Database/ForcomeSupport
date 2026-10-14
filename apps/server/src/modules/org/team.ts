@@ -2,6 +2,8 @@ import {
   roles as allRoles,
   disableBlockedReason,
   handoverError,
+  handoverPlan,
+  handoverStale,
   isTeamMember,
   orderedRoles,
   sameRoles,
@@ -39,7 +41,12 @@ import {
 } from '../core';
 import { dingtalkSyncHealth } from './dingtalk-sync';
 import { memberDisabledJob } from './events';
-import { listAftersalesOwners, memberAuditSnapshot, memberScopeValue } from './members';
+import {
+  listAftersalesOwners,
+  lockMembersForShare,
+  memberAuditSnapshot,
+  memberScopeValue,
+} from './members';
 import { member } from './schema';
 import { closeMemberSessions, type MemberRow } from './session';
 
@@ -320,9 +327,14 @@ function handoverMemberOf(row: MemberRow): TeamHandover['member'] {
   };
 }
 
-/** 成员表里的人（有客服系统角色的成员）；不是的为 null */
-async function teamMemberRow(db: DbExecutor, id: string): Promise<MemberRow | null> {
-  const [row] = await db.select().from(member).where(eq(member.id, id)).limit(1);
+/** 成员表里的人（有客服系统角色的成员）；不是的为 null。forUpdate：停用时锁住这一行（与登记、改派时的共享锁串行） */
+async function teamMemberRow(
+  db: DbExecutor,
+  id: string,
+  forUpdate = false,
+): Promise<MemberRow | null> {
+  const query = db.select().from(member).where(eq(member.id, id)).limit(1);
+  const [row] = forUpdate ? await query.for('update') : await query;
   return row && isTeamMember(row.roles) ? row : null;
 }
 
@@ -355,8 +367,10 @@ export async function teamHandover(
 
 /**
  * 「改派并停用」（AC-ST-02、K10 第一阶段）：同一事务里改派他负责的进行中售后单并停用（原因「管理员停用」，通讯录同步不会恢复）、
- * 删掉他的会话、审计「停用成员」，发「成员已停用」事件。先比版本号（G7，409），再看能不能停用（已停用、自己、最后一位在职管理员：
- * 报在 member 上）与接手人（没人可接手、没选、选的人不能接：报在 handover 上，400）。不在成员表里为 null
+ * 删掉他的会话、审计「停用成员」，发「成员已停用」事件。锁住他的成员行（FOR UPDATE）与接手人的成员行（FOR SHARE）后按当前数据重查
+ * 他负责的进行中售后单（协调者 2026-10-14 决定 R2）：先比成员版本号（G7，409），再看能不能停用（已停用、自己、最后一位在职管理员：
+ * 报在 member 上）、有没有人可接手（报在 handover 上，400）、弹窗里列的单还是不是这些（单号与版本对不上 409，弹窗刷新后再选）、
+ * 接手人对不对（没选、选的人不能接：handover，400）。这样停用后不会留下无人负责的进行中单。不在成员表里为 null
  */
 export async function disableTeamMember(
   tx: Tx,
@@ -366,16 +380,26 @@ export async function disableTeamMember(
   handover: MemberHandover,
 ): Promise<TeamMember | null> {
   await advisoryLock(tx, TEAM_LOCK);
-  const row = await teamMemberRow(tx.db, memberId);
+  const row = await teamMemberRow(tx.db, memberId, true);
   if (!row) return null;
   if (row.version !== input.version) throw new OptimisticLockError('org.member', row.id);
+  await lockMembersForShare(
+    tx.db,
+    input.assignments.flatMap((item) => (item.ownerId ? [item.ownerId] : [])),
+  );
 
   const selfId = actor.kind === 'member' ? actor.memberId : '';
   const blocked = disableBlockedReason(toTeamMember(row), selfId, await activeAdminCount(tx.db));
   if (blocked) throw new FieldValidationError({ member: blocked });
   const cases = await handover.openCases(tx.db, row.id);
   const owners = await otherOwners(tx.db, row.id);
-  const error = handoverError({ member: handoverMemberOf(row), cases, owners }, input.assignments);
+  const current = { member: handoverMemberOf(row), cases, owners };
+  const plan = handoverPlan(current);
+  if (plan.kind === 'blocked') throw new FieldValidationError({ handover: plan.reason });
+  if (handoverStale(cases, input.assignments)) {
+    throw new OptimisticLockError('aftersales', row.id);
+  }
+  const error = handoverError(current, input.assignments);
   if (error) throw new FieldValidationError({ handover: error });
 
   const updated = await updateWithVersion(tx, member, row, {

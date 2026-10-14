@@ -31,7 +31,7 @@ import { AFTERSALES_QUERY_KEY, registrationOptionsQuery } from '@/lib/aftersales
 import { api, ApiRequestError } from '@/lib/api';
 import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { endSessionIfUnauthenticated } from '@/lib/session';
-import { CANCEL, REASSIGN, STALE } from './p13-copy';
+import { REASSIGN, STALE } from './p13-copy';
 
 /*
  * 改派负责人（PRD P13「第一阶段」、S15 补充小样 · 改派负责人与待分配，协调者 2026-10-14 决定 Q8）：照取消弹窗的样子——
@@ -127,7 +127,7 @@ export function ReassignDialog({ item, onClose }: { item: LedgerItem; onClose: (
       <AlertDialogContent className="w-115">
         <AlertDialogHeader
           title={REASSIGN.title(item.number)}
-          description={CANCEL.description(item.customerName ?? '', method, responsibility)}
+          description={REASSIGN.description(item.customerName ?? '', method, responsibility)}
         />
         <AlertDialogBody asChild>
           <div className="flex flex-col gap-3 text-foreground">

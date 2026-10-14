@@ -222,7 +222,9 @@ export function LedgerPage() {
   const canRegister = can(member.roles, 'aftersales.register');
   // 行尾「更多」：能设为已完成或取消的角色才有（坐席没有，原型 S13 坐席视角）
   const showMore =
-    can(member.roles, 'aftersales.edit_open') || can(member.roles, 'aftersales.cancel');
+    can(member.roles, 'aftersales.edit_open') ||
+    can(member.roles, 'aftersales.cancel') ||
+    can(member.roles, 'aftersales.reassign_owner');
   const search = ledgerSearchSchema.parse(useSearch({ strict: false }));
   const navigate = useNavigate();
   const query = ledgerQueryOf(search);

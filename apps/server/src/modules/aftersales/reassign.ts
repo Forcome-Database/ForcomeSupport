@@ -25,12 +25,13 @@ import {
 } from '../core';
 import {
   listAftersalesOwners,
+  lockMembersForShare,
   memberNamesById,
   notifyMembers,
   type Access,
   type MemberHandover,
 } from '../org';
-import { auditSnapshot, ownerNameOf } from './audit';
+import { actorNameOf, auditSnapshot, ownerNameOf } from './audit';
 import { findOwnedAftersales, type AftersalesRow } from './ledger';
 import { aftersales } from './schema';
 
@@ -59,7 +60,7 @@ async function writeOwner(
       ownerId: owner.id,
       reassignQueuedAt: null,
       updatedAt: tx.now,
-      updatedByName: actor.kind === 'member' ? actor.name : null,
+      updatedByName: actorNameOf(actor),
     },
   );
   await recordAudit(tx, actor, {
@@ -92,6 +93,8 @@ export async function reassignAftersales(
   if (!aftersalesActions(access.member, found).reassign) throw new AccessDeniedError(m.denied);
 
   return transaction(runtime, async (tx) => {
+    // 接手人的成员行先加共享锁再读在职的售后负责人：与停用串行（协调者 2026-10-14 决定 R2）
+    if (input.ownerId) await lockMembersForShare(tx.db, [input.ownerId]);
     const owners = await listAftersalesOwners(tx.db);
     const candidates = reassignCandidates(owners, found.storeId, found.ownerId);
     const owner = candidates.find((candidate) => candidate.id === input.ownerId);
@@ -121,8 +124,8 @@ function openCasesOf(db: DbExecutor, memberId: string) {
 
 /**
  * P20 停用成员时的售后单（org 的 MemberHandover，由 app.ts 注入）：列出他负责的进行中售后单；在停用的事务里按选好的接手人改派
- * （接手人已由 org 按 contracts 的 handoverError 校验过：有该单店铺范围的在职售后负责人）。列出之后被别人改过的单版本对不上，
- * 整个停用回滚（409）
+ * （org 已锁住成员行、按当前数据重查这些单并与弹窗提交的单号与版本核对，接手人也已按 contracts 的 handoverError 校验过）。
+ * 写入仍带版本号，万一并发改动了单，整个停用回滚（409）
  */
 export const aftersalesHandover: MemberHandover = {
   async openCases(db, memberId): Promise<HandoverCase[]> {
@@ -150,25 +153,33 @@ export const aftersalesHandover: MemberHandover = {
       const ownerId = chosen.get(item.id);
       if (!ownerId) throw new Error(`售后单 ${item.number} 没有接手人`);
       const [found] = await tx.db.select().from(aftersales).where(eq(aftersales.id, item.id));
-      // 列出之后被别人改过（含刚设为已完成、改了负责人）：整个停用回滚，弹窗刷新后再选
-      if (!found || found.version !== item.version) {
-        throw new OptimisticLockError('aftersales', item.id);
-      }
-      await writeOwner(tx, actor, found, { id: ownerId, name: names.get(ownerId) ?? '' });
+      if (!found) throw new OptimisticLockError('aftersales', item.id);
+      await writeOwner(
+        tx,
+        actor,
+        { ...found, version: item.version },
+        {
+          id: ownerId,
+          name: names.get(ownerId) ?? '',
+        },
+      );
     }
   },
 };
 
 /**
- * 「成员已停用」→ 改派队列（AC-ST-05）：他负责、还没改派的进行中售后单标为「待分配」（记进入队列的时刻，不改状态，负责人仍是他），
- * 每张记审计「进入改派队列」（操作人「系统」）；按店铺各发一条站内通知给店铺范围包含该店铺的在职客服主管（11.4，notifyMembers）。
- * 已标过的不再标（任务重试不重复通知）；管理员停用时已在弹窗里改派，一般没有要标的单
+ * 「成员已停用」→ 改派队列（AC-ST-05）：钉钉离职停用的，他负责、还没改派的进行中售后单标为「待分配」（记进入队列的时刻，不改状态，
+ * 负责人仍是他），每张记审计「进入改派队列」（操作人「系统」）；按店铺各发一条站内通知给店铺范围包含该店铺的在职客服主管
+ * （11.4，notifyMembers）。已标过的不再标（任务重试不重复通知）。他之后又回到通讯录也照标：恢复在职时角色已清空，不再能负责售后单。
+ * 管理员停用的不进队列：停用时已锁住成员行、在同一事务里改派了全部进行中单，登记与改派给他也被串行挡住（协调者 2026-10-14 决定 R2）
  */
 export async function queueOwnedCases(
   runtime: Runtime,
-  memberId: string,
+  event: { readonly memberId: string; readonly reason: 'manual' | 'dingtalk_left' },
   logger: Logger,
 ): Promise<void> {
+  if (event.reason !== 'dingtalk_left') return;
+  const { memberId } = event;
   const queued = await transaction(runtime, async (tx) => {
     const rows = await tx.db
       .select()

@@ -41,7 +41,8 @@ import { DISABLE } from './p20-copy';
  * 停用成员的二次确认（PRD P20「第一阶段」、K10 第一阶段补充小样，协调者 2026-10-14 决定 Q1–Q4；AC-ST-02）：
  * 只检查进行中售后单——区块「进行中售后单 N 张」列出单号与状态，下面一个「接手人」下拉（必要时按店铺各一个，
  * contracts 的 handoverPlan）；没人可接手时下拉置灰、字段下写原因、底部写怎么办、「改派并停用」置灰。
- * 「改派并停用」一次提交：改派与停用同一事务；成功浮层写改派给了谁；成员或他的单刚被别人改过（409）关掉弹窗、成员表刷新。
+ * 「改派并停用」一次提交：改派与停用同一事务；成功浮层写改派给了谁。成员或他的单刚被别人改过（409，含弹窗打开后又登记给他的新单）：
+ * 弹窗按最新的数据刷新、已选的接手人清空，成员表也刷新，失败浮层说明已刷新（协调者 2026-10-14 决定 R2）；成员已不能停用时关掉弹窗。
  */
 
 const DISABLE_TOAST = 'team-disable';
@@ -72,7 +73,12 @@ export function DisableMemberDialog({
       <AlertDialogContent className="w-130">
         <AlertDialogHeader tone="warning" title={DISABLE.title(member.name)} />
         {handover.data ? (
-          <HandoverForm handover={handover.data} onClose={onClose} />
+          // 刷新后单变了：表单重来（已选的接手人清空）
+          <HandoverForm
+            key={handover.data.cases.map((c) => `${c.id}:${c.version}`).join(',')}
+            handover={handover.data}
+            onClose={onClose}
+          />
         ) : (
           <>
             <AlertDialogBody asChild>
@@ -120,10 +126,17 @@ function HandoverForm({ handover, onClose }: { handover: TeamHandover; onClose: 
   const { name } = handover.member;
   const blocked = plan.kind === 'blocked' ? plan : null;
 
+  /** 弹窗里读到的各张单的版本（提交时带上，G7） */
+  const versions = new Map(handover.cases.map((item) => [item.id, item.version]));
+
   /** 选好的接手人 → 每张单交给谁 */
   const assignments = (): HandoverAssignment[] =>
     groups.flatMap((group) =>
-      group.caseIds.map((caseId) => ({ caseId, ownerId: chosen.get(groupKey(group)) ?? null })),
+      group.caseIds.map((caseId) => ({
+        caseId,
+        version: versions.get(caseId) ?? 0,
+        ownerId: chosen.get(groupKey(group)) ?? null,
+      })),
     );
 
   /** 停用一次：成功关闭弹窗、成员表换成最新的并提示；失败时抛出 */
@@ -171,8 +184,8 @@ function HandoverForm({ handover, onClose }: { handover: TeamHandover; onClose: 
         }
       }
       if (error instanceof ApiRequestError && (error.status === 409 || error.fields?.member)) {
-        // 成员或他的单刚被别人改过（或已被停用）：关掉弹窗、成员表刷新，说明已刷新
-        onClose();
+        // 成员或他的单刚被别人改过：弹窗与成员表按最新的刷新，重新选接手人；成员已不能停用（例如已被停用）时关掉弹窗
+        if (error.fields?.member) onClose();
         await queryClient.invalidateQueries({ queryKey: teamQuery.queryKey });
         showError({
           id: DISABLE_TOAST,

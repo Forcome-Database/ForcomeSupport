@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  activeAdminCount,
   disableBlockedReason,
   disableMessages,
   handoverError,
   handoverPlan,
+  handoverStale,
   isTeamMember,
   lastLoginWords,
   orderedRoles,
@@ -201,24 +203,50 @@ describe('停用弹窗的接手人（K10 第一阶段，待办 23，协调者 20
 
   it('校验：每张都要选、选的人要有该单店铺的范围', () => {
     const handover = { member, cases, owners: [autoOnly, directOnly] };
-    expect(handoverError(handover, [{ caseId: C1, ownerId: 'o-auto' }])).toBe(
+    expect(handoverError(handover, [{ caseId: C1, version: 0, ownerId: 'o-auto' }])).toBe(
       disableMessages.ownerRequired,
     );
     expect(
       handoverError(handover, [
-        { caseId: C1, ownerId: 'o-auto' },
-        { caseId: C2, ownerId: 'o-auto' },
+        { caseId: C1, version: 0, ownerId: 'o-auto' },
+        { caseId: C2, version: 0, ownerId: 'o-auto' },
       ]),
     ).toBe(disableMessages.ownerNotEligible);
     expect(
       handoverError(handover, [
-        { caseId: C1, ownerId: 'o-auto' },
-        { caseId: C2, ownerId: 'o-fd' },
+        { caseId: C1, version: 0, ownerId: 'o-auto' },
+        { caseId: C2, version: 0, ownerId: 'o-fd' },
       ]),
     ).toBeNull();
     expect(handoverError({ member, cases, owners: [] }, [])).toBe(
       '王磊是唯一的售后负责人，没有其他人可接手',
     );
+  });
+
+  it('弹窗里列的单与现在的不一样（被改过、少了、多了）：handoverStale', () => {
+    const now = [
+      { id: C1, version: 2 },
+      { id: C2, version: 0 },
+    ];
+    const sent = [
+      { caseId: C1, version: 2 },
+      { caseId: C2, version: 0 },
+    ];
+    expect(handoverStale(now, sent)).toBe(false);
+    expect(handoverStale(now, [{ ...sent[0]!, version: 1 }, sent[1]!])).toBe(true);
+    expect(handoverStale(now, [sent[0]!])).toBe(true);
+    expect(handoverStale([now[0]!], sent)).toBe(true);
+    expect(handoverStale([], [])).toBe(false);
+  });
+
+  it('在职管理员的人数', () => {
+    expect(
+      activeAdminCount([
+        { status: 'active', roles: ['admin'] },
+        { status: 'disabled', roles: ['admin'] },
+        { status: 'active', roles: ['agent'] },
+      ]),
+    ).toBe(1);
   });
 
   it('行尾「停用」不可用的原因：已停用、自己、最后一位在职管理员', () => {

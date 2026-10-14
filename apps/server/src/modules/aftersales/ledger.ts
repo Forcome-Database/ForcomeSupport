@@ -175,7 +175,7 @@ export function toLedgerItem(row: AftersalesRow, cost: CostRow, names: LedgerNam
     registeredById: row.registeredById,
     ownerId: row.ownerId,
     ownerName: row.ownerId ? (names.members.get(row.ownerId) ?? null) : null,
-    ownerPending: row.reassignQueuedAt !== null,
+    ownerPending: isOwnerPending(row),
     missing: missingOf(row),
     version: row.version,
     fees: feesOf(row),
@@ -367,8 +367,19 @@ export function defaultFeeDateRangeAt(now: Date): FeeDateRange {
   return defaultFeeDateRange(businessDate(now));
 }
 
-/** 待分配的单（钉钉离职进入改派队列，待办 23） */
-const pendingOwner = isNotNull(aftersales.reassignQueuedAt);
+/**
+ * 待分配的单（钉钉离职进入改派队列，待办 23）：已取消的不算（终态、没有可做的事，标记只作历史保留；协调者 2026-10-14 决定 R1），
+ * 已完成的仍算（可改派）
+ */
+const pendingOwner = and(
+  isNotNull(aftersales.reassignQueuedAt),
+  ne(aftersales.status, 'cancelled'),
+);
+
+/** 这一行是不是待分配（同上） */
+export function isOwnerPending(row: Pick<AftersalesRow, 'reassignQueuedAt' | 'status'>): boolean {
+  return row.reassignQueuedAt !== null && row.status !== 'cancelled';
+}
 
 /**
  * 这次按的费用发生日起止：没给的一端取本月的那一端（北京时间，按注入的时钟；S13 补充小样）；筛出缺字段时不按日期，为 null。

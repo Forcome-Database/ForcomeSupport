@@ -189,6 +189,8 @@ test('P20 停用：选好接手人后「改派并停用」，成员表随之更�
     name,
     stores: { all: false, storeIds },
   });
+  // 第一次提交时 0092 刚被别人改过（版本 0 → 1）：409，弹窗按最新的刷新后重新选
+  let changed = false;
   await page.route(`**/api/org/team/members/${chenchen.id}/handover`, (route) =>
     route.fulfill({
       json: {
@@ -205,7 +207,7 @@ test('P20 停用：选好接手人后「改派并停用」，成员表随之更�
             number: 'S-20260911-0092',
             status: 'in_progress',
             store: direct,
-            version: 0,
+            version: changed ? 1 : 0,
           },
         ],
         owners: [
@@ -222,6 +224,14 @@ test('P20 停用：选好接手人后「改派并停用」，成员表随之更�
   };
   await page.route(`**/api/org/team/members/${chenchen.id}/disable`, async (route) => {
     submitted = route.request().postDataJSON();
+    if (!changed) {
+      changed = true;
+      await route.fulfill({
+        status: 409,
+        json: { error: 'optimistic_lock', message: '数据已被他人修改' },
+      });
+      return;
+    }
     await route.fulfill({ json: disabled });
   });
 
@@ -240,6 +250,18 @@ test('P20 停用：选好接手人后「改派并停用」，成员表随之更�
   await dialog(page).getByLabel('接手人 · Forcome Direct').click();
   await page.getByRole('option', { name: '郑八（售后负责人）' }).click();
   await dialog(page).getByRole('button', { name: '改派并停用' }).click();
+  // 409：弹窗留着、按最新的刷新，已选的接手人清空；失败浮层说明已刷新
+  await expect(page.getByText('停用失败：数据已被他人修改')).toBeVisible();
+  await expect(page.getByText('已刷新为最新内容，请核对后再操作。')).toBeVisible();
+  await expect(dialog(page).getByLabel('接手人 · Forcome Auto')).toHaveText('请选择');
+  for (const [label, name] of [
+    ['接手人 · Forcome Auto', '孙杰（售后负责人）'],
+    ['接手人 · Forcome Direct', '郑八（售后负责人）'],
+  ] as const) {
+    await dialog(page).getByLabel(label).click();
+    await page.getByRole('option', { name }).click();
+  }
+  await dialog(page).getByRole('button', { name: '改派并停用' }).click();
 
   await expect(dialog(page)).toHaveCount(0);
   await expect(page.getByText('已停用 陈晨')).toBeVisible();
@@ -247,8 +269,8 @@ test('P20 停用：选好接手人后「改派并停用」，成员表随之更�
   expect(submitted).toEqual({
     version: chenchen.version,
     assignments: [
-      { caseId: ids[0], ownerId: '0199a000-0000-7000-8000-0000000000b1' },
-      { caseId: ids[1], ownerId: '0199a000-0000-7000-8000-0000000000b2' },
+      { caseId: ids[0], version: 0, ownerId: '0199a000-0000-7000-8000-0000000000b1' },
+      { caseId: ids[1], version: 1, ownerId: '0199a000-0000-7000-8000-0000000000b2' },
     ],
   });
   await expect(teamRow(page, '陈晨')).toContainText('已停用');

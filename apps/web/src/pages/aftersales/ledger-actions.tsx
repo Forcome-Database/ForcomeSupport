@@ -149,6 +149,11 @@ function completeBlocked(item: LedgerItem): string {
   return MORE.reasons.notEditor;
 }
 
+/** 改派负责人不可用只有一种：这张单已取消（客服主管、售后负责人对其余的单都能改派） */
+function reassignBlocked(): string {
+  return MORE.reasons.cancelled;
+}
+
 function cancelBlocked(item: LedgerItem): string {
   return item.status === 'completed' ? MORE.reasons.cancelCompleted : MORE.reasons.cancelled;
 }
@@ -195,7 +200,7 @@ export function MoreMenu({
             {MORE.reassign}
           </DropdownMenuItem>
         ) : (
-          <BlockedItem icon={<Users />} label={MORE.reassign} reason={MORE.reasons.cancelled} />
+          <BlockedItem icon={<Users />} label={MORE.reassign} reason={reassignBlocked()} />
         )}
         <DropdownMenuSeparator />
         {actions.cancel ? (

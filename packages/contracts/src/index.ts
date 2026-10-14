@@ -494,6 +494,8 @@ export {
   handoverCaseSchema,
   handoverError,
   handoverPlan,
+  handoverStale,
+  activeAdminCount,
   teamDisableSchema,
   teamHandoverSchema,
   type HandoverAssignment,

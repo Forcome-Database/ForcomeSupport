@@ -167,6 +167,22 @@ export async function listAftersalesOwners(db: DbExecutor): Promise<OwnerOption[
 }
 
 /**
+ * 给这些成员的行加共享锁（FOR SHARE，按 id 排序防死锁），之后在同一事务里读到的在职状态与角色不会被并发的停用改掉
+ * （协调者 2026-10-14 决定 R2）：新建登记、编辑登记改负责人、改派与停用弹窗的接手人在校验负责人之前调用。停用成员持行锁
+ * （FOR UPDATE）、钉钉离职停用改成员行，都与它串行——停用先提交则校验时他已不在职，登记先提交则停用重查时会发现新单
+ */
+export async function lockMembersForShare(db: DbExecutor, ids: readonly string[]): Promise<void> {
+  const unique = [...new Set(ids)].sort();
+  if (unique.length === 0) return;
+  await db
+    .select({ id: member.id })
+    .from(member)
+    .where(inArray(member.id, unique))
+    .orderBy(member.id)
+    .for('share');
+}
+
+/**
  * 保存密度偏好。只是个人的界面偏好：不加版本号（不与管理员在 P20 改角色、店铺范围互相冲突），
  * 也不记审计（不是业务数据）。
  */

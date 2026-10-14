@@ -15,7 +15,9 @@ import {
   type TeamHandover,
 } from '@forcome/contracts';
 import { getDemoFixture } from '@forcome/fixtures';
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { DbTransaction } from '../src/modules/core';
 import { dingtalkClient } from '../src/modules/integration';
 import { dingtalkReconcileJob } from '../src/modules/org';
 import type { ApiClient } from './api-client';
@@ -158,30 +160,22 @@ describe('P20 停用成员：弹窗里选接手人，改派与停用同一事务
     expect(handover.owners.map((o) => o.name).sort()).toEqual(['孙杰', '王磊']);
 
     const version = handover.member.version;
+    const assign = (ownerId: string | null) =>
+      handover.cases.map((c) => ({ caseId: c.id, version: c.version, ownerId }));
     // 没选接手人：被拒绝
-    expect(await fieldsOf(await disable(admin, zhaoliu, version, []))).toEqual({
+    expect(await fieldsOf(await disable(admin, zhaoliu, version, assign(null)))).toEqual({
       handover: '请选择接手人',
     });
+    // 弹窗里列的单不全（没带第二张）：单号与版本对不上，409，没有停用
+    expect((await disable(admin, zhaoliu, version, assign(sunjie).slice(0, 1))).status).toBe(409);
     // 选了不是售后负责人的人（坐席李婷）：被拒绝
     const agent = memberId('liting');
-    expect(
-      await fieldsOf(
-        await disable(
-          admin,
-          zhaoliu,
-          version,
-          handover.cases.map((c) => ({ caseId: c.id, ownerId: agent })),
-        ),
-      ),
-    ).toEqual({ handover: '只能选有该店铺数据范围的售后负责人' });
+    expect(await fieldsOf(await disable(admin, zhaoliu, version, assign(agent)))).toEqual({
+      handover: '只能选有该店铺数据范围的售后负责人',
+    });
     expect(await memberStatus(admin, zhaoliu)).toBe('active');
 
-    const res = await disable(
-      admin,
-      zhaoliu,
-      version,
-      handover.cases.map((c) => ({ caseId: c.id, ownerId: sunjie })),
-    );
+    const res = await disable(admin, zhaoliu, version, assign(sunjie));
     expect(res.status, await res.clone().text()).toBe(200);
     expect(await memberStatus(admin, zhaoliu)).toBe('disabled');
     // 会话立即失效
@@ -504,6 +498,130 @@ describe('钉钉离职自动停用：售后单进入改派队列（AC-ST-05）�
         }),
       ),
     ).toEqual({ status: '这张单已取消' });
+    // 已取消的单不算待分配（协调者 2026-10-14 决定 R1）：筛选不列，负责人列写原负责人
+    expect(cancelled.ownerPending).toBe(false);
+    expect((await ledger(supervisor, '?owner=pending')).items.map((i) => i.number)).not.toContain(
+      cancelled.number,
+    );
+  });
+});
+
+describe('停用与登记、改派串行：停用后不留无人负责的进行中单（协调者 2026-10-14 决定 R2）', () => {
+  let t: TestHarness;
+  let admin: ApiClient;
+  let supervisor: ApiClient;
+
+  beforeAll(async () => {
+    t = await startTestHarness();
+    await t.loadFixtures();
+    admin = await t.loginAs('管理员');
+    supervisor = await t.loginAs('客服主管');
+  });
+
+  afterAll(async () => {
+    await t.close();
+  });
+
+  /** 开一个事务、做完 work 后停住，直到 release；返回 release 与事务结束的 Promise（模拟另一个请求正持有行锁） */
+  function holdTransaction(work: (db: DbTransaction) => Promise<unknown>) {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let locked!: () => void;
+    const ready = new Promise<void>((resolve) => (locked = resolve));
+    const done = t.runtime.db.transaction(async (db) => {
+      await work(db);
+      locked();
+      await gate;
+    });
+    return { ready, release, done };
+  }
+
+  /** 这个 Promise 在 ms 毫秒内还没有结果（被锁挡住了） */
+  async function stillPending(promise: Promise<unknown>, ms = 300): Promise<boolean> {
+    const marker = Symbol('pending');
+    const winner = await Promise.race([
+      promise.then(() => null),
+      new Promise((resolve) => setTimeout(() => resolve(marker), ms)),
+    ]);
+    return winner === marker;
+  }
+
+  async function ownerWithCase(name: string) {
+    const id = await t.addMember({
+      name,
+      dept: 'FSH / 售后部',
+      roles: ['aftersales_owner'],
+      allStores: true,
+    });
+    const item = await register(supervisor, adjusted(DIRECT.id, id));
+    return { id, item };
+  }
+
+  it('登记先提交：停用等登记的锁，重查发现弹窗里没有的新单，409，没有停用', async () => {
+    const { id, item } = await ownerWithCase('冯一');
+    const handover = await handoverOf(admin, id);
+    const assignments = handover.cases.map((c) => ({
+      caseId: c.id,
+      version: c.version,
+      ownerId: WANG,
+    }));
+    // 另一个请求正在登记一张负责人是冯一的单：持有冯一成员行的共享锁，并把示例单 0018 记到他名下
+    const holder = holdTransaction(async (db) => {
+      await db.execute(sql`SELECT id FROM org.member WHERE id = ${id} FOR SHARE`);
+      await db.execute(
+        sql`UPDATE aftersales.aftersales SET owner_id = ${id} WHERE number = 'S-20260911-0018'`,
+      );
+    });
+    await holder.ready;
+    const stop = disable(admin, id, handover.member.version, assignments);
+    expect(await stillPending(stop)).toBe(true);
+    holder.release();
+    await holder.done;
+    expect((await stop).status).toBe(409);
+    expect(await memberStatus(admin, id)).toBe('active');
+    expect((await handoverOf(admin, id)).cases.map((c) => c.number)).toEqual(
+      [item.number, 'S-20260911-0018'].sort(),
+    );
+  });
+
+  it('停用先提交：登记等停用的锁，之后负责人已停用，登记被拒绝', async () => {
+    const { id } = await ownerWithCase('褚二');
+    // 另一个请求正在停用褚二：持有他成员行的排他锁，已改为停用
+    const holder = holdTransaction(async (db) => {
+      await db.execute(sql`SELECT id FROM org.member WHERE id = ${id} FOR UPDATE`);
+      await db.execute(
+        sql`UPDATE org.member SET status = 'disabled', disabled_reason = 'manual', disabled_at = now() WHERE id = ${id}`,
+      );
+    });
+    await holder.ready;
+    const registering = supervisor.post('/api/aftersales/registrations', adjusted(COM.id, id));
+    expect(await stillPending(registering)).toBe(true);
+    holder.release();
+    await holder.done;
+    const res = await registering;
+    expect(await fieldsOf(res)).toMatchObject({ ownerId: '只能选有该店铺数据范围的售后负责人' });
+  });
+
+  it('改派给正在被停用的人：等停用提交后被拒绝', async () => {
+    const { id } = await ownerWithCase('卫三');
+    const target = await caseOf(supervisor, 'S-20260911-0019');
+    const holder = holdTransaction(async (db) => {
+      await db.execute(sql`SELECT id FROM org.member WHERE id = ${id} FOR UPDATE`);
+      await db.execute(
+        sql`UPDATE org.member SET status = 'disabled', disabled_reason = 'manual', disabled_at = now() WHERE id = ${id}`,
+      );
+    });
+    await holder.ready;
+    const reassigning = supervisor.post(`/api/aftersales/${target.number}/reassign`, {
+      version: target.version,
+      ownerId: id,
+    });
+    expect(await stillPending(reassigning)).toBe(true);
+    holder.release();
+    await holder.done;
+    expect(await fieldsOf(await reassigning)).toEqual({
+      ownerId: '只能选有该店铺数据范围的售后负责人',
+    });
   });
 });
 

@@ -331,6 +331,8 @@ export const CANCEL = {
 /** 改派负责人的弹窗（S15 补充小样 · 改派负责人与待分配，协调者 2026-10-14 决定 Q8；没人可接手的报错是 contracts 的 reassignMessages） */
 export const REASSIGN = {
   title: (number: string) => `改派 ${number}？`,
+  /** 标题下的说明（同取消弹窗：客户 · 处理方式 · 责任） */
+  description: CANCEL.description,
   current: '现在的负责人',
   pendingOwner: (name: string) => `待分配（原负责人 ${name} 已停用）`,
   owner: '接手人',

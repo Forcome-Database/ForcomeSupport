@@ -1,12 +1,17 @@
 import { PENDING_OWNER_WORDS } from '@forcome/contracts';
-import type { DbExecutor } from '../core';
+import type { Actor, DbExecutor } from '../core';
 import { memberNamesById, type Access } from '../org';
 import { feesOf } from './fees';
 import { keptFeesOf, ratiosOf, type AftersalesRow } from './ledger';
 
 /** 审计与「最近保存的人」里的操作人姓名（系统写入为空） */
+export function actorNameOf(actor: Actor): string | null {
+  return actor.kind === 'member' ? actor.name : null;
+}
+
+/** 同上，取接口的访问上下文里的操作人 */
 export function actorName(access: Access): string | null {
-  return access.actor.kind === 'member' ? access.actor.name : null;
+  return actorNameOf(access.actor);
 }
 
 /** 负责人姓名（审计快照用；离职的也取得到） */

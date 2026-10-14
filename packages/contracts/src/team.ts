@@ -3,6 +3,8 @@ import {
   aftersalesStatusSchema,
   ownerOptionSchema,
   ownersForStore,
+  reassignMessages,
+  registrationMessages,
   type OwnerOption,
 } from './aftersales';
 import { relativeTimeWords } from './audit-log';
@@ -222,8 +224,8 @@ export const disableMessages = {
   self: '不能停用自己',
   disabled: '这位成员已停用',
   lastAdmin: teamMessages.lastAdmin,
-  ownerRequired: '请选择接手人',
-  ownerNotEligible: '只能选有该店铺数据范围的售后负责人',
+  ownerRequired: reassignMessages.ownerMissing,
+  ownerNotEligible: registrationMessages.ownerNotEligible,
   onlyOwner: (name: string) => `${name}是唯一的售后负责人，没有其他人可接手`,
   noOwner: '没有在职的售后负责人可接手',
   noOwnerFix: '请先在成员表为其他成员分配售后负责人角色',
@@ -260,9 +262,10 @@ export const teamHandoverSchema = z.object({
 });
 export type TeamHandover = z.infer<typeof teamHandoverSchema>;
 
-/** 一张单交给谁；没选为 null */
+/** 一张单交给谁（没选为 null），带弹窗里读到的这张单的版本（G7：列出之后被别人改过就不停用） */
 export const handoverAssignmentSchema = z.object({
   caseId: z.uuid(),
+  version: z.int(),
   ownerId: z.uuid().nullable(),
 });
 export type HandoverAssignment = z.infer<typeof handoverAssignmentSchema>;
@@ -338,6 +341,25 @@ export function handoverPlan(
       candidates: ownersForStore(owners, store.id),
     })),
   };
+}
+
+/**
+ * 弹窗里列的单与现在的不一样了（有单被改过、不再是他负责的进行中单，或又登记了新的给他）：后端据此整笔回滚、409（G7），
+ * 弹窗刷新后再选（协调者 2026-10-14 决定 R2）
+ */
+export function handoverStale(
+  cases: readonly Pick<HandoverCase, 'id' | 'version'>[],
+  assignments: readonly Pick<HandoverAssignment, 'caseId' | 'version'>[],
+): boolean {
+  const seen = new Map(assignments.map((item) => [item.caseId, item.version]));
+  return (
+    cases.length !== assignments.length || cases.some((item) => seen.get(item.id) !== item.version)
+  );
+}
+
+/** 在职管理员的人数（「最后一位在职管理员」不能停用；前端按成员表算） */
+export function activeAdminCount(members: readonly Pick<TeamMember, 'status' | 'roles'>[]): number {
+  return members.filter((m) => m.status === 'active' && m.roles.includes('admin')).length;
 }
 
 /**

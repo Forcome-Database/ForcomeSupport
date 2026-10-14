@@ -1,4 +1,4 @@
-import { syncedAtWords, type Team, type TeamMember } from '@forcome/contracts';
+import { activeAdminCount, syncedAtWords, type Team, type TeamMember } from '@forcome/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBlocker, useSearch } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
@@ -381,10 +381,7 @@ export function TeamPage() {
                 cellId={cellId}
                 onRoles={(member, roles) => edit(member, { roles })}
                 onStores={(member, stores) => edit(member, { stores })}
-                activeAdmins={
-                  data?.members.filter((m) => m.status === 'active' && m.roles.includes('admin'))
-                    .length ?? 0
-                }
+                activeAdmins={activeAdminCount(data?.members ?? [])}
                 onDisable={setDisabling}
               />
             )}
