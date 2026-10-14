@@ -137,6 +137,37 @@ export const PERMISSIONS = {
   none: '—',
 } as const;
 
+/** 成员行尾「更多」（K10 第一阶段补充小样 ⑤）：只有「停用」；不可用的原因是 contracts 的 disableMessages */
+export const MEMBER_MENU = { disable: '停用' } as const;
+
+/**
+ * 停用成员的二次确认（K10 第一阶段补充小样，协调者 2026-10-14 决定 Q1–Q4）：只检查进行中售后单；没人可接手时的原因与怎么办是
+ * contracts 的 disableMessages
+ */
+export const DISABLE = {
+  title: (name: string) => `停用成员${name}？`,
+  note: (name: string) =>
+    `停用后${name}不能登录，现有会话立即失效；历史记录与操作日志保留。改派与停用记入审计日志。`,
+  cases: '进行中售后单',
+  count: (count: number) => `${count} 张`,
+  noCases: '没有进行中的售后单，无需改派',
+  owner: '接手人',
+  ownerForStore: (store: string) => `接手人 · ${store}`,
+  hint: '只列有该店铺范围的售后负责人',
+  placeholder: '请选择',
+  none: '没有可选的售后负责人',
+  option: (name: string) => `${name}（售后负责人）`,
+  dismiss: '取消',
+  confirm: '改派并停用',
+  doneTitle: (name: string) => `已停用 ${name}`,
+  doneReassigned: (count: number, owners: readonly string[]) =>
+    `${count} 张售后单已改派给 ${owners.join('、')}，已记入审计日志。`,
+  doneNone: '已记入审计日志。',
+  failedAction: '停用',
+  /** 成员或他的售后单刚被别人改过（G7）：关掉弹窗、成员表刷新 */
+  stale: '已刷新为最新内容，请核对后再操作。',
+} as const;
+
 /** 只给读屏器的说明（原型上不画，测试不核对） */
 export const A11Y = {
   membersRegion: MEMBER_SECTION.label,
@@ -145,4 +176,5 @@ export const A11Y = {
   editStores: (name: string) => `修改${name}的数据范围`,
   saveBar: '保存修改',
   stores: '店铺',
+  more: (name: string) => `${name} 的更多操作`,
 } as const;

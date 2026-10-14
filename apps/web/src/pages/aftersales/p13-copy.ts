@@ -49,6 +49,8 @@ export const FILTERS = {
   responsibility: '责任',
   status: '状态',
   owner: '负责人',
+  /** 负责人筛选「全部」之后的第一项（S15 补充小样 · 改派负责人与待分配，待办 23） */
+  pendingOwner: '待分配',
   all: '全部',
   clear: '清除筛选',
   /** 芯片「名称：值」中间的冒号 */
@@ -284,6 +286,7 @@ export const BACKFILL_RESULT = {
 /** 行尾「更多」（S15 ①；改派负责人随待办 23）与不可用时悬停的原因（S15 补充小样） */
 export const MORE = {
   complete: '设为已完成',
+  reassign: '改派负责人',
   cancel: '取消售后单',
   reasons: {
     completed: '这张单已完成',
@@ -323,6 +326,30 @@ export const CANCEL = {
   doneTitle: (number: string) => `已取消售后单 ${number}`,
   doneDescription: '已记入审计日志。',
   failedAction: '取消售后单',
+} as const;
+
+/** 改派负责人的弹窗（S15 补充小样 · 改派负责人与待分配，协调者 2026-10-14 决定 Q8；没人可接手的报错是 contracts 的 reassignMessages） */
+export const REASSIGN = {
+  title: (number: string) => `改派 ${number}？`,
+  current: '现在的负责人',
+  pendingOwner: (name: string) => `待分配（原负责人 ${name} 已停用）`,
+  owner: '接手人',
+  placeholder: '请选择',
+  none: '没有可选的售后负责人',
+  hint: '只列有该店铺范围的售后负责人',
+  option: (name: string) => `${name}（售后负责人）`,
+  dismiss: '取消',
+  confirm: '改派',
+  doneTitle: (number: string) => `已改派 ${number}`,
+  doneDescription: (before: string, after: string) =>
+    `负责人：${before} → ${after}，已记入审计日志。`,
+  failedAction: '改派',
+} as const;
+
+/** 负责人列：待分配的单写「待分配」（警示色），悬停写原负责人（S15 补充小样） */
+export const OWNER_CELL = {
+  pending: '待分配',
+  pendingTip: (name: string) => `原负责人 ${name} 已停用`,
 } as const;
 
 /**

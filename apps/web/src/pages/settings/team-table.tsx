@@ -1,4 +1,5 @@
 import {
+  disableBlockedReason,
   lastLoginWords,
   memberStatusLabels,
   type Role,
@@ -7,9 +8,12 @@ import {
   type TeamStore,
 } from '@forcome/contracts';
 import { createColumnHelper, metaHelper, tableFeatures, useTable } from '@tanstack/react-table';
+import { CircleX } from 'lucide-react';
 import { useLayoutEffect } from 'react';
+import { BlockedItem, RowMenuTrigger } from '@/components/row-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -21,14 +25,14 @@ import {
 } from '@/components/ui/table';
 import { avatarText, roleAvatarTone } from '@/lib/avatar';
 import { cn } from '@/lib/utils';
-import { MEMBER_TABLE } from './p20-copy';
+import { A11Y, MEMBER_MENU, MEMBER_TABLE } from './p20-copy';
 import { DISABLED_MEMBER_REASON, RoleCell, ScopeCell } from './team-cells';
 import { changedCells, type TeamCell, type TeamEdits } from './team-edits';
 
 /*
  * P20 成员表（原型 build_settings.member_table(lang=False)，参照图 P20_SettingsTeam）：
- * 成员（头像 + 姓名 + 邮箱）· 钉钉部门 · 角色 · 数据范围 · 状态 · 最近登录；第一阶段没有「语言」列。
- * 行尾「更多」（停用，K10）随待办 23 加上，本期不显示这一列（2026-10-06 用户确认）。
+ * 成员（头像 + 姓名 + 邮箱）· 钉钉部门 · 角色 · 数据范围 · 状态 · 最近登录 · 行尾「更多」（只有「停用」，K10 第一阶段补充小样，
+ * 待办 23）；第一阶段没有「语言」列。
  * 列定义交给 TanStack Table（ADR 0007「后续表格照 ledger-table.tsx 写」），列宽照原型 grid-template-columns
  * 「minmax(0, 1fr) 150px 190px 110px 90px 110px」换算（含单元格内边距）写在列的 meta；行上下 11。
  * 角色与数据范围两格可以直接改（team-cells.tsx），改过的行首格左侧画警示色条（K6 row_tones），从 P27 点成员进来的行为选中态
@@ -51,6 +55,10 @@ interface TableMeta {
   readonly cellId: (memberId: string, cell: TeamCell) => string;
   readonly onRoles: (member: TeamMember, roles: Role[]) => void;
   readonly onStores: (member: TeamMember, stores: StoreScopeValue) => void;
+  /** 在职管理员的人数（最后一位在职管理员不能停用） */
+  readonly activeAdmins: number;
+  /** 行尾「更多」点了「停用」 */
+  readonly onDisable: (member: TeamMember) => void;
 }
 
 const features = tableFeatures({
@@ -163,6 +171,34 @@ const COLUMN_DEFS = helper.columns([
       </span>
     ),
     meta: { width: 132 },
+  }),
+  helper.display({
+    id: 'more',
+    header: '',
+    cell: ({ row, table }) => {
+      const meta = table.options.meta!;
+      const member = row.original;
+      const reason = disableBlockedReason(member, meta.selfId, meta.activeAdmins);
+      return (
+        <DropdownMenu>
+          <RowMenuTrigger label={A11Y.more(member.name)} />
+          <DropdownMenuContent align="end" className="w-35">
+            {reason ? (
+              <BlockedItem icon={<CircleX />} label={MEMBER_MENU.disable} reason={reason} />
+            ) : (
+              <DropdownMenuItem
+                onSelect={() => meta.onDisable(member)}
+                className="text-destructive-text focus:text-destructive-text"
+              >
+                <CircleX />
+                {MEMBER_MENU.disable}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    },
+    meta: { width: 50 },
   }),
 ]);
 

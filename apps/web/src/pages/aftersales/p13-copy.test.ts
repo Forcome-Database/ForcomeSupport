@@ -17,6 +17,8 @@ import {
   ratioGroupWords,
   ratioPairsOf,
   ratioWords,
+  reassignMessages,
+  reassignQueueNotificationCopy,
   registrationMessages,
   responsibilityLabels,
 } from '@forcome/contracts';
@@ -44,9 +46,11 @@ import {
   NEW_REGISTRATION,
   NOT_KEPT,
   NOTE,
+  OWNER_CELL,
   PAGE_DESCRIPTION,
   PAGE_TITLE,
   rangeLabel,
+  REASSIGN,
   SAVE_RESULT,
   SHARE,
   LOOKUP,
@@ -517,5 +521,49 @@ describe('S14 编辑登记与补充小样之三（待办 21，10-05 用户确认
     expectText(STATES, EDIT.savedTitle);
     expectIn(STATES, EDIT.savedDescription('S-20260911-0020', 'Mateo Rivas'));
     expectIn(STATES, BACKFILL_RESULT.drawer('S-20260911-0018', ['寄出日期', '快递单号']));
+  });
+});
+
+describe('改派负责人与待分配（S15 补充小样，待办 23，协调者 2026-10-14 决定 Q5–Q9）', () => {
+  it('行尾「更多」的「改派负责人」，已取消的单禁用', () => {
+    expectIn(STATES, `>${MORE.reassign}</div>`);
+    expectText(STATES, MORE.reasons.cancelled);
+  });
+
+  it('改派弹窗：标题、说明、现在的负责人（含待分配）、接手人、提示与选项、按钮、没人可接', () => {
+    expectText(STATES, REASSIGN.title('S-20260911-0018'));
+    expectText(STATES, CANCEL.description('Laura Bennett', '寄配件', '产品质量问题'));
+    expectText(STATES, REASSIGN.current);
+    expectText(STATES, REASSIGN.pendingOwner('李婷'));
+    expectIn(STATES, `>${REASSIGN.owner}<span`);
+    expectText(STATES, REASSIGN.hint);
+    expectText(STATES, REASSIGN.option('赵倩'));
+    expectText(STATES, REASSIGN.none);
+    expectIn(STATES, reassignMessages.noCandidate);
+    expectText(STATES, REASSIGN.dismiss);
+    expectText(STATES, REASSIGN.confirm);
+  });
+
+  it('结果浮层与刚被别人改过', () => {
+    expectText(STATES, REASSIGN.doneTitle('S-20260911-0018'));
+    expectText(STATES, REASSIGN.doneDescription('王磊', '赵倩'));
+    expectText(STATES, `${REASSIGN.failedAction}失败：数据已被他人修改`);
+    expectText(STATES, STALE);
+  });
+
+  it('负责人筛选「待分配」与负责人列的写法', () => {
+    expectIn(
+      STATES,
+      `${FILTERS.owner}：<span style="font-weight: 600; color: #4338ca;">${FILTERS.pendingOwner}</span>`,
+    );
+    expectText(STATES, OWNER_CELL.pending);
+    expectText(STATES, OWNER_CELL.pendingTip('李婷'));
+  });
+
+  it('改派队列的站内通知（11.4）', () => {
+    const copy = reassignQueueNotificationCopy;
+    expectText(STATES, copy.title);
+    expectText(STATES, copy.body('李婷', 'Forcome Auto', 1));
+    expectText(STATES, copy.label);
   });
 });

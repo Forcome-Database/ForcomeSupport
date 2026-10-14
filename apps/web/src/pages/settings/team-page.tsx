@@ -54,6 +54,7 @@ import {
   type TeamConflict,
   type TeamEdits,
 } from './team-edits';
+import { DisableMemberDialog } from './disable-member-dialog';
 import { TeamMemberDrawer } from './team-member-drawer';
 import { TeamTable } from './team-table';
 
@@ -61,7 +62,7 @@ import { TeamTable } from './team-table';
  * P20 设置 · 团队与权限（第一阶段，PRD P20「第一阶段」、K6、K17、G7、G8；参照图 design/spec/shots/phase1/P20_SettingsTeam.png）：
  * 页头（不显示备用审批人）、页签「成员 N · 角色权限」；「成员」为成员表（第一阶段没有「语言」列）与「从钉钉添加」抽屉，
  * 「角色权限」为只读的权限矩阵（K17，由 contracts 的能力矩阵渲染）。角色与数据范围在格子里改，改过的留在页面上，
- * 由吸底保存栏统一保存（K6）：成功浮层写修改摘要；断网时保留修改、恢复后自动重试；有人已被别人改过时整批不保存，
+ * 行尾「更多 → 停用」打开停用弹窗（K10 第一阶段：选接手人后改派并停用，待办 23）。由吸底保存栏统一保存（K6）：成功浮层写修改摘要；断网时保留修改、恢复后自动重试；有人已被别人改过时整批不保存，
  * 表格上方给 G7 横幅（查看最新 / 覆盖保存）；有未保存的修改时离开本页先确认（G8），切页签不算离开。
  * 地址栏带了成员 ID（从 P27 点成员进来）时选中该行。
  */
@@ -88,6 +89,8 @@ export function TeamPage() {
   const [conflicts, setConflicts] = useState<TeamConflict[] | null>(null);
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const [adding, setAdding] = useState(false);
+  /** 行尾「更多 → 停用」的成员（K10） */
+  const [disabling, setDisabling] = useState<TeamMember | null>(null);
   /** 断网时等网络恢复后自动重试（K6） */
   const [waitingOnline, setWaitingOnline] = useState(false);
   const focusField = useFocusField();
@@ -378,6 +381,11 @@ export function TeamPage() {
                 cellId={cellId}
                 onRoles={(member, roles) => edit(member, { roles })}
                 onStores={(member, stores) => edit(member, { stores })}
+                activeAdmins={
+                  data?.members.filter((m) => m.status === 'active' && m.roles.includes('admin'))
+                    .length ?? 0
+                }
+                onDisable={setDisabling}
               />
             )}
           </section>
@@ -392,6 +400,8 @@ export function TeamPage() {
         stores={data?.stores ?? []}
         onClose={() => setAdding(false)}
       />
+
+      {disabling && <DisableMemberDialog member={disabling} onClose={() => setDisabling(null)} />}
 
       <OverwriteDialog
         conflict={conflictInfo}

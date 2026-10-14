@@ -16,7 +16,7 @@ import {
   type LedgerItem,
 } from '@forcome/contracts';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, CircleCheck, CircleX, Ellipsis } from 'lucide-react';
+import { ChevronRight, CircleCheck, CircleX, Users } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 import { FormField, useFocusField } from '@/components/form-field';
 import {
@@ -29,15 +29,14 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { BlockedItem, RowMenuTrigger } from '@/components/row-menu';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AFTERSALES_QUERY_KEY } from '@/lib/aftersales';
 import { centsOf, formatUsdCents } from '@/lib/cents';
 import { api, ApiRequestError } from '@/lib/api';
@@ -48,7 +47,7 @@ import { A11Y, CANCEL, COMPLETE_RESULT, COMPLETION, MORE, STALE } from './p13-co
 
 /*
  * P13 台账上的状态操作与完整率（PRD P13「第一阶段」、S13、S15 及其补充小样）：页头的当月登记完整率、点它筛出缺字段的
- * 已完成单的筛选芯片、行尾「更多」（设为已完成 5 秒撤销、取消售后单二次确认；改派负责人随待办 23）。
+ * 已完成单的筛选芯片、行尾「更多」（设为已完成 5 秒撤销、改派负责人、取消售后单二次确认）。
  * 谁能做什么按 contracts 的 aftersalesActions（与后端同一个判断）；不可用的项禁用并悬停写原因。
  */
 
@@ -154,54 +153,29 @@ function cancelBlocked(item: LedgerItem): string {
   return item.status === 'completed' ? MORE.reasons.cancelCompleted : MORE.reasons.cancelled;
 }
 
-/** 不可用的菜单项：禁用的样子，悬停写原因（Radix 的 disabled 收不到悬停，所以自己挡掉选择） */
-function BlockedItem({ icon, label, reason }: { icon: ReactNode; label: string; reason: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <DropdownMenuItem
-          aria-disabled
-          onSelect={(event) => event.preventDefault()}
-          className="text-placeholder focus:bg-transparent"
-        >
-          {icon}
-          {label}
-        </DropdownMenuItem>
-      </TooltipTrigger>
-      <TooltipContent side="left">{reason}</TooltipContent>
-    </Tooltip>
-  );
-}
-
 /**
- * 行尾「更多」（原型 more_cell()、S15 ①）：设为已完成 · 分隔线 · 取消售后单（危险色）；改派负责人随待办 23。
+ * 行尾「更多」（原型 more_cell()、S15 ① 与补充小样）：设为已完成 · 改派负责人 · 分隔线 · 取消售后单（危险色）。
  * 打开时按钮为浅主色底与描边，这一行为选中态（由使用处根据 onOpenChange 标出）。
  */
 export function MoreMenu({
   item,
   member,
   onComplete,
+  onReassign,
   onCancel,
   onOpenChange,
 }: {
   item: LedgerItem;
   member: CurrentMember;
   onComplete: (item: LedgerItem) => void;
+  onReassign: (item: LedgerItem) => void;
   onCancel: (item: LedgerItem) => void;
   onOpenChange: (open: boolean) => void;
 }) {
   const actions = aftersalesActions(member, item);
   return (
     <DropdownMenu onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={A11Y.more(item.number)}
-          className="flex size-6 items-center justify-center rounded-sm text-subtle-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-primary-soft data-[state=open]:text-primary-text data-[state=open]:ring-1 data-[state=open]:ring-primary-line data-[state=open]:ring-inset"
-        >
-          <Ellipsis className="size-4" />
-        </button>
-      </DropdownMenuTrigger>
+      <RowMenuTrigger label={A11Y.more(item.number)} />
       <DropdownMenuContent className="w-42">
         {actions.complete ? (
           <DropdownMenuItem onSelect={() => onComplete(item)}>
@@ -214,6 +188,14 @@ export function MoreMenu({
             label={MORE.complete}
             reason={completeBlocked(item)}
           />
+        )}
+        {actions.reassign ? (
+          <DropdownMenuItem onSelect={() => onReassign(item)}>
+            <Users />
+            {MORE.reassign}
+          </DropdownMenuItem>
+        ) : (
+          <BlockedItem icon={<Users />} label={MORE.reassign} reason={MORE.reasons.cancelled} />
         )}
         <DropdownMenuSeparator />
         {actions.cancel ? (

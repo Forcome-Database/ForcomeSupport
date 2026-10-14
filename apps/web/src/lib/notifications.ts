@@ -5,6 +5,7 @@ import type {
   NotificationType,
   NotificationView,
 } from '@forcome/contracts';
+import { PENDING_OWNER } from '@forcome/contracts';
 import { queryOptions, type QueryClient } from '@tanstack/react-query';
 import { CircleCheck, Store, TriangleAlert, Users, type LucideIcon } from 'lucide-react';
 import type { IconTileTone } from '@/components/icon-tile';
@@ -80,8 +81,8 @@ export const notificationLooks: Readonly<
 };
 
 /**
- * 点一条跳到哪个页面（G10「点一条即跳到对象」）：按通知类型定，要带的地址参数见 notificationSearch。P13「负责人：待分配」筛选
- * （待办 23）上线后给 reassign_queue 带上筛选的地址参数。自动归位的通知进归并成的工单的 P05（同一项能力「查看工单」，
+ * 点一条跳到哪个页面（G10「点一条即跳到对象」）：按通知类型定，要带的地址参数见 notificationSearch。
+ * 自动归位的通知进归并成的工单的 P05（同一项能力「查看工单」，
  * 工单号见 notificationTicket，待办 17）。
  */
 export const notificationTargets: Readonly<Record<NotificationType, PageDefinition>> = {
@@ -103,10 +104,13 @@ export function notificationTicket(notification: Notification): string | null {
     : null;
 }
 
-/** 跳转时带的地址参数：「未归属店铺来信」直接打开 P04 的未归属店铺队列（I17，待办 15，协调者 2026-10-07 决定） */
+/**
+ * 跳转时带的地址参数：「未归属店铺来信」直接打开 P04 的未归属店铺队列（I17，待办 15，协调者 2026-10-07 决定）；
+ * 「售后单待改派」打开 P13「负责人：待分配」（待办 23，协调者 2026-10-14 决定 Q6：没给日期时从最早的待分配单起）
+ */
 export const notificationSearch: Readonly<
-  Partial<Record<NotificationType, { view: 'unassigned' }>>
-> = { unassigned_mail: { view: 'unassigned' } };
+  Partial<Record<NotificationType, { view: 'unassigned' } | { owner: typeof PENDING_OWNER }>>
+> = { unassigned_mail: { view: 'unassigned' }, reassign_queue: { owner: PENDING_OWNER } };
 
 /**
  * 这一条能不能点进去（同 P27 v2.20「对象按查看者能否打开目标页决定可不可点」）：例如客服主管收到渠道连接异常，

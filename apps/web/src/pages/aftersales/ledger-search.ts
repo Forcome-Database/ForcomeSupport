@@ -2,6 +2,7 @@ import {
   aftersalesNumberSchema,
   aftersalesStatusSchema,
   handlingMethodSchema,
+  PENDING_OWNER,
   responsibilitySchema,
   type FeeDateRange,
   type LedgerQuery,
@@ -21,7 +22,11 @@ export const ledgerSearchSchema = z.object({
   method: handlingMethodSchema.optional().catch(undefined),
   responsibility: responsibilitySchema.optional().catch(undefined),
   status: aftersalesStatusSchema.optional().catch(undefined),
-  owner: z.uuid().optional().catch(undefined),
+  /** 负责人：成员 ID，或「待分配」（PENDING_OWNER，待办 23） */
+  owner: z
+    .union([z.uuid(), z.literal(PENDING_OWNER)])
+    .optional()
+    .catch(undefined),
   // 地址栏手写的 ?missing=1 会被路由当成数字 1（值按 JSON 解析），页面里跳转写的是字符串 "1"：两种都认
   missing: z.coerce.string().pipe(z.literal('1')).optional().catch(undefined),
   /** 打开这张单的编辑登记抽屉（从 P27 审计日志点售后单号进来，PRD P27 v2.20）；不影响列表的筛选 */

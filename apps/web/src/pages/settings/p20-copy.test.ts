@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import {
   capabilities,
+  disableMessages,
   isLive,
   memberStatusLabels,
   roleLabels,
@@ -16,9 +17,11 @@ import {
   ADD_RESULT,
   CELL_EDIT,
   CONFLICT,
+  DISABLE,
   DRAWER,
   EDITED,
   LEAVE,
+  MEMBER_MENU,
   MEMBER_SECTION,
   MEMBER_TABLE,
   PAGE_DESCRIPTION,
@@ -208,5 +211,47 @@ describe('P20 补充小样（K17 下方，待办 06）', () => {
       ADD_RESULT.addedDescription(newcomer.name, roleLabels.agent, '刘洋', '10:24'),
     );
     expectText(STATES_ADMIN, ADD_RESULT.failedDescription);
+  });
+});
+
+describe('停用成员（K10 第一阶段补充小样，待办 23，协调者 2026-10-14 决定 Q1–Q4）', () => {
+  it('弹窗：标题、说明、进行中售后单、接手人（一个或按店铺）、提示与选项、按钮', () => {
+    expectText(STATES_ADMIN, DISABLE.title('王磊'));
+    expectText(STATES_ADMIN, DISABLE.note('王磊'));
+    expectText(STATES_ADMIN, DISABLE.cases);
+    expectText(STATES_ADMIN, DISABLE.count(4));
+    expectIn(STATES_ADMIN, `>${DISABLE.owner}<span`);
+    expectIn(STATES_ADMIN, `>${DISABLE.ownerForStore('Forcome Auto')}<span`);
+    expectText(STATES_ADMIN, DISABLE.hint);
+    expectText(STATES_ADMIN, DISABLE.option('赵倩'));
+    expectText(STATES_ADMIN, DISABLE.none);
+    expectText(STATES_ADMIN, DISABLE.noCases);
+    expectText(STATES_ADMIN, DISABLE.dismiss);
+    expectText(STATES_ADMIN, DISABLE.confirm);
+  });
+
+  it('不可用：没有其他售后负责人、都没有该店铺范围（字段下的原因与底部的怎么办）', () => {
+    expectIn(STATES_ADMIN, disableMessages.onlyOwner('王磊'));
+    expectIn(STATES_ADMIN, disableMessages.noOwner);
+    expectText(STATES_ADMIN, disableMessages.noOwnerFix);
+    expectIn(STATES_ADMIN, disableMessages.scopeMissing(['Forcome Auto']));
+    expectText(STATES_ADMIN, disableMessages.scopeFix);
+  });
+
+  it('行尾「更多」：只有「停用」，三种不可用的悬停', () => {
+    expectIn(STATES_ADMIN, `>${MEMBER_MENU.disable}</div>`);
+    expectText(STATES_ADMIN, disableMessages.disabled);
+    expectText(STATES_ADMIN, disableMessages.self);
+    expectText(STATES_ADMIN, disableMessages.lastAdmin);
+  });
+
+  it('结果浮层：改派给了谁、没有单时、失败与刚被别人改过', () => {
+    expectText(STATES_ADMIN, DISABLE.doneTitle('王磊'));
+    expectText(STATES_ADMIN, DISABLE.doneReassigned(4, ['赵倩']));
+    expectText(STATES_ADMIN, DISABLE.doneTitle('李婷'));
+    expectText(STATES_ADMIN, DISABLE.doneNone);
+    expectText(STATES_ADMIN, `${DISABLE.failedAction}失败：网络连接已断开`);
+    expectText(STATES_ADMIN, `${DISABLE.failedAction}失败：数据已被他人修改`);
+    expectText(STATES_ADMIN, DISABLE.stale);
   });
 });

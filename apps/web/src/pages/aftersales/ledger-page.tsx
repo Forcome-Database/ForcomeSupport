@@ -2,6 +2,7 @@ import {
   can,
   canViewFinance,
   ledgerColumnLabels,
+  PENDING_OWNER,
   type LedgerItem,
   type LedgerQuery,
 } from '@forcome/contracts';
@@ -29,6 +30,7 @@ import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { pages } from '@/lib/pages';
 import { endSessionIfUnauthenticated } from '@/lib/session';
 import { CancelDialog, CompletionBadge, MoreMenu, useCompleteAction } from './ledger-actions';
+import { ReassignDialog } from './reassign-dialog';
 import type { CellContext, InlineBackfill } from './ledger-cells';
 import {
   hiddenColumns,
@@ -231,6 +233,7 @@ export function LedgerPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [opened, setOpened] = useState<DrawerTarget | null>(null);
   const [cancelling, setCancelling] = useState<LedgerItem | null>(null);
+  const [reassigning, setReassigning] = useState<LedgerItem | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const backfill = useInlineBackfill();
   const complete = useCompleteAction();
@@ -253,10 +256,11 @@ export function LedgerPage() {
     if (search.open) go({ ...search, open: undefined });
   };
   const storeOptions = (stores.data ?? []).map((store) => ({ value: store.id, label: store.name }));
-  const ownerOptions = (options.data?.owners ?? []).map((owner) => ({
-    value: owner.id,
-    label: owner.name,
-  }));
+  // 负责人：「全部」之后第一项「待分配」（钉钉离职进入改派队列的单，待办 23），其后是店铺范围内在职的售后负责人
+  const ownerOptions = [
+    { value: PENDING_OWNER, label: FILTERS.pendingOwner },
+    ...(options.data?.owners ?? []).map((owner) => ({ value: owner.id, label: owner.name })),
+  ];
   const month = Number((ledger.data?.completion.month ?? '').slice(5, 7));
   const hidden = hiddenColumns(columns.visibility, finance);
   const ctx: CellContext = {
@@ -360,6 +364,7 @@ export function LedgerPage() {
                 item={item}
                 member={member}
                 onComplete={(target) => void complete(target)}
+                onReassign={setReassigning}
                 onCancel={setCancelling}
                 onOpenChange={(open) => setMenuOpen(open ? item.id : null)}
               />
@@ -373,6 +378,7 @@ export function LedgerPage() {
       </div>
       {drawer && <RegistrationDrawer registrar={member} target={drawer} onClose={closeDrawer} />}
       {cancelling && <CancelDialog item={cancelling} onClose={() => setCancelling(null)} />}
+      {reassigning && <ReassignDialog item={reassigning} onClose={() => setReassigning(null)} />}
     </div>
   );
 }

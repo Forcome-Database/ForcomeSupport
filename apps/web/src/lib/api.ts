@@ -27,6 +27,7 @@ import {
   storeOptionsSchema,
   storeSchema,
   teamCandidatesSchema,
+  teamHandoverSchema,
   teamMemberSchema,
   teamSchema,
   ticketDetailSchema,
@@ -71,7 +72,10 @@ import {
   type Team,
   type TeamCandidate,
   type TeamChange,
+  type TeamDisable,
+  type TeamHandover,
   type TeamMember,
+  type ReassignInput,
   type TeamMemberAdd,
   type TicketDetail,
   type TicketList,
@@ -329,6 +333,17 @@ export const api = {
   saveTeam: (changes: TeamChange[]): Promise<Team> =>
     call('/api/org/team', teamSchema, jsonBody('PUT', { changes })),
 
+  /** 停用弹窗（K10 第一阶段）：他负责的进行中售后单、其他在职售后负责人与店铺范围 */
+  teamHandover: (memberId: string): Promise<TeamHandover> =>
+    call(`/api/org/team/members/${memberId}/handover`, teamHandoverSchema),
+
+  /**
+   * 改派并停用（AC-ST-02），返回最新的成员表；不能停用或接手人不对抛 400（fields 的键为 member、handover），
+   * 成员或他的售后单刚被别人改过抛 409 optimistic_lock（G7）
+   */
+  disableTeamMember: (memberId: string, input: TeamDisable): Promise<Team> =>
+    call(`/api/org/team/members/${memberId}/disable`, teamSchema, jsonBody('POST', input)),
+
   /** 当前成员店铺范围内的店铺（各页面的店铺筛选与选择） */
   storeOptions: async (): Promise<StoreOption[]> =>
     (await call('/api/channel/store-options', storeOptionsSchema)).stores,
@@ -453,6 +468,14 @@ export const api = {
       `/api/aftersales/${encodeURIComponent(number)}/undo-complete`,
       ledgerItemSchema,
       jsonBody('POST', { version }),
+    ),
+
+  /** 改派负责人（S15 补充小样）：接手人没选或不能接抛 400（fields.ownerId），已取消的单 fields.status，刚被别人改过 409 */
+  reassignAftersales: (number: string, input: ReassignInput): Promise<LedgerItem> =>
+    call(
+      `/api/aftersales/${encodeURIComponent(number)}/reassign`,
+      ledgerItemSchema,
+      jsonBody('POST', input),
     ),
 
   /** 取消售后单（S15 ②） */

@@ -21,8 +21,18 @@ import { AftersalesStatusBadge, CategoryBadge } from '@/components/aftersales-ba
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { A11Y, EMPTY_VALUE, FOREIGN_AMOUNT, MISSING, NOT_KEPT, SHARE, storeSite } from './p13-copy';
+import {
+  A11Y,
+  EMPTY_VALUE,
+  FOREIGN_AMOUNT,
+  MISSING,
+  NOT_KEPT,
+  OWNER_CELL,
+  SHARE,
+  storeSite,
+} from './p13-copy';
 
 /*
  * P13 台账的单元格（原型 build_ledger 的 p1_cells()、S13 与补充小样）：售后单号（「缺 N 项」）、文字列、快递单号（「待回填」与行内补登）、
@@ -122,9 +132,28 @@ export const responsibilityCell = (item: LedgerItem) =>
 
 export const statusCell = (item: LedgerItem) => <AftersalesStatusBadge status={item.status} />;
 
-/** 负责人（默认隐藏的列） */
-export const ownerCell = (item: LedgerItem) =>
-  valueOr(item, 'ownerId', item.ownerName && text(item.ownerName));
+/**
+ * 负责人（默认隐藏的列）：待分配的单（原负责人钉钉离职后进入改派队列）写「待分配」（警示色），悬停写原负责人
+ * （S15 补充小样 · 改派负责人与待分配）
+ */
+export function ownerCell(item: LedgerItem): ReactNode {
+  if (item.ownerPending) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            tabIndex={0}
+            className="rounded-xs text-body font-semibold text-warning-text outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {OWNER_CELL.pending}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{OWNER_CELL.pendingTip(item.ownerName ?? '')}</TooltipContent>
+      </Tooltip>
+    );
+  }
+  return valueOr(item, 'ownerId', item.ownerName && text(item.ownerName));
+}
 
 /** 生产厂（默认隐藏的列；R-AS-08 的必填字段，缺时计入「缺 N 项」） */
 export const factoryCell = (item: LedgerItem) =>
