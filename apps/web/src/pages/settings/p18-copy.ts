@@ -1,4 +1,11 @@
-import { adapterModeLabels, ORDER_QUEUE_NAME } from '@forcome/contracts';
+import {
+  adapterModeLabels,
+  mailboxTestMessages,
+  mailProviderLabels,
+  ORDER_QUEUE_NAME,
+  QIYE_GUIDE,
+  QIYE_IMAP_DEFAULTS,
+} from '@forcome/contracts';
 
 /*
  * P18 渠道与店铺的界面文案（逐字照原型；p18-copy.test.ts 直接读原型生成物核对，原型改了而这里没跟上就失败）：
@@ -30,7 +37,20 @@ export const RULE_ROUTE =
   '亚马逊按买家消息的收件邮箱与发件域名（amazon.com / .ca / .com.mx）识别店铺和站点；Shopify 按客服邮箱。' +
   '一个店铺可以登记多个进线邮箱（含别名）。识别不出的来信进入「未归属店铺」队列，由客服主管指定店铺。';
 
-/** 渠道卡的卡名与按数据写的说明行（K20：「2 个店铺 · 订单经 SP-API 准实时同步」「3 个邮箱：1 个亚马逊买家消息、2 个 Shopify 客服」） */
+/** 邮箱卡（Gmail、163 企业邮箱）的邮箱数：该服务商的进线邮箱按亚马逊买家消息、Shopify 客服分列；某一类没有就不写（原型 mailbox_count_line()） */
+function mailboxCount(amazon: number, shopify: number): string {
+  const parts = [
+    amazon > 0 ? `${amazon} 个亚马逊买家消息` : null,
+    shopify > 0 ? `${shopify} 个 Shopify 客服` : null,
+  ].filter(Boolean);
+  const total = amazon + shopify;
+  return parts.length > 0 ? `${total} 个邮箱：${parts.join('、')}` : `${total} 个邮箱`;
+}
+
+/**
+ * 渠道卡的卡名与按数据写的说明行（K20：「2 个店铺 · 订单经 SP-API 准实时同步」「3 个邮箱：1 个亚马逊买家消息、2 个 Shopify 客服」；
+ * 163 企业邮箱卡「1 个邮箱：1 个亚马逊买家消息」，D-28）
+ */
 export const CHANNEL_CARDS = {
   amazon: {
     name: '亚马逊 SP-API',
@@ -40,24 +60,14 @@ export const CHANNEL_CARDS = {
     name: 'Shopify Admin API',
     stores: (count: number) => `${count} 个店铺 · 订单经 Admin API 准实时同步`,
   },
-  gmail: {
-    name: 'Gmail',
-    /** 邮箱数；某一类没有就不写 */
-    mailboxes: (amazon: number, shopify: number) => {
-      const parts = [
-        amazon > 0 ? `${amazon} 个亚马逊买家消息` : null,
-        shopify > 0 ? `${shopify} 个 Shopify 客服` : null,
-      ].filter(Boolean);
-      const total = amazon + shopify;
-      return parts.length > 0 ? `${total} 个邮箱：${parts.join('、')}` : `${total} 个邮箱`;
-    },
-  },
+  gmail: { name: mailProviderLabels.gmail, mailboxes: mailboxCount },
+  qiye163: { name: mailProviderLabels.qiye163, mailboxes: mailboxCount },
   dingtalk: { name: '钉钉' },
 } as const;
 
-/** 渠道卡的固定说明行 */
+/** 渠道卡的固定说明行（Gmail 与 163 企业邮箱卡同一句「已发送」，原型 QIYE_LINES_P1） */
 export const CARD_LINES = {
-  gmailSent: '收件与「已发送」：识别到我方回复即转等客户',
+  mailSent: '收件与「已发送」：识别到我方回复即转等客户',
   dingtalk: ['通讯录：成员与部门每小时同步', '工作通知推送；扫码登录'],
 } as const;
 
@@ -72,6 +82,17 @@ export const GMAIL_ISSUE_LINES = {
   held: '该邮箱来信暂存，恢复后自动补拉',
   delayed: (mailbox: string, last: string) => `${mailbox} ${last} 后未同步成功，超过 10 分钟`,
   recheck: '重新检测',
+} as const;
+
+/**
+ * 163 企业邮箱卡的异常说明行（K20 补充小样，D-28，待办 34；原型 qiye_card_p1()）：写法同 Gmail 卡，恢复指引按服务商——
+ * 检查客户端授权码与网易后台的 IMAP、客户端登录设置（contracts 的 QIYE_GUIDE）；来信暂存与延迟行同 Gmail
+ */
+export const QIYE_ISSUE_LINES = {
+  failed: (mailbox: string, since: string, failures: number) =>
+    `${mailbox} 访问失败（${since} 起连续 ${failures} 次）：${QIYE_GUIDE}`,
+  held: GMAIL_ISSUE_LINES.held,
+  delayed: GMAIL_ISSUE_LINES.delayed,
 } as const;
 
 /**
@@ -145,6 +166,7 @@ export const CONNECTION_TEST = {
   okTitle: '连接正常',
   ok: {
     gmail: (mailboxes: number) => `Gmail：${mailboxes} 个邮箱均可访问`,
+    qiye163: (mailboxes: number) => `163 企业邮箱：${mailboxes} 个邮箱均可访问`,
     dingtalk: '钉钉：通讯录可访问',
     shopify: (stores: number) => `Shopify：${stores} 个店铺均可访问`,
     amazon: (stores: number) => `亚马逊 SP-API：${stores} 个店铺均可访问`,
@@ -152,6 +174,7 @@ export const CONNECTION_TEST = {
   failedAction: '测试连接',
   failedDescription: {
     gmail: '请检查全域委派范围与邮箱状态',
+    qiye163: QIYE_GUIDE,
     dingtalk: '请检查应用凭据与通讯录权限',
     shopify: '请检查 Admin API 应用凭据与授权范围',
     amazon: '请检查 SP-API 应用凭据与卖家授权',
@@ -168,15 +191,16 @@ export const SIMULATED = '模拟数据';
 export const LAST_SYNC = (at: string) => `最近同步 ${at}`;
 export const NOT_AUTHORIZED = '尚未授权';
 
-/** 第一阶段尚未接入的渠道（灰色虚线卡） */
-export const PHASE2_CARDS = {
+/**
+ * 第一阶段尚未接入的渠道（灰色虚线卡）：积加与易仓合成一张（加了 163 企业邮箱卡后仍是 3 × 2，PRD P18「第一阶段」v2.37，
+ * 原型 p18_channels_p1()；说明为原来两张卡的两句连写）
+ */
+export const PHASE2_CARD = {
   badge: '第二阶段接入',
   subtitle: '暂不连接',
-  jijia: { name: '积加 ERP', description: '亚马逊订单收件人、库存、售后出库单、单号与运费。' },
-  yicang: {
-    name: '易仓海外仓',
-    description: '库存与售后出库单经积加读写，本系统不直连易仓接口。',
-  },
+  name: '积加 ERP · 易仓海外仓',
+  description:
+    '亚马逊订单收件人、库存、售后出库单、单号与运费。库存与售后出库单经积加读写，本系统不直连易仓接口。',
 } as const;
 
 /** 「店铺」区块：小标题、店铺数、ⓘ 的短标题与「新增店铺」 */
@@ -198,7 +222,8 @@ export const STORE_TABLE = {
   },
   edit: '编辑',
   defaultSiteTitle: (site: string) => `默认站点 ${site}`,
-  gmail: 'Gmail',
+  /** 进线邮箱下一行写用途与服务商（D-28，例「亚马逊买家消息 · 163 企业邮箱」）；用途取 contracts 的 platformTerms.mailbox */
+  mailboxUsage: (usage: string, provider: string) => `${usage} · ${provider}`,
   /** 站点之间、状态列各连接之间的分隔 */
   separator: ' · ',
 } as const;
@@ -234,6 +259,33 @@ export const DRAWER = {
   save: '保存',
 } as const;
 
+/**
+ * 进线邮箱逐行登记（K8 与补充小样，D-28，待办 34；原型 mb_row()、mb_field()）：每行地址 + 服务商（新加的行默认 Gmail）+ 移除，
+ * 末尾「添加进线邮箱」。163 企业邮箱的行下方展开客户端授权码（只写不显：已保存时写「已保存」+「重新填写」）、IMAP 服务器与端口
+ * （预填 contracts 的 QIYE_IMAP_DEFAULTS）与按行「测试连接」；行内结果的写法在 contracts 的 mailboxTestMessages（接口给出）
+ */
+export const MAILBOX_ROWS = {
+  /** 地址输入框的占位（原型 mb_row() 的 input_box 占位） */
+  placeholder: '例如 support@forcome.mx',
+  providers: mailProviderLabels,
+  add: '添加进线邮箱',
+  authCode: '客户端授权码',
+  authCodePlaceholder: '粘贴客户端授权码',
+  authCodeHint:
+    '不是登录密码：管理员在网易企业邮箱开启 IMAP 与客户端登录后，为这个邮箱生成；保存后不再显示',
+  saved: '已保存',
+  refill: '重新填写',
+  imapHost: 'IMAP 服务器',
+  imapPort: '端口',
+  imapDefaults: QIYE_IMAP_DEFAULTS,
+  test: '测试连接',
+  testing: '测试中',
+  testingNote: '正在登录并检查收件箱与「已发送」',
+  testIdle: '不保存也能测，用这一行当前填的内容',
+  /** 行内结果（原型 QIYE_ROW_TESTS；接口按原因给出 message，这里只供守卫测试逐字核对） */
+  results: mailboxTestMessages,
+} as const;
+
 /** 保存结果浮层（K8 补充小样；失败浮层的标题由 notify 写成「<动作>失败：原因」） */
 export const SAVE_RESULT = {
   savedTitle: '店铺已保存',
@@ -260,6 +312,9 @@ export const A11Y = {
   copy: (value: string) => `复制 ${value}`,
   copied: '已复制',
   edit: (storeName: string) => `${STORE_TABLE.edit} ${storeName}`,
-  removeMailbox: (mailbox: string) => `移除 ${mailbox}`,
+  /** 进线邮箱一行的移除按钮（原型 icon_btn 的 title「移除这个邮箱」）与服务商下拉；还没填地址时只写「移除这个邮箱」 */
+  removeMailbox: (mailbox: string) => (mailbox ? `移除 ${mailbox}` : '移除这个邮箱'),
+  mailboxAddress: (index: number) => `进线邮箱 ${index + 1}`,
+  mailboxProvider: (index: number) => `进线邮箱 ${index + 1} 的服务商`,
   actionsColumn: '操作',
 } as const;

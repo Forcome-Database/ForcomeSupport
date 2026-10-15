@@ -120,6 +120,57 @@ describe('Gmail 卡', () => {
   });
 });
 
+describe('163 企业邮箱卡（D-28，待办 36：写法同 Gmail 卡，恢复指引按服务商）', () => {
+  // 示例：Forcome Auto 的买家消息邮箱在 163 企业邮箱，其余 3 个在 Gmail
+  const MIXED = [
+    store('amazon', ['amz-direct@forcome.com']),
+    store('amazon', ['amz-auto@forcome.com'], 'qiye163'),
+    store('shopify', ['support@forcome.com']),
+    store('shopify', ['support@forcome.mx']),
+  ];
+  const qiye = (overrides: Partial<ChannelCard>) => card({ kind: 'qiye163', ...overrides });
+
+  it('已连接：只数 163 企业邮箱的邮箱（Gmail 卡只数 Gmail 的），「已发送」同 Gmail 卡', () => {
+    expect(channelCardLines(qiye({}), MIXED)).toEqual([
+      '1 个邮箱：1 个亚马逊买家消息',
+      '收件与「已发送」：识别到我方回复即转等客户',
+    ]);
+    expect(channelCardLines(card({}), MIXED)[0]).toBe(
+      '3 个邮箱：1 个亚马逊买家消息、2 个 Shopify 客服',
+    );
+    expect(needsRecheck(qiye({}))).toBe(false);
+  });
+
+  it('同步延迟：每个延迟的邮箱一行在前，其余说明行照常', () => {
+    const delayed = qiye({
+      status: 'delayed',
+      issues: [
+        issue({
+          target: 'amz-auto@forcome.com',
+          status: 'delayed',
+          failingSince: null,
+          failures: 0,
+          lastSuccessAt: '2026-09-11T02:05:00.000Z',
+        }),
+      ],
+    });
+    expect(channelCardLines(delayed, MIXED)).toEqual([
+      'amz-auto@forcome.com 10:05 后未同步成功，超过 10 分钟',
+      '1 个邮箱：1 个亚马逊买家消息',
+      '收件与「已发送」：识别到我方回复即转等客户',
+    ]);
+  });
+
+  it('连接异常：原因与恢复指引（客户端授权码与网易后台设置）、来信暂存，卡底「重新检测」', () => {
+    const failed = qiye({ status: 'error', issues: [issue({ target: 'amz-auto@forcome.com' })] });
+    expect(channelCardLines(failed, MIXED)).toEqual([
+      'amz-auto@forcome.com 访问失败（10:05 起连续 3 次）：请检查客户端授权码，以及网易企业邮箱是否开启 IMAP 与客户端登录',
+      '该邮箱来信暂存，恢复后自动补拉',
+    ]);
+    expect(needsRecheck(failed)).toBe(true);
+  });
+});
+
 describe('钉钉卡', () => {
   const dingtalk = (overrides: Partial<ChannelCard>) =>
     card({ kind: 'dingtalk', lastSyncAt: '2026-09-11T00:00:00.000Z', ...overrides });

@@ -10,9 +10,9 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
+  Inbox,
   Link2,
   MessageSquare,
-  Package,
   RefreshCw,
   Store as StoreIcon,
   Users,
@@ -31,8 +31,6 @@ import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import {
   channelCardLines,
-  isShownChannelCard,
-  type ShownChannelCard,
   needsRecheck,
   orderBackfillLine,
   type OrderBackfillLine,
@@ -46,18 +44,19 @@ import {
   LAST_SYNC,
   NOT_AUTHORIZED,
   ORDER_QUEUE_LINE,
-  PHASE2_CARDS,
+  PHASE2_CARD,
   RULE_CARD_STATE,
   SIMULATED,
 } from './p18-copy';
 
 /*
  * P18 渠道卡（第一阶段，K20 与补充小样；原型 build_settings.p18_channels_p1()、gmail_card_p1()、shopify_card_p1()、amazon_card_p1()）：
- * 3 × 2 网格，间距 10。亚马逊 SP-API、Shopify Admin API、Gmail、钉钉四张卡头写连接状态（接模拟数据时前面另标「模拟数据」），
+ * 3 × 2 网格，间距 10。亚马逊 SP-API、Shopify Admin API、Gmail、163 企业邮箱（D-28，待办 36；原型 qiye_card_p1()，结构同 Gmail 卡）、
+ * 钉钉五张卡头写连接状态（接模拟数据时前面另标「模拟数据」），
  * 有同步记录时副标题写「最近同步 hh:mm」，未连接写「尚未授权」；说明行按连接状态写（channel-card-lines.ts）；亚马逊卡另有
- * 「订单通知队列（SQS）」一行带状态标签（原型 sqs_line()，待办 12 Q7，各状态下都照写）；四张卡头都有「测试连接」，Gmail、Shopify、
- * 亚马逊卡有连接异常的邮箱或店铺时卡底另有「重新检测」（同一个测试，K7，待办 09、11、12）；积加、易仓为灰色虚线卡「第二阶段接入」，
- * 没有同步时间与测试连接。亚马逊卡（SQS 行之后）与 Shopify 卡（店铺行之后）另有订单回补行（原型 backfill_line()，待办 13 Q2）。
+ * 「订单通知队列（SQS）」一行带状态标签（原型 sqs_line()，待办 12 Q7，各状态下都照写）；五张卡头都有「测试连接」，Gmail、163 企业邮箱、
+ * Shopify、亚马逊卡有连接异常的邮箱或店铺时卡底另有「重新检测」（同一个测试，K7，待办 09、11、12）；积加与易仓合成一张灰色虚线卡
+ * 「积加 ERP · 易仓海外仓」「第二阶段接入」（PRD v2.37），没有同步时间与测试连接。亚马逊卡（SQS 行之后）与 Shopify 卡（店铺行之后）另有订单回补行（原型 backfill_line()，待办 13 Q2）。
  */
 
 /** 连接状态 → 徽标色调（原型 STATE_TONE 的渠道连接一组） */
@@ -84,21 +83,21 @@ const statusCard: Record<ConnectionStatus, string> = {
   not_connected: '',
 };
 
-const CARD_ICONS: Record<ShownChannelCard['kind'], LucideIcon> = {
+const CARD_ICONS: Record<ChannelCard['kind'], LucideIcon> = {
   amazon: StoreIcon,
   shopify: StoreIcon,
   gmail: MessageSquare,
+  qiye163: Inbox,
   dingtalk: Users,
 };
 
-/** P18 现在显示的渠道卡的「测试连接」种类（163 企业邮箱卡随待办 36） */
-type ShownTestKind = Extract<ConnectionTestKind, ShownChannelCard['kind']>;
-
 /** 测试成功浮层的说明（测过几个邮箱或店铺） */
-function connectionOkWords(kind: ShownTestKind, targets: number): string {
+function connectionOkWords(kind: ConnectionTestKind, targets: number): string {
   switch (kind) {
     case 'gmail':
       return CONNECTION_TEST.ok.gmail(targets);
+    case 'qiye163':
+      return CONNECTION_TEST.ok.qiye163(targets);
     case 'shopify':
       return CONNECTION_TEST.ok.shopify(targets);
     case 'amazon':
@@ -111,7 +110,7 @@ function connectionOkWords(kind: ShownTestKind, targets: number): string {
 /**
  * 测试失败浮层的说明：写怎么查。亚马逊按访问不了的第一个（店铺在前、订单通知队列在后）：只有队列访问不了时写 AWS 的，否则写 SP-API 的
  */
-function connectionFailedWords(kind: ShownTestKind, message: string): string {
+function connectionFailedWords(kind: ConnectionTestKind, message: string): string {
   if (kind === 'amazon' && message.startsWith(ORDER_QUEUE_NAME)) {
     return CONNECTION_TEST.failedDescription.amazonQueue;
   }
@@ -122,7 +121,7 @@ function connectionFailedWords(kind: ShownTestKind, message: string): string {
  * 「测试连接」（K20，待办 09 Q4）：测试中按钮置灰转圈；全部可访问时成功浮层，访问不了时失败浮层写哪个访问不了与怎么查；
  * 网络等其他失败给「立即重试」。测试不改连接状态，测完把渠道卡与横幅重取一次（Gmail 测完会立即同步）
  */
-function useConnectionTest(kind: ShownTestKind) {
+function useConnectionTest(kind: ConnectionTestKind) {
   const queryClient = useQueryClient();
   const toastId = `connection-test-${kind}`;
   const mutation = useMutation({
@@ -214,7 +213,7 @@ function ConnectedCard({
   stores,
   test,
 }: {
-  card: ShownChannelCard;
+  card: ChannelCard;
   stores: readonly Store[];
   test: ConnectionTest;
 }) {
@@ -310,35 +309,32 @@ function TestableCard({
   card,
   stores,
 }: {
-  kind: ShownTestKind;
-  card: ShownChannelCard;
+  kind: ConnectionTestKind;
+  card: ChannelCard;
   stores: readonly Store[];
 }) {
   const test = useConnectionTest(kind);
   return <ConnectedCard card={card} stores={stores} test={test} />;
 }
 
-/** 第一阶段尚未接入的渠道（原型 phase2_card()）：灰色虚线卡「第二阶段接入」，没有同步时间与测试连接 */
-function PhaseTwoCard({
-  icon,
-  name,
-  description,
-}: {
-  icon: LucideIcon;
-  name: string;
-  description: string;
-}) {
+/**
+ * 第一阶段尚未接入的渠道（原型 phase2_card()）：积加与易仓合成一张灰色虚线卡「第二阶段接入」（PRD v2.37），没有同步时间与测试连接
+ */
+function PhaseTwoCard() {
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-dashed border-input bg-muted px-3.5 py-3">
+    <div
+      data-testid="channel-card-phase2"
+      className="flex flex-col gap-2 rounded-md border border-dashed border-input bg-muted px-3.5 py-3"
+    >
       <CardHead
-        icon={icon}
+        icon={Link2}
         tone="muted"
-        name={name}
-        sub={PHASE2_CARDS.subtitle}
+        name={PHASE2_CARD.name}
+        sub={PHASE2_CARD.subtitle}
         muted
-        right={<Badge tone="muted">{PHASE2_CARDS.badge}</Badge>}
+        right={<Badge tone="muted">{PHASE2_CARD.badge}</Badge>}
       />
-      <div className="text-12 text-muted-foreground">{description}</div>
+      <div className="text-12 text-muted-foreground">{PHASE2_CARD.description}</div>
     </div>
   );
 }
@@ -357,12 +353,11 @@ export function ChannelCards({
         <InfoTip label={CHANNEL_SECTION.ruleLabel} tip={RULE_CARD_STATE} />
       </div>
       <div className="grid grid-cols-3 items-stretch gap-2.5">
-        {channels.filter(isShownChannelCard).map((card) => (
-          // 第一期四张卡都有「测试连接」（K20，待办 09、11、12）：渠道卡的种类就是测试连接的种类
+        {channels.map((card) => (
+          // 第一期五张卡都有「测试连接」（K20，待办 09、11、12、36）：渠道卡的种类就是测试连接的种类
           <TestableCard key={card.kind} kind={card.kind} card={card} stores={stores} />
         ))}
-        <PhaseTwoCard icon={Link2} {...PHASE2_CARDS.jijia} />
-        <PhaseTwoCard icon={Package} {...PHASE2_CARDS.yicang} />
+        <PhaseTwoCard />
       </div>
     </section>
   );

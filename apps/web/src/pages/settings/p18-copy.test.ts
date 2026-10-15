@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import {
   connectionStatuses,
   connectionStatusLabels,
+  imapServerErrors,
   mailboxError,
+  mailboxTestFailureMessage,
+  mailboxTestFailureReasons,
+  mailProviderLabels,
+  qiyeMailboxMessages,
+  QIYE_GUIDE,
   platformLabels,
   platformTerms,
   storeInputErrors,
@@ -24,6 +30,7 @@ import {
   SHOPIFY_ISSUE_LINES,
   LAST_SYNC,
   LEAVE,
+  MAILBOX_ROWS,
   MENU_NOTE,
   MENU_TITLE,
   NOT_AUTHORIZED,
@@ -31,7 +38,8 @@ import {
   ORDER_QUEUE_LINE,
   PAGE_DESCRIPTION,
   PAGE_TITLE,
-  PHASE2_CARDS,
+  PHASE2_CARD,
+  QIYE_ISSUE_LINES,
   RULE_CARD_STATE,
   RULE_ROUTE,
   SAVE_RESULT,
@@ -94,35 +102,55 @@ describe('P18 第一期参照页', () => {
     expectIn(P18, `title="${RULE_ROUTE}"`);
   });
 
-  it('渠道卡：卡名、按示例数据写的说明行、最近同步、已连接、第二阶段卡', () => {
-    for (const card of Object.values(CHANNEL_CARDS)) expectIn(P18, card.name);
+  it('渠道卡：卡名、按示例数据写的说明行（Gmail 3 个、163 企业邮箱 1 个邮箱，D-28）、最近同步、已连接', () => {
+    for (const card of Object.values(CHANNEL_CARDS)) expectText(P18, card.name);
     expectIn(P18, CHANNEL_CARDS.amazon.stores(2));
     expectIn(P18, CHANNEL_CARDS.shopify.stores(2));
-    expectIn(P18, CHANNEL_CARDS.gmail.mailboxes(1, 2));
-    expectIn(P18, CARD_LINES.gmailSent);
+    expectText(P18, CHANNEL_CARDS.gmail.mailboxes(1, 2));
+    expectText(P18, CHANNEL_CARDS.qiye163.mailboxes(1, 0));
+    expectText(P18, CARD_LINES.mailSent);
     expectIn(P18, LAST_SYNC('10:12'));
+    expectIn(P18, LAST_SYNC('10:17'));
     expectIn(P18, connectionStatusLabels.connected);
-    for (const text of [
-      PHASE2_CARDS.badge,
-      PHASE2_CARDS.subtitle,
-      PHASE2_CARDS.jijia.name,
-      PHASE2_CARDS.jijia.description,
-      PHASE2_CARDS.yicang.name,
-      PHASE2_CARDS.yicang.description,
-    ]) {
-      expectIn(P18, text);
+  });
+
+  it('积加与易仓合成一张「第二阶段接入」卡（v2.37，仍是 3 × 2），说明为原来两句连写', () => {
+    for (const text of [PHASE2_CARD.name, PHASE2_CARD.subtitle, PHASE2_CARD.badge]) {
+      expectText(P18, text);
     }
+    expectText(P18, PHASE2_CARD.description);
+    expect(P18.split(`>${PHASE2_CARD.badge}<`)).toHaveLength(2);
   });
 
   it('店铺表：表头、渠道标识、默认站点悬停、站点分隔、邮箱与平台标识的小字、状态列连接名、行尾「编辑」', () => {
     for (const column of Object.values(STORE_TABLE.columns)) expectText(P18, column);
     for (const platform of ['amazon', 'shopify'] satisfies Platform[]) {
       expectText(P18, platformLabels[platform]);
-      expectIn(P18, platformTerms[platform].mailbox);
       expectIn(P18, platformTerms[platform].platformId);
-      expectIn(
+    }
+    // 进线邮箱下一行写用途与服务商；状态列连接名按服务商（D-28）
+    expectText(
+      P18,
+      STORE_TABLE.mailboxUsage(platformTerms.amazon.mailbox, mailProviderLabels.gmail),
+    );
+    expectText(
+      P18,
+      STORE_TABLE.mailboxUsage(platformTerms.amazon.mailbox, mailProviderLabels.qiye163),
+    );
+    expectText(
+      P18,
+      STORE_TABLE.mailboxUsage(platformTerms.shopify.mailbox, mailProviderLabels.gmail),
+    );
+    for (const [provider, platform] of [
+      ['gmail', 'amazon'],
+      ['qiye163', 'amazon'],
+      ['gmail', 'shopify'],
+    ] as const) {
+      expectText(
         P18,
-        [STORE_TABLE.gmail, platformTerms[platform].ordersApi].join(STORE_TABLE.separator),
+        [mailProviderLabels[provider], platformTerms[platform].ordersApi].join(
+          STORE_TABLE.separator,
+        ),
       );
     }
     expectIn(P18, `title="${STORE_TABLE.defaultSiteTitle('US')}"`);
@@ -197,6 +225,46 @@ describe('K8 新增店铺抽屉与补充小样', () => {
   });
 });
 
+describe('K8 补充小样：进线邮箱逐行登记与 163 企业邮箱的行（D-28，待办 34）', () => {
+  it('每行地址 + 服务商，末尾「添加进线邮箱」；163 企业邮箱的行：授权码、提示、已保存与重新填写、IMAP 服务器与端口的默认值', () => {
+    expectText(STATES_ADMIN, MAILBOX_ROWS.providers.gmail);
+    expectText(STATES_ADMIN, MAILBOX_ROWS.providers.qiye163);
+    expectIn(STATES_ADMIN, `>${MAILBOX_ROWS.add}<`);
+    for (const text of [
+      MAILBOX_ROWS.authCode,
+      MAILBOX_ROWS.authCodePlaceholder,
+      MAILBOX_ROWS.authCodeHint,
+      MAILBOX_ROWS.saved,
+      MAILBOX_ROWS.refill,
+      MAILBOX_ROWS.imapHost,
+      MAILBOX_ROWS.imapDefaults.host,
+      String(MAILBOX_ROWS.imapDefaults.port),
+      MAILBOX_ROWS.testingNote,
+      MAILBOX_ROWS.testIdle,
+    ]) {
+      expectIn(STATES_ADMIN, `>${text}<`);
+    }
+    expectIn(STATES_ADMIN, `>${MAILBOX_ROWS.imapPort}<span`);
+    expectIn(STATES_ADMIN, `</svg>${MAILBOX_ROWS.testing}<`);
+    expectIn(STATES_ADMIN, `>${MAILBOX_ROWS.test}<`);
+  });
+
+  it('授权码必填的报错照原型；服务器为空与端口不对原型没画，按 PRD P18「校验」写', () => {
+    expectText(STATES_ADMIN, qiyeMailboxMessages.authCodeMissing);
+    expect(imapServerErrors({ imapHost: '', imapPort: '0' })).toEqual({
+      imapHost: qiyeMailboxMessages.imapHostMissing,
+      imapPort: qiyeMailboxMessages.imapPortInvalid,
+    });
+  });
+
+  it('按行测试连接的五种行内结果逐字一致（连不上与超时同一种写法）', () => {
+    expectText(STATES_ADMIN, MAILBOX_ROWS.results.ok);
+    for (const reason of mailboxTestFailureReasons) {
+      expectText(STATES_ADMIN, mailboxTestFailureMessage(reason, 'imap.qiye.163.com', 993));
+    }
+  });
+});
+
 describe('K20 第一阶段渠道卡与 G8', () => {
   it('四种连接状态、模拟数据标签、未连接的副标题、钉钉卡第一阶段已连接的说明行逐字一致', () => {
     for (const status of connectionStatuses) {
@@ -241,6 +309,23 @@ describe('K20 补充小样：卡片的异常写法与「测试连接」（待办
     expectText(STATES_ADMIN, `${CONNECTION_TEST.failedAction}失败：钉钉通讯录无法访问`);
     expectText(STATES_ADMIN, CONNECTION_TEST.failedDescription.gmail);
     expectText(STATES_ADMIN, CONNECTION_TEST.failedDescription.dingtalk);
+  });
+});
+
+describe('K20 补充小样：163 企业邮箱卡（D-28，待办 34，写法同 Gmail 卡、恢复指引按服务商）', () => {
+  it('同步延迟与连接异常：每个邮箱一行、来信暂存、「重新检测」', () => {
+    expectText(STATES_ADMIN, QIYE_ISSUE_LINES.delayed('amz-auto@forcome.com', '10:05'));
+    expectText(STATES_ADMIN, QIYE_ISSUE_LINES.failed('amz-auto@forcome.com', '10:05', 3));
+    expectText(STATES_ADMIN, QIYE_ISSUE_LINES.held);
+    expectText(STATES_ADMIN, CHANNEL_CARDS.qiye163.mailboxes(1, 0));
+    expectText(STATES_ADMIN, CARD_LINES.mailSent);
+  });
+
+  it('「测试连接」的结果浮层', () => {
+    expectText(STATES_ADMIN, CONNECTION_TEST.ok.qiye163(1));
+    expectText(STATES_ADMIN, `${CONNECTION_TEST.failedAction}失败：amz-auto@forcome.com 无法访问`);
+    expectText(STATES_ADMIN, CONNECTION_TEST.failedDescription.qiye163);
+    expect(CONNECTION_TEST.failedDescription.qiye163).toBe(QIYE_GUIDE);
   });
 });
 

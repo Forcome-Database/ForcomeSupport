@@ -39,11 +39,13 @@ test('管理员打开 P18：渠道卡与示例数据的 4 个店铺', async ({ p
       '订单由平台直读；客户来信经店铺进线邮箱（Gmail 或 163 企业邮箱）收取。店铺决定订单匹配与数据权限。',
     ),
   ).toBeVisible();
-  for (const card of ['amazon', 'shopify', 'gmail', 'dingtalk']) {
+  for (const card of ['amazon', 'shopify', 'gmail', 'qiye163', 'dingtalk']) {
     // 开发测试环境接的是模拟数据，卡头另标「模拟数据」（K20）
     await expect(page.getByTestId(`channel-card-${card}`).getByText('模拟数据')).toBeVisible();
   }
-  await expect(page.getByText('第二阶段接入')).toHaveCount(2);
+  // 积加与易仓合成一张「第二阶段接入」卡（v2.37，加了 163 企业邮箱卡后仍是 3 × 2）
+  await expect(page.getByText('第二阶段接入')).toHaveCount(1);
+  await expect(page.getByTestId('channel-card-phase2')).toContainText('积加 ERP · 易仓海外仓');
   const rows = page.getByTestId('store-row');
   for (const name of ['Forcome Direct', 'Forcome Auto', 'forcome.com', 'forcome.mx']) {
     await expect(rows.filter({ hasText: name }).first()).toBeVisible();
@@ -53,6 +55,11 @@ test('管理员打开 P18：渠道卡与示例数据的 4 个店铺', async ({ p
   await expect(direct).toContainText('卖家 ID');
   await expect(direct).toContainText('A1FD7Q2M9XK3LC');
   await expect(direct).toContainText('已连接');
+  // 进线邮箱下一行写用途与服务商，状态列连接名按服务商（D-28）
+  await expect(direct).toContainText('亚马逊买家消息 · Gmail');
+  const auto = rows.filter({ hasText: 'amz-auto@forcome.com' });
+  await expect(auto).toContainText('亚马逊买家消息 · 163 企业邮箱');
+  await expect(auto).toContainText('163 企业邮箱 · SP-API');
   // 页头右上「查看审计日志」（管理员进入 P27 的另一个入口，待办 30）
   await page.getByRole('link', { name: '查看审计日志' }).click();
   await expect(page).toHaveURL(/\/audit$/);
@@ -71,9 +78,9 @@ test('新增店铺：只有最下面的「平台标识」没填时，定位到�
   await drawer(page).getByRole('button', { name: '站点（多选）' }).click();
   await page.getByRole('menuitemcheckbox', { name: 'MX' }).click();
   await page.keyboard.press('Escape');
-  const mailboxes = drawer(page).getByRole('textbox', { name: '进线邮箱（可填多个，含别名）' });
-  await mailboxes.fill(`e2e-locate-${stamp}@forcome.test`);
-  await mailboxes.press('Enter');
+  await drawer(page)
+    .getByRole('textbox', { name: '进线邮箱 1', exact: true })
+    .fill(`e2e-locate-${stamp}@forcome.test`);
 
   await drawer(page).getByRole('button', { name: '保存', exact: true }).click();
   const platformId = drawer(page).getByRole('textbox', { name: '平台标识 · Shopify 店铺域名' });
@@ -128,7 +135,11 @@ test('新增店铺：字段下方逐项报错、定位到第一个错误；改�
   await page.keyboard.press('Escape');
   // 只选一个站点时默认站点自动带入
   await expect(drawer(page).getByRole('combobox', { name: '默认站点' })).toHaveText('MX');
-  const mailboxes = drawer(page).getByRole('textbox', { name: '进线邮箱（可填多个，含别名）' });
+  // 进线邮箱逐行登记（D-28）：新增时先有一个空行，默认 Gmail
+  const mailboxes = drawer(page).getByRole('textbox', { name: '进线邮箱 1', exact: true });
+  await expect(drawer(page).getByRole('combobox', { name: '进线邮箱 1 的服务商' })).toHaveText(
+    'Gmail',
+  );
   await mailboxes.fill('info@forcome');
   await drawer(page).getByRole('button', { name: '保存', exact: true }).click();
   await expect(drawer(page).getByText('店铺名已存在，请换一个')).toBeVisible();
@@ -139,8 +150,7 @@ test('新增店铺：字段下方逐项报错、定位到第一个错误；改�
   // 改正后填测试店铺
   await drawer(page).getByRole('textbox', { name: '店铺名' }).fill(E2E_STORE);
   await mailboxes.fill(E2E_MAILBOX);
-  await mailboxes.press('Enter');
-  await expect(drawer(page).getByTestId('mailbox-chip')).toHaveText([E2E_MAILBOX]);
+  await expect(drawer(page).getByText('邮箱格式不正确，例如 info@forcome.mx')).toHaveCount(0);
   const platformId = drawer(page).getByRole('textbox', { name: '平台标识 · Shopify 店铺域名' });
   await platformId.fill(`e2e-${stamp}.myshopify.com`);
   await drawer(page).getByRole('button', { name: '保存', exact: true }).click();

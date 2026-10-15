@@ -299,6 +299,7 @@ export {
   QIYE_GUIDE,
   QIYE_IMAP_DEFAULTS,
   qiyeMailboxMessages,
+  reusesSavedAuthCode,
   storeMailboxInputSchema,
   storeMailboxSchema,
   validImapPort,

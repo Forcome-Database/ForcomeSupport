@@ -17,6 +17,7 @@ import {
   ledgerItemSchema,
   ledgerOptionsSchema,
   ledgerSchema,
+  mailboxTestResultSchema,
   loginDeniedSchema,
   loginFailedSchema,
   notificationListSchema,
@@ -61,6 +62,8 @@ import {
   type LoginDenialReason,
   type LoginDenied,
   type LoginFailureReason,
+  type MailboxTestInput,
+  type MailboxTestResult,
   type NotificationList,
   type NotificationView,
   type Preferences,
@@ -316,6 +319,13 @@ export const api = {
    */
   testConnection: (kind: ConnectionTestKind): Promise<ConnectionTestResult> =>
     call(`/api/channel/connection-tests/${kind}`, connectionTestResultSchema, jsonBody('POST', {})),
+
+  /**
+   * 店铺抽屉里按行「测试连接」（K8，163 企业邮箱的行）：通过时返回行内结果；没通过抛 502 connection_test_failed，message 就是行内结果
+   * （登录失败、登录被拒、连不上、找不到「已发送」）；填错抛 400（fields 的键为 address、imapHost、imapPort、authCode）
+   */
+  testMailbox: (input: MailboxTestInput): Promise<MailboxTestResult> =>
+    call('/api/channel/mailbox-tests', mailboxTestResultSchema, jsonBody('POST', input)),
 
   /** 新增店铺；字段填错时抛 ApiRequestError（fields 为各字段的错误） */
   createStore: (input: StoreInput): Promise<Store> =>

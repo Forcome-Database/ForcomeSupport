@@ -1,6 +1,4 @@
 import {
-  mailboxError,
-  normalizeMailbox,
   platformLabels,
   platforms,
   platformTerms,
@@ -12,7 +10,7 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, X } from 'lucide-react';
 import { useId, useState } from 'react';
-import { Controller, useForm, useWatch, type UseFormReturn } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import {
   EditConflictAlert,
   OverwriteDialog,
@@ -43,7 +41,8 @@ import { CHANNEL_QUERY_KEY, channelSettingsQuery, formatClock } from '@/lib/chan
 import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { endSessionIfUnauthenticated } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { A11Y, DRAWER, LEAVE, SAVE_RESULT } from './p18-copy';
+import { addMailboxId, mailboxControlId, MailboxesField } from './mailbox-rows';
+import { DRAWER, LEAVE, SAVE_RESULT } from './p18-copy';
 import {
   changedFields,
   defaultSiteAfter,
@@ -65,7 +64,7 @@ import {
  * 编辑时别人先保存了（409）在顶部给 G7 横幅（查看最新 / 覆盖保存，覆盖需二次确认）；有未保存的输入时关闭抽屉先确认（G8）。
  * 表单状态用 react-hook-form。点「保存」一律交给接口校验（contracts 的 storeInputErrors 加上查库的店铺名、邮箱重复），
  * 一次拿到全部字段的错误——K8 画的就是店铺名重复、邮箱格式、平台标识为空同时报出；改了哪个字段就先撤掉它的错误。
- * 进线邮箱按回车加入时先用同一条规则（contracts 的 mailboxError）就地检查格式与重复。
+ * 进线邮箱逐行登记（D-28，待办 36），163 企业邮箱的行另有授权码、服务器与端口和按行测试连接，见 mailbox-rows.tsx。
  */
 
 export type StoreDrawerTarget = { mode: 'create' } | { mode: 'edit'; store: Store };
@@ -146,94 +145,6 @@ function SitesSelect({
   );
 }
 
-/** 进线邮箱：已加入的是可移除的小标签，下面的输入框按回车（或逗号、离开输入框）加入一个 */
-function MailboxesField({ id, form }: { id: string; form: UseFormReturn<StoreFormValues> }) {
-  const { control, formState, setError, clearErrors, getValues, setValue, register } = form;
-  const draftError = formState.errors.mailboxDraft?.message;
-  const chipErrors = formState.errors.mailboxes as
-    Record<number, { message?: string } | undefined> | undefined;
-  const messages = [draftError, ...Object.values(chipErrors ?? {}).map((e) => e?.message)].filter(
-    (m): m is string => Boolean(m),
-  );
-
-  /** 把输入框里的邮箱加入；格式不对或重复时（strict）在输入框下方报错，留在输入框里 */
-  function addDraft(strict: boolean) {
-    const draft = getValues('mailboxDraft');
-    if (!draft.trim()) return;
-    const current = getValues('mailboxes');
-    const error = mailboxError(draft, current);
-    if (error) {
-      if (strict) setError('mailboxDraft', { message: error });
-      return;
-    }
-    setValue('mailboxes', [...current, normalizeMailbox(draft)], { shouldDirty: true });
-    setValue('mailboxDraft', '', { shouldDirty: true });
-    clearErrors('mailboxDraft');
-  }
-
-  const draft = register('mailboxDraft', {
-    onChange: () => clearErrors('mailboxDraft'),
-    onBlur: () => addDraft(false),
-  });
-
-  return (
-    <FormField
-      label={DRAWER.labels.mailboxes}
-      htmlFor={id}
-      required
-      hint={DRAWER.mailboxHint}
-      error={messages}
-    >
-      <div className="flex flex-col gap-1.5">
-        <Controller
-          control={control}
-          name="mailboxes"
-          render={({ field }) => (
-            <div className={cn('flex flex-wrap gap-1.5', field.value.length === 0 && 'hidden')}>
-              {field.value.map((mailbox, index) => (
-                <Badge
-                  key={mailbox}
-                  tone="outline"
-                  data-testid="mailbox-chip"
-                  className={cn(
-                    chipErrors?.[index]?.message && 'border-destructive text-destructive-text',
-                  )}
-                >
-                  {mailbox}
-                  <button
-                    type="button"
-                    aria-label={A11Y.removeMailbox(mailbox)}
-                    onClick={() => {
-                      field.onChange(field.value.filter((_, i) => i !== index));
-                      clearErrors('mailboxes');
-                    }}
-                    className="rounded-sm text-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <X className="size-2.75" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          )}
-        />
-        <Input
-          id={id}
-          autoComplete="off"
-          aria-invalid={draftError ? true : undefined}
-          aria-describedby={messages.length > 0 ? `${id}-error` : undefined}
-          {...draft}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ',' || event.key === '，') {
-              event.preventDefault();
-              addDraft(true);
-            }
-          }}
-        />
-      </div>
-    </FormField>
-  );
-}
-
 interface Conflict extends EditConflictInfo {
   readonly latest: Store;
 }
@@ -286,11 +197,12 @@ function StoreDrawerContent({
   const { isDirty, dirtyFields } = formState;
   const platform = useWatch({ control, name: 'platform' });
   const selectedSites = useWatch({ control, name: 'sites' });
+  const adapterMode = useWatch({ control, name: 'adapterMode' });
   const terms = platform ? platformTerms[platform] : null;
 
   const save = useMutation({
     mutationFn: ({ values, version }: { values: StoreFormValues; version?: number }) => {
-      const input = storeInputOf(values, dataSourceEditable, base);
+      const input = storeInputOf(values, dataSourceEditable);
       return base
         ? api.updateStore(base.id, { ...input, version: version ?? base.version })
         : api.createStore(input);
@@ -326,13 +238,32 @@ function StoreDrawerContent({
     });
   }
 
-  /** 定位到第一个错误：等字段下方的报错渲染出来再滚动（进线邮箱落到输入框，id 同字段） */
+  /** 定位到第一个错误：等字段下方的报错渲染出来再滚动（进线邮箱落到出错的那一行的控件；一行都没有时落到「添加进线邮箱」） */
   const focusField = useFocusField();
 
+  function controlIdOf(field: NonNullable<ReturnType<typeof firstErrorField>>): string {
+    const match = /^mailboxes\.(\d+)\.(\w+)$/.exec(field);
+    if (match) {
+      return mailboxControlId(
+        fieldId('mailboxes'),
+        Number(match[1]),
+        match[2] as Parameters<typeof mailboxControlId>[2],
+      );
+    }
+    if (field === 'mailboxes') {
+      return form.getValues('mailboxes').length > 0
+        ? mailboxControlId(fieldId('mailboxes'), 0, 'address')
+        : addMailboxId(fieldId('mailboxes'));
+    }
+    return fieldId(field);
+  }
+
   function showFieldErrors(errors: readonly FormError[]) {
-    for (const { field, message } of errors) setError(field, { type: 'server', message });
+    for (const { field, message } of errors) {
+      setError(field === 'mailboxes' ? 'root.mailboxes' : field, { type: 'server', message });
+    }
     const first = firstErrorField(errors);
-    if (first) focusField(fieldId(first));
+    if (first) focusField(controlIdOf(first));
   }
 
   /** 保存失败的处理；字段错误与冲突留在抽屉里显示，返回 true 表示已处理 */
@@ -340,7 +271,7 @@ function StoreDrawerContent({
     if (endSessionIfUnauthenticated(queryClient, error)) return true;
     if (!(error instanceof ApiRequestError)) return false;
     if (error.status === 400 && error.fields) {
-      showFieldErrors(formErrorsOf(error.fields, values.mailboxes.length));
+      showFieldErrors(formErrorsOf(error.fields, values.mailboxes));
       return true;
     }
     if (error.status === 409) {
@@ -535,7 +466,12 @@ function StoreDrawerContent({
                 />
               </FormField>
             </div>
-            <MailboxesField id={fieldId('mailboxes')} form={form} />
+            <MailboxesField
+              id={fieldId('mailboxes')}
+              form={form}
+              base={base}
+              adapterMode={dataSourceEditable ? adapterMode : null}
+            />
             <FormField
               label={terms?.platformIdField ?? DRAWER.labels.platformId}
               htmlFor={fieldId('platformId')}

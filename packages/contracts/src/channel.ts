@@ -205,6 +205,31 @@ export function imapServerErrors(server: {
 }
 
 /**
+ * 没带授权码的 163 企业邮箱行能不能沿用已保存的（PRD P18「校验」，协调者 2026-10-15 决定）：这个店铺里该地址原来就是 163 企业邮箱、
+ * 保存过授权码，且 IMAP 服务器与端口都没改（地址、服务器、端口任何一项变了都要重填——否则改成别的主机就能让系统把已保存的授权码发过去，
+ * 违背「只写不读」）。before 为店铺里同一地址原来的进线邮箱（按地址找，所以地址改了就找不到）。
+ * 保存店铺与按行测试连接（后端），以及抽屉里这一行写「已保存」还是要填授权码（前端，待办 36）都用这一条规则
+ */
+export function reusesSavedAuthCode(
+  before:
+    | {
+        readonly provider: MailProvider;
+        readonly imapHost: string | null;
+        readonly imapPort: number | null;
+      }
+    | undefined,
+  row: { readonly imapHost?: string | null; readonly imapPort?: number | string | null },
+  saved: boolean,
+): boolean {
+  return (
+    saved &&
+    before?.provider === 'qiye163' &&
+    before.imapHost === (row.imapHost?.trim().toLowerCase() ?? null) &&
+    before.imapPort === normalizeImapPort(row.imapPort ?? null)
+  );
+}
+
+/**
  * 单个进线邮箱的错误：格式不对，或与前面已填的重复（不分大小写）；没问题返回 null。
  * 保存时逐个检查用它，抽屉里按回车加入一个邮箱前也用它就地检查。
  */

@@ -1,7 +1,7 @@
 import {
-  normalizeImapPort,
   normalizeStoreInput,
   qiyeMailboxMessages,
+  reusesSavedAuthCode,
   storeInputErrors,
   storeSaveMessages,
   type AdapterMode,
@@ -311,24 +311,6 @@ async function conflictErrors(
 
 /** 没有主密钥（生产环境没配置 CREDENTIAL_MASTER_KEY）时填了授权码：原型不画（部署问题），直接调接口或误配置时才会看到 */
 const NO_MASTER_KEY = '服务器没有配置主密钥（CREDENTIAL_MASTER_KEY），不能保存客户端授权码';
-
-/**
- * 没带授权码的 163 企业邮箱行能不能沿用已保存的（PRD P18「校验」，协调者 2026-10-15 决定）：这个店铺里该地址原来就是 163 企业邮箱、
- * 保存过授权码，且 IMAP 服务器与端口都没改（地址、服务器、端口任何一项变了都要重填——否则改成别的主机就能让系统把已保存的授权码发过去，
- * 违背「只写不读」）。按行测试连接同一条规则
- */
-export function reusesSavedAuthCode(
-  before: Pick<StoreMailboxRecord, 'provider' | 'imapHost' | 'imapPort'> | undefined,
-  row: Pick<StoreMailboxInput, 'imapHost' | 'imapPort'>,
-  saved: boolean,
-): boolean {
-  return (
-    saved &&
-    before?.provider === 'qiye163' &&
-    before.imapHost === (row.imapHost?.trim().toLowerCase() ?? null) &&
-    before.imapPort === normalizeImapPort(row.imapPort ?? null)
-  );
-}
 
 /**
  * 163 企业邮箱的客户端授权码（PRD P18「校验」）：没带授权码的行要沿用已保存的（reusesSavedAuthCode：新加、从 Gmail 改来、

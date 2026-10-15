@@ -6,6 +6,7 @@ import {
   normalizeImapPort,
   normalizeMailbox,
   qiyeMailboxMessages,
+  reusesSavedAuthCode,
   type AdapterMode,
   type FieldErrors,
   type MailboxTestFailureReason,
@@ -60,7 +61,6 @@ import {
 import { mailboxHealths, recordMailboxSuccess } from './mailbox-health';
 import type { SenderRule } from './recognition';
 import { mailboxSync, message, store, storeMailbox, type ImapCursor } from './schema';
-import { reusesSavedAuthCode } from './stores';
 import { loadSenderRules } from './sender-rules';
 
 /*

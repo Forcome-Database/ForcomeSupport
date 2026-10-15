@@ -1,14 +1,18 @@
 import type { Store } from '@forcome/contracts';
 import { describe, expect, it } from 'vitest';
 import {
+  authCodeSaved,
   changedFields,
   defaultSiteAfter,
+  emptyMailboxRow,
   emptyStoreForm,
   firstErrorField,
   formErrorsOf,
+  mailboxTestInputOf,
   storeFormOf,
   storeInputOf,
   unsavedFieldCount,
+  type MailboxRow,
 } from './store-form';
 
 const store: Store = {
@@ -34,14 +38,88 @@ const store: Store = {
   updatedBy: '刘洋',
 };
 
+const auto: Store = {
+  ...store,
+  id: '0199a0c0-0000-7000-8000-000000000002',
+  name: 'Forcome Auto',
+  platform: 'amazon',
+  mailboxes: [
+    {
+      address: 'amz-auto@forcome.com',
+      provider: 'qiye163',
+      imapHost: 'imap.qiye.163.com',
+      imapPort: 993,
+      authCodeSaved: true,
+    },
+  ],
+};
+
+const row = (overrides: Partial<MailboxRow>): MailboxRow => ({
+  ...emptyMailboxRow(),
+  ...overrides,
+});
+
+describe('进线邮箱逐行登记（K8，D-28）', () => {
+  it('新增店铺先给一个空的 Gmail 行，服务器与端口预填 163 企业邮箱的默认值', () => {
+    expect(emptyStoreForm().mailboxes).toEqual([
+      {
+        address: '',
+        provider: 'gmail',
+        imapHost: 'imap.qiye.163.com',
+        imapPort: '993',
+        authCode: '',
+        refill: false,
+      },
+    ]);
+  });
+
+  it('编辑时每个邮箱一行：163 企业邮箱带服务器与端口，授权码不回显', () => {
+    expect(storeFormOf(auto).mailboxes).toEqual([
+      row({ address: 'amz-auto@forcome.com', provider: 'qiye163' }),
+    ]);
+    expect(storeFormOf(store).mailboxes).toEqual([row({ address: 'support@forcome.mx' })]);
+  });
+
+  it('已保存的授权码：同一地址、服务器、端口没改且没点「重新填写」才写「已保存」；改了任何一项回到要填授权码（待办 35 ⑦）', () => {
+    const saved = storeFormOf(auto).mailboxes[0]!;
+    expect(authCodeSaved(saved, auto)).toBe(true);
+    // 大小写与首尾空白不算改
+    expect(
+      authCodeSaved(
+        { ...saved, address: ' AMZ-auto@forcome.com', imapHost: 'IMAP.qiye.163.com ' },
+        auto,
+      ),
+    ).toBe(true);
+    expect(authCodeSaved({ ...saved, refill: true }, auto)).toBe(false);
+    expect(authCodeSaved({ ...saved, imapHost: 'imaphz.qiye.163.com' }, auto)).toBe(false);
+    expect(authCodeSaved({ ...saved, imapPort: '143' }, auto)).toBe(false);
+    expect(authCodeSaved({ ...saved, address: 'amz-auto2@forcome.com' }, auto)).toBe(false);
+    // 新店铺、从 Gmail 改来、没保存过授权码的
+    expect(authCodeSaved(saved, null)).toBe(false);
+    expect(authCodeSaved({ ...saved, provider: 'gmail' }, auto)).toBe(false);
+    expect(authCodeSaved(row({ address: 'support@forcome.mx', provider: 'qiye163' }), store)).toBe(
+      false,
+    );
+    expect(
+      authCodeSaved(saved, {
+        ...auto,
+        mailboxes: [{ ...auto.mailboxes[0]!, authCodeSaved: false }],
+      }),
+    ).toBe(false);
+  });
+});
+
 describe('店铺抽屉的提交内容（K8）', () => {
-  it('输入框里还没加入的邮箱也算一个，排在最后；没选的平台与默认站点为空', () => {
+  it('空着的 Gmail 行不提交；没选的平台与默认站点为空', () => {
     expect(
       storeInputOf(
         {
           ...emptyStoreForm(),
-          mailboxes: ['support@forcome.mx'],
-          mailboxDraft: ' info@forcome ',
+          mailboxes: [
+            row({ address: 'support@forcome.mx' }),
+            row({}),
+            row({ address: ' info@forcome ' }),
+          ],
         },
         true,
       ),
@@ -52,82 +130,145 @@ describe('店铺抽屉的提交内容（K8）', () => {
       defaultSite: null,
       mailboxes: [
         { address: 'support@forcome.mx', provider: 'gmail' },
-        { address: 'info@forcome', provider: 'gmail' },
+        { address: ' info@forcome ', provider: 'gmail' },
       ],
       platformId: '',
       adapterMode: 'fake',
     });
   });
 
-  it('原有的进线邮箱沿用编辑前的服务商与服务器（163 企业邮箱的授权码不带，沿用已保存的；待办 35），新加的为 Gmail', () => {
-    const auto: Store = {
-      ...store,
-      mailboxes: [
-        {
-          address: 'amz-auto@forcome.com',
-          provider: 'qiye163',
-          imapHost: 'imap.qiye.163.com',
-          imapPort: 993,
-          authCodeSaved: true,
-        },
-      ],
-    };
+  it('163 企业邮箱的行带服务器与端口，新填了授权码才带（没填由接口沿用已保存的）；地址空着也提交、由接口报错', () => {
     expect(
       storeInputOf(
-        { ...storeFormOf(auto), mailboxes: ['amz-auto@forcome.com', 'help@forcome.com'] },
+        {
+          ...storeFormOf(auto),
+          mailboxes: [
+            row({ address: 'amz-auto@forcome.com', provider: 'qiye163' }),
+            row({
+              address: 'help@forcome.com',
+              provider: 'qiye163',
+              imapPort: ' 994',
+              authCode: ' code-1 ',
+            }),
+            row({ provider: 'qiye163' }),
+          ],
+        },
         true,
-        auto,
       ).mailboxes,
     ).toEqual([
       {
         address: 'amz-auto@forcome.com',
         provider: 'qiye163',
         imapHost: 'imap.qiye.163.com',
-        imapPort: 993,
+        imapPort: '993',
       },
-      { address: 'help@forcome.com', provider: 'gmail' },
+      {
+        address: 'help@forcome.com',
+        provider: 'qiye163',
+        imapHost: 'imap.qiye.163.com',
+        imapPort: ' 994',
+        authCode: 'code-1',
+      },
+      { address: '', provider: 'qiye163', imapHost: 'imap.qiye.163.com', imapPort: '993' },
     ]);
+  });
+
+  it('163 企业邮箱改回 Gmail：只提交地址与服务商（保存后授权码由接口删除）', () => {
+    expect(
+      storeInputOf(
+        {
+          ...storeFormOf(auto),
+          mailboxes: [row({ address: 'amz-auto@forcome.com', authCode: 'x' })],
+        },
+        true,
+      ).mailboxes,
+    ).toEqual([{ address: 'amz-auto@forcome.com', provider: 'gmail' }]);
   });
 
   it('生产环境（不显示数据来源）不提交数据来源', () => {
     expect(storeInputOf(storeFormOf(store), false)).not.toHaveProperty('adapterMode');
   });
+
+  it('按行测试连接：这一行当前填的内容，新填了授权码才带；编辑时带店铺，数据来源按抽屉当前的选择', () => {
+    expect(
+      mailboxTestInputOf(
+        row({ address: 'amz-auto@forcome.com', provider: 'qiye163' }),
+        auto.id,
+        'fake',
+      ),
+    ).toEqual({
+      address: 'amz-auto@forcome.com',
+      imapHost: 'imap.qiye.163.com',
+      imapPort: '993',
+      storeId: auto.id,
+      adapterMode: 'fake',
+    });
+    expect(
+      mailboxTestInputOf(
+        row({ address: 'new@forcome.com', provider: 'qiye163', authCode: ' c ' }),
+        null,
+        null,
+      ),
+    ).toEqual({
+      address: 'new@forcome.com',
+      imapHost: 'imap.qiye.163.com',
+      imapPort: '993',
+      authCode: 'c',
+    });
+  });
 });
 
 describe('字段错误落到表单上', () => {
-  it('输入框那一个邮箱与「至少填写一个」落在输入框，已加入的邮箱按序号落在小标签上', () => {
+  it('接口按提交的行编号，换回抽屉里的行（空着的 Gmail 行不提交）；行内的授权码、服务器、端口各落各的', () => {
+    const rows = [
+      row({ address: 'support@forcome.mx' }),
+      row({}),
+      row({ address: 'info@forcome' }),
+      row({ address: 'help@forcome.com', provider: 'qiye163' }),
+    ];
     expect(
       formErrorsOf(
         {
           name: '店铺名已存在，请换一个',
           'mailboxes.0': 'support@forcome.mx 已是 forcome.mx 的进线邮箱',
-          'mailboxes.2': '邮箱格式不正确，例如 info@forcome.mx',
+          'mailboxes.1': '邮箱格式不正确，例如 info@forcome.mx',
+          'mailboxes.2.authCode': '请填写客户端授权码',
+          'mailboxes.2.imapPort': '端口为 1–65535 的整数',
           platformId: '请填写店铺域名',
         },
-        2,
+        rows,
       ),
     ).toEqual([
       { field: 'name', message: '店铺名已存在，请换一个' },
-      { field: 'mailboxes.0', message: 'support@forcome.mx 已是 forcome.mx 的进线邮箱' },
-      { field: 'mailboxDraft', message: '邮箱格式不正确，例如 info@forcome.mx' },
+      { field: 'mailboxes.0.address', message: 'support@forcome.mx 已是 forcome.mx 的进线邮箱' },
+      { field: 'mailboxes.2.address', message: '邮箱格式不正确，例如 info@forcome.mx' },
+      { field: 'mailboxes.3.authCode', message: '请填写客户端授权码' },
+      { field: 'mailboxes.3.imapPort', message: '端口为 1–65535 的整数' },
       { field: 'platformId', message: '请填写店铺域名' },
     ]);
-    expect(formErrorsOf({ mailboxes: '至少填写一个进线邮箱' }, 0)).toEqual([
-      { field: 'mailboxDraft', message: '至少填写一个进线邮箱' },
+    expect(formErrorsOf({ mailboxes: '至少填写一个进线邮箱' }, [row({})])).toEqual([
+      { field: 'mailboxes', message: '至少填写一个进线邮箱' },
     ]);
   });
 
-  it('保存后定位到最靠上的错误：平台 → 店铺名 → 站点 → 默认站点 → 进线邮箱 → 平台标识 → 数据来源', () => {
+  it('保存后定位到最靠上的错误：平台 → 店铺名 → 站点 → 默认站点 → 进线邮箱（按行，行内地址 → 授权码 → 服务器 → 端口）→ 平台标识 → 数据来源', () => {
+    const rows = [
+      row({ address: 'a@forcome.com', provider: 'qiye163' }),
+      row({ address: 'b@forcome.com', provider: 'qiye163' }),
+    ];
     const at = (...fields: string[]) =>
-      formErrorsOf(Object.fromEntries(fields.map((f) => [f, 'x'])), 2);
+      formErrorsOf(Object.fromEntries(fields.map((f) => [f, 'x'])), rows);
     expect(firstErrorField(at('platformId', 'name'))).toBe('name');
-    expect(firstErrorField(at('platformId', 'mailboxes.1'))).toBe('mailboxes');
-    expect(firstErrorField(at('adapterMode', 'mailboxes'))).toBe('mailboxDraft');
+    expect(firstErrorField(at('platformId', 'mailboxes.1'))).toBe('mailboxes.1.address');
+    expect(firstErrorField(at('mailboxes.1', 'mailboxes.0.imapPort', 'mailboxes.0.authCode'))).toBe(
+      'mailboxes.0.authCode',
+    );
+    expect(firstErrorField(at('adapterMode', 'mailboxes'))).toBe('mailboxes');
     expect(firstErrorField([])).toBeNull();
   });
 
-  it('G8 的未保存项数：进线邮箱的小标签与输入框算一项', () => {
-    expect(unsavedFieldCount({ name: true, mailboxes: [false, true], mailboxDraft: true })).toBe(2);
+  it('G8 的未保存项数：进线邮箱的各行算一项', () => {
+    expect(unsavedFieldCount({ name: true, mailboxes: [false, { address: true }] })).toBe(2);
     expect(unsavedFieldCount({ platformId: false })).toBe(0);
   });
 });

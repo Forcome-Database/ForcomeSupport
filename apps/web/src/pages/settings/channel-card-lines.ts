@@ -8,6 +8,7 @@ import {
   DINGTALK_ISSUE_LINES,
   GMAIL_ISSUE_LINES,
   ORDER_BACKFILL_LINE,
+  QIYE_ISSUE_LINES,
   SHOPIFY_ISSUE_LINES,
 } from './p18-copy';
 
@@ -17,8 +18,9 @@ import {
  *   再写一次订单暂停同步，同步延迟的店铺排在后面；只有同步延迟时，每个延迟的店铺一行，其余说明行照常；
  *   订单回补行（待办 13）带状态标签，文字与标签由本文件的 orderBackfillLine 给出，画在 channel-cards.tsx 的 OrderBackfillRow；
  *   亚马逊卡的「订单通知队列（SQS）」一行带状态标签，不在这里（channel-cards.tsx 的 OrderQueueLine），各状态下都照写；
- * - Gmail：都正常时写邮箱数与「已发送」；有连接异常的邮箱时，每个异常的邮箱一行原因与恢复指引（次数为实际的连续失败次数），
- *   再写一次来信暂存，同步延迟的邮箱排在后面；只有同步延迟时，每个延迟的邮箱一行，其余说明行照常；
+ * - Gmail 与 163 企业邮箱（D-28，待办 36）：都正常时写该服务商的邮箱数与「已发送」；有连接异常的邮箱时，每个异常的邮箱一行原因与
+ *   恢复指引（次数为实际的连续失败次数；恢复指引按服务商），再写一次来信暂存，同步延迟的邮箱排在后面；只有同步延迟时，每个延迟的邮箱
+ *   一行，其余说明行照常；
  * - 钉钉：同步延迟与连接异常时第一行换成未同步成功的说明（从没同步成功过写「尚未同步成功」），其后两行固定。
  */
 
@@ -55,29 +57,36 @@ function ordersLines(
   return [...delayed, ...storeLines(kind, stores)];
 }
 
-function gmailLines(card: ChannelCard, stores: readonly Store[]): string[] {
+const MAIL_ISSUE_LINES = { gmail: GMAIL_ISSUE_LINES, qiye163: QIYE_ISSUE_LINES } as const;
+
+/** 邮箱卡（Gmail、163 企业邮箱）的说明行：按邮箱列出异常与延迟；邮箱数只数该服务商的 */
+function mailLines(
+  provider: 'gmail' | 'qiye163',
+  card: ChannelCard,
+  stores: readonly Store[],
+): string[] {
+  const words = MAIL_ISSUE_LINES[provider];
   const mailboxCount = (platform: Store['platform']) =>
     stores
       .filter((s) => s.platform === platform)
-      // 只数服务商为 Gmail 的邮箱（163 企业邮箱另有一张卡，D-28，待办 35）
-      .reduce((n, s) => n + s.mailboxes.filter((m) => m.provider === 'gmail').length, 0);
+      .reduce((n, s) => n + s.mailboxes.filter((m) => m.provider === provider).length, 0);
   const failed = card.issues.filter((issue) => issue.status === 'error');
   const delayed = card.issues
     .filter((issue) => issue.status === 'delayed')
-    .map((issue) => GMAIL_ISSUE_LINES.delayed(issue.target, clockOf(issue.lastSuccessAt)));
+    .map((issue) => words.delayed(issue.target, clockOf(issue.lastSuccessAt)));
   if (failed.length > 0) {
     return [
       ...failed.map((issue) =>
-        GMAIL_ISSUE_LINES.failed(issue.target, clockOf(issue.failingSince), issue.failures),
+        words.failed(issue.target, clockOf(issue.failingSince), issue.failures),
       ),
-      GMAIL_ISSUE_LINES.held,
+      words.held,
       ...delayed,
     ];
   }
   return [
     ...delayed,
-    CHANNEL_CARDS.gmail.mailboxes(mailboxCount('amazon'), mailboxCount('shopify')),
-    CARD_LINES.gmailSent,
+    CHANNEL_CARDS[provider].mailboxes(mailboxCount('amazon'), mailboxCount('shopify')),
+    CARD_LINES.mailSent,
   ];
 }
 
@@ -99,15 +108,6 @@ function dingtalkLines(card: ChannelCard): string[] {
   return [...CARD_LINES.dingtalk];
 }
 
-/** 163 企业邮箱卡（D-28）的界面随待办 36 做；在那之前 P18 不显示它（接口已给出这张卡，待办 35） */
-export type ShownChannelCard = ChannelCard & {
-  readonly kind: Exclude<ChannelCard['kind'], 'qiye163'>;
-};
-
-export function isShownChannelCard(card: ChannelCard): card is ShownChannelCard {
-  return card.kind !== 'qiye163';
-}
-
 /** 一张渠道卡的说明行（按数据与连接状态写） */
 export function channelCardLines(card: ChannelCard, stores: readonly Store[]): string[] {
   switch (card.kind) {
@@ -115,12 +115,10 @@ export function channelCardLines(card: ChannelCard, stores: readonly Store[]): s
     case 'shopify':
       return ordersLines(card.kind, card, stores);
     case 'gmail':
-      return gmailLines(card, stores);
+    case 'qiye163':
+      return mailLines(card.kind, card, stores);
     case 'dingtalk':
       return dingtalkLines(card);
-    case 'qiye163':
-      // P18 还不显示这张卡（isShownChannelCard），说明行随待办 36 照原型写
-      return [];
   }
 }
 
@@ -162,7 +160,7 @@ export function orderBackfillLine(card: ChannelCard): OrderBackfillLine | null {
 }
 
 /**
- * Gmail 卡有连接异常的邮箱、Shopify 与亚马逊卡有连接异常的店铺时，卡底给「重新检测」（K7、K20 补充小样；立即重测并补拉）。
+ * Gmail、163 企业邮箱卡有连接异常的邮箱、Shopify 与亚马逊卡有连接异常的店铺时，卡底给「重新检测」（K7、K20 补充小样；立即重测并补拉）。
  * 只是订单通知队列拉取失败不算（Q7：只影响 SQS 那一行）
  */
 export function needsRecheck(card: ChannelCard): boolean {

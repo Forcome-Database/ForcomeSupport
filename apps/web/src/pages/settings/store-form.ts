@@ -1,8 +1,13 @@
 import {
+  normalizeMailbox,
   normalizeStoreInput,
+  QIYE_IMAP_DEFAULTS,
+  reusesSavedAuthCode,
   sites as allSites,
   type AdapterMode,
   type FieldErrors,
+  type MailboxTestInput,
+  type MailProvider,
   type Platform,
   type Site,
   type Store,
@@ -12,20 +17,30 @@ import {
 
 /*
  * 店铺抽屉（K8）的表单值与提交内容之间的换算，纯函数，便于单元测试。
- * 进线邮箱分两部分：已加入的邮箱（小标签）与输入框里还没加入的那一个（mailboxDraft）；
- * 保存时输入框里的内容也算一个邮箱，排在最后——K8 画的就是输入框里「info@forcome」报格式错误。
- * 进线邮箱的服务商（D-28，待办 35）：接口的进线邮箱是对象（地址 + 服务商；163 企业邮箱另有服务器、端口、授权码已保存否）。
- * 逐行登记服务商的界面随待办 36；在那之前表单仍按地址编辑，提交时原有的邮箱沿用原来的服务商与服务器（授权码不带即沿用已保存的），
- * 新加的按 Gmail。
+ * 进线邮箱逐行登记（D-28，待办 34 原型、待办 36）：每行地址 + 服务商；163 企业邮箱的行另有客户端授权码、IMAP 服务器与端口。
+ * 每行都留着服务器与端口（Gmail 的行也预填默认值），在两种服务商之间切换时不丢；只有 163 企业邮箱的行提交它们。
+ * 客户端授权码只写不读：表单里只有这次新填的，没填就不带，由接口沿用已保存的（contracts 的 reusesSavedAuthCode 同一条规则）。
  */
+
+/** 进线邮箱的一行 */
+export interface MailboxRow {
+  address: string;
+  provider: MailProvider;
+  imapHost: string;
+  /** 端口按输入框里的文字留着，提交时由接口判断是不是 1–65535 的整数 */
+  imapPort: string;
+  /** 这次新填的客户端授权码；没填为空 */
+  authCode: string;
+  /** 已保存授权码的行点了「重新填写」 */
+  refill: boolean;
+}
 
 export interface StoreFormValues {
   platform: Platform | '';
   name: string;
   sites: Site[];
   defaultSite: Site | '';
-  mailboxes: string[];
-  mailboxDraft: string;
+  mailboxes: MailboxRow[];
   platformId: string;
   adapterMode: AdapterMode;
 }
@@ -37,21 +52,35 @@ export const FORM_FIELDS = [
   'sites',
   'defaultSite',
   'mailboxes',
-  'mailboxDraft',
   'platformId',
   'adapterMode',
 ] as const;
 export type FormField = (typeof FORM_FIELDS)[number];
 
-/** 新增店铺时的初值；非生产环境数据来源默认模拟数据（开发测试环境外部客户端默认 Fake） */
+/** 163 企业邮箱的行里报错的字段（地址的错误在 address） */
+export const MAILBOX_ROW_FIELDS = ['address', 'authCode', 'imapHost', 'imapPort'] as const;
+export type MailboxRowField = (typeof MAILBOX_ROW_FIELDS)[number];
+
+/** 新加的一行：默认 Gmail（K8「新加的行默认 Gmail」），服务器与端口预填 163 企业邮箱的默认值，改成 163 企业邮箱时直接可用 */
+export function emptyMailboxRow(): MailboxRow {
+  return {
+    address: '',
+    provider: 'gmail',
+    imapHost: QIYE_IMAP_DEFAULTS.host,
+    imapPort: String(QIYE_IMAP_DEFAULTS.port),
+    authCode: '',
+    refill: false,
+  };
+}
+
+/** 新增店铺时的初值：进线邮箱先给一个空行；非生产环境数据来源默认模拟数据（开发测试环境外部客户端默认 Fake） */
 export function emptyStoreForm(): StoreFormValues {
   return {
     platform: '',
     name: '',
     sites: [],
     defaultSite: '',
-    mailboxes: [],
-    mailboxDraft: '',
+    mailboxes: [emptyMailboxRow()],
     platformId: '',
     adapterMode: 'fake',
   };
@@ -64,53 +93,78 @@ export function storeFormOf(store: Store): StoreFormValues {
     name: store.name,
     sites: [...store.sites],
     defaultSite: store.defaultSite,
-    mailboxes: store.mailboxes.map((mailbox) => mailbox.address),
-    mailboxDraft: '',
+    mailboxes: store.mailboxes.map((mailbox) => ({
+      ...emptyMailboxRow(),
+      address: mailbox.address,
+      provider: mailbox.provider,
+      ...(mailbox.imapHost ? { imapHost: mailbox.imapHost } : {}),
+      ...(mailbox.imapPort ? { imapPort: String(mailbox.imapPort) } : {}),
+    })),
     platformId: store.platformId,
     adapterMode: store.adapterMode,
   };
 }
 
-/** 提交的一个进线邮箱：编辑前就有的沿用它的服务商与服务器（地址不分大小写），新加的为 Gmail */
-function mailboxInputOf(address: string, before: Store | null): StoreMailboxInput {
-  const existing = before?.mailboxes.find(
-    (mailbox) => mailbox.address === address.trim().toLowerCase(),
-  );
-  return existing?.provider === 'qiye163'
-    ? {
-        address,
-        provider: 'qiye163',
-        imapHost: existing.imapHost,
-        imapPort: existing.imapPort,
-      }
-    : { address, provider: 'gmail' };
+/**
+ * 这一行在抽屉里写「已保存」+「重新填写」（K8 补充小样），而不是要填授权码：163 企业邮箱的行，店铺里同一地址原来就是 163 企业邮箱、
+ * 保存过授权码，服务器与端口也没改，且没点「重新填写」。地址、服务器或端口改了就回到要填授权码的样子（待办 35 ⑦，PRD P18「校验」）
+ */
+export function authCodeSaved(row: MailboxRow, before: Store | null): boolean {
+  if (row.provider !== 'qiye163' || row.refill) return false;
+  const saved = before?.mailboxes.find((m) => m.address === normalizeMailbox(row.address));
+  return reusesSavedAuthCode(saved, row, saved?.authCodeSaved ?? false);
 }
 
-/**
- * 要提交的内容；dataSourceEditable 为 false（生产环境）时不带数据来源。before 为编辑前的店铺（新增时为 null），
- * 进线邮箱的服务商按它沿用
- */
-export function storeInputOf(
-  values: StoreFormValues,
-  dataSourceEditable: boolean,
-  before: Store | null = null,
-): StoreInput {
-  const draft = values.mailboxDraft.trim();
-  const addresses = draft ? [...values.mailboxes, draft] : values.mailboxes;
+/** 空着的 Gmail 行（新增时给的空行、点了「添加进线邮箱」没填的）不提交；163 企业邮箱的行即使地址空着也提交，由接口报错 */
+function submitted(row: MailboxRow): boolean {
+  return row.provider === 'qiye163' || row.address.trim() !== '';
+}
+
+function mailboxInputOf(row: MailboxRow): StoreMailboxInput {
+  if (row.provider === 'gmail') return { address: row.address, provider: 'gmail' };
+  const authCode = row.authCode.trim();
+  return {
+    address: row.address,
+    provider: 'qiye163',
+    imapHost: row.imapHost,
+    imapPort: row.imapPort,
+    ...(authCode ? { authCode } : {}),
+  };
+}
+
+/** 要提交的内容；dataSourceEditable 为 false（生产环境）时不带数据来源 */
+export function storeInputOf(values: StoreFormValues, dataSourceEditable: boolean): StoreInput {
   return {
     name: values.name,
     platform: values.platform || null,
     sites: values.sites,
     defaultSite: values.defaultSite || null,
-    mailboxes: addresses.map((address) => mailboxInputOf(address, before)),
+    mailboxes: values.mailboxes.filter(submitted).map(mailboxInputOf),
     platformId: values.platformId,
     ...(dataSourceEditable ? { adapterMode: values.adapterMode } : {}),
   };
 }
 
-/** 表单上的一个错误：落在哪个字段（已加入的进线邮箱按序号，如 mailboxes.0），写什么 */
+/** 按行「测试连接」提交的内容：这一行当前填的地址、服务器、端口，新填了授权码就带上；编辑时带店铺（没重填时用已保存的） */
+export function mailboxTestInputOf(
+  row: MailboxRow,
+  storeId: string | null,
+  adapterMode: AdapterMode | null,
+): MailboxTestInput {
+  const authCode = row.authCode.trim();
+  return {
+    address: row.address,
+    imapHost: row.imapHost,
+    imapPort: row.imapPort,
+    ...(authCode ? { authCode } : {}),
+    ...(storeId ? { storeId } : {}),
+    ...(adapterMode ? { adapterMode } : {}),
+  };
+}
+
+/** 表单上的一个错误：落在哪个字段（进线邮箱按行与行内的字段，如 mailboxes.0.address、mailboxes.0.authCode），写什么 */
 export interface FormError {
-  readonly field: FormField | `mailboxes.${number}`;
+  readonly field: FormField | `mailboxes.${number}.${MailboxRowField}`;
   readonly message: string;
 }
 
@@ -119,19 +173,20 @@ function isFormField(key: string): key is FormField {
 }
 
 /**
- * 把接口给出的字段错误（键如 name、mailboxes.2）换成表单上的错误：
- * 「至少填写一个进线邮箱」与输入框里那一个邮箱的错误落在输入框（mailboxDraft）上，已加入的邮箱的错误按序号落在小标签上。
+ * 把接口给出的字段错误换成表单上的错误。接口的序号按提交的行数（空着的 Gmail 行不提交），这里换回抽屉里的行：
+ * mailboxes.<序号> 为这一行的地址，mailboxes.<序号>.<字段> 为 163 企业邮箱的授权码、服务器与端口；「至少填写一个进线邮箱」落在整个字段上。
  */
-export function formErrorsOf(errors: FieldErrors, mailboxCount: number): FormError[] {
+export function formErrorsOf(errors: FieldErrors, rows: readonly MailboxRow[]): FormError[] {
+  const rowOf = rows.flatMap((row, index) => (submitted(row) ? [index] : []));
   const result: FormError[] = [];
   for (const [key, message] of Object.entries(errors)) {
-    const match = /^mailboxes\.(\d+)$/.exec(key);
-    if (key === 'mailboxes' || (match && Number(match[1]) >= mailboxCount)) {
-      if (!result.some((e) => e.field === 'mailboxDraft')) {
-        result.push({ field: 'mailboxDraft', message });
+    const match = /^mailboxes\.(\d+)(?:\.(\w+))?$/.exec(key);
+    if (match) {
+      const row = rowOf[Number(match[1])];
+      const field = (match[2] ?? 'address') as MailboxRowField;
+      if (row !== undefined && MAILBOX_ROW_FIELDS.includes(field)) {
+        result.push({ field: `mailboxes.${row}.${field}`, message });
       }
-    } else if (match) {
-      result.push({ field: `mailboxes.${Number(match[1])}`, message });
     } else if (isFormField(key)) {
       result.push({ field: key, message });
     }
@@ -139,24 +194,34 @@ export function formErrorsOf(errors: FieldErrors, mailboxCount: number): FormErr
   return result;
 }
 
-/** 有错误的字段里最靠上的一个（保存后定位到它） */
-export function firstErrorField(errors: readonly FormError[]): FormField | null {
+/**
+ * 有错误的控件里最靠上的一个（保存后定位到它）：进线邮箱按行、行内按地址、授权码、服务器、端口的先后。
+ * 返回字段名，进线邮箱的行内错误返回 mailboxes.<行>.<字段>
+ */
+export function firstErrorField(errors: readonly FormError[]): FormError['field'] | null {
   for (const field of FORM_FIELDS) {
-    const hit =
-      field === 'mailboxes'
-        ? errors.some((e) => e.field.startsWith('mailboxes.'))
-        : errors.some((e) => e.field === field);
-    if (hit) return field;
+    if (field !== 'mailboxes') {
+      if (errors.some((e) => e.field === field)) return field;
+      continue;
+    }
+    if (errors.some((e) => e.field === 'mailboxes')) return 'mailboxes';
+    const inRows = errors
+      .map((e) => /^mailboxes\.(\d+)\.(\w+)$/.exec(e.field))
+      .filter((m): m is RegExpExecArray => m !== null)
+      .map((m) => ({
+        row: Number(m[1]),
+        order: MAILBOX_ROW_FIELDS.indexOf(m[2] as MailboxRowField),
+        field: m[0] as FormError['field'],
+      }))
+      .sort((a, b) => a.row - b.row || a.order - b.order);
+    if (inRows[0]) return inRows[0].field;
   }
   return null;
 }
 
-/** G8 里写的「有 N 项未保存的修改」：进线邮箱的小标签与输入框算一项 */
+/** G8 里写的「有 N 项未保存的修改」：进线邮箱的各行算一项 */
 export function unsavedFieldCount(dirtyFields: Partial<Record<FormField, unknown>>): number {
-  const fields = Object.entries(dirtyFields)
-    .filter(([, dirty]) => Boolean(dirty))
-    .map(([field]) => (field === 'mailboxDraft' ? 'mailboxes' : field));
-  return new Set(fields).size;
+  return Object.values(dirtyFields).filter(Boolean).length;
 }
 
 /** 站点改了以后的默认站点：只选一个站点时自动带入；原来的默认站点不在所选站点里时清空 */
@@ -194,7 +259,10 @@ function comparable(store: Store) {
     platform: input.platform,
     sites: input.sites.join(','),
     defaultSite: input.defaultSite,
-    mailboxes: input.mailboxes.map((mailbox) => mailbox.address).join(','),
+    // 服务商、服务器与端口改了也算进线邮箱改了（授权码只写不读，比不出来）
+    mailboxes: input.mailboxes
+      .map((m) => [m.address, m.provider, m.imapHost ?? '', m.imapPort ?? ''].join(' '))
+      .join(','),
     platformId: input.platformId,
     adapterMode: store.adapterMode,
   };

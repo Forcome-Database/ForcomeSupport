@@ -2,6 +2,7 @@ import {
   platformLabels,
   mailProviderLabels,
   platformTerms,
+  type MailProvider,
   type Store,
   type StoreConnection,
 } from '@forcome/contracts';
@@ -26,7 +27,7 @@ import { A11Y, EMPTY_STORES, RULE_ROUTE, STORE_SECTION, STORE_TABLE } from './p1
 
 /*
  * P18 店铺表（第一阶段，K20；原型 build_settings.p18_stores(phase1=True)）：
- * 列为 店铺 · 站点（加粗为默认）· 进线邮箱 · 平台标识（可复制）· 状态 · 行尾「编辑」，第一阶段没有覆盖项列；
+ * 列为 店铺 · 站点（加粗为默认）· 进线邮箱（下一行写用途与服务商）· 平台标识（可复制）· 状态 · 行尾「编辑」，第一阶段没有覆盖项列；
  * 表头上方「店铺 N 个 | ⓘ 进线识别」，右侧「新增店铺」。上线初期没有店铺时显示空状态。
  */
 
@@ -84,10 +85,9 @@ function CopyValue({ value }: { value: string }) {
  * 不同时逐个写出不是已连接的那几个（例「SP-API 未连接」）。
  */
 function StoreStatus({ store }: { store: Store }) {
+  // 进线邮箱按服务商各一个连接（D-28：「163 企业邮箱 · SP-API」「163 企业邮箱 连接异常」），订单接口一个
   const names: Record<StoreConnection['kind'], string> = {
-    gmail: STORE_TABLE.gmail,
-    // 163 企业邮箱的进线邮箱（D-28，待办 35 接口；店铺表的服务商写法随待办 36 核对）
-    qiye163: mailProviderLabels.qiye163,
+    ...mailProviderLabels,
     orders: platformTerms[store.platform].ordersApi,
   };
   const [first] = store.connections;
@@ -112,6 +112,34 @@ function StoreStatus({ store }: { store: Store }) {
   );
 }
 
+/**
+ * 「进线邮箱」列：每个地址一行，下一行写用途与服务商（D-28，例「亚马逊买家消息 · 163 企业邮箱」）。各邮箱同一个服务商时
+ * 用途与服务商在所有地址之后写一次；服务商不同时每个地址下各写一行（原型的示例每个店铺只有一个邮箱）
+ */
+function MailboxCell({ store }: { store: Store }) {
+  const usage = platformTerms[store.platform].mailbox;
+  const mixed = new Set(store.mailboxes.map((m) => m.provider)).size > 1;
+  const usageLine = (provider: MailProvider, key?: string) => (
+    <span key={key} className="text-11 text-subtle-foreground">
+      {STORE_TABLE.mailboxUsage(usage, mailProviderLabels[provider])}
+    </span>
+  );
+  const [first] = store.mailboxes;
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      {store.mailboxes.map(({ address, provider }) => (
+        <Fragment key={address}>
+          <span className="truncate text-13 font-semibold text-foreground" title={address}>
+            {address}
+          </span>
+          {mixed && usageLine(provider, `${address}-usage`)}
+        </Fragment>
+      ))}
+      {!mixed && first && usageLine(first.provider)}
+    </div>
+  );
+}
+
 function StoreRow({ store, onEdit }: { store: Store; onEdit: (store: Store) => void }) {
   const terms = platformTerms[store.platform];
   return (
@@ -126,18 +154,7 @@ function StoreRow({ store, onEdit }: { store: Store; onEdit: (store: Store) => v
         <SiteCell store={store} />
       </TableCell>
       <TableCell className="py-3">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          {store.mailboxes.map(({ address: mailbox }) => (
-            <span
-              key={mailbox}
-              className="truncate text-13 font-semibold text-foreground"
-              title={mailbox}
-            >
-              {mailbox}
-            </span>
-          ))}
-          <span className="text-11 text-subtle-foreground">{terms.mailbox}</span>
-        </div>
+        <MailboxCell store={store} />
       </TableCell>
       <TableCell className="py-3">
         <div className="flex min-w-0 flex-col gap-0.5">

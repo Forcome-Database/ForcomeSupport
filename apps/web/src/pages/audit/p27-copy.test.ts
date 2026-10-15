@@ -332,6 +332,68 @@ describe('后端写出的摘要与两栏对照与原型一致', () => {
     expectText(STATES_ADMIN, exported.actionLabel);
   });
 
+  it('163 企业邮箱（D-28，待办 36）：重新填写客户端授权码只记「已重新填写」（K18 补充小样）；邮箱恢复连接的对象、摘要与补拉（K20 补充小样）', () => {
+    const auto: AuditSnapshot<'store.update'> = {
+      name: 'Forcome Auto',
+      platform: 'amazon',
+      sites: ['US'],
+      defaultSite: 'US',
+      mailboxes: ['amz-auto@forcome.com'],
+      mailboxServers: [
+        {
+          address: 'amz-auto@forcome.com',
+          provider: 'qiye163',
+          imapHost: 'imap.qiye.163.com',
+          imapPort: 993,
+        },
+      ],
+      platformId: 'A3KA8V1T6RW2NB',
+      adapterMode: 'fake',
+    };
+    const renewed = describeAs(
+      record({
+        action: 'store.update',
+        objectType: 'store',
+        before: auto,
+        after: { ...auto, authCodeRenewed: ['amz-auto@forcome.com'] },
+      }),
+    );
+    expectText(STATES_ADMIN, renewed.summary);
+
+    const recovered = describeAs(
+      record({
+        action: 'channel.recovered',
+        objectType: 'channel',
+        storeId: null,
+        objectId: 'qiye163:amz-auto@forcome.com',
+        objectLabel: '163 企业邮箱 · amz-auto@forcome.com',
+        occurredAt: new Date('2026-09-11T02:14:00Z'),
+        before: {
+          channel: 'qiye163',
+          status: 'error',
+          lastSuccessAt: '2026-09-11T02:04:00.000Z',
+          backfilled: null,
+          trigger: { kind: 'failures', count: 3 },
+        },
+        after: {
+          channel: 'qiye163',
+          status: 'connected',
+          lastSuccessAt: '2026-09-11T02:14:00.000Z',
+          backfilled: {
+            count: 2,
+            from: '2026-09-11T02:05:00.000Z',
+            to: '2026-09-11T02:13:00.000Z',
+          },
+          trigger: { kind: 'retry_succeeded', attempt: 4 },
+        },
+      }),
+    );
+    expectIn(STATES_ADMIN, `>${recovered.objectLabel} · ${recovered.actionLabel}<`);
+    expectText(STATES_ADMIN, recovered.summary);
+    const backfilled = recovered.fields.find((f) => f.label === '补拉');
+    expectText(STATES_ADMIN, `补拉：${backfilled?.after ?? ''}`);
+  });
+
   it('P27 第一期参照页：台账导出与登录的摘要', () => {
     const ledger = describeAs(
       record({

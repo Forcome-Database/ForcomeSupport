@@ -49,6 +49,12 @@ describe('点一条跳到哪里', () => {
       expect(notificationTarget(notification(type), member('admin'))).toBe(pages.settingsChannels);
       expect(notificationTarget(notification(type), member('supervisor'))).toBeNull();
     }
+    // 163 企业邮箱的连接异常与恢复（对象 id 为 qiye163，D-28）同样进 P18
+    const qiye = {
+      ...notification('channel_disconnected'),
+      object: { type: 'channel' as const, id: 'qiye163', label: 'P18 · 163 企业邮箱' },
+    };
+    expect(notificationTarget(qiye, member('admin'))).toBe(pages.settingsChannels);
     // 兼管理员的客服主管能打开
     expect(
       notificationTarget(notification('channel_disconnected'), member('supervisor', 'admin')),
