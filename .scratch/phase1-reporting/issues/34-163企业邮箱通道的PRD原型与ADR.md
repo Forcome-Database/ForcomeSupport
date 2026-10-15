@@ -1,6 +1,6 @@
 # 34: 163 企业邮箱通道的 PRD、原型与 ADR
 
-Status: ready-for-agent
+Status: claimed
 Blocked by: None (can start immediately)
 
 规格：[第一期：报表与台账](../spec.md)
