@@ -181,7 +181,7 @@ deploy/                  部署（ADR 0013 修订，docs/部署说明.md）
 
 **CI 与合并**：`.github/workflows/ci.yml` 在 PR 与 main 上跑类型检查、lint、迁移一致性、示例数据夹具一致性、构建、单元与集成测试、镜像构建与部署配置检查，最后由「CI 通过」汇总。仓库推到 GitHub 后，在 Settings → Branches 为 `main` 加保护规则：Require a pull request before merging（至少 1 个批准）、Require status checks to pass（必需检查选「CI 通过」）。仓库暂不上 GitHub，期间用 `pnpm ci:local` 代替。
 
-**部署**：main 上 CI 通过后，`.github/workflows/deploy-staging.yml` 在内网的开发测试运行器上执行 `deploy/deploy.mjs`，部署后对开发测试环境跑 Playwright（`apps/web/e2e` 全部用例）并在作业摘要里报告。生产由 `v*` 版本标签触发 `.github/workflows/deploy-production.yml`，GitHub environment `production` 的审批人批准后在生产运行器上部署（迁移前自动备份），见 `docs/部署说明.md` 第 17 节。仓库暂不上 GitHub，期间在本机用 `pnpm deploy:staging` 部署与冒烟；启用步骤、根证书安装与运维清单见 `docs/部署说明.md`。本机开发时的端到端用 `pnpm test:e2e`。
+**部署**：main 上 CI 通过后，`.github/workflows/deploy-staging.yml` 在内网的开发测试运行器上执行 `deploy/deploy.mjs`，部署后对开发测试环境跑 Playwright（`apps/web/e2e` 全部用例）并在作业摘要里报告。生产由 `v*` 版本标签触发 `.github/workflows/deploy-production.yml`，GitHub environment `production` 的审批人批准后在生产运行器上部署（迁移前自动备份），见 `docs/部署说明.md` 第 17 节。仓库暂不上 GitHub，期间在本机用 `pnpm deploy:staging` 部署与冒烟；启用步骤、根证书安装与运维清单见 `docs/部署说明.md`。本机开发时的端到端用 `pnpm test:e2e`。部署后的冒烟（设了 `E2E_BASE_URL`）在开发测试环境的容器里跑浏览器，比本机慢且时快时慢：`apps/web/playwright.config.ts` 只对它把用例时限放宽到 60 秒、断言等待到 10 秒，本机照默认（30 秒、5 秒）；用例里不要在产品的倒计时窗口（如 5 秒撤销）内做多余的接口往返（待办 36）。
 
 **镜像**：`docker build -f apps/server/Dockerfile -t forcome-server .`（构建上下文是仓库根目录）；默认运行 api，`node dist/worker.mjs`、`node dist/migrate.mjs` 运行另两个入口，`node dist/seed.mjs` 在非生产环境灌示例数据，`node dist/reset-inbound.mjs` 在非生产环境重放来信，`node dist/import-aftersales.mjs <登记表>` 导入售后登记表（各环境都用），`node dist/alert-test.mjs` 经群机器人发「告警通道已连通」。前端镜像（caddy + 静态文件）、自建 PostgreSQL 与冒烟镜像在 `deploy/`，由部署脚本构建。
 
