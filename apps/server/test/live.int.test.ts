@@ -114,6 +114,8 @@ describe('实时推送', () => {
   beforeAll(async () => {
     t = await startTestHarness({ liveHeartbeatMs: HEARTBEAT_MS });
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     // 邮箱开始监听（之后到达的来信才同步进来）
     await t.runJobs();

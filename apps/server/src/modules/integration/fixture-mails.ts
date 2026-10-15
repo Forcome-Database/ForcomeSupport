@@ -2,14 +2,18 @@ import {
   amazonDomains,
   roleByLabel,
   SHOPIFY_CONTACT_FORM_SENDER,
+  type MailProvider,
   type Role,
 } from '@forcome/contracts';
 import type { DemoFixture, FixtureTicket } from '@forcome/fixtures';
+import { toMilliseconds } from '../core';
 import { fixtureCustomerAddress } from './fixture-customers';
 import type { FakeMailInput } from './gmail-mime';
 
 /*
- * 示例数据夹具 → Fake Gmail 的邮件（开发测试环境、本机开发与 Playwright 的 worker 启动时回放，ADR 0009 修订）。
+ * 示例数据夹具 → Fake 邮箱的邮件（开发测试环境、本机开发与 Playwright 的 worker 启动时回放，ADR 0009 修订）。与服务商无关（待办 35，
+ * ADR 0015）：按信落到的邮箱的服务商分给 Fake Gmail 或 Fake IMAP（fixtureMailsFor），示例里 Forcome Auto 的 amz-auto@forcome.com
+ * 是 163 企业邮箱，它的信由 Fake IMAP 回放，回放出的工单与原型一致。
  * 来信（待办 08）：每张示例工单一封（到达时间取「最近来信」，留言是主题，直邮的两张取夹具的正文）；P05 时间线那张工单（P1_OLIVER）按时间线里的各封来信回放。
  * 有订单号的照平台的写法带上（14 按订单归并要用；P05 只显示留言，待办 17）：亚马逊买家消息把留言夹在「Begin message」「End message」
  * 两行之间、后面写「Order ID」，Shopify 联系表单多一栏「Order number」，直邮在留言后另起一行写订单号。
@@ -25,8 +29,9 @@ import type { FakeMailInput } from './gmail-mime';
  * 夹具里没有客户邮箱：亚马逊来信用按站点的买家消息中转域名、其余用 example.com，地址由客户名推出（fixture-customers.ts，
  * 与 Fake Shopify 订单上的邮箱一致）；夹具写明发件地址的（如生产厂来信）照用。渠道为 Shopify 的来信做成 Shopify 联系表单通知的
  * 样子（R-TK-08，待办 10）：mailer@shopify.com 代发、Reply-To 是客户邮箱、正文是表单各栏；主题沿用原型的主题。
- * Message-ID 与 Gmail 消息 ID 由工单号推出，重启后回放的是同样的信（按「邮箱 + Gmail 消息 ID」去重，不会重复入库）。
- * 时间按夹具写（9 月的演示时刻）；回放时由 Fake Gmail 整天平移到当前日期（见 gmail.ts 的 replay）。
+ * Message-ID 与 Gmail 消息 ID 由工单号推出，重启后回放的是同样的信（Gmail 按「邮箱 + 服务商消息标识」去重；Fake IMAP 重启后
+ * UIDVALIDITY 与 UID 从头编，按「同一邮箱 + 方向 + Message-ID」认出已收过的信，ADR 0015）。
+ * 时间按夹具写（9 月的演示时刻）；回放时由 Fake 邮箱整天平移到当前日期（replayShiftMs）。
  */
 
 /** 回放的一封邮件：寄到店铺邮箱的来信，或店铺邮箱「已发送」里的我方邮件（mail.from 是店铺邮箱，mail.to 是客户） */
@@ -127,6 +132,38 @@ export function fixtureNoReplyMarks(fixture: DemoFixture): ReplayNoReplyMark[] {
 
 export function fixtureMails(fixture: DemoFixture): ReplayMail[] {
   return [...ticketMails(fixture), ...unassignedMails(fixture)];
+}
+
+/** 示例邮箱的服务商（按地址，小写）：夹具店铺的进线邮箱；没登记的按 Gmail */
+export function fixtureMailboxProvider(fixture: DemoFixture, mailbox: string): MailProvider {
+  const address = mailbox.toLowerCase();
+  return (
+    fixture.stores.find((store) => store.mailbox.toLowerCase() === address)?.provider ?? 'gmail'
+  );
+}
+
+/** 落到某种服务商的邮箱的示例邮件（Fake Gmail 与 Fake IMAP 各回放各的） */
+export function fixtureMailsFor(fixture: DemoFixture, provider: MailProvider): ReplayMail[] {
+  return fixtureMails(fixture).filter(
+    (entry) => fixtureMailboxProvider(fixture, entry.mailbox) === provider,
+  );
+}
+
+const DAY_MS = toMilliseconds({ days: 1 });
+
+/**
+ * 示例邮件平移几天（待办 16）：夹具的时间在 9 月的演示时刻附近，开发测试环境与 Playwright 用真实时钟，原样回放的话
+ * 时限扫描一上来就把它们按 7 天、14 天关闭（与归并交错时还会重开、另建工单）。回放时按整天平移到当前日期：
+ * 演示时刻落在「现在」之前不到一天，时分不变（北京时间没有夏令时），原型画面的状态在当下重现，之后照规则随时间推进。
+ * 时钟在演示时刻（本机截图的 CLOCK_START、集成测试）或更早时不平移
+ */
+export function replayShiftMs(fixture: DemoFixture, now: Date): number {
+  const ahead = now.getTime() - new Date(fixture.meta.now).getTime();
+  return ahead > 0 ? Math.floor(ahead / DAY_MS) * DAY_MS : 0;
+}
+
+export function shiftedMail(mail: FakeMailInput, ms: number): FakeMailInput {
+  return ms === 0 ? mail : { ...mail, at: new Date(new Date(mail.at).getTime() + ms) };
 }
 
 function ticketMails(fixture: DemoFixture): ReplayMail[] {

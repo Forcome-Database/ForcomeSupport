@@ -107,6 +107,8 @@ describe('按时关闭前确认邮箱已同步、到期前的来信已归并（�
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     await t.runJobs();
   });
@@ -267,8 +269,8 @@ describe('按时关闭前确认邮箱已同步、到期前的来信已归并（�
     const at = new Date('2026-09-12T11:00:00+08:00');
     expect(await mailSyncedThrough(t.runtime.db, 'test', AUTO.id, at)).toBe(true);
     await t.runtime.db.execute(sql`
-      INSERT INTO channel.store_mailbox (store_id, address, position, created_at)
-      VALUES (${AUTO.id}, 'auto-alias@forcome.com', 9, now())`);
+      INSERT INTO channel.store_mailbox (store_id, address, position, provider, created_at)
+      VALUES (${AUTO.id}, 'auto-alias@forcome.com', 9, 'gmail', now())`);
     expect(await mailSyncedThrough(t.runtime.db, 'test', AUTO.id, at)).toBe(true);
     await t.runtime.db.execute(sql`
       INSERT INTO channel.mailbox_sync (address, history_id, watched_at, created_at, updated_at)
@@ -288,6 +290,8 @@ describe('非生产的示例回放不与时限扫描交错（待办 33；集成�
     t = await startTestHarness();
     t.clock.set(now.toISOString());
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     t.clients.replayFixtures(fixture);
     // worker 一个任务一个任务地推进（入库、归并、回复识别……），每个任务之后都插一次每分钟的时限扫描
     for (let i = 0; ; i += 1) {

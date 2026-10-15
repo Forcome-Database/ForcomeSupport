@@ -7,7 +7,12 @@ const config = loadConfig();
 const logger = createLogger({ level: config.logLevel, name: 'seed' });
 
 try {
-  const report = await seedDemoData(config.databaseUrl, config.appEnv, logger);
+  const report = await seedDemoData(
+    config.databaseUrl,
+    config.appEnv,
+    logger,
+    config.credentialMasterKey,
+  );
   logger.info({ steps: report.steps }, '示例数据已灌入');
 } catch (error) {
   logger.error({ err: error }, '灌示例数据失败');

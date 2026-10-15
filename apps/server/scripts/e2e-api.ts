@@ -28,7 +28,12 @@ try {
 }
 
 await runMigrations(config.databaseUrl, jobDefinitions, logger);
-const report = await seedDemoData(config.databaseUrl, config.appEnv, logger);
+const report = await seedDemoData(
+  config.databaseUrl,
+  config.appEnv,
+  logger,
+  config.credentialMasterKey,
+);
 logger.info({ database, steps: report.steps }, 'e2e 库已重建并灌入示例数据');
 
 await import('../src/api');

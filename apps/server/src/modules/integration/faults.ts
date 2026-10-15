@@ -112,11 +112,44 @@ export class ConnectionLostError extends ExternalServiceError {
   }
 }
 
+/**
+ * 访问不了邮箱的原因（163 企业邮箱 IMAP，ADR 0015）：授权码错或客户端登录没开、登录 IP 被限制、连不上服务器与端口。
+ * 超时另用 ExternalTimeoutError；找不到「已发送」不是失败（收件箱照收），只在测试连接里作为结果
+ */
+export const mailboxAccessFailures = ['auth_failed', 'login_denied_ip', 'unreachable'] as const;
+export type MailboxAccessFailure = (typeof mailboxAccessFailures)[number];
+
+/**
+ * 访问不了邮箱（ADR 0015）：授权码错、客户端登录被关、登录 IP 被限制属于要管理员处理的错误（needsAdmin，常驻连接遇到就停下
+ * 该邮箱的重连、只靠每 5 分钟的轮询再试，免得连续登录失败让网易锁定账号）；连不上服务器可以原样重试
+ */
+export class MailboxAccessError extends ExternalServiceError {
+  override name = 'MailboxAccessError';
+  readonly reason: MailboxAccessFailure;
+
+  constructor(system: string, operation: string, reason: MailboxAccessFailure, cause?: unknown) {
+    super(system, operation, MAILBOX_ACCESS_MESSAGES[reason], reason === 'unreachable', cause);
+    this.reason = reason;
+  }
+
+  /** 要管理员处理（授权码、客户端登录、登录 IP），原样重试没用 */
+  get needsAdmin(): boolean {
+    return this.reason !== 'unreachable';
+  }
+}
+
+const MAILBOX_ACCESS_MESSAGES: Record<MailboxAccessFailure, string> = {
+  auth_failed: '登录失败（客户端授权码不对，或没有开启 IMAP 与客户端登录）',
+  login_denied_ip: '登录被拒（登录 IP 受限）',
+  unreachable: '连不上服务器',
+};
+
 /** 安排给 Fake 的一种故障 */
 export type FaultSpec =
   | { kind: 'error'; status?: number; message?: string; retryable?: boolean }
   | { kind: 'timeout' }
-  | { kind: 'cursor_expired' };
+  | { kind: 'cursor_expired' }
+  | { kind: 'mailbox_access'; reason: MailboxAccessFailure };
 
 interface PlannedFault {
   readonly fault: FaultSpec;
@@ -199,6 +232,8 @@ export class FaultInjector {
         return new ExternalTimeoutError(this.#system, operation);
       case 'cursor_expired':
         return new CursorExpiredError(this.#system, operation);
+      case 'mailbox_access':
+        return new MailboxAccessError(this.#system, operation, fault.reason);
     }
   }
 }

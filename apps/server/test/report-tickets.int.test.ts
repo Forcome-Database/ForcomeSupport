@@ -124,6 +124,8 @@ describe('P17 工单指标的口径与对比（演示时刻 09-30 12:00）', () 
   beforeAll(async () => {
     t = await startTestHarness({ now: '2026-09-01T09:00:00+08:00' });
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     await t.runJobs();
     const amazon = t.clients.fake(amazonOrdersClient);
@@ -263,6 +265,8 @@ describe('P17 与 P04 一致、店铺范围与权限（AC-P1-14 验收夹具，�
   beforeAll(async () => {
     t = await startTestHarness({ now: '2026-09-11T10:20:00+08:00' });
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     await t.runJobs();
     for (const { mail } of reportAcceptanceMails(fixture)) gmail.deliver(mail);
@@ -426,6 +430,8 @@ describe('「更新于」与 Shopify 回补的注', () => {
   beforeAll(async () => {
     t = await startTestHarness({ now: '2026-09-11T10:00:00+08:00' });
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     await t.runJobs();
   });
 

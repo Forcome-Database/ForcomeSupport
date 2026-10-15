@@ -127,6 +127,8 @@ describe('售后成本按责任类型（AC-RP-01、R-AS-08）', () => {
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     supervisor = await t.loginAs('客服主管');
     owner = await t.loginAs('售后负责人');
   });
@@ -234,6 +236,8 @@ describe('没有财务权限的角色看不到售后成本（AC-P1-09、ADR 0010
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
   });
 
   afterAll(async () => {
@@ -270,6 +274,8 @@ describe('售后成本的店铺范围（ADR 0010：视图查询显式施加）',
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     const id = await t.addMember({
       name: '孙杰',
       dept: 'FSH / 客服',
@@ -303,6 +309,8 @@ describe('报表导出（K5、PRD P17「第一阶段」v2.35）', () => {
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     const gmail = t.clients.fake(gmailClient);
     await t.runJobs();
     // 本期（09-05 至 09-11）：一封 2 小时后回复的亚马逊来信；上一周期（08-29 至 09-04）：一封没回复的

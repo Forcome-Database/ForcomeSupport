@@ -4,6 +4,7 @@ export { createDevAcceptanceRoutes, reportAcceptanceJob } from './dev-acceptance
 export { channelSenderRulesFixtureStep, channelStoresFixtureStep } from './fixtures';
 export { inboundReceivedJob, outboundSyncedJob } from './events';
 export { gmailPollJob, gmailRenewWatchJob, gmailSyncJob } from './gmail-sync';
+export { imapPollJob, imapSyncJob } from './imap-sync';
 export {
   createChannelFeeds,
   createChannelJobHandlers,
@@ -40,6 +41,7 @@ export {
   nextReplayItems,
   replayMail,
   replayProgress,
+  ReplaySessions,
   watchedMailboxes,
   watchMailboxes,
   type ReplayItem,

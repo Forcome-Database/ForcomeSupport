@@ -35,6 +35,7 @@
     "fast-xml-parser": "^5.11.2",
     "hono": "^4.13.12",
     "html-to-text": "^10.0.1",
+    "imapflow": "2.1.2",
     "jose": "^6.2.12",
     "p-throttle": "^8.1.1",
     "pg": "^8.23.1",

@@ -110,6 +110,8 @@ async function pollAll(options: { allowFailures?: boolean } = {}) {
 beforeAll(async () => {
   t = await startTestHarness();
   await t.loadFixtures();
+  // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+  await t.useGmailForFixtureMailboxes();
   gmail = t.clients.fake(gmailClient);
   // 钉钉的示例通讯录：工作通知发给成员、「测试连接」取根部门
   t.clients.fake(dingtalkClient).replay(getDemoFixture());
@@ -426,7 +428,7 @@ describe('Gmail 同步健壮性与连接状态', () => {
       platform: 'shopify',
       sites: ['US'],
       defaultSite: 'US',
-      mailboxes: ['watch-test@forcome.test'],
+      mailboxes: [{ address: 'watch-test@forcome.test', provider: 'gmail' }],
       platformId: 'watch-test.myshopify.com',
     });
     expect(res.status).toBe(201);
@@ -521,7 +523,7 @@ describe('Gmail 同步健壮性与连接状态', () => {
       platform: 'shopify',
       sites: ['US'],
       defaultSite: 'US',
-      mailboxes: ['recheck-test@forcome.test'],
+      mailboxes: [{ address: 'recheck-test@forcome.test', provider: 'gmail' }],
       platformId: 'recheck-test.myshopify.com',
     });
     expect(res.status).toBe(201);
@@ -568,7 +570,7 @@ describe('Gmail 同步健壮性与连接状态', () => {
       platform: 'shopify',
       sites: ['US'],
       defaultSite: 'US',
-      mailboxes: ['no-credentials@forcome.test'],
+      mailboxes: [{ address: 'no-credentials@forcome.test', provider: 'gmail' }],
       platformId: 'no-credentials.myshopify.com',
       adapterMode: 'real',
     });
@@ -605,7 +607,7 @@ describe('生产环境没有配置 Google 凭据（用户 2026-10-04 口径：Go
       platform: 'shopify',
       sites: ['MX'],
       defaultSite: 'MX',
-      mailboxes: ['support@forcome.mx'],
+      mailboxes: [{ address: 'support@forcome.mx', provider: 'gmail' }],
       platformId: 'forcome-mx.myshopify.com',
     });
     expect(res.status).toBe(201);

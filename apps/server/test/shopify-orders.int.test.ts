@@ -520,7 +520,7 @@ describe('Shopify 订单镜像', () => {
       platform: 'shopify',
       sites: ['CA'],
       defaultSite: 'CA',
-      mailboxes: ['support@forcome.ca'],
+      mailboxes: [{ address: 'support@forcome.ca', provider: 'gmail' }],
       platformId: 'forcome-ca.myshopify.com',
     });
     expect(res.status).toBe(201);
@@ -535,7 +535,7 @@ describe('Shopify 订单镜像', () => {
       platform: 'shopify',
       sites: ['CA'],
       defaultSite: 'CA',
-      mailboxes: ['support@forcome.ca'],
+      mailboxes: [{ address: 'support@forcome.ca', provider: 'gmail' }],
       platformId: 'forcome-ca.myshopify.com',
       adapterMode: 'real',
       version: created.version,
@@ -566,7 +566,7 @@ describe('生产环境没有配置 Shopify 凭据（用户 2026-10-04 口径：S
       platform: 'shopify',
       sites: ['MX'],
       defaultSite: 'MX',
-      mailboxes: ['support@forcome.mx'],
+      mailboxes: [{ address: 'support@forcome.mx', provider: 'gmail' }],
       platformId: 'forcome-mx.myshopify.com',
     });
     expect(res.status).toBe(201);

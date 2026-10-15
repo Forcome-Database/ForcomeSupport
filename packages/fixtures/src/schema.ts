@@ -59,6 +59,11 @@ export const fixtureStoreSchema = z.object({
   sites: z.array(z.enum(['US', 'CA', 'MX'])),
   defaultSite: z.enum(['US', 'CA', 'MX']),
   mailbox: z.string(),
+  /**
+   * 进线邮箱的服务商（D-28，待办 35）：gmail / qiye163（contracts 的 MailProvider）。示例里 Forcome Auto 的 amz-auto@forcome.com
+   * 是 163 企业邮箱，它的示例来信由 Fake IMAP 回放，其余邮箱由 Fake Gmail 回放
+   */
+  provider: z.enum(['gmail', 'qiye163']),
   /** 平台标识（亚马逊卖家 ID 或 Shopify 店铺域名），不带「卖家 ID」之类的字段名 */
   platformId: z.string(),
 });

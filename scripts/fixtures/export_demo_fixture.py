@@ -115,6 +115,9 @@ def directory_newcomers():
     } for n in d.DINGTALK_NEWCOMERS]
 
 
+PROVIDERS = {'Gmail': 'gmail', d.QIYE: 'qiye163'}
+
+
 def stores():
     return [{
         'id': entity_id('store', s['id']),
@@ -124,6 +127,8 @@ def stores():
         'sites': list(s['sites']),
         'defaultSite': s['default_site'],
         'mailbox': s['mailbox'],
+        # 进线邮箱的服务商（D-28，待办 35）：原型存显示写法「Gmail」「163 企业邮箱」，夹具转成 contracts 的取值 gmail / qiye163
+        'provider': PROVIDERS[s['provider']],
         # 原型的 sid 是显示写法（亚马逊带「卖家 ID 」前缀），夹具只取标识本身；字段名由店铺表按平台另写
         'platformId': s['sid'].rsplit(' ', 1)[-1],
     } for s in d.STORES]

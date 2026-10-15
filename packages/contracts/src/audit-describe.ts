@@ -23,6 +23,7 @@ import {
   auditSnapshotSchemas,
   isAuditAction,
   loginMethodLabels,
+  storeAuditSnapshotSchema,
   type AuditChannel,
   type AuditObjectType,
   type AuditSnapshotKind,
@@ -38,7 +39,7 @@ import {
   type AuditLogField,
 } from './audit-log';
 import { memberStatusLabels, storeScopeSchema } from './auth';
-import { connectionStatusLabels, platformLabels } from './channel';
+import { connectionStatusLabels, mailProviderLabels, platformLabels } from './channel';
 import { formatRate, formatRateDate } from './exchange-rate';
 import { FINANCE_HIDDEN, maskFinanceFields } from './finance';
 import { adapterModeLabels } from './integration';
@@ -104,7 +105,9 @@ type ValueKind =
   | 'backfill'
   | 'trigger'
   | 'sameDayTime'
-  | 'whoAt';
+  | 'whoAt'
+  | 'mailboxServers'
+  | 'authCodes';
 
 interface FieldDefinition {
   /** 快照里的路径（点分） */
@@ -135,6 +138,8 @@ const snapshotFields: Record<AuditSnapshotKind, readonly FieldDefinition[]> = {
     field('sites', '站点', 'list'),
     field('defaultSite', '默认站点'),
     field('mailboxes', '进线邮箱', 'list'),
+    field('mailboxServers', '进线邮箱服务商', 'mailboxServers'),
+    field('authCodeRenewed', '客户端授权码', 'authCodes'),
     field('platformId', '平台标识'),
     field('adapterMode', '数据来源', 'text', adapterModeLabels),
   ],
@@ -285,6 +290,12 @@ interface FormatContext {
   readonly channel: AuditChannel;
 }
 
+/** 来信的补拉（Gmail 与 163 企业邮箱）：N 封来信，到达时间的起止 */
+const MAIL_BACKFILL = {
+  count: (n: number) => `${n} 封来信`,
+  range: (from: string, to: string) => `${from}–${to} 到达，SLA 按原到达时间`,
+};
+
 /** 订单的补拉：N 笔订单，平台更新时间的起止 */
 const ORDER_BACKFILL = {
   count: (n: number) => `${n} 笔订单`,
@@ -298,10 +309,8 @@ const BACKFILL_WORDS: Record<
   AuditChannel,
   { count: (n: number) => string; range: (from: string, to: string) => string }
 > = {
-  gmail: {
-    count: (n: number) => `${n} 封来信`,
-    range: (from: string, to: string) => `${from}–${to} 到达，SLA 按原到达时间`,
-  },
+  gmail: MAIL_BACKFILL,
+  qiye163: MAIL_BACKFILL,
   shopify: ORDER_BACKFILL,
   amazon: ORDER_BACKFILL,
 };
@@ -462,9 +471,36 @@ function valueWords(definition: FieldDefinition, value: unknown, ctx: FormatCont
       return isPlainObject(value) && typeof value.name === 'string'
         ? `${value.name} · ${dateTimeWords(value.at, ctx)}`
         : EMPTY;
+    case 'mailboxServers':
+      return mailboxServerWords(value);
+    case 'authCodes':
+      return Array.isArray(value)
+        ? value.map((address) => authCodeRenewedWords(text(address))).join('；')
+        : EMPTY;
     default:
       return labelOf(value);
   }
+}
+
+/** 改了客户端授权码的写法（PRD P27、AC-P1-23，原型 K18 补充小样）：不记授权码本身 */
+export function authCodeRenewedWords(address: string): string {
+  return `进线邮箱 ${address}：客户端授权码已重新填写`;
+}
+
+/** 进线邮箱的服务商：「amz-auto@forcome.com：163 企业邮箱（imap.qiye.163.com:993）」，Gmail 只写服务商 */
+function mailboxServerWords(value: unknown): string {
+  const parsed = storeAuditSnapshotSchema.shape.mailboxServers.safeParse(value);
+  if (!parsed.success || !parsed.data) return EMPTY;
+  return parsed.data
+    .map((mailbox) => {
+      const provider = mailProviderLabels[mailbox.provider];
+      const server =
+        mailbox.provider === 'qiye163' && mailbox.imapHost
+          ? `（${mailbox.imapHost}:${mailbox.imapPort ?? ''}）`
+          : '';
+      return `${mailbox.address}：${provider}${server}`;
+    })
+    .join('、');
 }
 
 /** 某种快照里某条路径的字段 */
@@ -595,6 +631,7 @@ export function describeAuditRecord(
 
   const fields: AuditLogField[] = [];
   let first: AuditLogField | null = null;
+  let firstKind: ValueKind | null = null;
   let changes = 0;
   for (const definition of snapshotFields[kind]) {
     const rawB = valueAt(rawBefore, definition.path);
@@ -615,16 +652,22 @@ export function describeAuditRecord(
     fields.push(item);
     if (changed) {
       changes += 1;
-      first ??= item;
+      if (!first) {
+        first = item;
+        firstKind = definition.kind;
+      }
     }
   }
   const special = snapshotSummaries[kind];
   if (special) return { ...base, summary: special(after, ctx, before), more: 0, fields };
+  // 改了客户端授权码只写「进线邮箱 <地址>：客户端授权码已重新填写」（不写前后值，原型 K18 补充小样）
   const summary = !first
     ? EMPTY
     : first.hidden
       ? `${first.label}：已隐藏`
-      : `${first.label}：${first.before} → ${first.after}`;
+      : firstKind === 'authCodes'
+        ? (first.after ?? EMPTY)
+        : `${first.label}：${first.before} → ${first.after}`;
   return { ...base, summary, more: changes > 1 ? changes : 0, fields };
 }
 

@@ -1,5 +1,6 @@
 import {
   platformLabels,
+  mailProviderLabels,
   platformTerms,
   type Store,
   type StoreConnection,
@@ -85,6 +86,8 @@ function CopyValue({ value }: { value: string }) {
 function StoreStatus({ store }: { store: Store }) {
   const names: Record<StoreConnection['kind'], string> = {
     gmail: STORE_TABLE.gmail,
+    // 163 企业邮箱的进线邮箱（D-28，待办 35 接口；店铺表的服务商写法随待办 36 核对）
+    qiye163: mailProviderLabels.qiye163,
     orders: platformTerms[store.platform].ordersApi,
   };
   const [first] = store.connections;
@@ -124,7 +127,7 @@ function StoreRow({ store, onEdit }: { store: Store; onEdit: (store: Store) => v
       </TableCell>
       <TableCell className="py-3">
         <div className="flex min-w-0 flex-col gap-0.5">
-          {store.mailboxes.map((mailbox) => (
+          {store.mailboxes.map(({ address: mailbox }) => (
             <span
               key={mailbox}
               className="truncate text-13 font-semibold text-foreground"

@@ -12,6 +12,7 @@ import {
   nextReplayItems,
   readMailCutover,
   replayMail,
+  ReplaySessions,
   replayProgress,
   watchedMailboxes,
   watchMailboxes,
@@ -37,7 +38,7 @@ import { nextTimeLimitAt, scanTimeLimits } from './modules/ticket';
  * 「历史邮件回放与 T0 切换」命令（规格「历史导入与切换」，待办 26；协调者 2026-10-14 决定 Q1–Q4；ADR 0008「待办 26 落地」）：
  *   node dist/mail-replay.mjs [--t0 <带时区的时刻>] [--confirm]
  * 上线切换用（生产与开发测试环境都可用）。不加 --confirm 只看计划，不动任何东西；加了才执行：
- * 1. 各进线邮箱 watch（没有游标的建立游标，即「T0 前启动 watch」；已有的续订）；
+ * 1. 各进线邮箱开始监听（Gmail 没有游标的 watch 建立游标，即「T0 前启动 watch」，已有的续订；163 企业邮箱记下两个文件夹的位置，待办 35）；
  * 2. 定 T0（--t0，不给取此刻）：不能晚于现在，不能早于任何邮箱第一次 watch 的时刻（两者之间的信既不回放、也不在增量里）；
  *    写下切换记录后进入回放中，实时收信暂停（mail-cutover.ts）；
  * 3. 列回放清单：各邮箱 [T0 − 90 天, T0) 到达的收件与「已发送」；
@@ -344,33 +345,39 @@ async function replay(
     }
   };
   let done = progress.replayed;
-  for (;;) {
-    const items = await nextReplayItems(runtime, pageSize);
-    if (items.length === 0) break;
-    for (const item of items) {
-      await catchUp(item.internalDate);
-      clock.set(item.internalDate);
-      const outcome = await replayMail(replayRuntime, clients, item, logger);
-      if (outcome.result === 'created') {
-        counts[outcome.direction] += 1;
-      } else if (outcome.result === 'copy') {
-        counts.copies += 1;
-      } else {
-        counts.skipped += 1;
+  // 163 企业邮箱一个邮箱一条 IMAP 会话，回放完（或中途停下）关掉，不逐封登录（待办 35）
+  const sessions = new ReplaySessions(clients);
+  try {
+    for (;;) {
+      const items = await nextReplayItems(runtime, pageSize);
+      if (items.length === 0) break;
+      for (const item of items) {
+        await catchUp(item.internalDate);
+        clock.set(item.internalDate);
+        const outcome = await replayMail(replayRuntime, clients, item, logger, sessions);
+        if (outcome.result === 'created') {
+          counts[outcome.direction] += 1;
+        } else if (outcome.result === 'copy') {
+          counts.copies += 1;
+        } else {
+          counts.skipped += 1;
+        }
+        await drain();
+        await markReplayed(runtime, item, systemClock.now());
+        done += 1;
+        if (done % PROGRESS_EVERY === 0) {
+          io.stdout(`已回放 ${done} / ${progress.total} 封（到 ${at(item.internalDate)}）\n`);
+        }
       }
-      await drain();
-      await markReplayed(runtime, item, systemClock.now());
-      done += 1;
-      if (done % PROGRESS_EVERY === 0) {
-        io.stdout(`已回放 ${done} / ${progress.total} 封（到 ${at(item.internalDate)}）\n`);
+      if (await (options.workerRunning ?? workerConnected)(runtime)) {
+        io.stderr(
+          'worker 在回放途中连上了：已停在这里（已回放的不受影响）。停掉 worker 后再执行同一命令接着回放。\n',
+        );
+        return 1;
       }
     }
-    if (await (options.workerRunning ?? workerConnected)(runtime)) {
-      io.stderr(
-        'worker 在回放途中连上了：已停在这里（已回放的不受影响）。停掉 worker 后再执行同一命令接着回放。\n',
-      );
-      return 1;
-    }
+  } finally {
+    await sessions.close();
   }
 
   // 5. 时限扫描补到 T0，完成切换

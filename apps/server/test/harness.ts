@@ -7,6 +7,7 @@ import {
   type Role,
 } from '@forcome/contracts';
 import { getDemoFixture } from '@forcome/fixtures';
+import { sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { JobOptions } from 'pg-boss';
 import { createApp, type AppDeps } from '../src/app';
@@ -26,6 +27,7 @@ import {
 } from '../src/modules/aftersales';
 import {
   gmailPollJob,
+  imapPollJob,
   listOrderStores,
   listReceivedMail,
   registerSenderRule,
@@ -52,6 +54,7 @@ import {
 import {
   databaseCredentialVault,
   IntegrationClients,
+  seedFixtureMailboxAuthCodes,
   type AnyClientDefinition,
 } from '../src/modules/integration';
 import {
@@ -180,7 +183,8 @@ export interface TestHarness {
    */
   runJobs(options?: RunJobsOptions): Promise<JobRunReport>;
   /**
-   * 像 worker 那样在当前时钟做一次时限扫描：先排一次邮箱轮询（每 5 分钟的 history.list 兜底，同步记录随之前进到此刻）并跑完，
+   * 像 worker 那样在当前时钟做一次时限扫描：先排一次邮箱轮询（Gmail 每 5 分钟的 history.list 兜底与 163 企业邮箱每 5 分钟的检查，
+   * 同步记录随之前进到此刻）并跑完，
    * 再排每分钟的时限扫描并跑到空闲。按时关闭要店铺的邮箱已同步到到期时刻（待办 33），只排扫描不轮询时到期的工单不关
    */
   scanTimeLimits(options?: RunJobsOptions): Promise<JobRunReport>;
@@ -192,8 +196,13 @@ export interface TestHarness {
   ): Promise<string | null>;
   /** 把 Fake 全部重置到初始状态（数据、故障、调用记录） */
   resetFakes(): void;
-  /** 灌示例数据夹具（按各模块登记的加载步骤） */
+  /** 灌示例数据夹具（按各模块登记的加载步骤；同 pnpm db:seed，示例 163 企业邮箱另存模拟授权码） */
   loadFixtures(): Promise<FixtureLoadReport>;
+  /**
+   * 把示例数据的进线邮箱都改成 Gmail（示例里 Forcome Auto 的 amz-auto@forcome.com 是 163 企业邮箱，待办 35）：测 Gmail 收信、
+   * 又要用到它的用例在灌完示例数据、开始监听之前调用（163 企业邮箱的收信见 qiye163-mail.int.test.ts）
+   */
+  useGmailForFixtureMailboxes(): Promise<void>;
   /**
    * 按动作或对象取原始审计记录（core.audit_log 的行，不经查看范围与财务字段过滤），核对写入了什么。
    * P27 看到的样子（10.2 过滤、写成中文、「已隐藏」）经接口 GET /api/audit 断言，见 audit-log.int.test.ts
@@ -391,7 +400,10 @@ export async function startTestHarness(
 
     scanTimeLimits: async (runOptions) => {
       const worker = { handlers, feeds };
-      await transaction(runtime, (tx) => tx.enqueue(gmailPollJob, {}));
+      await transaction(runtime, async (tx) => {
+        await tx.enqueue(gmailPollJob, {});
+        await tx.enqueue(imapPollJob, {});
+      });
       const polled = await runQueuedJobs(runtime, worker, silentLogger, runOptions);
       await transaction(runtime, (tx) => tx.enqueue(ticketTimeLimitsJob, {}));
       const scanned = await runQueuedJobs(runtime, worker, silentLogger, runOptions);
@@ -406,8 +418,22 @@ export async function startTestHarness(
 
     resetFakes: () => clients.resetFakes(),
 
-    loadFixtures: () =>
-      loadFixtures(runtime, { appEnv: setupEnv, fixture: getDemoFixture(), steps: fixtureSteps }),
+    async loadFixtures() {
+      const fixture = getDemoFixture();
+      const report = await loadFixtures(runtime, {
+        appEnv: setupEnv,
+        fixture,
+        steps: fixtureSteps,
+      });
+      await seedFixtureMailboxAuthCodes(runtime, clients.credentialVault, fixture);
+      return report;
+    },
+
+    async useGmailForFixtureMailboxes() {
+      await runtime.db.execute(sql`
+        UPDATE channel.store_mailbox SET provider = 'gmail', imap_host = NULL, imap_port = NULL
+         WHERE provider <> 'gmail'`);
+    },
 
     auditRecords: (query) => findAuditRecords(runtime.db, query),
 

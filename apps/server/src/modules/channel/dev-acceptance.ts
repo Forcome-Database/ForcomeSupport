@@ -2,8 +2,16 @@ import { getDemoFixture } from '@forcome/fixtures';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { inArray } from 'drizzle-orm';
 import { defineJob, transaction, type AppEnv, type JobContext, type Runtime } from '../core';
-import { gmailClient, reportAcceptanceMails, type IntegrationClients } from '../integration';
+import {
+  fixtureMailboxProvider,
+  gmailClient,
+  imapClient,
+  imapFolderRoles,
+  reportAcceptanceMails,
+  type IntegrationClients,
+} from '../integration';
 import { gmailSyncJob } from './gmail-sync';
+import { imapSyncJob } from './imap-sync';
 import { mailboxSync } from './schema';
 
 /*
@@ -20,28 +28,44 @@ export const reportAcceptanceJob = defineJob('channel.report_acceptance', z.obje
 });
 
 /**
- * worker：把验收夹具的来信投进本进程的 Fake Gmail（生产环境拒绝：FakeNotAllowedError），再给这几个邮箱各排一次同步。
+ * worker：把验收夹具的来信投进本进程的 Fake 邮箱（按邮箱的服务商：Fake Gmail 或 Fake IMAP，待办 35；生产环境拒绝：FakeNotAllowedError），
+ * 再给这几个邮箱各排一次同步。
  * 开发测试环境长期运行：worker 重启后 Fake 的历史号从头数，库里却记着上一个进程的游标，所以投信前先让 Fake 接上库里的游标
- * （否则新到的信历史号比游标小，增量同步取不到）；重启后的 Fake 邮箱也没有 watch、不会推送，所以直接排同步
+ * （否则新到的信历史号比游标小，增量同步取不到；Fake IMAP 同理接上 UIDVALIDITY 与 UID）；重启后的 Fake 邮箱也没有 watch、不会推送，所以直接排同步
  */
 export async function deliverReportAcceptance(
   clients: IntegrationClients,
   { runtime, logger }: Pick<JobContext, 'runtime' | 'logger'>,
 ): Promise<void> {
   const gmail = clients.fake(gmailClient);
-  const mails = reportAcceptanceMails(getDemoFixture());
+  const imap = clients.fake(imapClient);
+  const fixture = getDemoFixture();
+  const mails = reportAcceptanceMails(fixture);
   const mailboxes = [...new Set(mails.map((m) => m.mailbox.toLowerCase()))];
+  const qiye = new Set(mailboxes.filter((m) => fixtureMailboxProvider(fixture, m) === 'qiye163'));
   const cursors = await runtime.db
-    .select({ address: mailboxSync.address, historyId: mailboxSync.historyId })
+    .select({
+      address: mailboxSync.address,
+      historyId: mailboxSync.historyId,
+      imapCursor: mailboxSync.imapCursor,
+    })
     .from(mailboxSync)
     .where(inArray(mailboxSync.address, mailboxes));
-  for (const { address, historyId } of cursors) {
+  for (const { address, historyId, imapCursor } of cursors) {
     if (historyId) gmail.continueHistoryFrom(address, Number(historyId));
+    for (const role of imapFolderRoles) {
+      const cursor = imapCursor?.[role];
+      if (cursor) imap.continueFrom(address, role, cursor);
+    }
   }
-  for (const { mail } of mails) gmail.deliver(mail);
+  for (const { mailbox, mail } of mails) {
+    if (qiye.has(mailbox.toLowerCase())) imap.deliver(mail);
+    else gmail.deliver(mail);
+  }
   await transaction(runtime, async (tx) => {
     for (const mailbox of mailboxes) {
-      await tx.enqueue(gmailSyncJob, { mailbox }, { singletonKey: mailbox });
+      const job = qiye.has(mailbox) ? imapSyncJob : gmailSyncJob;
+      await tx.enqueue(job, { mailbox }, { singletonKey: mailbox });
     }
   });
   logger.info({ mails: mails.length, mailboxes }, '验收夹具：已投入报表验收日的来信');

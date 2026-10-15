@@ -1,5 +1,6 @@
 import {
   adapterModes,
+  mailProviders,
   messageDirections,
   messageSources,
   platforms,
@@ -56,6 +57,8 @@ export const store = channelSchema.table(
 /**
  * 店铺的进线邮箱（可多个，含别名，D-26）：寄到这些地址的来信归到该店铺。地址存小写，全表唯一——
  * 一个地址只能属于一个店铺（P18「校验」）。编辑店铺时按新的列表整体替换。
+ * 服务商（D-28，待办 35）：Gmail 或 163 企业邮箱；163 企业邮箱另有 IMAP 服务器与端口（Gmail 为空，第二期再加 SMTP 的），
+ * 客户端授权码按地址加密存在 integration.mailbox_credential（只写不读，ADR 0015）。
  */
 export const storeMailbox = channelSchema.table(
   'store_mailbox',
@@ -67,13 +70,39 @@ export const storeMailbox = channelSchema.table(
     address: text('address').notNull(),
     /** 在店铺里的显示顺序，从 0 开始 */
     position: integer('position').notNull(),
+    /** 服务商：gmail / qiye163（迁移 0037 加列、0038 给已有的行补 gmail、0039 改为必填） */
+    provider: text('provider', { enum: mailProviders }).notNull(),
+    /** 163 企业邮箱的 IMAP 服务器（小写）与端口；Gmail 为空 */
+    imapHost: text('imap_host'),
+    imapPort: integer('imap_port'),
     createdAt: timestamptz('created_at').notNull(),
   },
   (t) => [
     unique('store_mailbox_address_key').on(t.address),
     index('store_mailbox_store_idx').on(t.storeId),
+    // 163 企业邮箱要有服务器与 1–65535 的端口，Gmail 没有
+    check(
+      'store_mailbox_imap_server_check',
+      sql`(${t.provider} = 'gmail' AND ${t.imapHost} IS NULL AND ${t.imapPort} IS NULL)
+        OR (${t.provider} = 'qiye163' AND ${t.imapHost} IS NOT NULL AND ${t.imapPort} BETWEEN 1 AND 65535)`,
+    ),
   ],
 );
+
+/**
+ * IMAP 的增量游标（163 企业邮箱，ADR 0015）：收件箱与「已发送」各一组 UIDVALIDITY 与已入库的最大 UID（「开始监听」时为 UIDNEXT − 1），
+ * 与找到的「已发送」文件夹名。找不到「已发送」时 sent 为空（收件箱照收，之后找到了再从那时起收）
+ */
+export interface ImapCursor {
+  readonly inbox: ImapFolderCursor;
+  readonly sent: ImapFolderCursor | null;
+  readonly sentFolder: string | null;
+}
+
+export interface ImapFolderCursor {
+  readonly uidValidity: string;
+  readonly uid: number;
+}
 
 /**
  * 邮箱的同步状态（规格 channel「Gmail 客户端」、PRD 6.9）：每个进线邮箱一行，watch 建立后有增量游标 historyId，
@@ -114,6 +143,13 @@ export const mailboxSync = channelSchema.table(
     backfillFrom: timestamptz('backfill_from'),
     /** 补拉开始时取的新游标（users.getProfile 的 historyId），补拉完成后换上 */
     backfillHistoryId: text('backfill_history_id'),
+    /**
+     * 163 企业邮箱的增量游标（ADR 0015，待办 35）：第一次记下两个文件夹的位置即「开始监听」（同 Gmail 的 watch，写 watched_at）；
+     * Gmail 邮箱为空。「已开始监听」= 有 Gmail 游标（history_id）或 IMAP 游标
+     */
+    imapCursor: jsonb('imap_cursor').$type<ImapCursor>(),
+    /** UIDVALIDITY 变了按到达时间区间补拉（起点同 backfill_from）：补拉开始时记下的新游标，补拉完成后换上 */
+    imapBackfillCursor: jsonb('imap_backfill_cursor').$type<ImapCursor>(),
     createdAt: timestamptz('created_at').notNull(),
     updatedAt: timestamptz('updated_at').notNull(),
   },
@@ -135,8 +171,13 @@ export const message = channelSchema.table(
     id: primaryId(),
     /** 收到这封信的邮箱（小写）：同步的 Gmail 邮箱 */
     mailbox: text('mailbox').notNull(),
-    gmailMessageId: text('gmail_message_id').notNull(),
-    gmailThreadId: text('gmail_thread_id').notNull(),
+    /**
+     * 服务商的消息标识（ADR 0015）：Gmail 消息 ID；163 企业邮箱为「文件夹角色 : UIDVALIDITY : UID」（例 inbox:1700000001:4521）。
+     * 「邮箱 + 它」唯一（R-TK-07、E-15）。迁移 0037 加列、0038 从 gmail_message_id 回填、0039 改为必填并删旧列
+     */
+    providerMessageId: text('provider_message_id').notNull(),
+    /** 线程（Gmail 线程 ID，回复识别的第三顺位）；163 企业邮箱没有线程，为空 */
+    threadId: text('thread_id'),
     /** 方向：来信 inbound / 我方发出 outbound（Gmail 标签含 SENT） */
     direction: text('direction', { enum: messageDirections }).notNull(),
     /** RFC Message-ID（带尖括号）；邮件没写时为空 */
@@ -184,7 +225,9 @@ export const message = channelSchema.table(
     createdAt: timestamptz('created_at').notNull(),
   },
   (t) => [
-    unique('message_mailbox_gmail_id_key').on(t.mailbox, t.gmailMessageId),
+    unique('message_mailbox_provider_id_key').on(t.mailbox, t.providerMessageId),
+    // 163 企业邮箱的 UIDVALIDITY 变了以后同一封信的标识也变了：入库前按「同一邮箱 + 方向 + Message-ID」认出已收过的（ADR 0015）
+    index('message_mailbox_rfc_message_id_idx').on(t.mailbox, t.direction, t.rfcMessageId),
     uniqueIndex('message_rfc_message_id_key')
       .on(t.direction, t.rfcMessageId)
       .where(sql`${t.duplicateOfId} IS NULL AND ${t.rfcMessageId} IS NOT NULL`),
@@ -254,16 +297,17 @@ export const mailReplayItem = channelSchema.table(
   'mail_replay_item',
   {
     mailbox: text('mailbox').notNull(),
-    gmailMessageId: text('gmail_message_id').notNull(),
+    /** 服务商的消息标识（同 message.provider_message_id）；迁移 0037–0039 从 gmail_message_id 改过来 */
+    providerMessageId: text('provider_message_id').notNull(),
     /** 到达时间（Gmail internalDate）：回放的顺序与注入的「当前时间」 */
     internalDate: timestamptz('internal_date').notNull(),
     /** 回放完的时刻（处理时刻）；还没回放为空 */
     replayedAt: timestamptz('replayed_at'),
   },
   (t) => [
-    primaryKey({ columns: [t.mailbox, t.gmailMessageId] }),
+    primaryKey({ columns: [t.mailbox, t.providerMessageId] }),
     index('mail_replay_item_pending_idx')
-      .on(t.internalDate, t.mailbox, t.gmailMessageId)
+      .on(t.internalDate, t.mailbox, t.providerMessageId)
       .where(sql`${t.replayedAt} IS NULL`),
   ],
 );

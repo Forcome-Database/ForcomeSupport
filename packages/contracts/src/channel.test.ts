@@ -8,8 +8,13 @@ import {
   SYNC_DELAY_MS,
   syncConnectionStatus,
   worstConnectionStatus,
+  mailboxTestFailureMessage,
   type StoreInput,
+  type StoreMailboxInput,
 } from './channel';
+
+/** Gmail 的一行进线邮箱 */
+const gmail = (address: string): StoreMailboxInput => ({ address, provider: 'gmail' });
 
 // 店铺抽屉（PRD P18「校验」、K8、AC-ST-01）：逐项校验，错误写在字段下方；店铺名重复、进线邮箱与其他店铺重复
 // 要查库，由 channel 模块在保存时补上，这里只管表单本身能判断的部分
@@ -18,7 +23,7 @@ const valid: StoreInput = {
   platform: 'shopify',
   sites: ['CA'],
   defaultSite: 'CA',
-  mailboxes: ['support@forcome.ca'],
+  mailboxes: [gmail('support@forcome.ca')],
   platformId: 'forcome-ca.myshopify.com',
 };
 
@@ -42,13 +47,19 @@ describe('店铺输入的字段级校验（K8）', () => {
 
   it('进线邮箱逐个校验格式，错误落在对应的那一个上', () => {
     expect(
-      storeInputErrors({ ...valid, mailboxes: ['support@forcome.ca', 'info@forcome'] }),
+      storeInputErrors({
+        ...valid,
+        mailboxes: [gmail('support@forcome.ca'), gmail('info@forcome')],
+      }),
     ).toEqual({ 'mailboxes.1': '邮箱格式不正确，例如 info@forcome.mx' });
   });
 
   it('同一个店铺里重复填写的邮箱（不分大小写）指出是哪一个', () => {
     expect(
-      storeInputErrors({ ...valid, mailboxes: ['support@forcome.ca', ' Support@Forcome.CA '] }),
+      storeInputErrors({
+        ...valid,
+        mailboxes: [gmail('support@forcome.ca'), gmail(' Support@Forcome.CA ')],
+      }),
     ).toEqual({ 'mailboxes.1': 'support@forcome.ca 已经填过' });
   });
 
@@ -79,6 +90,86 @@ describe('店铺输入的字段级校验（K8）', () => {
   });
 });
 
+describe('163 企业邮箱的行（D-28，PRD P18「校验」）', () => {
+  const qiye = (fields: Partial<StoreMailboxInput>): StoreMailboxInput => ({
+    address: 'amz-auto@forcome.com',
+    provider: 'qiye163',
+    imapHost: 'imap.qiye.163.com',
+    imapPort: 993,
+    ...fields,
+  });
+
+  it('服务器与端口填对时没有错误；授权码有没有保存要查库，表单这里不报', () => {
+    expect(storeInputErrors({ ...valid, mailboxes: [qiye({})] })).toEqual({});
+  });
+
+  it('IMAP 服务器必填、端口为 1–65535 的整数，错误写在该行的字段上', () => {
+    expect(
+      storeInputErrors({
+        ...valid,
+        mailboxes: [gmail('support@forcome.ca'), qiye({ imapHost: ' ', imapPort: '99999' })],
+      }),
+    ).toEqual({
+      'mailboxes.1.imapHost': '请填写 IMAP 服务器',
+      'mailboxes.1.imapPort': '端口为 1–65535 的整数',
+    });
+    for (const port of ['', '9x', 0, 1.5, null]) {
+      expect(storeInputErrors({ ...valid, mailboxes: [qiye({ imapPort: port })] })).toEqual({
+        'mailboxes.0.imapPort': '端口为 1–65535 的整数',
+      });
+    }
+  });
+
+  it('规范化：服务器去空白转小写、端口文字转数字、授权码去首尾空白（空的当没填）；Gmail 的行丢掉服务器与授权码', () => {
+    const [qiyeRow, gmailRow] = normalizeStoreInput({
+      ...valid,
+      mailboxes: [
+        qiye({
+          address: ' AMZ-Auto@Forcome.com ',
+          imapHost: ' IMAPHZ.qiye.163.com ',
+          imapPort: ' 993 ',
+          authCode: ' abc123 ',
+        }),
+        {
+          address: 'x@forcome.ca',
+          provider: 'gmail',
+          imapHost: 'h',
+          imapPort: 1,
+          authCode: 'secret',
+        },
+      ],
+    }).mailboxes;
+    expect(qiyeRow).toEqual({
+      address: 'amz-auto@forcome.com',
+      provider: 'qiye163',
+      imapHost: 'imaphz.qiye.163.com',
+      imapPort: 993,
+      authCode: 'abc123',
+    });
+    expect(gmailRow).toEqual({
+      address: 'x@forcome.ca',
+      provider: 'gmail',
+      imapHost: null,
+      imapPort: null,
+    });
+    expect(
+      normalizeStoreInput({ ...valid, mailboxes: [qiye({ authCode: '  ' })] }).mailboxes[0],
+    ).not.toHaveProperty('authCode');
+  });
+
+  it('按行测试连接的行内结果照原型 QIYE_ROW_TESTS（连不上与超时同一种写法）', () => {
+    expect(mailboxTestFailureMessage('auth_failed', 'imap.qiye.163.com', 993)).toBe(
+      '登录失败：请检查客户端授权码，以及网易企业邮箱是否开启 IMAP 与客户端登录',
+    );
+    expect(mailboxTestFailureMessage('timeout', 'imap.qiye.163.com', 993)).toBe(
+      '连不上 imap.qiye.163.com:993：请检查 IMAP 服务器与端口',
+    );
+    expect(mailboxTestFailureMessage('no_sent_folder', 'h', 1)).toBe(
+      '找不到「已发送」文件夹：请在网易企业邮箱里确认有「已发送」',
+    );
+  });
+});
+
 describe('单个进线邮箱的就地检查（抽屉按回车加入前）', () => {
   it('格式不对、或与前面已填的重复（不分大小写）时给出错误，没问题为 null', () => {
     expect(mailboxError('info@forcome', [])).toBe('邮箱格式不正确，例如 info@forcome.mx');
@@ -97,7 +188,7 @@ describe('店铺输入的规范化', () => {
         name: '  forcome.ca ',
         sites: ['MX', 'US', 'MX'],
         defaultSite: 'US',
-        mailboxes: [' Support@Forcome.CA ', 'Ventas@forcome.ca'],
+        mailboxes: [gmail(' Support@Forcome.CA '), gmail('Ventas@forcome.ca')],
         platformId: ' forcome-ca.myshopify.com ',
       }),
     ).toEqual({
@@ -105,7 +196,10 @@ describe('店铺输入的规范化', () => {
       name: 'forcome.ca',
       sites: ['US', 'MX'],
       defaultSite: 'US',
-      mailboxes: ['support@forcome.ca', 'ventas@forcome.ca'],
+      mailboxes: [
+        { address: 'support@forcome.ca', provider: 'gmail', imapHost: null, imapPort: null },
+        { address: 'ventas@forcome.ca', provider: 'gmail', imapHost: null, imapPort: null },
+      ],
       platformId: 'forcome-ca.myshopify.com',
     });
   });

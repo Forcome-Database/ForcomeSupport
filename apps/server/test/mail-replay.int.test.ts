@@ -140,6 +140,8 @@ describe('AC-P1-13：近 90 天邮件回放（编号日期取首封来信日期�
     // 此刻 2026-09-11 10:20（北京时间）上线切换：T0 取此刻，回放 06-13 10:20 起到达的邮件
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     amazon = t.clients.fake(amazonOrdersClient);
     amazon.put(AUTO.id, {
@@ -334,6 +336,8 @@ describe('T0 交界：回放与 T0 之后的实时来信不丢不重', () => {
   beforeAll(async () => {
     t = await startTestHarness({ now: '2026-09-11T08:00:00+08:00' });
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     agent = await t.loginAs('坐席');
   });
@@ -389,6 +393,8 @@ describe('切换的状态与命令的保护', () => {
   beforeAll(async () => {
     t = await startTestHarness({ now: '2026-09-11T10:20:00+08:00' });
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
   });
 

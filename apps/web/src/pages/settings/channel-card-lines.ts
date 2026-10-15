@@ -57,7 +57,10 @@ function ordersLines(
 
 function gmailLines(card: ChannelCard, stores: readonly Store[]): string[] {
   const mailboxCount = (platform: Store['platform']) =>
-    stores.filter((s) => s.platform === platform).reduce((n, s) => n + s.mailboxes.length, 0);
+    stores
+      .filter((s) => s.platform === platform)
+      // 只数服务商为 Gmail 的邮箱（163 企业邮箱另有一张卡，D-28，待办 35）
+      .reduce((n, s) => n + s.mailboxes.filter((m) => m.provider === 'gmail').length, 0);
   const failed = card.issues.filter((issue) => issue.status === 'error');
   const delayed = card.issues
     .filter((issue) => issue.status === 'delayed')
@@ -96,6 +99,15 @@ function dingtalkLines(card: ChannelCard): string[] {
   return [...CARD_LINES.dingtalk];
 }
 
+/** 163 企业邮箱卡（D-28）的界面随待办 36 做；在那之前 P18 不显示它（接口已给出这张卡，待办 35） */
+export type ShownChannelCard = ChannelCard & {
+  readonly kind: Exclude<ChannelCard['kind'], 'qiye163'>;
+};
+
+export function isShownChannelCard(card: ChannelCard): card is ShownChannelCard {
+  return card.kind !== 'qiye163';
+}
+
 /** 一张渠道卡的说明行（按数据与连接状态写） */
 export function channelCardLines(card: ChannelCard, stores: readonly Store[]): string[] {
   switch (card.kind) {
@@ -106,6 +118,9 @@ export function channelCardLines(card: ChannelCard, stores: readonly Store[]): s
       return gmailLines(card, stores);
     case 'dingtalk':
       return dingtalkLines(card);
+    case 'qiye163':
+      // P18 还不显示这张卡（isShownChannelCard），说明行随待办 36 照原型写
+      return [];
   }
 }
 

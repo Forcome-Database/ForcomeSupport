@@ -35,6 +35,24 @@ export const SHOPIFY_CONTACT_FORM_SENDER = 'mailer@shopify.com';
  */
 export const AMAZON_ORDER_NUMBER_PATTERN = String.raw`\d{3}-\d{7}-\d{7}`;
 
+/**
+ * 进线邮箱的服务商（PRD D-28，ADR 0015，待办 35）：每个进线邮箱各自选 Gmail 或 163 企业邮箱（网易企业邮箱）。
+ * 收信层按服务商分派（Gmail API / IMAP），之后的去重、识别、归并、SLA 与报表都与服务商无关
+ */
+export const mailProviders = ['gmail', 'qiye163'] as const;
+export const mailProviderSchema = z.enum(mailProviders);
+export type MailProvider = z.infer<typeof mailProviderSchema>;
+export const mailProviderLabels: Record<MailProvider, string> = {
+  gmail: 'Gmail',
+  qiye163: '163 企业邮箱',
+};
+
+/** 163 企业邮箱 IMAP 服务器的默认值（原型 data.QIYE_DEFAULTS）：企业所在机房不同地址不同，按邮箱可改 */
+export const QIYE_IMAP_DEFAULTS = { host: 'imap.qiye.163.com', port: 993 } as const;
+
+/** 163 企业邮箱连接异常的恢复指引（原型 data.QIYE_GUIDE）：渠道卡异常行、测试连接失败与按行测试「登录失败」共用 */
+export const QIYE_GUIDE = '请检查客户端授权码，以及网易企业邮箱是否开启 IMAP 与客户端登录';
+
 /** 各平台的平台标识（亚马逊卖家 ID、Shopify 店铺域名）与进线邮箱的叫法：店铺表、抽屉与报错共用 */
 export const platformTerms: Record<
   Platform,
@@ -70,6 +88,20 @@ export const platformTerms: Record<
 };
 
 /**
+ * 提交的一个进线邮箱（K8 逐行登记，D-28）：地址与服务商；163 企业邮箱另有 IMAP 服务器与端口、客户端授权码。
+ * 形状宽松（端口可以是没填对的文字），由 storeInputErrors 逐项判断。客户端授权码只写不读：不带就沿用该地址已保存的，
+ * 163 企业邮箱新加或从 Gmail 改来时必须带（要查库，由 channel 保存时判断）；Gmail 的行忽略服务器、端口与授权码
+ */
+export const storeMailboxInputSchema = z.object({
+  address: z.string(),
+  provider: mailProviderSchema,
+  imapHost: z.string().nullable().optional(),
+  imapPort: z.union([z.int(), z.string()]).nullable().optional(),
+  authCode: z.string().optional(),
+});
+export type StoreMailboxInput = z.infer<typeof storeMailboxInputSchema>;
+
+/**
  * 新增或编辑店铺提交的内容（抽屉的字段）。形状宽松（平台、默认站点可以没选），
  * 是否填对由 storeInputErrors 逐项判断，这样所有字段的错误能一次列全（K8：保存后定位到第一个错误）。
  */
@@ -80,8 +112,8 @@ export const storeInputSchema = z.object({
   sites: z.array(siteSchema),
   /** 默认站点：无订单的来信按它归站点（D-23），必须是所选站点之一 */
   defaultSite: siteSchema.nullable(),
-  /** 进线邮箱：可填多个（含别名），寄到这些地址的来信归到本店铺；不能与其他店铺重复 */
-  mailboxes: z.array(z.string()),
+  /** 进线邮箱：可填多个（含别名），寄到这些地址的来信归到本店铺；不能与其他店铺重复。每个各选服务商（D-28） */
+  mailboxes: z.array(storeMailboxInputSchema),
   platformId: z.string(),
   /** 数据来源（真实接口 / 模拟数据）：只在非生产环境可设；不传时新建按环境取默认，编辑保持原值 */
   adapterMode: adapterModeSchema.optional(),
@@ -106,15 +138,70 @@ export function normalizeMailbox(mailbox: string): string {
   return mailbox.trim().toLowerCase();
 }
 
-/** 规范化：去掉首尾空白，进线邮箱转小写，站点按 US · CA · MX 排序去重 */
+/** 端口的规范写法：数字原样，全是数字的文字转成数字，其余（没填对的）原样留着由校验报错；没填为 null */
+export function normalizeImapPort(
+  port: number | string | null | undefined,
+): number | string | null {
+  if (port === undefined || port === null) return null;
+  if (typeof port === 'number') return port;
+  const trimmed = port.trim();
+  if (trimmed === '') return null;
+  return /^\d+$/.test(trimmed) ? Number(trimmed) : trimmed;
+}
+
+/**
+ * 一个进线邮箱的规范写法：地址去空白转小写；163 企业邮箱的服务器去空白转小写、端口转数字、授权码去首尾空白（空的当没填）；
+ * Gmail 没有服务器、端口与授权码
+ */
+export function normalizeStoreMailbox(mailbox: StoreMailboxInput): StoreMailboxInput {
+  const address = normalizeMailbox(mailbox.address);
+  if (mailbox.provider === 'gmail') {
+    return { address, provider: 'gmail', imapHost: null, imapPort: null };
+  }
+  const authCode = mailbox.authCode?.trim();
+  return {
+    address,
+    provider: mailbox.provider,
+    imapHost: mailbox.imapHost?.trim().toLowerCase() ?? '',
+    imapPort: normalizeImapPort(mailbox.imapPort),
+    ...(authCode ? { authCode } : {}),
+  };
+}
+
+/** 规范化：去掉首尾空白，进线邮箱转小写（见 normalizeStoreMailbox），站点按 US · CA · MX 排序去重 */
 export function normalizeStoreInput(input: StoreInput): StoreInput {
   return {
     ...input,
     name: input.name.trim(),
     sites: sites.filter((site) => input.sites.includes(site)),
-    mailboxes: input.mailboxes.map(normalizeMailbox),
+    mailboxes: input.mailboxes.map(normalizeStoreMailbox),
     platformId: input.platformId.trim(),
   };
+}
+
+/** 163 企业邮箱的行的错误文案（PRD P18「校验」；授权码的写法照原型 K8，服务器与端口原型没画，按 PRD 的校验写） */
+export const qiyeMailboxMessages = {
+  authCodeMissing: '请填写客户端授权码',
+  imapHostMissing: '请填写 IMAP 服务器',
+  imapPortInvalid: '端口为 1–65535 的整数',
+} as const;
+
+/** 端口是否为 1–65535 的整数 */
+export function validImapPort(port: unknown): port is number {
+  return typeof port === 'number' && Number.isInteger(port) && port >= 1 && port <= 65535;
+}
+
+/** 163 企业邮箱的 IMAP 服务器与端口能在表单里判断的错误，键为字段（imapHost、imapPort） */
+export function imapServerErrors(server: {
+  readonly imapHost?: string | null;
+  readonly imapPort?: number | string | null;
+}): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (!server.imapHost?.trim()) errors.imapHost = qiyeMailboxMessages.imapHostMissing;
+  if (!validImapPort(normalizeImapPort(server.imapPort))) {
+    errors.imapPort = qiyeMailboxMessages.imapPortInvalid;
+  }
+  return errors;
 }
 
 /**
@@ -130,7 +217,7 @@ export function mailboxError(mailbox: string, earlier: readonly string[]): strin
 
 /**
  * 表单本身能判断的错误（PRD P18「校验」、K8）：必填项、平台标识为空、邮箱格式、同一店铺内重复的邮箱、
- * 默认站点不在所选站点里。店铺名重复与邮箱被其他店铺占用要查库，由 channel 模块保存时补上，与这里的结果一起返回，
+ * 默认站点不在所选站点里、163 企业邮箱的行的 IMAP 服务器与端口（D-28；授权码要查库才知道有没有保存过，由 channel 判断）。店铺名重复与邮箱被其他店铺占用要查库，由 channel 模块保存时补上，与这里的结果一起返回，
  * 所以抽屉点「保存」后各类错误同时报出（K8）；前端加入单个进线邮箱时用 mailboxError 就地检查。
  */
 export function storeInputErrors(raw: StoreInput): FieldErrors {
@@ -143,9 +230,15 @@ export function storeInputErrors(raw: StoreInput): FieldErrors {
     errors.defaultSite = '请选择默认站点';
   }
   if (input.mailboxes.length === 0) errors.mailboxes = '至少填写一个进线邮箱';
+  const addresses = input.mailboxes.map((mailbox) => mailbox.address);
   input.mailboxes.forEach((mailbox, index) => {
-    const error = mailboxError(mailbox, input.mailboxes.slice(0, index));
+    // 地址的错误写在 mailboxes.<序号>（同改为逐行登记之前），163 企业邮箱的服务器与端口写在 mailboxes.<序号>.<字段>
+    const error = mailboxError(mailbox.address, addresses.slice(0, index));
     if (error) errors[`mailboxes.${index}`] = error;
+    if (mailbox.provider !== 'qiye163') return;
+    for (const [key, message] of Object.entries(imapServerErrors(mailbox))) {
+      errors[`mailboxes.${index}.${key}`] = message;
+    }
   });
   if (!input.platformId) {
     errors.platformId = input.platform
@@ -224,12 +317,28 @@ export function syncConnectionStatus(
   return now.getTime() - health.lastSuccessAt.getTime() > delayAfterMs ? 'delayed' : 'connected';
 }
 
-/** 店铺的一个连接：Gmail（收件与「已发送」）或订单（亚马逊 SP-API、Shopify Admin API） */
+/**
+ * 店铺的一个连接：进线邮箱按服务商各一个（Gmail、163 企业邮箱，收件与「已发送」；店铺只有一种服务商的邮箱时只有那一个），
+ * 与订单（亚马逊 SP-API、Shopify Admin API）
+ */
 export const storeConnectionSchema = z.object({
-  kind: z.enum(['gmail', 'orders']),
+  kind: z.enum(['gmail', 'qiye163', 'orders']),
   status: connectionStatusSchema,
 });
 export type StoreConnection = z.infer<typeof storeConnectionSchema>;
+
+/**
+ * 店铺的一个进线邮箱（P18 店铺表与抽屉，D-28）：地址、服务商；163 企业邮箱另有 IMAP 服务器与端口，
+ * 客户端授权码只写不读——只返回是否已保存（抽屉写「已保存」+「重新填写」）。Gmail 的服务器与端口为 null、授权码为未保存
+ */
+export const storeMailboxSchema = z.object({
+  address: z.string(),
+  provider: mailProviderSchema,
+  imapHost: z.string().nullable(),
+  imapPort: z.int().nullable(),
+  authCodeSaved: z.boolean(),
+});
+export type StoreMailbox = z.infer<typeof storeMailboxSchema>;
 
 /** 店铺（P18 店铺表与抽屉） */
 export const storeSchema = z.object({
@@ -238,7 +347,7 @@ export const storeSchema = z.object({
   platform: platformSchema,
   sites: z.array(siteSchema),
   defaultSite: siteSchema,
-  mailboxes: z.array(z.string()),
+  mailboxes: z.array(storeMailboxSchema),
   platformId: z.string(),
   adapterMode: adapterModeSchema,
   /** 该店铺各连接的状态（店铺表「状态」列） */
@@ -250,8 +359,11 @@ export const storeSchema = z.object({
 });
 export type Store = z.infer<typeof storeSchema>;
 
-/** 渠道卡（K20）：第一期四张——亚马逊 SP-API、Shopify Admin API、Gmail、钉钉；积加与易仓是静态的「第二阶段接入」卡 */
-export const channelKinds = ['amazon', 'shopify', 'gmail', 'dingtalk'] as const;
+/**
+ * 渠道卡（K20）：第一期五张——亚马逊 SP-API、Shopify Admin API、Gmail、163 企业邮箱（D-28）、钉钉；
+ * 积加与易仓是静态的「第二阶段接入」卡
+ */
+export const channelKinds = ['amazon', 'shopify', 'gmail', 'qiye163', 'dingtalk'] as const;
 export const channelKindSchema = z.enum(channelKinds);
 export type ChannelKind = z.infer<typeof channelKindSchema>;
 
@@ -260,7 +372,7 @@ export type ChannelKind = z.infer<typeof channelKindSchema>;
  * 刚登记、还没同步过的（未连接）不算异常
  */
 export const channelIssueSchema = z.object({
-  /** 邮箱地址（Gmail）或店铺名（Shopify 待办 11、亚马逊待办 12） */
+  /** 邮箱地址（Gmail、163 企业邮箱）或店铺名（Shopify 待办 11、亚马逊待办 12） */
   target: z.string(),
   status: z.enum(['delayed', 'error']),
   /** 最近一次同步成功的时间；从没成功过为 null */
@@ -380,7 +492,8 @@ export const channelCardSchema = z.object({
   /** 接的是模拟数据（Fake，只在非生产环境），卡头另标「模拟数据」 */
   simulated: z.boolean(),
   /**
-   * 最近一次同步成功的时间：Gmail 取各邮箱、Shopify 与亚马逊取各店铺中最旧的一次（同报表「更新于」的取法）；还没有同步记录时为 null
+   * 最近一次同步成功的时间：Gmail 与 163 企业邮箱取该服务商各邮箱、Shopify 与亚马逊取各店铺中最旧的一次（同报表「更新于」的取法）；
+   * 还没有同步记录时为 null
    */
   lastSyncAt: z.iso.datetime({ offset: true }).nullable(),
   /** 异常的邮箱（按地址排序）或店铺（按店铺名排序）；钉钉卡与没有异常时为空 */
@@ -394,13 +507,13 @@ export type ChannelCard = z.infer<typeof channelCardSchema>;
 
 /**
  * 全站横幅（G4，GET /api/channel/alerts）：连接异常的渠道（钉钉除外，6.9），所有登录成员都看得到，恢复后自动消失。
- * Gmail（09）、亚马逊订单（12）与 Shopify 订单（11）；几个渠道同时异常时各一条、按这里的顺序上下叠放
- * （Gmail 在上，协调者 2026-10-06 决定；亚马逊在 Shopify 前同渠道卡的顺序，待办 12 Q3）
+ * Gmail（09）、163 企业邮箱（35，D-28）、亚马逊订单（12）与 Shopify 订单（11）；几个渠道同时异常时各一条、按这里的顺序上下叠放
+ * （Gmail 在上，协调者 2026-10-06 决定；163 企业邮箱紧随 Gmail，PRD G4 v2.37；亚马逊在 Shopify 前同渠道卡的顺序，待办 12 Q3）
  */
-export const channelAlertKinds = ['gmail', 'amazon', 'shopify'] as const;
+export const channelAlertKinds = ['gmail', 'qiye163', 'amazon', 'shopify'] as const;
 export const channelAlertSchema = z.object({
   kind: z.enum(channelAlertKinds),
-  /** 连接异常的邮箱（按地址排序）或店铺（按店铺名排序） */
+  /** 连接异常的邮箱（按地址排序，Gmail 与 163 企业邮箱各列各的）或店铺（按店铺名排序） */
   targets: z.array(z.string()).min(1),
   /** 最早的一串连续失败从何时起（G4「09-11 10:05 起未收取」） */
   since: z.iso.datetime({ offset: true }),
@@ -410,17 +523,17 @@ export const channelAlertsSchema = z.object({ alerts: z.array(channelAlertSchema
 export type ChannelAlerts = z.infer<typeof channelAlertsSchema>;
 
 /**
- * 「测试连接」（K20，POST /api/channel/connection-tests/{kind}）：Gmail、钉钉（09）、Shopify（11）与亚马逊（12）。
+ * 「测试连接」（K20，POST /api/channel/connection-tests/{kind}）：Gmail、钉钉（09）、Shopify（11）、亚马逊（12）与 163 企业邮箱（35）。
  * 测试连接不改连接状态（状态只看同步记录），Gmail、Shopify、亚马逊测完立即排一次同步（2026-10-06 用户确认，Shopify、亚马逊为协调者同日套用）。
  * 亚马逊另探一次订单通知队列（SQS）。全部可访问时 200 返回测过的对象；有访问不了的返回 502，message 写哪些访问不了（connectionTestMessages）
  */
-export const connectionTestKinds = ['gmail', 'dingtalk', 'shopify', 'amazon'] as const;
+export const connectionTestKinds = ['gmail', 'qiye163', 'dingtalk', 'shopify', 'amazon'] as const;
 export const connectionTestKindSchema = z.enum(connectionTestKinds);
 export type ConnectionTestKind = z.infer<typeof connectionTestKindSchema>;
 export const connectionTestResultSchema = z.object({
   kind: connectionTestKindSchema,
   /**
-   * 测过且可访问的：Gmail 为全部进线邮箱，钉钉为通讯录，Shopify、亚马逊为该平台的全部店铺（店铺名；亚马逊的订单通知队列不列在这里）
+   * 测过且可访问的：Gmail、163 企业邮箱为该服务商的全部进线邮箱，钉钉为通讯录，Shopify、亚马逊为该平台的全部店铺（店铺名；亚马逊的订单通知队列不列在这里）
    */
   targets: z.array(z.string()),
 });
@@ -434,6 +547,77 @@ export const connectionTestMessages = {
   unreachable: (targets: readonly string[]) => `${targets.join('、')} 无法访问`,
   dingtalkUnreachable: '钉钉通讯录无法访问',
 } as const;
+
+/**
+ * 店铺抽屉里按行「测试连接」（K8，PRD P18，D-28；POST /api/channel/mailbox-tests）：用这一行当前填的地址、IMAP 服务器与端口、
+ * 授权码测一次登录与收件箱、「已发送」能否访问，不保存、不记同步记录、不改连接状态，只给管理员。没带授权码时用该地址已保存的
+ * （要给出它所在的店铺 storeId，新店铺的行必须带）；数据来源按抽屉当前的选择（不给时按店铺，新店铺在非生产环境为模拟数据）。
+ * 填错时 400，fields 的键为 address、imapHost、imapPort、authCode
+ */
+export const mailboxTestInputSchema = z.object({
+  address: z.string(),
+  imapHost: z.string(),
+  imapPort: z.union([z.int(), z.string()]),
+  authCode: z.string().optional(),
+  storeId: z.uuid().optional(),
+  adapterMode: adapterModeSchema.optional(),
+});
+export type MailboxTestInput = z.infer<typeof mailboxTestInputSchema>;
+
+/** 按行测试连接失败的原因（ADR 0015）：授权码错或客户端登录没开、登录 IP 被限制、连不上服务器与端口、超时、找不到「已发送」 */
+export const mailboxTestFailureReasons = [
+  'auth_failed',
+  'login_denied_ip',
+  'unreachable',
+  'timeout',
+  'no_sent_folder',
+] as const;
+export type MailboxTestFailureReason = (typeof mailboxTestFailureReasons)[number];
+
+/** 按行测试连接的行内结果（原型 data.QIYE_ROW_TESTS，PRD P18）：连不上与超时同一种写法 */
+export const mailboxTestMessages = {
+  ok: '连接正常：收件箱与「已发送」均可访问',
+  authFailed: `登录失败：${QIYE_GUIDE}`,
+  loginDeniedIp: '登录被拒：网易企业邮箱限制了登录 IP，请管理员在网易后台放行本系统服务器的出口 IP',
+  unreachable: (host: string, port: number | string) =>
+    `连不上 ${host}:${port}：请检查 IMAP 服务器与端口`,
+  noSentFolder: '找不到「已发送」文件夹：请在网易企业邮箱里确认有「已发送」',
+} as const;
+
+/** 按行测试没通过时的行内结果（失败原因 → 写法） */
+export function mailboxTestFailureMessage(
+  reason: MailboxTestFailureReason,
+  host: string,
+  port: number | string,
+): string {
+  switch (reason) {
+    case 'auth_failed':
+      return mailboxTestMessages.authFailed;
+    case 'login_denied_ip':
+      return mailboxTestMessages.loginDeniedIp;
+    case 'no_sent_folder':
+      return mailboxTestMessages.noSentFolder;
+    case 'unreachable':
+    case 'timeout':
+      return mailboxTestMessages.unreachable(host, port);
+  }
+}
+
+/** 测试通过（200）：「已发送」文件夹的名字与行内结果 */
+export const mailboxTestResultSchema = z.object({
+  address: z.string(),
+  sentFolder: z.string(),
+  message: z.string(),
+});
+export type MailboxTestResult = z.infer<typeof mailboxTestResultSchema>;
+
+/** 测试没通过（502）：原因与行内结果（message） */
+export const mailboxTestFailureSchema = z.object({
+  error: z.literal('connection_test_failed'),
+  reason: z.enum(mailboxTestFailureReasons),
+  message: z.string(),
+});
+export type MailboxTestFailure = z.infer<typeof mailboxTestFailureSchema>;
 
 /** P18 渠道与店铺（GET /api/channel/settings） */
 export const channelSettingsSchema = z.object({

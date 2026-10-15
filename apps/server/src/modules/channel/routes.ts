@@ -8,6 +8,9 @@ import {
   connectionTestKindSchema,
   connectionTestMessages,
   connectionTestResultSchema,
+  mailboxTestFailureSchema,
+  mailboxTestInputSchema,
+  mailboxTestResultSchema,
   storeInputSchema,
   storeOptionsSchema,
   storeSchema,
@@ -16,7 +19,7 @@ import {
 } from '@forcome/contracts';
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import type { AppEnv, Logger, Runtime } from '../core';
-import { dingtalkClient, type IntegrationClients } from '../integration';
+import { dingtalkClient, savedMailboxAuthCodes, type IntegrationClients } from '../integration';
 import { testAmazonConnection, testShopifyConnection } from '../order';
 import {
   checkDingtalkDirectory,
@@ -27,6 +30,7 @@ import {
 } from '../org';
 import { channelAlerts, channelCards, loadConnections } from './connections';
 import { testGmailConnection } from './gmail-sync';
+import { testImapConnection, testMailboxRow } from './imap-sync';
 import {
   createStore,
   listAllStores,
@@ -34,6 +38,7 @@ import {
   listStoreOptions,
   toStore,
   updateStore,
+  type StoreRecord,
 } from './stores';
 import { assignStore, findPlacementStore, listUnassignedMail } from './unassigned';
 
@@ -113,11 +118,35 @@ const alertsRoute = createRoute({
   },
 });
 
+const mailboxTestRoute = createRoute({
+  method: 'post',
+  path: '/api/channel/mailbox-tests',
+  summary:
+    '店铺抽屉里按行测试 163 企业邮箱的连接（K8，D-28）：用这一行当前填的地址、IMAP 服务器与端口、授权码登录，看收件箱与「已发送」能否访问；' +
+    '没带授权码时用该店铺里这个地址已保存的。不保存、不记同步记录、不改连接状态；同一个地址同时只跑一个',
+  request: {
+    body: { content: { 'application/json': { schema: mailboxTestInputSchema } }, required: true },
+  },
+  responses: {
+    200: json(mailboxTestResultSchema, '连接正常：收件箱与「已发送」均可访问'),
+    400: json(
+      apiErrorSchema,
+      '填错：fields 的键为 address、imapHost、imapPort、authCode（没带授权码、也没有可沿用的已保存授权码）',
+    ),
+    401: unauthenticated,
+    403: forbidden,
+    502: json(
+      mailboxTestFailureSchema,
+      '没通过：reason 为原因（auth_failed / login_denied_ip / unreachable / timeout / no_sent_folder），message 为行内结果（原型 QIYE_ROW_TESTS）',
+    ),
+  },
+});
+
 const connectionTestRoute = createRoute({
   method: 'post',
   path: '/api/channel/connection-tests/{kind}',
   summary:
-    '测试连接（K20）：Gmail 逐个进线邮箱试访问、Shopify 逐个店铺读店铺信息、亚马逊逐个店铺读卖家参与的站点并探一次订单通知队列，测完立即排一次同步；钉钉取根部门。不改连接状态',
+    '测试连接（K20）：Gmail 逐个进线邮箱试访问、163 企业邮箱逐个登录看收件箱与「已发送」、Shopify 逐个店铺读店铺信息、亚马逊逐个店铺读卖家参与的站点并探一次订单通知队列，测完立即排一次同步；钉钉取根部门。不改连接状态',
   request: { params: z.object({ kind: connectionTestKindSchema }) },
   responses: {
     200: json(connectionTestResultSchema, '全部可访问'),
@@ -187,6 +216,7 @@ export function createChannelRoutes(deps: {
     '/api/channel/stores',
     '/api/channel/stores/*',
     '/api/channel/connection-tests/*',
+    '/api/channel/mailbox-tests',
   ]) {
     routes.use(path, admin);
   }
@@ -197,35 +227,64 @@ export function createChannelRoutes(deps: {
     const connections = await loadConnections(runtime.db, now);
     // 钉钉卡按通讯录的同步记录（org，待办 05）
     const dingtalk = await dingtalkConnection(runtime.db, now);
+    const saved = await savedMailboxAuthCodes(runtime.db);
     return c.json(
       {
         channels: channelCards(stores, connections, {
           mode: clients.globalMode('dingtalk'),
           ...dingtalk,
         }),
-        stores: stores.map((record) => toStore(record, connections)),
+        stores: stores.map((record) => toStore(record, connections, saved)),
         dataSourceEditable: appEnv !== 'production',
       },
       200,
     );
   });
 
+  /** 保存后的店铺写成接口输出：连接状态与「授权码已保存」按这一刻的库 */
+  const storeOutput = async (record: StoreRecord) =>
+    toStore(
+      record,
+      await loadConnections(runtime.db, runtime.clock.now()),
+      await savedMailboxAuthCodes(
+        runtime.db,
+        record.mailboxes.map((mailbox) => mailbox.address),
+      ),
+    );
+
   routes.openapi(createStoreRoute, async (c) => {
     const created = await createStore(
-      { runtime, appEnv, actor: c.get('access').actor },
+      { runtime, appEnv, actor: c.get('access').actor, vault: clients.credentialVault },
       c.req.valid('json'),
     );
-    return c.json(toStore(created, await loadConnections(runtime.db, runtime.clock.now())), 201);
+    return c.json(await storeOutput(created), 201);
   });
 
   routes.openapi(updateStoreRoute, async (c) => {
     const updated = await updateStore(
-      { runtime, appEnv, actor: c.get('access').actor },
+      { runtime, appEnv, actor: c.get('access').actor, vault: clients.credentialVault },
       c.req.valid('param').id,
       c.req.valid('json'),
     );
     if (!updated) return c.json({ error: 'not_found', message: '没有这个店铺' }, 404);
-    return c.json(toStore(updated, await loadConnections(runtime.db, runtime.clock.now())), 200);
+    return c.json(await storeOutput(updated), 200);
+  });
+
+  routes.openapi(mailboxTestRoute, async (c) => {
+    const outcome = await testMailboxRow(runtime, clients, appEnv, c.req.valid('json'), logger);
+    return outcome.ok
+      ? c.json(
+          { address: outcome.address, sentFolder: outcome.sentFolder, message: outcome.message },
+          200,
+        )
+      : c.json(
+          {
+            error: 'connection_test_failed' as const,
+            reason: outcome.reason,
+            message: outcome.message,
+          },
+          502,
+        );
   });
 
   routes.openapi(storeOptionsRoute, async (c) =>
@@ -289,6 +348,7 @@ export function createChannelRoutes(deps: {
     }
     const tests = {
       gmail: () => testGmailConnection(runtime, clients, logger),
+      qiye163: () => testImapConnection(runtime, clients, logger),
       shopify: () => testShopifyConnection(runtime, clients, listOrderStores, logger),
       amazon: () => testAmazonConnection(runtime, clients, listOrderStores, logger),
     } as const;

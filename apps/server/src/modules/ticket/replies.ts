@@ -26,7 +26,7 @@ import { applyTransition } from './ticket-status';
 
 /*
  * 回复识别（规格 ticket「回复识别」，PRD R-SL-08、6.1 第一阶段迁移表，待办 16；处理 channel 的「我方发信已同步」）：
- * 1. 「已发送」里的一封我方邮件按 In-Reply-To、References（从最近的一封往前）、Gmail 线程的顺序找它回复的邮件，
+ * 1. 「已发送」里的一封我方邮件按 In-Reply-To、References（从最近的一封往前）、Gmail 线程（163 企业邮箱没有线程，只按前两种，待办 35）的顺序找它回复的邮件，
  *    归到那封邮件所在的工单；只归到发件邮箱所属店铺的工单（别的店铺邮箱回的不算，工单详情按店铺范围读消息）。
  * 2. 归到工单后：消息照常入工单（全程记录）；带 Auto-Submitted 或自动回复标记的不算回复，到此为止。其余结束它之前该工单内
  *    所有未回复来信的计时（sla.ts）；工单是待回复、且这之后没有未回复来信时按迁移表转等客户。已关闭的工单只记首次回复
@@ -54,16 +54,18 @@ export const attributeReplyJob = defineJob(
   { retryLimit: 5, retryDelay: 10, retryBackoff: true },
 );
 
-/** 回复与来信互斥用的咨询锁键：每个 Message-ID 一个、邮箱里的 Gmail 线程一个，排序去重 */
+/** 回复与来信互斥用的咨询锁键：每个 Message-ID 一个、邮箱里的 Gmail 线程一个（163 企业邮箱没有），排序去重 */
 function replyLinkKeys(input: {
   readonly messageIds: readonly (string | null)[];
   readonly mailbox: string;
-  readonly gmailThreadId: string;
+  readonly threadId: string | null;
 }): string[] {
   const keys = input.messageIds
     .filter((id) => id !== null)
     .map((id) => `ticket.reply_link:message:${id}`);
-  keys.push(`ticket.reply_link:thread:${input.mailbox}:${input.gmailThreadId}`);
+  // 163 企业邮箱没有线程（待办 35）
+  if (input.threadId !== null)
+    keys.push(`ticket.reply_link:thread:${input.mailbox}:${input.threadId}`);
   return [...new Set(keys)].sort();
 }
 
@@ -144,7 +146,8 @@ async function matchTicket(
     .filter(
       (target) =>
         target.mailbox === reply.mailbox &&
-        target.gmailThreadId === reply.gmailThreadId &&
+        reply.threadId !== null &&
+        target.threadId === reply.threadId &&
         ticketOf.has(target.id),
     )
     .sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime());
@@ -158,7 +161,7 @@ async function waitForInbound(tx: Tx, reply: OutboundMessage): Promise<void> {
     .values({
       channelMessageId: reply.id,
       mailbox: reply.mailbox,
-      gmailThreadId: reply.gmailThreadId,
+      threadId: reply.threadId,
       replyTo: [reply.inReplyTo, ...reply.references].filter((id) => id !== null),
       waitingSince: tx.now,
     })
@@ -187,7 +190,7 @@ export async function attributeReply(
     await lockReplyLinks(tx, {
       messageIds: [reply.inReplyTo, ...reply.references],
       mailbox: reply.mailbox,
-      gmailThreadId: reply.gmailThreadId,
+      threadId: reply.threadId,
     });
     if (await alreadyLinked(tx, messageId)) return;
     // 候选在取锁之后读：取锁前刚入库并归并完的来信（那次归并还看不到这封回复在等）也要在这里看到
@@ -246,7 +249,7 @@ export async function retryWaitingReplies(
   tx: Tx,
   inbound: {
     readonly mailbox: string;
-    readonly gmailThreadId: string;
+    readonly threadId: string | null;
     readonly rfcMessageId: string | null;
   },
 ): Promise<void> {
@@ -255,10 +258,12 @@ export async function retryWaitingReplies(
     .from(pendingReply)
     .where(
       or(
-        and(
-          eq(pendingReply.mailbox, inbound.mailbox),
-          eq(pendingReply.gmailThreadId, inbound.gmailThreadId),
-        ),
+        inbound.threadId === null
+          ? undefined
+          : and(
+              eq(pendingReply.mailbox, inbound.mailbox),
+              eq(pendingReply.threadId, inbound.threadId),
+            ),
         inbound.rfcMessageId
           ? sql`${inbound.rfcMessageId} = ANY(${pendingReply.replyTo})`
           : undefined,

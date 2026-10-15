@@ -595,7 +595,7 @@ describe('亚马逊订单镜像', () => {
       platform: 'amazon',
       sites: ['US'],
       defaultSite: 'US',
-      mailboxes: ['amz-home@forcome.com'],
+      mailboxes: [{ address: 'amz-home@forcome.com', provider: 'gmail' }],
       platformId: 'A7HOME2SELLER9',
     });
     expect(res.status).toBe(201);
@@ -609,7 +609,7 @@ describe('亚马逊订单镜像', () => {
       platform: 'amazon',
       sites: ['US'],
       defaultSite: 'US',
-      mailboxes: ['amz-home@forcome.com'],
+      mailboxes: [{ address: 'amz-home@forcome.com', provider: 'gmail' }],
       platformId: 'A7HOME2SELLER9',
       adapterMode: 'real',
       version: created.version,
@@ -648,7 +648,7 @@ describe('生产环境没有配置 SP-API 与 SQS（用户 2026-10-04 口径：�
       platform: 'amazon',
       sites: ['US', 'CA', 'MX'],
       defaultSite: 'US',
-      mailboxes: ['amz-direct@forcome.com'],
+      mailboxes: [{ address: 'amz-direct@forcome.com', provider: 'gmail' }],
       platformId: 'A1FD7Q2M9XK3LC',
     });
     expect(res.status).toBe(201);

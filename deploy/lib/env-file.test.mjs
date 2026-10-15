@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
-import { createEnvFile, envFilePermissionProblem, readDeployEnv } from './env-file.mjs';
+import {
+  createEnvFile,
+  envFilePermissionProblem,
+  generatedSecret,
+  readDeployEnv,
+} from './env-file.mjs';
 import { ENVIRONMENTS } from './environments.mjs';
 
 const staging = ENVIRONMENTS.staging;
@@ -198,14 +203,23 @@ describe('第一次部署时从模板生成环境文件', () => {
     POSTGRES_PASSWORD: 'a1b2c3d4e5f6a7b8c9d0',
     WALG_LIBSODIUM_KEY: 'ab'.repeat(32),
     RESTIC_PASSWORD: 'c3d4e5f6a7b8c9d0e1f2',
+    CREDENTIAL_MASTER_KEY: Buffer.alloc(32, 9).toString('base64'),
   };
 
-  it('只把口令与两把备份密钥换成随机值，其余行（含注释与空行）原样保留', () => {
+  it('只把口令、两把备份密钥与主密钥换成随机值，其余行（含注释与空行）原样保留', () => {
     const example =
-      '# 说明\nAPP_ENV=staging\n\nPOSTGRES_PASSWORD=change-me\nPOSTGRES_DB=forcome\nWALG_LIBSODIUM_KEY=change-me\nRESTIC_PASSWORD=change-me\n';
+      '# 说明\nAPP_ENV=staging\n\nPOSTGRES_PASSWORD=change-me\nPOSTGRES_DB=forcome\nWALG_LIBSODIUM_KEY=change-me\nRESTIC_PASSWORD=change-me\nCREDENTIAL_MASTER_KEY=\n';
     expect(createEnvFile(example, secrets)).toBe(
-      `# 说明\nAPP_ENV=staging\n\nPOSTGRES_PASSWORD=a1b2c3d4e5f6a7b8c9d0\nPOSTGRES_DB=forcome\nWALG_LIBSODIUM_KEY=${'ab'.repeat(32)}\nRESTIC_PASSWORD=c3d4e5f6a7b8c9d0e1f2\n`,
+      `# 说明\nAPP_ENV=staging\n\nPOSTGRES_PASSWORD=a1b2c3d4e5f6a7b8c9d0\nPOSTGRES_DB=forcome\nWALG_LIBSODIUM_KEY=${'ab'.repeat(32)}\nRESTIC_PASSWORD=c3d4e5f6a7b8c9d0e1f2\nCREDENTIAL_MASTER_KEY=${secrets.CREDENTIAL_MASTER_KEY}\n`,
     );
+  });
+
+  it('生成的随机值：主密钥是 32 字节的 base64（应用的 CREDENTIAL_MASTER_KEY 要这个写法），WAL-G 密钥 32 字节十六进制', () => {
+    const key = generatedSecret('CREDENTIAL_MASTER_KEY');
+    expect(key).toMatch(/^[A-Za-z0-9+/]+={0,2}$/);
+    expect(Buffer.from(key, 'base64')).toHaveLength(32);
+    expect(generatedSecret('WALG_LIBSODIUM_KEY')).toMatch(/^[0-9a-f]{64}$/);
+    expect(generatedSecret('POSTGRES_PASSWORD')).toMatch(/^[0-9a-f]{48}$/);
   });
 
   it('模板里缺了要生成的一行时报错，而不是生成一份不能用的文件', () => {

@@ -296,7 +296,7 @@ WHERE ${ticketMessage.direction} = 'inbound' AND ${ticketMessage.source} = 'cust
   );
 
 /**
- * 还没找到工单的我方回复（R-SL-08 乱序：回复先于它所回复的来信入库，16）：回复识别按 In-Reply-To、References、Gmail 线程
+ * 还没找到工单的我方回复（R-SL-08 乱序：回复先于它所回复的来信入库，16）：回复识别按 In-Reply-To、References、线程（Gmail）
  * 都找不到工单时记在这里，等对应的来信归并（归并时按它的 Message-ID 与线程找到这里的回复，重新识别）；
  * 最多等 24 小时，每分钟的扫描把满 24 小时的删掉（不再等，记日志）。找到工单后删掉这一行。
  */
@@ -306,9 +306,10 @@ export const pendingReply = ticketSchema.table(
     id: primaryId(),
     /** 我方回复（channel.message 的 id，跨模块不设外键） */
     channelMessageId: uuid('channel_message_id').notNull(),
-    /** 发出它的店铺邮箱与 Gmail 线程：同一线程里的来信归并后再找 */
+    /** 发出它的店铺邮箱与线程（Gmail 线程；163 企业邮箱没有线程）：同一线程里的来信归并后再找 */
     mailbox: text('mailbox').notNull(),
-    gmailThreadId: text('gmail_thread_id').notNull(),
+    /** 线程（同 channel.message.thread_id；163 企业邮箱没有线程，为空）；迁移 0037–0039 从 gmail_thread_id 改过来 */
+    threadId: text('thread_id'),
     /** 它回复的 Message-ID（In-Reply-To 与 References）：这些来信归并后再找 */
     replyTo: text('reply_to')
       .array()
@@ -319,6 +320,6 @@ export const pendingReply = ticketSchema.table(
   },
   (t) => [
     uniqueIndex('pending_reply_channel_message_key').on(t.channelMessageId),
-    index('pending_reply_thread_idx').on(t.mailbox, t.gmailThreadId),
+    index('pending_reply_thread_idx').on(t.mailbox, t.threadId),
   ],
 );

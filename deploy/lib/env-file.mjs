@@ -1,6 +1,7 @@
 // 部署环境文件（deploy/.env.<环境>，模板 deploy/.env.example）：读取、校验与第一次部署时生成。
 // 解析用 Node 内置的 util.parseEnv（与 Compose 的 --env-file 同一种写法：注释、引号、行内注释）。
 // 这里只校验部署脚本与 Compose 直接用到的变量；应用自己的变量（LOG_LEVEL、发信白名单等）由 api 启动时校验。
+import { randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
 import { parseEnv } from 'node:util';
 
@@ -18,8 +19,27 @@ const IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
 /** WAL-G 的 libsodium 密钥：32 字节的十六进制（openssl rand -hex 32） */
 const HEX_32_BYTES = /^[0-9a-f]{64}$/i;
 
-/** 生成环境文件时换成随机值的几项（模板里都是占位值 change-me） */
-export const GENERATED_SECRETS = ['POSTGRES_PASSWORD', 'WALG_LIBSODIUM_KEY', 'RESTIC_PASSWORD'];
+/**
+ * 生成环境文件时换成随机值的几项（模板里是占位值 change-me 或空值）：数据库口令、两把备份密钥，与主密钥（加密动态凭据与
+ * 163 企业邮箱的客户端授权码，待办 35；生产环境的主密钥由运维填写，见 docs/部署说明.md 第 6 节）
+ */
+export const GENERATED_SECRETS = [
+  'POSTGRES_PASSWORD',
+  'WALG_LIBSODIUM_KEY',
+  'RESTIC_PASSWORD',
+  'CREDENTIAL_MASTER_KEY',
+];
+
+/**
+ * 一项要生成的随机值：WAL-G 的 libsodium 密钥 32 字节十六进制；主密钥 32 字节 base64（应用的 CREDENTIAL_MASTER_KEY 要这个写法）；
+ * 其余 24 字节十六进制
+ * @param {string} name GENERATED_SECRETS 之一
+ * @param {(size: number) => Buffer} random 随机字节（测试可换）
+ */
+export function generatedSecret(name, random = randomBytes) {
+  if (name === 'CREDENTIAL_MASTER_KEY') return random(32).toString('base64');
+  return random(name === 'WALG_LIBSODIUM_KEY' ? 32 : 24).toString('hex');
+}
 
 function port(vars, name, problems) {
   const value = Number(vars[name]);
@@ -131,9 +151,9 @@ export function envFilePermissionProblem(mode, platform, environment) {
 }
 
 /**
- * 第一次部署时从模板生成环境文件：只把数据库口令与两把备份密钥换成随机值，其余原样保留。
+ * 第一次部署时从模板生成环境文件：只把数据库口令、两把备份密钥与主密钥换成随机值，其余原样保留。
  * @param {string} exampleText deploy/.env.example 的内容
- * @param {Readonly<Record<string, string>>} secrets GENERATED_SECRETS 各项的随机值（十六进制）
+ * @param {Readonly<Record<string, string>>} secrets GENERATED_SECRETS 各项的随机值（generatedSecret）
  */
 export function createEnvFile(exampleText, secrets) {
   let text = exampleText;

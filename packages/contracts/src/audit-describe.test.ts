@@ -619,6 +619,69 @@ describe('要查名字的 ID', () => {
   });
 });
 
+describe('店铺的 163 企业邮箱（D-28，待办 35，PRD P27、AC-P1-23）', () => {
+  const before: AuditSnapshot<'store.update'> = {
+    name: 'Forcome Auto',
+    platform: 'amazon',
+    sites: ['US'],
+    defaultSite: 'US',
+    mailboxes: ['amz-auto@forcome.com'],
+    mailboxServers: [
+      {
+        address: 'amz-auto@forcome.com',
+        provider: 'qiye163',
+        imapHost: 'imap.qiye.163.com',
+        imapPort: 993,
+      },
+    ],
+    platformId: 'A3KA8V1T6RW2NB',
+    adapterMode: 'fake',
+  };
+  const describeStore = (after: AuditSnapshot<'store.update'>) =>
+    describeAuditRecord(
+      record({
+        action: 'store.update',
+        objectType: 'store',
+        objectId: STORE_MX,
+        objectLabel: 'Forcome Auto',
+        storeId: STORE_MX,
+        before,
+        after,
+      }),
+      { financeVisible: false, names },
+    );
+
+  it('只重新填写了客户端授权码：摘要只写「进线邮箱 <地址>：客户端授权码已重新填写」，不含授权码（K18 补充小样）', () => {
+    const entry = describeStore({ ...before, authCodeRenewed: ['amz-auto@forcome.com'] });
+    expect(entry.summary).toBe('进线邮箱 amz-auto@forcome.com：客户端授权码已重新填写');
+    expect(entry.more).toBe(0);
+    expect(field(entry, '客户端授权码')).toMatchObject({
+      before: '—',
+      after: '进线邮箱 amz-auto@forcome.com：客户端授权码已重新填写',
+      changed: true,
+    });
+  });
+
+  it('服务商、服务器与端口照常记前后值', () => {
+    const entry = describeStore({
+      ...before,
+      mailboxServers: [{ ...before.mailboxServers![0]!, imapHost: 'imaphz.qiye.163.com' }],
+      authCodeRenewed: ['amz-auto@forcome.com'],
+    });
+    expect(entry.summary).toBe(
+      '进线邮箱服务商：amz-auto@forcome.com：163 企业邮箱（imap.qiye.163.com:993） → amz-auto@forcome.com：163 企业邮箱（imaphz.qiye.163.com:993）',
+    );
+    expect(entry.more).toBe(2);
+    const gmail = describeStore({
+      ...before,
+      mailboxServers: [
+        { address: 'amz-auto@forcome.com', provider: 'gmail', imapHost: null, imapPort: null },
+      ],
+    });
+    expect(field(gmail, '进线邮箱服务商')?.after).toBe('amz-auto@forcome.com：Gmail');
+  });
+});
+
 describe('渠道连接的记录（待办 09，原型 AUDIT_LOG 与 AUDIT_P27_EXPAND）', () => {
   const system = {
     actorType: 'system',

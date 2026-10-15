@@ -17,7 +17,15 @@ const store: Store = {
   platform: 'shopify',
   sites: ['MX'],
   defaultSite: 'MX',
-  mailboxes: ['support@forcome.mx'],
+  mailboxes: [
+    {
+      address: 'support@forcome.mx',
+      provider: 'gmail',
+      imapHost: null,
+      imapPort: null,
+      authCodeSaved: false,
+    },
+  ],
   platformId: 'forcome-mx.myshopify.com',
   adapterMode: 'fake',
   connections: [],
@@ -42,10 +50,43 @@ describe('店铺抽屉的提交内容（K8）', () => {
       platform: null,
       sites: [],
       defaultSite: null,
-      mailboxes: ['support@forcome.mx', 'info@forcome'],
+      mailboxes: [
+        { address: 'support@forcome.mx', provider: 'gmail' },
+        { address: 'info@forcome', provider: 'gmail' },
+      ],
       platformId: '',
       adapterMode: 'fake',
     });
+  });
+
+  it('原有的进线邮箱沿用编辑前的服务商与服务器（163 企业邮箱的授权码不带，沿用已保存的；待办 35），新加的为 Gmail', () => {
+    const auto: Store = {
+      ...store,
+      mailboxes: [
+        {
+          address: 'amz-auto@forcome.com',
+          provider: 'qiye163',
+          imapHost: 'imap.qiye.163.com',
+          imapPort: 993,
+          authCodeSaved: true,
+        },
+      ],
+    };
+    expect(
+      storeInputOf(
+        { ...storeFormOf(auto), mailboxes: ['amz-auto@forcome.com', 'help@forcome.com'] },
+        true,
+        auto,
+      ).mailboxes,
+    ).toEqual([
+      {
+        address: 'amz-auto@forcome.com',
+        provider: 'qiye163',
+        imapHost: 'imap.qiye.163.com',
+        imapPort: 993,
+      },
+      { address: 'help@forcome.com', provider: 'gmail' },
+    ]);
   });
 
   it('生产环境（不显示数据来源）不提交数据来源', () => {
@@ -107,10 +148,15 @@ describe('乐观锁冲突时对方改了哪些项（G7）', () => {
       changedFields(store, {
         ...store,
         name: 'forcome México',
-        mailboxes: ['support@forcome.mx', 'ventas@forcome.mx'],
+        mailboxes: [...store.mailboxes, { ...store.mailboxes[0]!, address: 'ventas@forcome.mx' }],
         version: 4,
       }),
     ).toEqual(['店铺名', '进线邮箱']);
-    expect(changedFields(store, { ...store, mailboxes: ['Support@Forcome.MX'] })).toEqual([]);
+    expect(
+      changedFields(store, {
+        ...store,
+        mailboxes: [{ ...store.mailboxes[0]!, address: 'Support@Forcome.MX' }],
+      }),
+    ).toEqual([]);
   });
 });

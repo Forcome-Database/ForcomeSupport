@@ -65,6 +65,8 @@ describe('来信到工单', () => {
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     // 系统开始监听店铺邮箱（watch 建立增量游标），之后到达的来信才会同步进来
     await t.runJobs();
@@ -290,6 +292,8 @@ describe('并发归并（规格「需要覆盖的场景·并发」）', () => {
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     await t.runJobs();
     agent = await t.loginAs('坐席');
@@ -342,6 +346,8 @@ describe('一个邮箱收不了信，不影响其他邮箱', () => {
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
   });
 
   afterAll(async () => {
@@ -355,7 +361,7 @@ describe('一个邮箱收不了信，不影响其他邮箱', () => {
       platform: 'shopify',
       sites: ['CA'],
       defaultSite: 'CA',
-      mailboxes: ['support@forcome.ca'],
+      mailboxes: [{ address: 'support@forcome.ca', provider: 'gmail' }],
       platformId: 'forcome-ca.myshopify.com',
       adapterMode: 'real',
     });
@@ -380,6 +386,8 @@ describe('工单接口的店铺范围与权限（R-ST-06、E-24、PRD 10.1）', 
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     const gmail = t.clients.fake(gmailClient);
     await t.runJobs();
     gmail.deliver(letter({ at: '2026-09-10T08:15:00+08:00' }));
@@ -463,6 +471,8 @@ describe('工单状态只能经迁移表改变（ADR 0008）', () => {
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     await t.runJobs();
     t.clients.fake(gmailClient).deliver(letter());
     await t.runJobs();

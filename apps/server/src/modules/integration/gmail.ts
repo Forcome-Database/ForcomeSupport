@@ -1,10 +1,10 @@
 import type { DemoFixture } from '@forcome/fixtures';
-import { toMilliseconds, type Clock } from '../core';
+import type { Clock } from '../core';
 import { defineClient, type FakeClient } from './definition';
 import { ExternalCallFailedError, FaultInjector } from './faults';
+import { fixtureMailsFor, replayShiftMs, shiftedMail, type ReplayMail } from './fixture-mails';
 import { buildFakeMail, type FakeMailInput } from './gmail-mime';
 import { createRealGmail, createRealGmailPush } from './gmail-real';
-import { fixtureMails, type ReplayMail } from './gmail-replay';
 
 /*
  * Gmail（规格 channel「Gmail 客户端」、ADR 0008 修订；待办 08 是最小形态，09 补健壮性）：
@@ -99,23 +99,6 @@ function recipientsOf(mail: FakeMailInput): readonly string[] {
 const HISTORY_START = 1000;
 /** Gmail 推送的有效期 */
 const WATCH_DAYS = 7;
-
-const DAY_MS = toMilliseconds({ days: 1 });
-
-/**
- * 示例邮件平移几天（待办 16）：夹具的时间在 9 月的演示时刻附近，开发测试环境与 Playwright 用真实时钟，原样回放的话
- * 时限扫描一上来就把它们按 7 天、14 天关闭（与归并交错时还会重开、另建工单）。回放时按整天平移到当前日期：
- * 演示时刻落在「现在」之前不到一天，时分不变（北京时间没有夏令时），原型画面的状态在当下重现，之后照规则随时间推进。
- * 时钟在演示时刻（本机截图的 CLOCK_START、集成测试）或更早时不平移
- */
-function replayShiftMs(fixture: DemoFixture, now: Date): number {
-  const ahead = now.getTime() - new Date(fixture.meta.now).getTime();
-  return ahead > 0 ? Math.floor(ahead / DAY_MS) * DAY_MS : 0;
-}
-
-function shifted(mail: FakeMailInput, ms: number): FakeMailInput {
-  return ms === 0 ? mail : { ...mail, at: new Date(new Date(mail.at).getTime() + ms) };
-}
 
 /**
  * Fake 推送：Fake 邮箱被 watch 后，每到一封信发一条通知进来。拉走但没确认的通知，下次拉取时再次投递
@@ -355,13 +338,13 @@ export class FakeGmail implements FakeClient<GmailClient> {
   }
 
   /**
-   * 从示例数据夹具回放来信与我方回复（ADR 0009 修订）：按时间排好、整天平移到当前日期（replayShiftMs），
-   * 每个邮箱的邮件等开始监听后送达
+   * 从示例数据夹具回放服务商为 Gmail 的邮箱的来信与我方回复（ADR 0009 修订；163 企业邮箱的由 Fake IMAP 回放，待办 35）：
+   * 按时间排好、整天平移到当前日期（replayShiftMs），每个邮箱的邮件等开始监听后送达
    */
   replay(fixture: DemoFixture): void {
     const shift = replayShiftMs(fixture, this.#clock.now());
-    const mails = fixtureMails(fixture)
-      .map((entry) => ({ ...entry, mail: shifted(entry.mail, shift) }))
+    const mails = fixtureMailsFor(fixture, 'gmail')
+      .map((entry) => ({ ...entry, mail: shiftedMail(entry.mail, shift) }))
       .sort((a, b) => new Date(a.mail.at).getTime() - new Date(b.mail.at).getTime());
     for (const entry of mails) {
       const box = this.#mailbox(entry.mailbox);

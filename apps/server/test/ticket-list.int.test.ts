@@ -363,6 +363,8 @@ describe('P04 工单列表：分页与重开的事件数', () => {
   beforeAll(async () => {
     t = await startTestHarness({ now: '2026-09-30T12:00:00+08:00' });
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     await t.runJobs();
     agent = await t.loginAs('坐席');

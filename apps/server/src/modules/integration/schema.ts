@@ -59,3 +59,24 @@ export const credential = integrationSchema.table(
   },
   (t) => [unique('credential_system_store_key').on(t.system, t.storeId)],
 );
+
+/**
+ * 163 企业邮箱的客户端授权码（ADR 0015，待办 35）：按进线邮箱地址一行，管理员在 P18 店铺抽屉里填写，只写不读——接口只说有没有保存，
+ * 明文只有 IMAP 的真实现读得到。用主密钥 CREDENTIAL_MASTER_KEY 以 AES-256-GCM 加密（同 credential，附加数据为「qiye163:邮箱地址」，
+ * 密文搬到别的行就解不开）。与进线邮箱行分开存、按地址关联（编辑店铺时进线邮箱整行替换，授权码要留着）；删掉邮箱或改成 Gmail 时随保存删除。
+ * 主密钥换了或密文被改：解密失败当作没有授权码，该邮箱为「未连接」，要管理员重新填写
+ */
+export const mailboxCredential = integrationSchema.table(
+  'mailbox_credential',
+  {
+    id: primaryId(),
+    /** 进线邮箱地址（小写） */
+    address: text('address').notNull(),
+    ciphertext: bytea('ciphertext').notNull(),
+    iv: bytea('iv').notNull(),
+    authTag: bytea('auth_tag').notNull(),
+    /** 最近一次填写的时刻：常驻连接据此知道授权码换了、要重连 */
+    updatedAt: timestamptz('updated_at').notNull(),
+  },
+  (t) => [unique('mailbox_credential_address_key').on(t.address)],
+);

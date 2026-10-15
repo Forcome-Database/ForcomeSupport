@@ -140,6 +140,8 @@ describe('按订单归并（R-TK-01）', () => {
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     amazon = t.clients.fake(amazonOrdersClient);
     shopify = t.clients.fake(shopifyClient);
@@ -661,6 +663,8 @@ describe('并发归并（规格「需要覆盖的场景·并发」）', () => {
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     await t.runJobs();
   });
 

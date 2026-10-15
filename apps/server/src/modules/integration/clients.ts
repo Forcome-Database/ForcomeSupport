@@ -46,7 +46,8 @@ export class FakeNotAllowedError extends Error {
 
 /** 店铺的客户端选择，来自 channel 的店铺配置（「真实 / Fake」只在非生产环境可设） */
 export interface StoreClientSelection {
-  readonly id: string;
+  /** 店铺 ID；还没保存的店铺（抽屉里按行测试 163 企业邮箱的连接，待办 35）为 null */
+  readonly id: string | null;
   readonly adapterMode: AdapterMode;
   /** 平台标识（亚马逊卖家 ID / Shopify 店铺域名）：订单的真实现按它连店铺；Gmail 用不到，可不给 */
   readonly platformId?: string;
@@ -100,6 +101,13 @@ export class IntegrationClients {
   /** 发信白名单守卫，经 RealClientContext 交给真实现 */
   readonly mailRecipientGuard: MailRecipientGuard;
 
+  /**
+   * 动态凭据保管（没有主密钥为 null）：P18 保存店铺时经它加密存 163 企业邮箱的客户端授权码（待办 35，只写不读，明文只有 IMAP 的真实现读）
+   */
+  get credentialVault(): CredentialVault | null {
+    return this.#credentialVault;
+  }
+
   constructor(options: IntegrationClientsOptions) {
     this.#appEnv = options.appEnv;
     this.#production = options.appEnv === 'production';
@@ -142,17 +150,17 @@ export class IntegrationClients {
     if (store.adapterMode === 'fake') {
       if (this.#production) {
         throw new FakeNotAllowedError(
-          `生产环境不允许使用 Fake：${definition.system}（店铺 ${store.id}）`,
+          `生产环境不允许使用 Fake：${definition.system}（店铺 ${store.id ?? '未保存'}）`,
         );
       }
-      return this.fake(definition).client(store.id);
+      return this.fake(definition).client(store.id ?? undefined);
     }
     return definition.createReal(this.#realContext(store));
   }
 
   #realContext(store?: StoreClientSelection): RealClientContext {
     return {
-      ...(store === undefined ? {} : { storeId: store.id }),
+      ...(store?.id ? { storeId: store.id } : {}),
       ...(store?.platformId === undefined ? {} : { storePlatformId: store.platformId }),
       mailRecipientGuard: this.mailRecipientGuard,
       dingtalk: this.#dingtalk,

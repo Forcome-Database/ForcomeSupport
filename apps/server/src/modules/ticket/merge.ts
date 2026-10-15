@@ -273,7 +273,7 @@ export async function mergeInbound(
     await lockReplyLinks(tx, {
       messageIds: [mail.rfcMessageId],
       mailbox: mail.mailbox,
-      gmailThreadId: mail.gmailThreadId,
+      threadId: mail.threadId,
     });
 
     const target = orderNumber

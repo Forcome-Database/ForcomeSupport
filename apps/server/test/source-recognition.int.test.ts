@@ -66,6 +66,8 @@ describe('来源识别与亚马逊站点', () => {
     t = await startTestHarness();
     // 示例店铺与示例生产厂邮箱（来源规则「生产厂」）
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     await t.runJobs();
     agent = await t.loginAs('坐席');

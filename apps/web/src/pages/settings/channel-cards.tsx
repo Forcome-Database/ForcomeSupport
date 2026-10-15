@@ -2,7 +2,6 @@ import {
   connectionStatusLabels,
   ORDER_QUEUE_NAME,
   type ChannelCard,
-  type ChannelKind,
   type ConnectionStatus,
   type ConnectionTestKind,
   type OrderQueue,
@@ -32,6 +31,8 @@ import { dismissToast, showError, showSuccess } from '@/lib/notify';
 import { cn } from '@/lib/utils';
 import {
   channelCardLines,
+  isShownChannelCard,
+  type ShownChannelCard,
   needsRecheck,
   orderBackfillLine,
   type OrderBackfillLine,
@@ -83,15 +84,18 @@ const statusCard: Record<ConnectionStatus, string> = {
   not_connected: '',
 };
 
-const CARD_ICONS: Record<ChannelKind, LucideIcon> = {
+const CARD_ICONS: Record<ShownChannelCard['kind'], LucideIcon> = {
   amazon: StoreIcon,
   shopify: StoreIcon,
   gmail: MessageSquare,
   dingtalk: Users,
 };
 
+/** P18 现在显示的渠道卡的「测试连接」种类（163 企业邮箱卡随待办 36） */
+type ShownTestKind = Extract<ConnectionTestKind, ShownChannelCard['kind']>;
+
 /** 测试成功浮层的说明（测过几个邮箱或店铺） */
-function connectionOkWords(kind: ConnectionTestKind, targets: number): string {
+function connectionOkWords(kind: ShownTestKind, targets: number): string {
   switch (kind) {
     case 'gmail':
       return CONNECTION_TEST.ok.gmail(targets);
@@ -107,7 +111,7 @@ function connectionOkWords(kind: ConnectionTestKind, targets: number): string {
 /**
  * 测试失败浮层的说明：写怎么查。亚马逊按访问不了的第一个（店铺在前、订单通知队列在后）：只有队列访问不了时写 AWS 的，否则写 SP-API 的
  */
-function connectionFailedWords(kind: ConnectionTestKind, message: string): string {
+function connectionFailedWords(kind: ShownTestKind, message: string): string {
   if (kind === 'amazon' && message.startsWith(ORDER_QUEUE_NAME)) {
     return CONNECTION_TEST.failedDescription.amazonQueue;
   }
@@ -118,7 +122,7 @@ function connectionFailedWords(kind: ConnectionTestKind, message: string): strin
  * 「测试连接」（K20，待办 09 Q4）：测试中按钮置灰转圈；全部可访问时成功浮层，访问不了时失败浮层写哪个访问不了与怎么查；
  * 网络等其他失败给「立即重试」。测试不改连接状态，测完把渠道卡与横幅重取一次（Gmail 测完会立即同步）
  */
-function useConnectionTest(kind: ConnectionTestKind) {
+function useConnectionTest(kind: ShownTestKind) {
   const queryClient = useQueryClient();
   const toastId = `connection-test-${kind}`;
   const mutation = useMutation({
@@ -210,7 +214,7 @@ function ConnectedCard({
   stores,
   test,
 }: {
-  card: ChannelCard;
+  card: ShownChannelCard;
   stores: readonly Store[];
   test: ConnectionTest;
 }) {
@@ -306,8 +310,8 @@ function TestableCard({
   card,
   stores,
 }: {
-  kind: ConnectionTestKind;
-  card: ChannelCard;
+  kind: ShownTestKind;
+  card: ShownChannelCard;
   stores: readonly Store[];
 }) {
   const test = useConnectionTest(kind);
@@ -353,7 +357,7 @@ export function ChannelCards({
         <InfoTip label={CHANNEL_SECTION.ruleLabel} tip={RULE_CARD_STATE} />
       </div>
       <div className="grid grid-cols-3 items-stretch gap-2.5">
-        {channels.map((card) => (
+        {channels.filter(isShownChannelCard).map((card) => (
           // 第一期四张卡都有「测试连接」（K20，待办 09、11、12）：渠道卡的种类就是测试连接的种类
           <TestableCard key={card.kind} kind={card.kind} card={card} stores={stores} />
         ))}

@@ -260,6 +260,27 @@
       "when": 1792017803551,
       "tag": "0036_ticket_status_change_due_at_check",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792050703526,
+      "tag": "0037_mailbox_provider",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792050720889,
+      "tag": "0038_mailbox_provider_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792050764685,
+      "tag": "0039_mailbox_provider_required",
+      "breakpoints": true
     }
   ]
 }

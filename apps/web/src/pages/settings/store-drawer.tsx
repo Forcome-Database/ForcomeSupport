@@ -290,7 +290,7 @@ function StoreDrawerContent({
 
   const save = useMutation({
     mutationFn: ({ values, version }: { values: StoreFormValues; version?: number }) => {
-      const input = storeInputOf(values, dataSourceEditable);
+      const input = storeInputOf(values, dataSourceEditable, base);
       return base
         ? api.updateStore(base.id, { ...input, version: version ?? base.version })
         : api.createStore(input);

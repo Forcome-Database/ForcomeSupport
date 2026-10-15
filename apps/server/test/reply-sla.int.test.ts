@@ -133,6 +133,8 @@ describe('回复识别与 SLA（R-SL-08）', () => {
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     // 邮箱开始监听（之后到达的来信与「已发送」才同步进来）
     await t.runJobs();
@@ -394,6 +396,8 @@ describe('乱序：回复先于它所回复的来信入库（R-SL-08）', () => 
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     await t.runJobs();
     agent = await t.loginAs('坐席');
@@ -576,6 +580,8 @@ describe('生产厂来信（AC-P1-04 的 SLA 部分）与时限扫描（AC-TK-07
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     amazon = t.clients.fake(amazonOrdersClient);
     await t.runJobs();
@@ -936,6 +942,8 @@ describe('Shopify 与邮件的内部目标', () => {
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     await t.runJobs();
     agent = await t.loginAs('坐席');

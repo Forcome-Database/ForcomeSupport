@@ -56,6 +56,8 @@ async function rows<T>(query: ReturnType<typeof sql>): Promise<T[]> {
 beforeAll(async () => {
   t = await startTestHarness();
   await t.loadFixtures();
+  // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+  await t.useGmailForFixtureMailboxes();
   t.clients.fake(dingtalkClient).replay(getDemoFixture());
   rates = t.clients.fake(exchangeRateClient);
   rates.replay(getDemoFixture());
@@ -78,6 +80,8 @@ describe('worker 每分钟自检', () => {
       ['amazon', 'connected'],
       ['shopify', 'connected'],
       ['gmail', 'connected'],
+      // 本文件把示例邮箱都改成了 Gmail，没有 163 企业邮箱：未连接，不告警
+      ['qiye163', 'not_connected'],
       ['dingtalk', 'connected'],
     ]);
 

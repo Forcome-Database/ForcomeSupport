@@ -42,7 +42,7 @@
 // 只依赖 Node（≥ 22）、git 与 Docker（含 compose），不需要 pnpm install；Linux 服务器与 Windows 本机通用。
 // 环境文件默认 deploy/.env.<环境>，可用 FORCOME_ENV_FILE 指到别处；部署产物（根证书、报告）在 deploy/.state/<环境>/。
 import { spawnSync } from 'node:child_process';
-import { randomBytes, randomUUID, X509Certificate } from 'node:crypto';
+import { randomUUID, X509Certificate } from 'node:crypto';
 import {
   appendFileSync,
   existsSync,
@@ -68,6 +68,7 @@ import { composeEnvironment } from './lib/compose.mjs';
 import { sendRobotMessage } from './lib/dingtalk-robot.mjs';
 import {
   createEnvFile,
+  generatedSecret,
   envFilePermissionProblem,
   GENERATED_SECRETS,
   readDeployEnv,
@@ -139,14 +140,13 @@ function ensureEnvFile() {
     throw new Error(`找不到环境文件 ${envFile}：按 ${example} 填写（权限 600）`);
   }
   const secrets = Object.fromEntries(
-    GENERATED_SECRETS.map((name) => [
-      name,
-      randomBytes(name === 'WALG_LIBSODIUM_KEY' ? 32 : 24).toString('hex'),
-    ]),
+    GENERATED_SECRETS.map((name) => [name, generatedSecret(name)]),
   );
   const text = createEnvFile(readFileSync('deploy/.env.example', 'utf8'), secrets);
   writeFileSync(envFile, text, { mode: 0o600 });
-  console.log(`已从 deploy/.env.example 生成 ${envFile}（随机数据库口令与备份密钥；不进 git）`);
+  console.log(
+    `已从 deploy/.env.example 生成 ${envFile}（随机数据库口令、备份密钥与主密钥；不进 git）`,
+  );
 }
 
 function loadDeployEnv() {

@@ -48,9 +48,9 @@ function recognitionOf(row: RecognitionColumns): Recognition | null {
 export interface InboundMessage {
   readonly id: string;
   readonly direction: MessageDirection;
-  /** 收到它的店铺邮箱与 Gmail 线程、RFC Message-ID：归并后据此找先到的我方回复（回复识别的乱序，16） */
+  /** 收到它的店铺邮箱与线程（Gmail；163 企业邮箱没有线程为 null）、RFC Message-ID：归并后据此找先到的我方回复（回复识别的乱序，16） */
   readonly mailbox: string;
-  readonly gmailThreadId: string;
+  readonly threadId: string | null;
   readonly rfcMessageId: string | null;
   /** 识别出的店铺；未归属店铺（15）与同一封邮件的其余副本为空 */
   readonly storeId: string | null;
@@ -78,7 +78,7 @@ export async function findInboundMessage(
       id: message.id,
       direction: message.direction,
       mailbox: message.mailbox,
-      gmailThreadId: message.gmailThreadId,
+      threadId: message.threadId,
       rfcMessageId: message.rfcMessageId,
       storeId: message.storeId,
       ...recognitionColumns,
@@ -99,7 +99,7 @@ export async function findInboundMessage(
     id: messageId,
     direction,
     mailbox: row.mailbox,
-    gmailThreadId: row.gmailThreadId,
+    threadId: row.threadId,
     rfcMessageId: row.rfcMessageId,
     storeId,
     recognition: recognitionOf(row),
@@ -145,7 +145,7 @@ export async function listMergeableInboundIds(
 }
 
 /**
- * 「已发送」里的一封我方邮件（回复识别，R-SL-08，待办 16）：发件的店铺邮箱与店铺、Gmail 线程、它回复的 Message-ID
+ * 「已发送」里的一封我方邮件（回复识别，R-SL-08，待办 16）：发件的店铺邮箱与店铺、线程（Gmail；163 企业邮箱为 null）、它回复的 Message-ID
  * （In-Reply-To 与 References，按出现顺序）、发出时间与是否自动回复（auto-reply.ts，读的时候按头字段判断）
  */
 export interface OutboundMessage {
@@ -154,7 +154,7 @@ export interface OutboundMessage {
   readonly mailbox: string;
   /** 发件邮箱所属的店铺；同一封邮件的其余副本为空 */
   readonly storeId: string | null;
-  readonly gmailThreadId: string;
+  readonly threadId: string | null;
   readonly inReplyTo: string | null;
   readonly references: readonly string[];
   /** 发出时间（Gmail internalDate） */
@@ -175,7 +175,7 @@ export async function findOutboundMessage(
       direction: message.direction,
       mailbox: message.mailbox,
       storeId: message.storeId,
-      gmailThreadId: message.gmailThreadId,
+      threadId: message.threadId,
       inReplyTo: message.inReplyTo,
       references: message.references,
       receivedAt: message.receivedAt,
@@ -198,7 +198,7 @@ export interface ReplyTarget {
   readonly mergeable: boolean;
   readonly rfcMessageId: string | null;
   readonly mailbox: string;
-  readonly gmailThreadId: string;
+  readonly threadId: string | null;
   readonly receivedAt: Date;
 }
 
@@ -210,7 +210,7 @@ export interface ReplyTarget {
 export async function listReplyTargets(
   db: DbExecutor,
   scope: StoreScope,
-  reply: Pick<OutboundMessage, 'id' | 'mailbox' | 'gmailThreadId' | 'inReplyTo' | 'references'>,
+  reply: Pick<OutboundMessage, 'id' | 'mailbox' | 'threadId' | 'inReplyTo' | 'references'>,
 ): Promise<ReplyTarget[]> {
   const ids = [...new Set([reply.inReplyTo, ...reply.references].filter((x) => x !== null))];
   const rows = await db
@@ -220,7 +220,7 @@ export async function listReplyTargets(
       source: message.source,
       rfcMessageId: message.rfcMessageId,
       mailbox: message.mailbox,
-      gmailThreadId: message.gmailThreadId,
+      threadId: message.threadId,
       receivedAt: message.receivedAt,
     })
     .from(message)
@@ -231,7 +231,10 @@ export async function listReplyTargets(
         storeScopeCondition(scope, message.storeId),
         or(
           ids.length > 0 ? inArray(message.rfcMessageId, ids) : undefined,
-          and(eq(message.mailbox, reply.mailbox), eq(message.gmailThreadId, reply.gmailThreadId)),
+          // 163 企业邮箱没有线程（待办 35），只按 Message-ID
+          reply.threadId === null
+            ? undefined
+            : and(eq(message.mailbox, reply.mailbox), eq(message.threadId, reply.threadId)),
         ),
       ),
     )

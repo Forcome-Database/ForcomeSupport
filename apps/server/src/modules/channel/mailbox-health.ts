@@ -3,9 +3,10 @@ import {
   SYNC_DELAY_MS,
   syncConnectionStatus,
   type ConnectionStatus,
+  type MailProvider,
   type SyncHealth,
 } from '@forcome/contracts';
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, or, sql } from 'drizzle-orm';
 import {
   recordAudit,
   systemActor,
@@ -16,25 +17,34 @@ import {
   type Tx,
 } from '../core';
 import { notifyMembers } from '../org';
-import { GMAIL_CONNECTION_NOTICES, gmailAuditObject } from './gmail-copy';
+import { mailboxAuditObject, mailboxConnectionNotices } from './mailbox-copy';
 import { liveMailOpen } from './mail-cutover';
 import { mailboxSync, storeMailbox } from './schema';
 
 /*
- * 邮箱的同步记录与连接状态（PRD 6.9、E-02、11.4，待办 09）：
+ * 邮箱的同步记录与连接状态（PRD 6.9、E-02、11.4，待办 09；163 企业邮箱同一口径，待办 35、D-28，通知与审计的名称按服务商）：
  * - 每个进线邮箱按 channel.mailbox_sync 的「最近同步成功的时间」与「连续失败的次数」算状态（contracts 的 syncConnectionStatus：
  *   连续 3 次失败为连接异常，从没成功过为未连接，超过 10 分钟没同步成功为同步延迟）；
- * - 失败：watch、续订与同步的外部调用失败都记一次；连续第 3 次时转为连接异常——给在职的管理员与客服主管发站内通知
+ * - 失败：watch、续订与同步的外部调用失败都记一次（163 企业邮箱为登录、常驻连接与同步，常驻连接断开后重连成功不算）；连续第 3 次时转为连接异常——给在职的管理员与客服主管发站内通知
  *   （连接异常另排钉钉工作通知，org 的 notifyMembers 按 11.4 自动），记审计「连接异常」，全站横幅随之出现（alerts）；
  * - 成功：一次同步把游标之后的消息全部入库（游标过期时是区间补拉全部完成）才算，清零失败次数、记下时间，另记这次取清单的时刻
  *   （synced_through：那之前到达的信都已入库，按时关闭据此判断邮箱同步到了哪里，待办 33）；
- *   之前是连接异常的，发「Gmail 已恢复」（写补拉了几封来信）并记审计「恢复连接」，横幅随之消失。
+ *   之前是连接异常的，发「Gmail 已恢复」（163 企业邮箱为「163 企业邮箱已恢复」，写补拉了几封来信）并记审计「恢复连接」，横幅随之消失。
  * 我们自己的错误（数据库、解析）不算连接失败：游标不前进，超过 10 分钟就显示同步延迟。
  */
+
+/**
+ * 已开始监听（查询里要连着 store_mailbox 与 mailbox_sync）：Gmail 邮箱有游标（watch 过），163 企业邮箱有 IMAP 游标（记下过两个文件夹的位置）
+ */
+export const listening = or(
+  and(eq(storeMailbox.provider, 'gmail'), isNotNull(mailboxSync.historyId)),
+  and(eq(storeMailbox.provider, 'qiye163'), isNotNull(mailboxSync.imapCursor)),
+)!;
 
 /** 一个进线邮箱的同步记录 */
 export interface MailboxHealth extends SyncHealth {
   readonly address: string;
+  readonly provider: MailProvider;
   readonly failingSince: Date | null;
 }
 
@@ -43,6 +53,7 @@ export async function mailboxHealths(db: DbExecutor): Promise<MailboxHealth[]> {
   const rows = await db
     .select({
       address: storeMailbox.address,
+      provider: storeMailbox.provider,
       lastSuccessAt: mailboxSync.lastSuccessAt,
       consecutiveFailures: mailboxSync.consecutiveFailures,
       failingSince: mailboxSync.failingSince,
@@ -52,6 +63,7 @@ export async function mailboxHealths(db: DbExecutor): Promise<MailboxHealth[]> {
     .orderBy(storeMailbox.address);
   return rows.map((row) => ({
     address: row.address,
+    provider: row.provider,
     lastSuccessAt: row.lastSuccessAt,
     consecutiveFailures: row.consecutiveFailures ?? 0,
     failingSince: row.failingSince,
@@ -77,11 +89,11 @@ export async function mailSyncedThrough(
     .select({ syncedThrough: mailboxSync.syncedThrough })
     .from(storeMailbox)
     .innerJoin(mailboxSync, eq(mailboxSync.address, storeMailbox.address))
-    .where(and(eq(storeMailbox.storeId, storeId), isNotNull(mailboxSync.historyId)));
+    .where(and(eq(storeMailbox.storeId, storeId), listening));
   return rows.every((row) => row.syncedThrough !== null && row.syncedThrough >= at);
 }
 
-/** 邮箱的连接状态（6.9：Gmail 超过 10 分钟没同步成功为同步延迟） */
+/** 邮箱的连接状态（6.9：Gmail 与 163 企业邮箱都是超过 10 分钟没同步成功为同步延迟） */
 export function mailboxStatus(health: SyncHealth, now: Date): ConnectionStatus {
   return syncConnectionStatus(health, SYNC_DELAY_MS.gmail, now);
 }
@@ -99,6 +111,7 @@ function errorText(error: unknown): string {
 export async function recordMailboxFailure(
   runtime: Runtime,
   address: string,
+  provider: MailProvider,
   error: unknown,
 ): Promise<number> {
   return transaction(runtime, async (tx) => {
@@ -127,26 +140,36 @@ export async function recordMailboxFailure(
       });
     const failures = row?.failures ?? 1;
     if (failures === CONNECTION_FAILURE_LIMIT) {
-      await disconnected(tx, address, row?.lastSuccessAt ?? null);
+      await disconnected(tx, address, provider, row?.lastSuccessAt ?? null);
     }
     return failures;
   });
 }
 
-async function disconnected(tx: Tx, address: string, lastSuccessAt: Date | null): Promise<void> {
-  const notice = GMAIL_CONNECTION_NOTICES.disconnected;
+/** 审计快照里写哪个渠道：163 企业邮箱写上（补拉写「封来信」）；Gmail 照待办 09 的写法不写 */
+const channelOf = (provider: MailProvider) =>
+  provider === 'gmail' ? {} : ({ channel: provider } as const);
+
+async function disconnected(
+  tx: Tx,
+  address: string,
+  provider: MailProvider,
+  lastSuccessAt: Date | null,
+): Promise<void> {
+  const notices = mailboxConnectionNotices(provider);
   await notifyMembers(tx, {
     type: 'channel_disconnected',
-    title: notice.title,
-    body: notice.body(address),
-    object: { ...GMAIL_CONNECTION_NOTICES.object },
+    title: notices.disconnected.title,
+    body: notices.disconnected.body(address),
+    object: { ...notices.object },
   });
   const lastSuccess = lastSuccessAt?.toISOString() ?? null;
   await recordAudit(tx, systemActor, {
     action: 'channel.disconnected',
     objectType: 'channel',
-    ...gmailAuditObject(address),
+    ...mailboxAuditObject(provider, address),
     before: {
+      ...channelOf(provider),
       // 第 3 次失败之前的状态：上次成功的时间决定是已连接、同步延迟还是未连接
       status: mailboxStatus(
         { lastSuccessAt, consecutiveFailures: CONNECTION_FAILURE_LIMIT - 1 },
@@ -157,6 +180,7 @@ async function disconnected(tx: Tx, address: string, lastSuccessAt: Date | null)
       trigger: null,
     },
     after: {
+      ...channelOf(provider),
       status: 'error',
       lastSuccessAt: lastSuccess,
       backfilled: null,
@@ -175,11 +199,12 @@ export interface SyncedMail {
 /**
  * 记一次同步成功（与推进游标在同一个事务里）：清零失败次数、记下时间，另记这次取清单（history.list 或区间补拉的 messages.list）
  * 的时刻 listedAt（synced_through，按时关闭用：入库期间新到的信不在这次的清单里，所以不取入库完的时刻）。
- * 之前是连接异常的，发「Gmail 已恢复」并记审计
+ * 之前是连接异常的，发「Gmail 已恢复」（按服务商）并记审计
  */
 export async function recordMailboxSuccess(
   tx: Tx,
   address: string,
+  provider: MailProvider,
   synced: SyncedMail,
   listedAt: Date,
 ): Promise<void> {
@@ -204,24 +229,26 @@ export async function recordMailboxSuccess(
     .where(eq(mailboxSync.address, address));
   if (!before || before.failures < CONNECTION_FAILURE_LIMIT) return;
 
-  const notice = GMAIL_CONNECTION_NOTICES.recovered;
+  const notices = mailboxConnectionNotices(provider);
   await notifyMembers(tx, {
     type: 'channel_recovered',
-    title: notice.title,
-    body: notice.body(address, synced.count),
-    object: { ...GMAIL_CONNECTION_NOTICES.object },
+    title: notices.recovered.title,
+    body: notices.recovered.body(address, synced.count),
+    object: { ...notices.object },
   });
   await recordAudit(tx, systemActor, {
     action: 'channel.recovered',
     objectType: 'channel',
-    ...gmailAuditObject(address),
+    ...mailboxAuditObject(provider, address),
     before: {
+      ...channelOf(provider),
       status: 'error',
       lastSuccessAt: before.lastSuccessAt?.toISOString() ?? null,
       backfilled: null,
       trigger: { kind: 'failures', count: before.failures },
     },
     after: {
+      ...channelOf(provider),
       status: 'connected',
       lastSuccessAt: tx.now.toISOString(),
       backfilled:

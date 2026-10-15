@@ -1,7 +1,9 @@
 import {
+  mailProviders,
   orderBackfillSummary,
   worstConnectionStatus,
   type AdapterMode,
+  type MailProvider,
   type ChannelAlert,
   type ChannelCard,
   type ChannelIssue,
@@ -23,8 +25,9 @@ import { mailboxHealths, mailboxStatus, type MailboxHealth } from './mailbox-hea
 
 /*
  * 渠道连接状态（PRD 6.9、K20、K7、G4）：按店铺计算，渠道卡显示该渠道下最差的状态并列出异常的邮箱，店铺表「状态」列显示该店铺各连接的状态。
- * - Gmail（待办 09）：按每个进线邮箱的同步记录（mailbox-health.ts）——连续 3 次失败为连接异常、从没成功过为未连接、
- *   超过 10 分钟没同步成功为同步延迟；店铺取其邮箱中最差的，卡片取全部邮箱中最差的，最近同步时间取各邮箱中最旧的一次；
+ * - Gmail（待办 09）与 163 企业邮箱（待办 35，D-28）：按每个进线邮箱的同步记录（mailbox-health.ts）——连续 3 次失败为连接异常、
+ *   从没成功过为未连接、超过 10 分钟没同步成功为同步延迟；店铺按服务商各一个连接、取其该服务商邮箱中最差的，Gmail 卡与 163 企业邮箱卡
+ *   各取该服务商全部邮箱中最差的，最近同步时间取各邮箱中最旧的一次；
  * - Shopify（待办 11）与亚马逊（待办 12）：按每个店铺的订单同步记录（order 的 orderSyncHealths，按数据源）——口径同 Gmail
  *   （订单 10 分钟为同步延迟），卡片取该平台各店铺中最差的并列出延迟与异常的店铺（按店铺名），最近同步时间取各店铺中最旧的一次；
  *   亚马逊卡另有订单通知队列（SQS）一行（order 的 orderQueueState），只影响这一行，不进卡片与店铺的状态（待办 12 Q7）；
@@ -39,7 +42,7 @@ export interface StoreConnectionSource {
   readonly name: string;
   readonly platform: Platform;
   readonly adapterMode: AdapterMode;
-  readonly mailboxes: readonly string[];
+  readonly mailboxes: readonly { readonly address: string; readonly provider: MailProvider }[];
 }
 
 /**
@@ -94,15 +97,29 @@ function mailboxesStatus(addresses: readonly string[], snapshot: ConnectionSnaps
   );
 }
 
-/** 店铺的两个连接：Gmail（收件与「已发送」）与订单（亚马逊 SP-API / Shopify Admin API） */
+/** 某种服务商的邮箱地址 */
+function addressesOf(
+  mailboxes: StoreConnectionSource['mailboxes'],
+  provider: MailProvider,
+): string[] {
+  return mailboxes.filter((mailbox) => mailbox.provider === provider).map((m) => m.address);
+}
+
+/**
+ * 店铺的连接：进线邮箱按服务商各一个（Gmail、163 企业邮箱，收件与「已发送」；店铺没有这种服务商的邮箱就没有这一个）与订单
+ * （亚马逊 SP-API / Shopify Admin API）
+ */
 export function storeConnections(
   store: StoreConnectionSource,
   snapshot: ConnectionSnapshot,
 ): StoreConnection[] {
-  return [
-    { kind: 'gmail', status: mailboxesStatus(store.mailboxes, snapshot) },
-    { kind: 'orders', status: ordersStatus(store, snapshot) },
-  ];
+  const mailboxes = mailProviders.flatMap((provider): StoreConnection[] => {
+    const addresses = addressesOf(store.mailboxes, provider);
+    return addresses.length === 0
+      ? []
+      : [{ kind: provider, status: mailboxesStatus(addresses, snapshot) }];
+  });
+  return [...mailboxes, { kind: 'orders', status: ordersStatus(store, snapshot) }];
 }
 
 /**
@@ -148,12 +165,17 @@ function ordersCard(
   };
 }
 
-/** Gmail 卡：全部店铺的进线邮箱 */
-function gmailCard(
+/** 邮箱卡（Gmail、163 企业邮箱）：全部店铺里该服务商的进线邮箱 */
+function mailboxCard(
+  provider: MailProvider,
   stores: readonly StoreConnectionSource[],
   snapshot: ConnectionSnapshot,
 ): ChannelCard {
-  const addresses = [...new Set(stores.flatMap((store) => store.mailboxes))].sort();
+  const addresses = [
+    ...new Set(stores.flatMap((store) => addressesOf(store.mailboxes, provider))),
+  ].sort();
+  // 「模拟数据」看有这种邮箱的店铺；一个都还没有时看全部店铺（开发测试环境整体接的是 Fake）
+  const owners = stores.filter((store) => addressesOf(store.mailboxes, provider).length > 0);
   const issues: ChannelIssue[] = [];
   let oldest: Date | null = null;
   for (const address of addresses) {
@@ -173,9 +195,9 @@ function gmailCard(
     }
   }
   return {
-    kind: 'gmail',
+    kind: provider,
     status: mailboxesStatus(addresses, snapshot),
-    simulated: stores.some((store) => store.adapterMode === 'fake'),
+    simulated: (owners.length > 0 ? owners : stores).some((store) => store.adapterMode === 'fake'),
     lastSyncAt: oldest?.toISOString() ?? null,
     issues,
     queue: null,
@@ -191,8 +213,8 @@ export interface DingtalkCardSource {
 }
 
 /**
- * 第一期四张渠道卡（K20 的顺序）：亚马逊 SP-API、Shopify Admin API（订单，按平台的店铺）、Gmail（全部店铺的邮箱）、
- * 钉钉（全局客户端，按通讯录的同步记录）。积加、易仓是前端的静态卡「第二阶段接入」。
+ * 第一期五张渠道卡（K20 的顺序）：亚马逊 SP-API、Shopify Admin API（订单，按平台的店铺）、Gmail 与 163 企业邮箱（全部店铺里
+ * 该服务商的邮箱，D-28）、钉钉（全局客户端，按通讯录的同步记录）。积加、易仓是前端的静态卡「第二阶段接入」。
  */
 export function channelCards(
   stores: readonly StoreConnectionSource[],
@@ -210,7 +232,8 @@ export function channelCards(
       stores.filter((s) => s.platform === 'shopify'),
       snapshot,
     ),
-    gmailCard(stores, snapshot),
+    mailboxCard('gmail', stores, snapshot),
+    mailboxCard('qiye163', stores, snapshot),
     {
       kind: 'dingtalk',
       status: dingtalk.status,
@@ -235,24 +258,29 @@ function earliestFailure(
 }
 
 /**
- * 全站横幅（G4）：连接异常的渠道，钉钉除外（6.9）。Gmail——任一进线邮箱连接异常就出，列出这些邮箱；亚马逊（待办 12）与 Shopify
+ * 全站横幅（G4）：连接异常的渠道，钉钉除外（6.9）。Gmail 与 163 企业邮箱——该服务商任一进线邮箱连接异常就出，列出这些邮箱（各一条）；亚马逊（待办 12）与 Shopify
  * （待办 11）——该平台任一店铺的订单同步连接异常就出，列出这些店铺。时刻取其中最早的一串连续失败的开始；几个渠道都异常时各一条，
- * 顺序 Gmail → 亚马逊 → Shopify（contracts 的 channelAlertKinds；协调者 2026-10-06 决定）。订单通知队列（SQS）不出横幅
+ * 顺序 Gmail → 163 企业邮箱 → 亚马逊 → Shopify（contracts 的 channelAlertKinds；协调者 2026-10-06 决定，PRD G4 v2.37）。
+ * 订单通知队列（SQS）不出横幅
  */
 export function channelAlerts(
   stores: readonly Pick<StoreConnectionSource, 'id' | 'name' | 'platform'>[],
   snapshot: ConnectionSnapshot,
 ): ChannelAlert[] {
   const alerts: ChannelAlert[] = [];
-  const failingMailboxes = [...snapshot.mailboxes.values()]
-    .filter((health) => mailboxStatus(health, snapshot.now) === 'error')
-    .sort((a, b) => a.address.localeCompare(b.address));
-  if (failingMailboxes.length > 0) {
-    alerts.push({
-      kind: 'gmail',
-      targets: failingMailboxes.map((health) => health.address),
-      since: earliestFailure(failingMailboxes, snapshot.now),
-    });
+  for (const provider of mailProviders) {
+    const failingMailboxes = [...snapshot.mailboxes.values()]
+      .filter(
+        (health) => health.provider === provider && mailboxStatus(health, snapshot.now) === 'error',
+      )
+      .sort((a, b) => a.address.localeCompare(b.address));
+    if (failingMailboxes.length > 0) {
+      alerts.push({
+        kind: provider,
+        targets: failingMailboxes.map((health) => health.address),
+        since: earliestFailure(failingMailboxes, snapshot.now),
+      });
+    }
   }
   for (const platform of ['amazon', 'shopify'] as const) {
     const failingStores = stores

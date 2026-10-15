@@ -131,6 +131,7 @@
       ],
       "defaultSite": "US",
       "mailbox": "amz-direct@forcome.com",
+      "provider": "gmail",
       "platformId": "A1FD7Q2M9XK3LC"
     },
     {
@@ -143,6 +144,7 @@
       ],
       "defaultSite": "US",
       "mailbox": "amz-auto@forcome.com",
+      "provider": "qiye163",
       "platformId": "A3KA8V1T6RW2NB"
     },
     {
@@ -156,6 +158,7 @@
       ],
       "defaultSite": "US",
       "mailbox": "support@forcome.com",
+      "provider": "gmail",
       "platformId": "forcome-com.myshopify.com"
     },
     {
@@ -168,6 +171,7 @@
       ],
       "defaultSite": "MX",
       "mailbox": "support@forcome.mx",
+      "provider": "gmail",
       "platformId": "forcome-mx.myshopify.com"
     }
   ],

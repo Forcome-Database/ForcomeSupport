@@ -141,6 +141,8 @@ describe('未归属店铺来信', () => {
     t = await startTestHarness();
     t.clock.set(NOW);
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     // 系统开始监听店铺邮箱，之后到达的来信才会同步进来
     await t.runJobs();
     supervisor = await t.loginAs({ member: 'zhoumin' });
@@ -452,7 +454,7 @@ describe('未归属店铺来信', () => {
       platform: 'amazon',
       sites: ['CA'],
       defaultSite: 'CA',
-      mailboxes: ['amz-ca2@forcome.com'],
+      mailboxes: [{ address: 'amz-ca2@forcome.com', provider: 'gmail' }],
       platformId: 'A2CA7Q2M9XK3LC',
       ...overrides,
     });
@@ -519,8 +521,8 @@ describe('未归属店铺来信', () => {
       await arrive(buyerMessage('Gus Late', 'amz-late@forcome.com'), 'Gus Late');
       // 模拟「店铺已变更」已处理完、这封信才入队：直接改库登记邮箱，不发事件
       await t.runtime.db.execute(
-        sql`INSERT INTO channel.store_mailbox (store_id, address, position, created_at)
-            VALUES (${DIRECT.id}, 'amz-late@forcome.com', 9, now())`,
+        sql`INSERT INTO channel.store_mailbox (store_id, address, position, provider, created_at)
+            VALUES (${DIRECT.id}, 'amz-late@forcome.com', 9, 'gmail', now())`,
       );
       expect(await queued('Gus Late')).toBeDefined();
       await t.enqueue(placeUnassignedJob, {});
@@ -533,7 +535,7 @@ describe('未归属店铺来信', () => {
     it('编辑现有店铺、加一个进线邮箱（别名）后同样自动归位到该店铺', async () => {
       await arrive(forwardedLetter('Lola Alias', 'info3@forcome.mx'), 'Lola Alias');
       const settings = (await (await admin.get('/api/channel/settings')).json()) as {
-        stores: { id: string; mailboxes: string[]; version: number }[];
+        stores: { id: string; mailboxes: { address: string }[]; version: number }[];
       };
       const mx = settings.stores.find((s) => s.id === MX.id)!;
       const res = await admin.put(`/api/channel/stores/${MX.id}`, {
@@ -542,7 +544,10 @@ describe('未归属店铺来信', () => {
           platform: 'shopify',
           sites: ['MX'],
           defaultSite: 'MX',
-          mailboxes: [...mx.mailboxes, 'info3@forcome.mx'],
+          mailboxes: [...mx.mailboxes, { address: 'info3@forcome.mx' }].map(({ address }) => ({
+            address,
+            provider: 'gmail' as const,
+          })),
           platformId: MX.platformId,
         }),
         version: mx.version,
@@ -608,6 +613,8 @@ describe('示例数据回放（开发测试环境、本机与 Playwright：原�
     t = await startTestHarness();
     t.clock.set(NOW);
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     t.clients.fake(gmailClient).replay(getDemoFixture());
     await t.runJobs();
   });

@@ -7,12 +7,16 @@ import {
   type Site,
   type Store,
   type StoreInput,
+  type StoreMailboxInput,
 } from '@forcome/contracts';
 
 /*
  * 店铺抽屉（K8）的表单值与提交内容之间的换算，纯函数，便于单元测试。
  * 进线邮箱分两部分：已加入的邮箱（小标签）与输入框里还没加入的那一个（mailboxDraft）；
  * 保存时输入框里的内容也算一个邮箱，排在最后——K8 画的就是输入框里「info@forcome」报格式错误。
+ * 进线邮箱的服务商（D-28，待办 35）：接口的进线邮箱是对象（地址 + 服务商；163 企业邮箱另有服务器、端口、授权码已保存否）。
+ * 逐行登记服务商的界面随待办 36；在那之前表单仍按地址编辑，提交时原有的邮箱沿用原来的服务商与服务器（授权码不带即沿用已保存的），
+ * 新加的按 Gmail。
  */
 
 export interface StoreFormValues {
@@ -60,22 +64,45 @@ export function storeFormOf(store: Store): StoreFormValues {
     name: store.name,
     sites: [...store.sites],
     defaultSite: store.defaultSite,
-    mailboxes: [...store.mailboxes],
+    mailboxes: store.mailboxes.map((mailbox) => mailbox.address),
     mailboxDraft: '',
     platformId: store.platformId,
     adapterMode: store.adapterMode,
   };
 }
 
-/** 要提交的内容；dataSourceEditable 为 false（生产环境）时不带数据来源 */
-export function storeInputOf(values: StoreFormValues, dataSourceEditable: boolean): StoreInput {
+/** 提交的一个进线邮箱：编辑前就有的沿用它的服务商与服务器（地址不分大小写），新加的为 Gmail */
+function mailboxInputOf(address: string, before: Store | null): StoreMailboxInput {
+  const existing = before?.mailboxes.find(
+    (mailbox) => mailbox.address === address.trim().toLowerCase(),
+  );
+  return existing?.provider === 'qiye163'
+    ? {
+        address,
+        provider: 'qiye163',
+        imapHost: existing.imapHost,
+        imapPort: existing.imapPort,
+      }
+    : { address, provider: 'gmail' };
+}
+
+/**
+ * 要提交的内容；dataSourceEditable 为 false（生产环境）时不带数据来源。before 为编辑前的店铺（新增时为 null），
+ * 进线邮箱的服务商按它沿用
+ */
+export function storeInputOf(
+  values: StoreFormValues,
+  dataSourceEditable: boolean,
+  before: Store | null = null,
+): StoreInput {
   const draft = values.mailboxDraft.trim();
+  const addresses = draft ? [...values.mailboxes, draft] : values.mailboxes;
   return {
     name: values.name,
     platform: values.platform || null,
     sites: values.sites,
     defaultSite: values.defaultSite || null,
-    mailboxes: draft ? [...values.mailboxes, draft] : values.mailboxes,
+    mailboxes: addresses.map((address) => mailboxInputOf(address, before)),
     platformId: values.platformId,
     ...(dataSourceEditable ? { adapterMode: values.adapterMode } : {}),
   };
@@ -167,7 +194,7 @@ function comparable(store: Store) {
     platform: input.platform,
     sites: input.sites.join(','),
     defaultSite: input.defaultSite,
-    mailboxes: input.mailboxes.join(','),
+    mailboxes: input.mailboxes.map((mailbox) => mailbox.address).join(','),
     platformId: input.platformId,
     adapterMode: store.adapterMode,
   };

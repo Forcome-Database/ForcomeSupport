@@ -7,13 +7,23 @@ import { channelCardLines, needsRecheck, orderBackfillLine } from './channel-car
  * 连接异常、从没同步成功过。时刻按北京时间写「时:分」。画面上的布局另由 e2e（channel-status.spec.ts）与截图覆盖。
  */
 
-const store = (platform: Store['platform'], mailboxes: string[]): Store => ({
+const store = (
+  platform: Store['platform'],
+  mailboxes: string[],
+  provider: Store['mailboxes'][number]['provider'] = 'gmail',
+): Store => ({
   id: crypto.randomUUID(),
   name: mailboxes[0] ?? '',
   platform,
   sites: ['US'],
   defaultSite: 'US',
-  mailboxes,
+  mailboxes: mailboxes.map((address) => ({
+    address,
+    provider,
+    imapHost: provider === 'qiye163' ? 'imap.qiye.163.com' : null,
+    imapPort: provider === 'qiye163' ? 993 : null,
+    authCodeSaved: provider === 'qiye163',
+  })),
   platformId: 'x',
   adapterMode: 'fake',
   connections: [],

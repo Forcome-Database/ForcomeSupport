@@ -159,7 +159,7 @@ describe('生产环境全部店铺都还没配置凭据（用户 2026-10-04 口�
         platform: 'amazon',
         sites: ['US'],
         defaultSite: 'US',
-        mailboxes: ['amz-direct@forcome.com'],
+        mailboxes: [{ address: 'amz-direct@forcome.com', provider: 'gmail' }],
         platformId: 'A1FD7Q2M9XK3LC',
       },
       {
@@ -167,7 +167,7 @@ describe('生产环境全部店铺都还没配置凭据（用户 2026-10-04 口�
         platform: 'shopify',
         sites: ['MX'],
         defaultSite: 'MX',
-        mailboxes: ['support@forcome.mx'],
+        mailboxes: [{ address: 'support@forcome.mx', provider: 'gmail' }],
         platformId: 'forcome-mx.myshopify.com',
       },
     ]) {

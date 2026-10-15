@@ -12,7 +12,7 @@ import {
   shipperSchema,
 } from './aftersales';
 import { memberStatusSchema, storeScopeSchema } from './auth';
-import { connectionStatusSchema, platformSchema, siteSchema } from './channel';
+import { connectionStatusSchema, mailProviderSchema, platformSchema, siteSchema } from './channel';
 import { financeField } from './finance';
 import { adapterModeSchema } from './integration';
 import { reportPeriodSchema } from './report';
@@ -66,13 +66,28 @@ export const SYSTEM_ACTOR_NAME = '系统';
  * 新增一种审计动作：在 auditActions 登记（叫法、对象类型、快照），快照结构放这里，字段表放 audit-describe.ts。
  */
 
-/** 店铺（P18 抽屉的全部字段，K8） */
+/**
+ * 店铺（P18 抽屉的全部字段，K8）。进线邮箱的地址仍在 mailboxes；服务商、163 企业邮箱的 IMAP 服务器与端口在 mailboxServers
+ * （D-28，待办 35 起才有）。客户端授权码不记内容：这次保存重新填写了授权码的进线邮箱只把地址记在后值的 authCodeRenewed，
+ * P27 写「进线邮箱 <地址>：客户端授权码已重新填写」（PRD P27、AC-P1-23）
+ */
 export const storeAuditSnapshotSchema = z.object({
   name: z.string(),
   platform: platformSchema.nullable(),
   sites: z.array(siteSchema),
   defaultSite: siteSchema.nullable(),
   mailboxes: z.array(z.string()),
+  mailboxServers: z
+    .array(
+      z.object({
+        address: z.string(),
+        provider: mailProviderSchema,
+        imapHost: z.string().nullable(),
+        imapPort: z.int().nullable(),
+      }),
+    )
+    .optional(),
+  authCodeRenewed: z.array(z.string()).optional(),
   platformId: z.string(),
   adapterMode: adapterModeSchema,
 });
@@ -196,13 +211,13 @@ export const accessDeniedAuditSnapshotSchema = z.object({
 });
 
 /**
- * 渠道连接（待办 09；PRD P27「第一阶段」的「渠道」对象、原型 AUDIT_LOG 与 AUDIT_P27_EXPAND）：某个 Gmail 邮箱、Shopify 店铺（待办 11）
- * 或亚马逊店铺（待办 12）进入连接异常与恢复连接，操作人「系统」。状态、最近同步成功的时间、恢复时补拉了多少（Gmail 为来信与到达时间的起止，
+ * 渠道连接（待办 09；PRD P27「第一阶段」的「渠道」对象、原型 AUDIT_LOG 与 AUDIT_P27_EXPAND）：某个 Gmail 邮箱、163 企业邮箱的邮箱
+ * （待办 35，写法同 Gmail）、Shopify 店铺（待办 11）或亚马逊店铺（待办 12）进入连接异常与恢复连接，操作人「系统」。状态、最近同步成功的时间、恢复时补拉了多少（Gmail 为来信与到达时间的起止，
  * Shopify 与亚马逊为订单与平台更新时间的起止）与触发（前值「连续 N 次失败」、恢复的后值「第 N 次重试成功」）。
  * channel 写是哪个渠道（决定「补拉」的单位）；待办 09 写下的记录没有它，是 Gmail
  */
 /** 渠道连接记录的渠道（快照的 channel） */
-export const auditChannels = ['gmail', 'shopify', 'amazon'] as const;
+export const auditChannels = ['gmail', 'qiye163', 'shopify', 'amazon'] as const;
 export type AuditChannel = (typeof auditChannels)[number];
 
 export const channelAuditSnapshotSchema = z.object({

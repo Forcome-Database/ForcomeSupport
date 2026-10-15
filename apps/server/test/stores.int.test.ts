@@ -23,6 +23,17 @@ const MX = fixtureStore('forcome.mx');
 
 const STORE_CHANGED = 'channel.store_changed';
 
+/** 提交的一行 Gmail 进线邮箱 */
+const gmail = (address: string) => ({ address, provider: 'gmail' as const });
+/** 店铺接口里的一个 Gmail 进线邮箱（没有服务器、端口与授权码） */
+const gmailOut = (address: string) => ({
+  address,
+  provider: 'gmail',
+  imapHost: null,
+  imapPort: null,
+  authCodeSaved: false,
+});
+
 /** 一个填对了的新店铺（Shopify 加拿大站），各用例在它上面改出要测的情形 */
 function newStore(overrides: Partial<StoreInput> = {}): StoreInput {
   return {
@@ -30,7 +41,7 @@ function newStore(overrides: Partial<StoreInput> = {}): StoreInput {
     platform: 'shopify',
     sites: ['CA'],
     defaultSite: 'CA',
-    mailboxes: ['support@forcome.ca'],
+    mailboxes: [gmail('support@forcome.ca')],
     platformId: 'forcome-ca.myshopify.com',
     ...overrides,
   };
@@ -89,7 +100,7 @@ describe('P18 店铺表（非生产环境）', () => {
         platform: 'amazon',
         sites: ['US', 'CA', 'MX'],
         defaultSite: 'US',
-        mailboxes: ['amz-direct@forcome.com'],
+        mailboxes: [gmailOut('amz-direct@forcome.com')],
         platformId: 'A1FD7Q2M9XK3LC',
         adapterMode: 'fake',
       },
@@ -99,7 +110,16 @@ describe('P18 店铺表（非生产环境）', () => {
         platform: 'amazon',
         sites: ['US'],
         defaultSite: 'US',
-        mailboxes: ['amz-auto@forcome.com'],
+        // 示例里 Forcome Auto 的买家消息邮箱是 163 企业邮箱（D-28，待办 35）：IMAP 服务器与端口为默认值，示例存了模拟授权码，接口只说「已保存」
+        mailboxes: [
+          {
+            address: 'amz-auto@forcome.com',
+            provider: 'qiye163',
+            imapHost: 'imap.qiye.163.com',
+            imapPort: 993,
+            authCodeSaved: true,
+          },
+        ],
         platformId: 'A3KA8V1T6RW2NB',
         adapterMode: 'fake',
       },
@@ -109,7 +129,7 @@ describe('P18 店铺表（非生产环境）', () => {
         platform: 'shopify',
         sites: ['US', 'CA'],
         defaultSite: 'US',
-        mailboxes: ['support@forcome.com'],
+        mailboxes: [gmailOut('support@forcome.com')],
         platformId: 'forcome-com.myshopify.com',
         adapterMode: 'fake',
       },
@@ -119,16 +139,17 @@ describe('P18 店铺表（非生产环境）', () => {
         platform: 'shopify',
         sites: ['MX'],
         defaultSite: 'MX',
-        mailboxes: ['support@forcome.mx'],
+        mailboxes: [gmailOut('support@forcome.mx')],
         platformId: 'forcome-mx.myshopify.com',
         adapterMode: 'fake',
       },
     ]);
     // 店铺表「状态」列：Gmail 按邮箱的同步记录（待办 09）、Shopify 与亚马逊订单按店铺的同步记录（待办 11、12），这里都还没同步过，
     // 为未连接（同步后的状态见 gmail-sync-health.int.test.ts、shopify-orders.int.test.ts、amazon-orders.int.test.ts）
+    // 进线邮箱的连接按服务商（Forcome Auto 为 163 企业邮箱，待办 35）
     for (const store of data.stores) {
       expect(store.connections).toEqual([
-        { kind: 'gmail', status: 'not_connected' },
+        { kind: store.name === 'Forcome Auto' ? 'qiye163' : 'gmail', status: 'not_connected' },
         { kind: 'orders', status: 'not_connected' },
       ]);
       expect(store.updatedBy).toBeNull();
@@ -146,6 +167,7 @@ describe('P18 店铺表（非生产环境）', () => {
       { kind: 'amazon', ...empty, queue: { status: 'not_connected', backlog: null } },
       { kind: 'shopify', ...empty, queue: null },
       { kind: 'gmail', ...empty, queue: null },
+      { kind: 'qiye163', ...empty, queue: null },
       { kind: 'dingtalk', ...empty, queue: null },
     ]);
   });
@@ -196,7 +218,7 @@ describe('P18 店铺表（非生产环境）', () => {
       const fields = await fieldErrors(
         await admin.post(
           '/api/channel/stores',
-          newStore({ mailboxes: ['support@forcome.ca', 'info@forcome'] }),
+          newStore({ mailboxes: [gmail('support@forcome.ca'), gmail('info@forcome')] }),
         ),
       );
       expect(fields).toEqual({ 'mailboxes.1': '邮箱格式不正确，例如 info@forcome.mx' });
@@ -206,7 +228,7 @@ describe('P18 店铺表（非生产环境）', () => {
       const fields = await fieldErrors(
         await admin.post(
           '/api/channel/stores',
-          newStore({ name: 'forcome.com', mailboxes: ['info@forcome'], platformId: '' }),
+          newStore({ name: 'forcome.com', mailboxes: [gmail('info@forcome')], platformId: '' }),
         ),
       );
       expect(fields).toEqual({
@@ -220,7 +242,7 @@ describe('P18 店铺表（非生产环境）', () => {
       const fields = await fieldErrors(
         await admin.post(
           '/api/channel/stores',
-          newStore({ mailboxes: ['ventas@forcome.ca', 'Support@Forcome.MX'] }),
+          newStore({ mailboxes: [gmail('ventas@forcome.ca'), gmail('Support@Forcome.MX')] }),
         ),
       );
       expect(fields).toEqual({ 'mailboxes.1': 'support@forcome.mx 已是 forcome.mx 的进线邮箱' });
@@ -249,7 +271,7 @@ describe('P18 店铺表（非生产环境）', () => {
         newStore({
           name: ' forcome.ca ',
           sites: ['US', 'CA'],
-          mailboxes: [' Support@Forcome.CA ', 'ventas@forcome.ca'],
+          mailboxes: [gmail(' Support@Forcome.CA '), gmail('ventas@forcome.ca')],
         }),
       );
       expect(res.status).toBe(201);
@@ -259,7 +281,7 @@ describe('P18 店铺表（非生产环境）', () => {
         platform: 'shopify',
         sites: ['US', 'CA'],
         defaultSite: 'CA',
-        mailboxes: ['support@forcome.ca', 'ventas@forcome.ca'],
+        mailboxes: [gmailOut('support@forcome.ca'), gmailOut('ventas@forcome.ca')],
         platformId: 'forcome-ca.myshopify.com',
         // 非生产环境没选数据来源时接模拟数据（ADR 0009：开发测试环境外部客户端默认 Fake）
         adapterMode: 'fake',
@@ -293,11 +315,16 @@ describe('P18 店铺表（非生产环境）', () => {
           sites: ['US', 'CA'],
           defaultSite: 'CA',
           mailboxes: ['support@forcome.ca', 'ventas@forcome.ca'],
+          mailboxServers: [
+            { address: 'support@forcome.ca', provider: 'gmail', imapHost: null, imapPort: null },
+            { address: 'ventas@forcome.ca', provider: 'gmail', imapHost: null, imapPort: null },
+          ],
           platformId: 'forcome-ca.myshopify.com',
           adapterMode: 'fake',
         },
       });
       expect(audit?.occurredAt.toISOString()).toBe('2026-09-11T02:24:00.000Z');
+      expect(audit?.after).not.toHaveProperty('authCodeRenewed');
 
       const report = await t.runJobs();
       expect(report.completed.filter((j) => j.name === STORE_CHANGED).map((j) => j.data)).toEqual([
@@ -311,7 +338,7 @@ describe('P18 店铺表（非生产环境）', () => {
         ...newStore({
           name: 'forcome.ca',
           sites: ['CA'],
-          mailboxes: ['support@forcome.ca', 'help+ca@forcome.ca'],
+          mailboxes: [gmail('support@forcome.ca'), gmail('help+ca@forcome.ca')],
           adapterMode: 'real',
         }),
         version: created.version,
@@ -320,7 +347,7 @@ describe('P18 店铺表（非生产环境）', () => {
       const updated = storeSchema.parse(await res.json());
       expect(updated).toMatchObject({
         sites: ['CA'],
-        mailboxes: ['support@forcome.ca', 'help+ca@forcome.ca'],
+        mailboxes: [gmailOut('support@forcome.ca'), gmailOut('help+ca@forcome.ca')],
         adapterMode: 'real',
         version: 2,
         // 改成真实接口：订单的同步记录按新的数据源从头算（之前模拟数据的同步不算数）；Google、Shopify 凭据都没配置，为未连接
@@ -365,7 +392,7 @@ describe('P18 店铺表（非生产环境）', () => {
       const fields = await fieldErrors(
         await admin.post(
           '/api/channel/stores',
-          newStore({ name: 'forcome.us', mailboxes: ['ventas@forcome.ca'], platformId: '' }),
+          newStore({ name: 'forcome.us', mailboxes: [gmail('ventas@forcome.ca')], platformId: '' }),
         ),
       );
       expect(fields).toEqual({ platformId: '请填写店铺域名' });
@@ -377,7 +404,7 @@ describe('P18 店铺表（非生产环境）', () => {
         await admin.put(`/api/channel/stores/${created.id}`, {
           ...newStore({
             name: 'Forcome Auto',
-            mailboxes: ['amz-auto@forcome.com'],
+            mailboxes: [gmail('amz-auto@forcome.com')],
             platformId: '',
           }),
           version: current.version,
@@ -416,7 +443,7 @@ describe('P18 店铺表（非生产环境）', () => {
       newStore({
         name: 'Forcome Canada',
         platform: 'amazon',
-        mailboxes: ['amz-canada@forcome.com'],
+        mailboxes: [gmail('amz-canada@forcome.com')],
         platformId: 'A9CANADA00001',
       }),
     );
@@ -488,6 +515,7 @@ describe('P18 店铺表（生产环境配置）', () => {
       ['amazon', 'not_connected', false],
       ['shopify', 'not_connected', false],
       ['gmail', 'not_connected', false],
+      ['qiye163', 'not_connected', false],
       ['dingtalk', 'not_connected', false],
     ]);
   });

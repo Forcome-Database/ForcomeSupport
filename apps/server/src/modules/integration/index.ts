@@ -57,15 +57,36 @@ export {
 } from './gmail';
 export { type FakeMailInput } from './gmail-mime';
 export {
+  fixtureMailboxProvider,
   fixtureNoReplyMarks,
   reportAcceptanceMails,
   type ReplayMail,
   type ReplayNoReplyMark,
-} from './gmail-replay';
+} from './fixture-mails';
+export {
+  FAKE_IMAP_REJECTED_AUTH_CODES,
+  FakeImap,
+  findSentFolder,
+  imapClient,
+  imapFolderRoles,
+  imapMessageId,
+  type ImapAccount,
+  type ImapClient,
+  type ImapFolderRole,
+  type ImapIdle,
+  type ImapMessageInfo,
+  type ImapPosition,
+  type ImapRawMessage,
+  type ImapSession,
+} from './imap';
 export { MailRecipientGuard, MailRecipientNotAllowedError } from './mail-recipient-guard';
 export { integrationSelfCheckProbe } from './self-check';
 export {
   databaseCredentialVault,
+  deleteMailboxAuthCodes,
+  FIXTURE_MAILBOX_AUTH_CODE,
+  savedMailboxAuthCodes,
+  seedFixtureMailboxAuthCodes,
   type CredentialVault,
   type StoredCredential,
 } from './credential-vault';
@@ -111,5 +132,8 @@ export {
   ExternalTimeoutError,
   FaultInjector,
   HistoryLimitedError,
+  MailboxAccessError,
+  mailboxAccessFailures,
   type FaultSpec,
+  type MailboxAccessFailure,
 } from './faults';

@@ -1,7 +1,8 @@
-import type { Platform } from '@forcome/contracts';
+import { QIYE_IMAP_DEFAULTS, type Platform } from '@forcome/contracts';
 import type { FixtureStore } from '@forcome/fixtures';
+import { and, eq, isNull, ne } from 'drizzle-orm';
 import { defineFixtureStep } from '../core';
-import { store, storeMailbox } from './schema';
+import { mailboxSync, store, storeMailbox } from './schema';
 import { registerSenderRule } from './sender-rules';
 
 const PLATFORM: Record<FixtureStore['platform'], Platform> = {
@@ -13,6 +14,9 @@ const PLATFORM: Record<FixtureStore['platform'], Platform> = {
  * 示例店铺（原型 data.py 的 STORES，待办 07 种子）：4 个店铺沿用夹具里确定的 id，已存在则跳过；
  * 数据来源一律模拟数据（加载器只在非生产环境运行）。建立时间按示例数据的顺序错开 1 毫秒，
  * 店铺表按建立先后排序时与原型一致（Forcome Direct、Forcome Auto、forcome.com、forcome.mx）。
+ * 进线邮箱的服务商按夹具（待办 35：Forcome Auto 的 amz-auto@forcome.com 为 163 企业邮箱，IMAP 服务器与端口取默认值）；
+ * 加服务商之前灌进库的示例店铺（迁移 0038 一律补成 Gmail）在没被人改过（updated_by_name 为空）时按夹具改过来。
+ * 163 企业邮箱的模拟授权码要主密钥加密，不在这一步：灌完数据后由 seedDemoData 存（integration 的 seedFixtureMailboxAuthCodes）。
  */
 export const channelStoresFixtureStep = defineFixtureStep({
   name: 'channel.stores',
@@ -34,15 +38,34 @@ export const channelStoresFixtureStep = defineFixtureStep({
           updatedByName: null,
         })
         .onConflictDoNothing({ target: store.id });
+      const mailbox = {
+        provider: fixtureStore.provider,
+        imapHost: fixtureStore.provider === 'qiye163' ? QIYE_IMAP_DEFAULTS.host : null,
+        imapPort: fixtureStore.provider === 'qiye163' ? QIYE_IMAP_DEFAULTS.port : null,
+      };
+      const address = fixtureStore.mailbox.toLowerCase();
       await tx.db
         .insert(storeMailbox)
-        .values({
-          storeId: fixtureStore.id,
-          address: fixtureStore.mailbox.toLowerCase(),
-          position: 0,
-          createdAt: at,
-        })
+        .values({ storeId: fixtureStore.id, address, position: 0, ...mailbox, createdAt: at })
         .onConflictDoNothing({ target: storeMailbox.address });
+      const [stale] = await tx.db
+        .select({ id: storeMailbox.id })
+        .from(storeMailbox)
+        .innerJoin(store, eq(store.id, storeMailbox.storeId))
+        .where(
+          and(
+            eq(storeMailbox.storeId, fixtureStore.id),
+            eq(storeMailbox.address, address),
+            ne(storeMailbox.provider, mailbox.provider),
+            isNull(store.updatedByName),
+          ),
+        )
+        .limit(1);
+      if (stale) {
+        await tx.db.update(storeMailbox).set(mailbox).where(eq(storeMailbox.id, stale.id));
+        // 服务商换了：同步记录从头算（同 P18 改服务商，stores.ts）
+        await tx.db.delete(mailboxSync).where(eq(mailboxSync.address, address));
+      }
     }
   },
 });

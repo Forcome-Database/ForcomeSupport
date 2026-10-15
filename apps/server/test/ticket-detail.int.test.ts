@@ -91,6 +91,8 @@ describe('标记无需回复（AC-P1-01）', () => {
   beforeAll(async () => {
     t = await startTestHarness({ now: '2026-09-10T09:00:00+08:00' });
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     gmail = t.clients.fake(gmailClient);
     await t.runJobs();
     agent = await t.loginAs('坐席');
@@ -384,6 +386,8 @@ describe('P05 按示例夹具（P1_OLIVER）渲染', () => {
   beforeAll(async () => {
     t = await startTestHarness();
     await t.loadFixtures();
+    // 本文件测 Gmail 收信，用到示例的 amz-auto@forcome.com（示例里是 163 企业邮箱，待办 35）
+    await t.useGmailForFixtureMailboxes();
     // 与 worker 启动时一样：Fake 从示例数据夹具回放来信与我方回复；时钟在演示时刻，不平移
     t.clients.replayFixtures(fixture);
     await t.enqueue(syncExchangeRatesJob, {});

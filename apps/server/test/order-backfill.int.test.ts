@@ -556,7 +556,7 @@ describe('P18 回补行跟着进度变（汇总连接上的店铺）', () => {
       platform: 'amazon',
       sites: ['US'],
       defaultSite: 'US',
-      mailboxes: ['amz-outdoor@forcome.com'],
+      mailboxes: [{ address: 'amz-outdoor@forcome.com', provider: 'gmail' }],
       platformId: 'A2OUTDOOR7Q2M9',
     });
     expect(res.status).toBe(201);
@@ -637,7 +637,7 @@ describe('生产环境没有配置 SP-API 与 Shopify（用户 2026-10-04 口径
         platform: 'amazon',
         sites: ['US'],
         defaultSite: 'US',
-        mailboxes: ['amz-direct@forcome.com'],
+        mailboxes: [{ address: 'amz-direct@forcome.com', provider: 'gmail' }],
         platformId: 'A1FD7Q2M9XK3LC',
       },
       {
@@ -645,7 +645,7 @@ describe('生产环境没有配置 SP-API 与 Shopify（用户 2026-10-04 口径
         platform: 'shopify',
         sites: ['MX'],
         defaultSite: 'MX',
-        mailboxes: ['support@forcome.mx'],
+        mailboxes: [{ address: 'support@forcome.mx', provider: 'gmail' }],
         platformId: 'forcome-mx.myshopify.com',
       },
     ]) {
