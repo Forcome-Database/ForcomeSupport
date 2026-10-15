@@ -162,7 +162,7 @@ async function dailyOf(
 }
 
 /**
- * 「更新于」（AC-P1-11，D-24）：全部已连接的 Gmail 邮箱、亚马逊订单、Shopify 订单中最旧的一次同步成功时间（从没同步成功过的
+ * 「更新于」（AC-P1-11，D-24）：全部已连接的进线邮箱（Gmail 与 163 企业邮箱）、亚马逊订单、Shopify 订单中最旧的一次同步成功时间（从没同步成功过的
  * 不算连接上，不参与；都没有为空）。订单通知队列（SQS）、回补与夜间对账不参与（待办 12、13）。不随店铺筛选变化（Q6）
  */
 async function updatedAtOf(tx: DbTransaction): Promise<Date | null> {
