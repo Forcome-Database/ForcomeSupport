@@ -104,6 +104,16 @@ describe('读取并校验部署环境文件', () => {
       'TLS_MODE：目前只支持 internal（caddy 内部 CA）；切换 DNS-01 的做法见 docs/部署说明.md',
     ]);
   });
+
+  it('SITE_IP 可选：留空或一个 IP 地址都行，写成域名或带端口时报错', () => {
+    expect(readDeployEnv(VALID.concat('SITE_IP=\n'), staging).problems).toEqual([]);
+    expect(readDeployEnv(VALID.concat('SITE_IP=144.34.128.235\n'), staging).problems).toEqual([]);
+    for (const wrong of ['support-dev.forcome.internal', '144.34.128.235:4510']) {
+      expect(readDeployEnv(VALID.concat(`SITE_IP=${wrong}\n`), staging).problems).toEqual([
+        'SITE_IP：只填一个 IP 地址（如 10.0.8.21），不带协议与端口；不按 IP 访问时留空',
+      ]);
+    }
+  });
 });
 
 describe('备份密钥与生产环境（待办 28）', () => {
