@@ -143,3 +143,7 @@ status: accepted
 ## 修订（2026-10-14，待办 33 落地）
 
 - **迁移 0034–0036**（按时关闭的到期时刻与邮箱同步到的时刻，ADR 0008「待办 33 落地」）：照「给已有数据的表加列分三步」——0034 生成迁移加 `ticket.status_change.due_at` 与 `channel.mailbox_sync.synced_through`（都可空），0035 用 `--custom` 回填已有按时关闭的到期时刻（`synced_through` 不回填，下次同步成功时写上），0036 生成迁移加约束「按时关闭 ⇔ 有到期时刻、不晚于发生时刻」。
+
+## 修订（2026-10-15，待办 35 落地）
+
+- **迁移 0037–0039**（进线邮箱的服务商，ADR 0015「待办 35 落地」）：「加列分三步」也用于**改列名**——0037 生成迁移加新列（`store_mailbox.provider` / `imap_host` / `imap_port`、`mailbox_sync.imap_cursor` / `imap_backfill_cursor`、`message.provider_message_id` / `thread_id`、`mail_replay_item.provider_message_id`、`ticket.pending_reply.thread_id`，都可空）与表 `integration.mailbox_credential`；0038 用 `--custom` 回填（已有的进线邮箱为 `gmail`，消息标识与线程从 `gmail_*` 列抄过来，只补空值）；0039 生成迁移改为必填、把唯一键、主键与索引换到新列、删掉 `gmail_*` 列，加「163 企业邮箱要有服务器与端口」的约束。代码只读写新列；迁移的一次性回填跨 schema（`ticket.pending_reply`）同 0021 的做法。

@@ -192,3 +192,7 @@ status: accepted
 - **同步记录与连接状态不分服务商**：`channel.mailbox_sync` 每个邮箱一行，最近同步成功、`synced_through`（取清单之前的时刻）、连续失败、失败起点与原因、补拉区间起点都照旧；163 企业邮箱的登录、常驻连接与同步失败照「外部调用失败」计数（常驻连接断开后重连成功不算），第 3 次发「163 企业邮箱连接异常」并记审计 `channel.disconnected`，恢复发「163 企业邮箱已恢复 · 补拉 N 封来信」并记 `channel.recovered`（通知与横幅的标题按服务商，PRD 11.4、G4）。认证失败、登录 IP 被限制不在常驻连接里连环重试，只靠 5 分钟轮询（网易可能锁定账号）。
 - **按时关闭的前提**（「待办 33 落地」）对 163 企业邮箱同样成立：「已开始监听」指已记下增量位置（第一次记下两个文件夹的 `UIDVALIDITY` 与 `UIDNEXT`，写 `watched_at`）；`mailSyncedThrough` 不分服务商。
 - **历史回放与 T0**（「待办 26 落地」）：回放清单不分服务商，163 企业邮箱按 `SEARCH SINCE/BEFORE` 列出后按 `INTERNALDATE` 筛进 `[T0 − 90 天, T0)`，与 Gmail 的信合在一起按 `(到达时间, 邮箱, 服务商消息标识)` 升序回放；T0 不能早于任何进线邮箱开始监听的时刻（两种服务商都按 `watched_at`）；切换前 IMAP 同步同样什么也不做（不登录、不记成败、不开常驻连接）。`mail_replay_item` 的 `gmail_message_id` 改为与服务商无关的标识（迁移按 ADR 0006）。
+
+## 修订（2026-10-15，待办 35 落地）
+
+163 企业邮箱的任务与常驻拉取落地（细节见 ADR 0015「待办 35 落地」）：任务 `channel.imap_sync`（stately + `singletonKey` 邮箱，并发 5；认证失败、IP 受限只记进同步记录、任务正常结束，不按任务重试）、定时 `channel.imap_poll`（每 5 分钟，启动时一次）、独占常驻拉取 `channel.imap_idle`（开始监听在切换前也做，IDLE 连接只在切换完成后开）。测试工具的 `scanTimeLimits` 先排 Gmail 与 163 企业邮箱两种轮询再扫描。`reset-inbound` 一并丢掉排着的 `channel.imap_sync`。
