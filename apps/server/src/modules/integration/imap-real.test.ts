@@ -219,7 +219,7 @@ describe('163 企业邮箱 IMAP 的真实现（imapflow）', () => {
     // 没有新信：不发 FETCH
     expect(await session.fetchAfter('inbox', { uidValidity: '1700000001', uid: 3 })).toEqual([]);
     expect(flow.calls.filter((c) => c.startsWith('open:'))).toEqual(
-      Array(3).fill('open:INBOX:readonly'),
+      Array(4).fill('open:INBOX:readonly'),
     );
     expect(flow.calls).toContain('fetch:2:*:uid');
   });
