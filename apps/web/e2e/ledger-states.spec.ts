@@ -190,10 +190,20 @@ test('设为已完成：不要求齐全，标黄「待回填」与「缺 N 项�
   await expect(mine.getByText(/^缺 \d+ 项$/)).toHaveCount(0);
   await expect(mine.getByRole('button', { name: '补登' })).toHaveCount(0);
 
-  await mine.getByRole('button', { name: `${number} 的更多操作` }).click();
-  await page.getByRole('menuitem', { name: '设为已完成' }).click();
-  await expect(page.getByText(`${number} 已完成`)).toBeVisible();
-  await expect(page.getByText('缺 2 项，已标黄待回填')).toBeVisible();
+  // 撤销浮层只有 5 秒：先在窗口内撤销（看完浮层就点，不在窗口里做别的——开发测试环境的远端主机慢时，中间多做几步
+  // 就会超过 5 秒，待办 36 查明的冒烟偶发），回到进行中、不再标缺；再设为已完成一次，看标缺与完整率
+  const complete = async () => {
+    await mine.getByRole('button', { name: `${number} 的更多操作` }).click();
+    await page.getByRole('menuitem', { name: '设为已完成' }).click();
+    await expect(page.getByText(`${number} 已完成`)).toBeVisible();
+    await expect(page.getByText('缺 2 项，已标黄待回填')).toBeVisible();
+  };
+  await complete();
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(mine).toContainText('进行中');
+  await expect(mine.getByText(/^缺 \d+ 项$/)).toHaveCount(0);
+
+  await complete();
   await expect(mine).toContainText('已完成');
   await expect(mine.getByText('缺 2 项')).toBeVisible();
   await expect(mine.getByTitle('缺：寄出日期、快递单号（含隐藏列里的字段）')).toBeVisible();
@@ -204,12 +214,8 @@ test('设为已完成：不要求齐全，标黄「待回填」与「缺 N 项�
   await expect(page.getByText(/^缺字段的已完成单：/)).toBeVisible();
   await expect(row(page, number)).toBeVisible();
   await expect(page.getByTestId('ledger-row').filter({ hasText: '进行中' })).toHaveCount(0);
-
-  // 撤销：回到进行中，不再标缺
-  await page.getByRole('button', { name: '撤销' }).click();
   await page.getByRole('button', { name: '清除筛选' }).click();
-  await expect(row(page, number)).toContainText('进行中');
-  await expect(row(page, number).getByText(/^缺 \d+ 项$/)).toHaveCount(0);
+  await expect(row(page, number)).toContainText('已完成');
 });
 
 test('设为已完成且适用字段齐全：撤销浮层只有标题，没有「缺 N 项」那一行；台账不标缺（S15 ①、补充小样）', async ({
@@ -355,10 +361,28 @@ test('取消弹窗只列已登记的费用项，四项都没登记时没有费�
   await expect(row(page, partial)).toContainText('进行中');
 
   // 设为已完成后、撤销前别人补登了：撤销失败写原因，这张单保持已完成
+  // 设为已完成的响应里有新的版本号：窗口内只发一次请求改登记，随后就点「撤销」（先取详情再改要两次往返，
+  // 远端主机慢时会把撤销挤出 5 秒窗口，待办 36 查明的冒烟偶发）
   await openMenu(partial);
-  await page.getByRole('menuitem', { name: '设为已完成' }).click();
+  const [completed] = await Promise.all([
+    page.waitForResponse(
+      (res) => res.url().endsWith(`/api/aftersales/${partial}/complete`) && res.ok(),
+    ),
+    page.getByRole('menuitem', { name: '设为已完成' }).click(),
+  ]);
+  const { version } = (await completed.json()) as { version: number };
   await expect(page.getByText(`${partial} 已完成`)).toBeVisible();
-  await changeViaApi(page, partial, { trackingNumber: '1Z4R28830358229099' });
+  await page.evaluate(
+    async ({ n, version }) => {
+      const res = await fetch(`/api/aftersales/${n}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ version, changes: { trackingNumber: '1Z4R28830358229099' } }),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    },
+    { n: partial, version },
+  );
   await page.getByRole('button', { name: '撤销' }).click();
   await expect(page.getByText('撤销失败：数据已被他人修改')).toBeVisible();
   await expect(row(page, partial)).toContainText('已完成');

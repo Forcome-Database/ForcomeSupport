@@ -9,6 +9,9 @@ import {
   firstErrorField,
   formErrorsOf,
   mailboxTestInputOf,
+  parseRowPath,
+  refillErrors,
+  sameMailboxRow,
   storeFormOf,
   storeInputOf,
   unsavedFieldCount,
@@ -267,9 +270,49 @@ describe('字段错误落到表单上', () => {
     expect(firstErrorField([])).toBeNull();
   });
 
-  it('G8 的未保存项数：进线邮箱的各行算一项', () => {
+  it('G8 的未保存项数：进线邮箱的各行算一项；删掉行后留下的空数组、全是 false 的行不算', () => {
     expect(unsavedFieldCount({ name: true, mailboxes: [false, { address: true }] })).toBe(2);
     expect(unsavedFieldCount({ platformId: false })).toBe(0);
+    expect(unsavedFieldCount({ mailboxes: [] })).toBe(0);
+    expect(unsavedFieldCount({ mailboxes: [{ address: false, provider: false }] })).toBe(0);
+  });
+
+  it('测试结果只对测过的内容有效：测试中改了这一行的任何一项，回来的结果不写', () => {
+    const tested = row({ address: 'a@forcome.com', provider: 'qiye163', authCode: 'x' });
+    expect(sameMailboxRow(tested, { ...tested })).toBe(true);
+    for (const change of [
+      { address: 'b@forcome.com' },
+      { imapHost: 'imaphz.qiye.163.com' },
+      { imapPort: '994' },
+      { authCode: 'y' },
+      { provider: 'gmail' as const },
+      { refill: true },
+    ]) {
+      expect(sameMailboxRow(tested, { ...tested, ...change })).toBe(false);
+    }
+  });
+
+  it('控件路径拆成行号与字段：只认 mailboxes.<行>.<地址 / 授权码 / 服务器 / 端口>', () => {
+    expect(parseRowPath('mailboxes.2.authCode')).toEqual({ row: 2, field: 'authCode' });
+    expect(parseRowPath('mailboxes.0.address')).toEqual({ row: 0, field: 'address' });
+    expect(parseRowPath('mailboxes.0.provider')).toBeNull();
+    expect(parseRowPath('mailboxes')).toBeNull();
+    expect(parseRowPath('name')).toBeNull();
+  });
+
+  it('点了「重新填写」又没填授权码的 163 企业邮箱行，保存前就报「请填写客户端授权码」', () => {
+    expect(
+      refillErrors([
+        row({ address: 'a@forcome.com', provider: 'qiye163', refill: true }),
+        row({ address: 'b@forcome.com', provider: 'qiye163', refill: true, authCode: 'x' }),
+        row({ address: 'c@forcome.com', provider: 'qiye163' }),
+        row({ address: 'd@forcome.com', refill: true }),
+        row({ address: 'e@forcome.com', provider: 'qiye163', refill: true, authCode: '  ' }),
+      ]),
+    ).toEqual([
+      { field: 'mailboxes.0.authCode', message: '请填写客户端授权码' },
+      { field: 'mailboxes.4.authCode', message: '请填写客户端授权码' },
+    ]);
   });
 });
 

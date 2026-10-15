@@ -23,6 +23,8 @@ import {
   emptyMailboxRow,
   mailboxTestInputOf,
   MAILBOX_ROW_FIELDS,
+  sameMailboxRow,
+  type MailboxRow,
   type MailboxRowField,
   type StoreFormValues,
 } from './store-form';
@@ -104,34 +106,43 @@ function MailboxRowEditor({
     setFocus(name('authCode'));
   });
 
-  /** 改了这一行：撤掉该控件的错误与上次的测试结果（结果只对测过的内容有效） */
-  function changed(field: MailboxRowField) {
-    clearErrors(name(field));
+  /** 改了这一行：撤掉该控件的错误与上次的测试结果 */
+  function changed(field?: MailboxRowField) {
+    if (field) clearErrors(name(field));
     clearErrors('root.mailboxes');
     setResult(null);
   }
 
+  /**
+   * 测试连接时记下这一行当时的内容；结果回来时这一行已经改了（测试中又改了地址、授权码、服务器或端口），就不写结果与错误——
+   * 结果只对测过的内容有效
+   */
+  const current = () => getValues(`mailboxes.${index}`);
   const test = useMutation({
-    mutationFn: () =>
-      api.testMailbox(
-        mailboxTestInputOf(getValues(`mailboxes.${index}`), base?.id ?? null, adapterMode),
-      ),
+    mutationFn: (tested: MailboxRow) =>
+      api.testMailbox(mailboxTestInputOf(tested, base?.id ?? null, adapterMode)),
     onMutate: () => {
       setResult(null);
       clearErrors(MAILBOX_ROW_FIELDS.map(name));
     },
-    onSuccess: (tested) => setResult({ ok: true, message: tested.message }),
-    onError: (error) => {
+    onSuccess: (passed, tested) => {
+      if (sameMailboxRow(tested, current())) setResult({ ok: true, message: passed.message });
+    },
+    onError: (error, tested) => {
       if (endSessionIfUnauthenticated(queryClient, error)) return;
+      if (!sameMailboxRow(tested, current())) return;
       if (error instanceof ApiRequestError && error.code === 'connection_test_failed') {
         setResult({ ok: false, message: error.message });
         return;
       }
-      if (error instanceof ApiRequestError && error.status === 400 && error.fields) {
-        for (const [key, message] of Object.entries(error.fields)) {
-          if ((MAILBOX_ROW_FIELDS as readonly string[]).includes(key)) {
-            setError(name(key as MailboxRowField), { type: 'server', message });
-          }
+      // 填错（400）落到这一行对应的输入框下方；落不到的（接口另有别的字段）同其他失败给浮层
+      const fields = error instanceof ApiRequestError && error.status === 400 ? error.fields : null;
+      const known = Object.entries(fields ?? {}).filter(([key]) =>
+        (MAILBOX_ROW_FIELDS as readonly string[]).includes(key),
+      );
+      if (known.length > 0) {
+        for (const [key, message] of known) {
+          setError(name(key as MailboxRowField), { type: 'server', message });
         }
         return;
       }
@@ -139,7 +150,7 @@ function MailboxRowEditor({
         id: `mailbox-test-${fieldId}-${index}`,
         action: MAILBOX_ROWS.test,
         error,
-        retry: () => test.mutateAsync(),
+        retry: () => test.mutateAsync(current()),
       });
     },
   });
@@ -174,7 +185,7 @@ function MailboxRowEditor({
                 if (!value) return;
                 field.onChange(value);
                 clearErrors([...MAILBOX_ROW_FIELDS.filter((f) => f !== 'address').map(name)]);
-                setResult(null);
+                changed();
               }}
             >
               <SelectTrigger
@@ -220,13 +231,21 @@ function MailboxRowEditor({
               error={errors.authCode?.message}
             >
               <div className="flex items-center gap-2.5">
-                <div
-                  id={id('authCode')}
-                  data-testid="auth-code-saved"
-                  className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-muted px-2.5 text-body text-foreground"
-                >
-                  <Lock aria-hidden className="size-4 shrink-0 text-subtle-foreground" />
-                  {MAILBOX_ROWS.saved}
+                {/* 原型 input_box(st='readonly', icon_name='lock')：只读输入框（浅色边线、浅灰底），左侧锁图标 */}
+                <div className="relative min-w-0 flex-1">
+                  <Lock
+                    aria-hidden
+                    className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-subtle-foreground"
+                  />
+                  <Input
+                    id={id('authCode')}
+                    data-testid="auth-code-saved"
+                    readOnly
+                    value={MAILBOX_ROWS.saved}
+                    aria-invalid={errors.authCode?.message ? true : undefined}
+                    aria-describedby={describedBy('authCode')}
+                    className="border-border bg-muted pl-8.5"
+                  />
                 </div>
                 <Button
                   type="button"
@@ -235,7 +254,7 @@ function MailboxRowEditor({
                   onClick={() => {
                     setValue(`mailboxes.${index}.refill`, true, { shouldDirty: true });
                     setValue(name('authCode'), '', { shouldDirty: true });
-                    setResult(null);
+                    changed();
                     focusCode.current = true;
                   }}
                 >
@@ -300,7 +319,7 @@ function MailboxRowEditor({
               variant="outline"
               size="sm"
               loading={test.isPending}
-              onClick={() => test.mutate()}
+              onClick={() => test.mutate(current())}
             >
               {test.isPending ? MAILBOX_ROWS.testing : MAILBOX_ROWS.test}
             </Button>

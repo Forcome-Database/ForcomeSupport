@@ -1,5 +1,6 @@
 import {
   normalizeMailbox,
+  qiyeMailboxMessages,
   normalizeStoreInput,
   QIYE_IMAP_DEFAULTS,
   reusesSavedAuthCode,
@@ -120,15 +121,20 @@ function submitted(row: MailboxRow): boolean {
   return row.provider === 'qiye163' || row.address.trim() !== '';
 }
 
+/** 这次新填的授权码（去首尾空白）：没填就不带，由接口沿用已保存的或报错 */
+function newAuthCode(row: MailboxRow): { authCode?: string } {
+  const authCode = row.authCode.trim();
+  return authCode ? { authCode } : {};
+}
+
 function mailboxInputOf(row: MailboxRow): StoreMailboxInput {
   if (row.provider === 'gmail') return { address: row.address, provider: 'gmail' };
-  const authCode = row.authCode.trim();
   return {
     address: row.address,
     provider: 'qiye163',
     imapHost: row.imapHost,
     imapPort: row.imapPort,
-    ...(authCode ? { authCode } : {}),
+    ...newAuthCode(row),
   };
 }
 
@@ -151,15 +157,26 @@ export function mailboxTestInputOf(
   storeId: string | null,
   adapterMode: AdapterMode | null,
 ): MailboxTestInput {
-  const authCode = row.authCode.trim();
   return {
     address: row.address,
     imapHost: row.imapHost,
     imapPort: row.imapPort,
-    ...(authCode ? { authCode } : {}),
+    ...newAuthCode(row),
     ...(storeId ? { storeId } : {}),
     ...(adapterMode ? { adapterMode } : {}),
   };
+}
+
+/** 两份行内容测试连接时是不是同一份（地址、服务商、服务器、端口、授权码与是否重新填写都一样） */
+export function sameMailboxRow(a: MailboxRow, b: MailboxRow): boolean {
+  return (
+    a.address === b.address &&
+    a.provider === b.provider &&
+    a.imapHost === b.imapHost &&
+    a.imapPort === b.imapPort &&
+    a.authCode === b.authCode &&
+    a.refill === b.refill
+  );
 }
 
 /** 表单上的一个错误：落在哪个字段（进线邮箱按行与行内的字段，如 mailboxes.0.address、mailboxes.0.authCode），写什么 */
@@ -170,6 +187,28 @@ export interface FormError {
 
 function isFormField(key: string): key is FormField {
   return (FORM_FIELDS as readonly string[]).includes(key);
+}
+
+/** 进线邮箱一行里某个控件的路径（mailboxes.<行>.<字段>）拆成行号与字段；不是这种路径返回 null */
+export function parseRowPath(
+  path: string,
+): { readonly row: number; readonly field: MailboxRowField } | null {
+  const match = /^mailboxes\.(\d+)\.(\w+)$/.exec(path);
+  const field = match?.[2];
+  if (!match || !field || !(MAILBOX_ROW_FIELDS as readonly string[]).includes(field)) return null;
+  return { row: Number(match[1]), field: field as MailboxRowField };
+}
+
+/**
+ * 点了「重新填写」又没填授权码的 163 企业邮箱行（K8：点「重新填写」清空后重填，界面上是带 * 的空密码框）：保存前就报
+ * 「请填写客户端授权码」、不提交——否则接口会沿用已保存的，与界面上的必填不一致。不想换授权码就关闭抽屉放弃修改
+ */
+export function refillErrors(rows: readonly MailboxRow[]): FormError[] {
+  return rows.flatMap((row, index): FormError[] =>
+    row.provider === 'qiye163' && row.refill && !row.authCode.trim()
+      ? [{ field: `mailboxes.${index}.authCode`, message: qiyeMailboxMessages.authCodeMissing }]
+      : [],
+  );
 }
 
 /**
@@ -206,22 +245,28 @@ export function firstErrorField(errors: readonly FormError[]): FormError['field'
     }
     if (errors.some((e) => e.field === 'mailboxes')) return 'mailboxes';
     const inRows = errors
-      .map((e) => /^mailboxes\.(\d+)\.(\w+)$/.exec(e.field))
-      .filter((m): m is RegExpExecArray => m !== null)
-      .map((m) => ({
-        row: Number(m[1]),
-        order: MAILBOX_ROW_FIELDS.indexOf(m[2] as MailboxRowField),
-        field: m[0] as FormError['field'],
-      }))
+      .flatMap((e) => {
+        const path = parseRowPath(e.field);
+        return path
+          ? [{ ...path, order: MAILBOX_ROW_FIELDS.indexOf(path.field), at: e.field }]
+          : [];
+      })
       .sort((a, b) => a.row - b.row || a.order - b.order);
-    if (inRows[0]) return inRows[0].field;
+    if (inRows[0]) return inRows[0].at;
   }
   return null;
 }
 
+/** react-hook-form 的 dirtyFields 里一项是否真的改了：进线邮箱是各行各字段的布尔值（删掉行后可能留下空数组，不算） */
+function dirty(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(dirty);
+  if (value && typeof value === 'object') return Object.values(value).some(dirty);
+  return value === true;
+}
+
 /** G8 里写的「有 N 项未保存的修改」：进线邮箱的各行算一项 */
 export function unsavedFieldCount(dirtyFields: Partial<Record<FormField, unknown>>): number {
-  return Object.values(dirtyFields).filter(Boolean).length;
+  return Object.values(dirtyFields).filter(dirty).length;
 }
 
 /** 站点改了以后的默认站点：只选一个站点时自动带入；原来的默认站点不在所选站点里时清空 */

@@ -1,4 +1,4 @@
-import type { ChannelCard, Store } from '@forcome/contracts';
+import type { ChannelCard, MailProvider, Store } from '@forcome/contracts';
 import type { BadgeTone } from '@/components/ui/badge';
 import { formatClock } from '@/lib/channel';
 import {
@@ -60,11 +60,7 @@ function ordersLines(
 const MAIL_ISSUE_LINES = { gmail: GMAIL_ISSUE_LINES, qiye163: QIYE_ISSUE_LINES } as const;
 
 /** 邮箱卡（Gmail、163 企业邮箱）的说明行：按邮箱列出异常与延迟；邮箱数只数该服务商的 */
-function mailLines(
-  provider: 'gmail' | 'qiye163',
-  card: ChannelCard,
-  stores: readonly Store[],
-): string[] {
+function mailLines(provider: MailProvider, card: ChannelCard, stores: readonly Store[]): string[] {
   const words = MAIL_ISSUE_LINES[provider];
   const mailboxCount = (platform: Store['platform']) =>
     stores

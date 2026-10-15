@@ -1,10 +1,8 @@
 import {
   adapterModeLabels,
-  mailboxTestMessages,
   mailProviderLabels,
   ORDER_QUEUE_NAME,
   QIYE_GUIDE,
-  QIYE_IMAP_DEFAULTS,
 } from '@forcome/contracts';
 
 /*
@@ -262,7 +260,7 @@ export const DRAWER = {
 /**
  * 进线邮箱逐行登记（K8 与补充小样，D-28，待办 34；原型 mb_row()、mb_field()）：每行地址 + 服务商（新加的行默认 Gmail）+ 移除，
  * 末尾「添加进线邮箱」。163 企业邮箱的行下方展开客户端授权码（只写不显：已保存时写「已保存」+「重新填写」）、IMAP 服务器与端口
- * （预填 contracts 的 QIYE_IMAP_DEFAULTS）与按行「测试连接」；行内结果的写法在 contracts 的 mailboxTestMessages（接口给出）
+ * （预填 contracts 的 QIYE_IMAP_DEFAULTS）与按行「测试连接」；行内结果的写法在 contracts 的 mailboxTestMessages（接口给出，守卫测试直接核对它）
  */
 export const MAILBOX_ROWS = {
   /** 地址输入框的占位（原型 mb_row() 的 input_box 占位） */
@@ -277,13 +275,10 @@ export const MAILBOX_ROWS = {
   refill: '重新填写',
   imapHost: 'IMAP 服务器',
   imapPort: '端口',
-  imapDefaults: QIYE_IMAP_DEFAULTS,
   test: '测试连接',
   testing: '测试中',
   testingNote: '正在登录并检查收件箱与「已发送」',
   testIdle: '不保存也能测，用这一行当前填的内容',
-  /** 行内结果（原型 QIYE_ROW_TESTS；接口按原因给出 message，这里只供守卫测试逐字核对） */
-  results: mailboxTestMessages,
 } as const;
 
 /** 保存结果浮层（K8 补充小样；失败浮层的标题由 notify 写成「<动作>失败：原因」） */

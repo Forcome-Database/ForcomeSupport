@@ -3,6 +3,7 @@ import {
   platforms,
   platformTerms,
   sites as allSites,
+  storeInputErrors,
   SYSTEM_ACTOR_NAME,
   type Site,
   type Store,
@@ -49,6 +50,8 @@ import {
   emptyStoreForm,
   firstErrorField,
   formErrorsOf,
+  parseRowPath,
+  refillErrors,
   sortSites,
   storeFormOf,
   storeInputOf,
@@ -242,14 +245,8 @@ function StoreDrawerContent({
   const focusField = useFocusField();
 
   function controlIdOf(field: NonNullable<ReturnType<typeof firstErrorField>>): string {
-    const match = /^mailboxes\.(\d+)\.(\w+)$/.exec(field);
-    if (match) {
-      return mailboxControlId(
-        fieldId('mailboxes'),
-        Number(match[1]),
-        match[2] as Parameters<typeof mailboxControlId>[2],
-      );
-    }
+    const path = parseRowPath(field);
+    if (path) return mailboxControlId(fieldId('mailboxes'), path.row, path.field);
     if (field === 'mailboxes') {
       return form.getValues('mailboxes').length > 0
         ? mailboxControlId(fieldId('mailboxes'), 0, 'address')
@@ -282,6 +279,19 @@ function StoreDrawerContent({
   }
 
   async function submit(values: StoreFormValues, version?: number) {
+    // 点了「重新填写」没填的行先在本地报（不提交，否则接口会沿用已保存的授权码）；表单本身能判断的其余错误一并列出
+    const refill = refillErrors(values.mailboxes);
+    if (refill.length > 0) {
+      const local = formErrorsOf(
+        storeInputErrors(storeInputOf(values, dataSourceEditable)),
+        values.mailboxes,
+      );
+      showFieldErrors([
+        ...local.filter((e) => !refill.some((r) => r.field === e.field)),
+        ...refill,
+      ]);
+      return;
+    }
     try {
       await saved(await save.mutateAsync({ values, version }));
     } catch (error) {

@@ -6,9 +6,11 @@ import {
   mailboxError,
   mailboxTestFailureMessage,
   mailboxTestFailureReasons,
+  mailboxTestMessages,
   mailProviderLabels,
   qiyeMailboxMessages,
   QIYE_GUIDE,
+  QIYE_IMAP_DEFAULTS,
   platformLabels,
   platformTerms,
   storeInputErrors,
@@ -237,8 +239,8 @@ describe('K8 补充小样：进线邮箱逐行登记与 163 企业邮箱的行�
       MAILBOX_ROWS.saved,
       MAILBOX_ROWS.refill,
       MAILBOX_ROWS.imapHost,
-      MAILBOX_ROWS.imapDefaults.host,
-      String(MAILBOX_ROWS.imapDefaults.port),
+      QIYE_IMAP_DEFAULTS.host,
+      String(QIYE_IMAP_DEFAULTS.port),
       MAILBOX_ROWS.testingNote,
       MAILBOX_ROWS.testIdle,
     ]) {
@@ -258,7 +260,7 @@ describe('K8 补充小样：进线邮箱逐行登记与 163 企业邮箱的行�
   });
 
   it('按行测试连接的五种行内结果逐字一致（连不上与超时同一种写法）', () => {
-    expectText(STATES_ADMIN, MAILBOX_ROWS.results.ok);
+    expectText(STATES_ADMIN, mailboxTestMessages.ok);
     for (const reason of mailboxTestFailureReasons) {
       expectText(STATES_ADMIN, mailboxTestFailureMessage(reason, 'imap.qiye.163.com', 993));
     }

@@ -174,7 +174,7 @@ test('K8：已保存的授权码只写「已保存」；按行测试连接的成
   await page.getByRole('button', { name: '编辑 Forcome Auto' }).click();
   const row = rowOf(page, 'amz-auto@forcome.com');
   await expect(row.getByRole('combobox')).toHaveText('163 企业邮箱');
-  await expect(row.getByTestId('auth-code-saved')).toHaveText('已保存');
+  await expect(row.getByTestId('auth-code-saved')).toHaveValue('已保存');
   await expect(row.getByRole('textbox', { name: 'IMAP 服务器' })).toHaveValue('imap.qiye.163.com');
   await expect(row.getByRole('textbox', { name: '端口' })).toHaveValue('993');
   // 授权码不回显：整个抽屉里没有密码框
@@ -197,6 +197,11 @@ test('K8：已保存的授权码只写「已保存」；按行测试连接的成
   ).toBeVisible();
   // 改了这一行就撤掉上次的结果
   await expect(testResult(row)).toHaveCount(0);
+  // 点了「重新填写」却没填就保存：报「请填写客户端授权码」，不提交（不悄悄沿用已保存的）
+  await save(page).click();
+  await expect(row.getByText('请填写客户端授权码')).toBeVisible();
+  await expect(code).toBeFocused();
+  await expect(drawer(page)).toBeVisible();
   await code.fill('fake-auth-failed');
   await row.getByRole('button', { name: '测试连接' }).click();
   await expect(testResult(row)).toHaveText(`登录失败：${QIYE_GUIDE}`);
@@ -315,7 +320,7 @@ test('登记 163 企业邮箱：授权码必填，测试连接通过后保存；
 
   // 重开：授权码写「已保存」，不回显
   await edit();
-  await expect(rowOf(page, QIYE_MAILBOX).getByTestId('auth-code-saved')).toHaveText('已保存');
+  await expect(rowOf(page, QIYE_MAILBOX).getByTestId('auth-code-saved')).toHaveValue('已保存');
   await expect(drawer(page).locator('input[type="password"]')).toHaveCount(0);
 
   // 删掉这一行还原（保存后授权码一并删除）
@@ -337,6 +342,11 @@ test('权限：非管理员打不开 P18，也调不了店铺与按行测试连�
   await expect(page.getByTestId('channel-card-qiye163')).toHaveCount(0);
 
   const statuses = await page.evaluate(async () => {
+    // 周敏的店铺选项里能拿到店铺 ID（各页面的店铺筛选用它）
+    const options = (await (await fetch('/api/channel/store-options')).json()) as {
+      stores: { id: string; name: string }[];
+    };
+    const store = options.stores.find((s) => s.name === 'Forcome Auto');
     const post = (path: string, body: unknown) =>
       fetch(path, {
         method: 'POST',
@@ -351,7 +361,27 @@ test('权限：非管理员打不开 P18，也调不了店铺与按行测试连�
         imapPort: 993,
       }),
       cardTest: await post('/api/channel/connection-tests/qiye163', {}),
+      // 改不了：新增店铺与编辑店铺（含 163 企业邮箱的授权码）
+      create: await post('/api/channel/stores', {
+        name: 'E2E 越权',
+        platform: 'amazon',
+        sites: ['US'],
+        defaultSite: 'US',
+        mailboxes: [{ address: 'e2e-denied@forcome.test', provider: 'qiye163', authCode: 'x' }],
+        platformId: 'A0E2EDENIED',
+      }),
+      update: await fetch(`/api/channel/stores/${store?.id ?? ''}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ version: 1 }),
+      }).then((r) => r.status),
     };
   });
-  expect(statuses).toEqual({ settings: 403, mailboxTest: 403, cardTest: 403 });
+  expect(statuses).toEqual({
+    settings: 403,
+    mailboxTest: 403,
+    cardTest: 403,
+    create: 403,
+    update: 403,
+  });
 });
