@@ -33,17 +33,23 @@ mustRun('docker', [
   'forcome-web:ci',
   '.',
 ]);
-mustRun('docker', [
-  'run',
-  '--rm',
-  '-e',
-  'SITE_HOST=ci.forcome.internal',
-  'forcome-web:ci',
-  'caddy',
-  'validate',
-  '--config',
-  '/etc/caddy/Caddyfile',
-]);
+// Caddyfile 的变量照 compose.yml 给 web 服务的写法：SITE_DEFAULT_SNI 为 SITE_IP，没填 SITE_IP 时为 SITE_HOST。
+// 两条路径都校验：只按内网域名访问，与另外按 IP 访问（SITE_IP，内部 CA 给这个 IP 签证书）
+for (const siteVars of [
+  ['SITE_HOST=ci.forcome.internal', 'SITE_DEFAULT_SNI=ci.forcome.internal'],
+  ['SITE_HOST=ci.forcome.internal', 'SITE_IP=10.0.8.21', 'SITE_DEFAULT_SNI=10.0.8.21'],
+]) {
+  mustRun('docker', [
+    'run',
+    '--rm',
+    ...siteVars.flatMap((v) => ['-e', v]),
+    'forcome-web:ci',
+    'caddy',
+    'validate',
+    '--config',
+    '/etc/caddy/Caddyfile',
+  ]);
+}
 // 镜像里构建时就执行 wal-g --version 与 restic version（下载的二进制核对过校验和）
 mustRun('docker', ['build', '-f', 'deploy/postgres/Dockerfile', '-t', 'forcome-postgres:ci', '.']);
 console.log(
