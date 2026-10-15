@@ -29,9 +29,6 @@ const textbox = (page: Page, name: string) =>
   drawer(page).getByRole('textbox', { name, exact: true });
 
 test('售后负责人新建一张寄配件登记，保存后在台账里看到它（S14）', async ({ page }) => {
-  // 一整条台账流程：开发测试环境的冒烟在远端主机（2 GB）的容器里跑浏览器，每步要 0.3–1.2 秒，这类用例在那里要 22–34 秒，
-  // 默认的 30 秒不够（待办 36 查明的冒烟偶发：没有哪一步卡住，是整条用时超了）
-  test.setTimeout(60_000);
   const customer = `E2E 冒烟 ${Date.now()}`;
   await loginAs(page, '王磊');
   await page.goto('/aftersales/ledger');

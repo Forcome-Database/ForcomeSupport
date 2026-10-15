@@ -64,9 +64,6 @@ async function fillRefund(page: Page, customer: string): Promise<void> {
 test('非美元金额：抽屉里即时折算成美元，保存后台账写美元与「原币 · 汇率 日期」（S13、S14、R-FL-06）', async ({
   page,
 }) => {
-  // 一整条台账流程：开发测试环境的冒烟在远端主机（2 GB）的容器里跑浏览器，每步要 0.3–1.2 秒，这类用例在那里要 22–34 秒，
-  // 默认的 30 秒不够（待办 36 查明的冒烟偶发：没有哪一步卡住，是整条用时超了）
-  test.setTimeout(60_000);
   const customer = `E2E 汇率 ${Date.now()}`;
   await loginAs(page, '王磊');
   await waitForRates(page, beijingToday());

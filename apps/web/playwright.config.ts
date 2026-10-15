@@ -17,6 +17,11 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
+  // 开发测试环境的冒烟（E2E_BASE_URL）在远端主机（2 GB，与别的容器共用）的容器里跑浏览器，比本机慢一倍上下且时快时慢：
+  // 整条台账流程在那里要 20–34 秒、登录后等顶栏要近 5 秒（待办 36 查明的冒烟偶发：没有哪一步卡住，是整条用时与等待超了默认）。
+  // 只对冒烟把用例时限与断言等待放宽一倍；本机照默认（30 秒、5 秒），变慢的回归在本机就能发现。产品自己的计时（撤销窗口等）不受影响
+  timeout: external ? 60_000 : 30_000,
+  expect: { timeout: external ? 10_000 : 5_000 },
   reporter: process.env.CI ? 'github' : 'list',
   outputDir: 'test-results',
   use: {

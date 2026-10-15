@@ -178,9 +178,6 @@ async function openLedger(page: Page, path = '/aftersales/ledger'): Promise<void
 test('设为已完成：不要求齐全，标黄「待回填」与「缺 N 项」，5 秒内撤销回到进行中；完整率可筛出缺字段的单（S15 ①、AC-AS-22）', async ({
   page,
 }) => {
-  // 一整条台账流程：开发测试环境的冒烟在远端主机（2 GB）的容器里跑浏览器，每步要 0.3–1.2 秒，这类用例在那里要 22–34 秒，
-  // 默认的 30 秒不够（待办 36 查明的冒烟偶发：没有哪一步卡住，是整条用时超了）
-  test.setTimeout(60_000);
   const customer = `E2E 完成 ${Date.now()}`;
   await loginAs(page, '王磊');
   const number = await register(page, { customer });
@@ -275,9 +272,6 @@ test('行内补登：售后负责人点「补登」填快递单号，为空时�
 test('取消售后单：二次确认，原因必填，勾选保留的已产生费用；取消后只读，「更多」悬停写「这张单已取消」（S15 ②、AC-AS-16）', async ({
   page,
 }) => {
-  // 一整条台账流程：开发测试环境的冒烟在远端主机（2 GB）的容器里跑浏览器，每步要 0.3–1.2 秒，这类用例在那里要 22–34 秒，
-  // 默认的 30 秒不够（待办 36 查明的冒烟偶发：没有哪一步卡住，是整条用时超了）
-  test.setTimeout(60_000);
   const customer = `E2E 取消 ${Date.now()}`;
   await loginAs(page, '王磊');
   const number = await register(page, { customer });
@@ -324,9 +318,6 @@ test('取消售后单：二次确认，原因必填，勾选保留的已产生�
 test('取消弹窗只列已登记的费用项，四项都没登记时没有费用框；别人刚改过时设为已完成与撤销失败都说明原因（S15 补充小样）', async ({
   page,
 }) => {
-  // 一整条台账流程：开发测试环境的冒烟在远端主机（2 GB）的容器里跑浏览器，每步要 0.3–1.2 秒，这类用例在那里要 22–34 秒，
-  // 默认的 30 秒不够（待办 36 查明的冒烟偶发：没有哪一步卡住，是整条用时超了）
-  test.setTimeout(60_000);
   const stamp = Date.now();
   await loginAs(page, '王磊');
   const partial = await register(page, {
