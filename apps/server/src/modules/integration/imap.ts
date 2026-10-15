@@ -61,13 +61,13 @@ export interface ImapSession {
   /** 文件夹此刻的位置（EXAMINE）；「已发送」找不到时抛错，调用方先看 sentFolder */
   position(role: ImapFolderRole): Promise<ImapPosition>;
   /**
-   * 某个 UID 之后到的信（UID FETCH <uid+1>:*，INTERNALDATE 与原文），按 UID 升序；文件夹的 UIDVALIDITY 已不是 uidValidity 时
-   * 抛 CursorExpiredError（文件夹被重建、服务端迁移），调用方按到达时间区间补拉
+   * 某个 UID 之后到的信的 UID 与到达时间（UID FETCH <uid+1>:* 只取 INTERNALDATE，原文由调用方入库前逐封 fetch，不一次读进内存），
+   * 按 UID 升序；文件夹的 UIDVALIDITY 已不是 uidValidity 时抛 CursorExpiredError（文件夹被重建、服务端迁移），调用方按到达时间区间补拉
    */
   fetchAfter(
     role: ImapFolderRole,
     from: { uidValidity: string; uid: number },
-  ): Promise<ImapRawMessage[]>;
+  ): Promise<ImapMessageInfo[]>;
   /**
    * 按日期搜索（SEARCH SINCE <since 那天> [BEFORE <before 那天的次日>]，IMAP 只到日期）后取到达时间，再按 [since, before) 精确筛，
    * 按 UID 升序；返回此刻的 UIDVALIDITY（之后按 UID 取信要对得上）
@@ -353,7 +353,9 @@ export class FakeImap implements FakeClient<ImapClient> {
             if (String(folder.uidValidity) !== from.uidValidity) {
               throw new CursorExpiredError('qiye163', 'fetchAfter');
             }
-            return folder.messages.filter((m) => m.uid > from.uid);
+            return folder.messages
+              .filter((m) => m.uid > from.uid)
+              .map((m) => ({ uid: m.uid, internalDate: m.internalDate }));
           },
           search: async (role, { since, before }) => {
             await this.faults.check('search');

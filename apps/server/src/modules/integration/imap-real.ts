@@ -279,8 +279,18 @@ export function createRealImap(context: RealClientContext): ImapClient {
               throw new CursorExpiredError(SYSTEM, `fetchAfter:${role}`);
             }
             if (mailbox.uidNext <= from.uid + 1) return [];
-            // UID FETCH n:* 在没有更大 UID 时也会返回最后一封，按 UID 再筛一次
-            return (await fetchRaw(`${from.uid + 1}:*`)).filter((m) => m.uid > from.uid);
+            // 只取 UID 与到达时间；UID FETCH n:* 在没有更大 UID 时也会返回最后一封，按 UID 再筛一次
+            const messages: ImapMessageInfo[] = [];
+            for await (const message of client.fetch(
+              `${from.uid + 1}:*`,
+              { uid: true, internalDate: true },
+              { uid: true },
+            )) {
+              if (message.uid > from.uid) {
+                messages.push({ uid: message.uid, internalDate: dateOf(message.internalDate) });
+              }
+            }
+            return messages.sort((a, b) => a.uid - b.uid);
           }),
         search: (role, { since, before }) =>
           recorded(account, `search:${role}`, async () => {

@@ -119,7 +119,8 @@ function addressesOf(list: readonly Address[] | undefined): string[] {
   );
 }
 
-function firstMailbox(address: Address | undefined): MailAddress {
+/** 地址列表里的第一个（地址组取第一个成员），地址小写；没有为空串 */
+export function firstMailbox(address: Address | undefined): MailAddress {
   const mailbox = address?.group ? address.group[0] : address;
   return { name: mailbox?.name.trim() ?? '', address: mailbox?.address.trim().toLowerCase() ?? '' };
 }

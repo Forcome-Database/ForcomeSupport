@@ -311,16 +311,24 @@ describe('163 企业邮箱收信（Fake IMAP）', () => {
   });
 
   describe('UIDVALIDITY、IDLE 掉线与连接状态（6.9，与 Gmail 同口径）', () => {
-    it('UIDVALIDITY 变化：按到达时间区间补拉，补拉期间新到的信也收到，已收过的不重复；之后照常增量', async () => {
+    it('UIDVALIDITY 变化：变了的文件夹按到达时间区间补拉，没变的文件夹照常增量（到达时间早于补拉起点的也收到），已收过的不重复；之后照常增量', async () => {
       t.clock.advance({ minutes: 5 });
       const before = await stored(t);
       const oldValidity = (await syncRow(t))!.imap_cursor!.inbox.uidValidity;
       imap.resetUidValidity(ADDRESS, 'inbox');
       imap.deliver(letter('Cara Diaz', t.clock.now()));
+      // 「已发送」没重建：客户端离线后补存进去的一封，到达时间在补拉起点之前，照常按游标收到
+      imap.send(reply('Offline Sender', new Date(t.clock.now().getTime() - 2 * DAY)));
       await t.runJobs();
       const after = await stored(t);
-      expect(after).toHaveLength(before.length + 1);
-      expect(after.at(-1)?.recognition?.sender.name).toBe('Cara Diaz');
+      expect(after).toHaveLength(before.length + 2);
+      expect(
+        after.find((m) => m.direction === 'inbound' && !before.some((b) => b.id === m.id))
+          ?.recognition?.sender.name,
+      ).toBe('Cara Diaz');
+      const outbound = (list: typeof after) =>
+        list.filter((m) => m.direction === 'outbound').length;
+      expect(outbound(after)).toBe(outbound(before) + 1);
       const row = await syncRow(t);
       expect(row?.imap_cursor?.inbox.uidValidity).not.toBe(oldValidity);
       expect(row?.last_success_at?.toISOString()).toBe(t.clock.now().toISOString());
@@ -328,7 +336,7 @@ describe('163 企业邮箱收信（Fake IMAP）', () => {
       imap.deliver(letter('Dan Wu', t.clock.now()));
       await t.runJobs();
       expect(await ticketsOf(agent, 'Dan Wu')).toHaveLength(1);
-      expect(await stored(t)).toHaveLength(before.length + 2);
+      expect(await stored(t)).toHaveLength(before.length + 3);
     });
 
     it('IDLE 掉线后不算连接失败；新信由每 5 分钟的检查收到，水位与最近同步照常前进；1 分钟后重连上', async () => {
@@ -552,6 +560,36 @@ describe('163 企业邮箱收信（Fake IMAP）', () => {
       });
     });
 
+    it('改了 IMAP 服务器或端口就要重填授权码（不把已保存的授权码发给别的主机，协调者 2026-10-15 决定）：保存与按行测试都不沿用', async () => {
+      const evil = { ...QIYE_ROW, imapHost: 'imap.attacker.example' };
+      const save = await admin.put(
+        `/api/channel/stores/${AUTO.id}`,
+        await autoUpdate(admin, [evil]),
+      );
+      expect(save.status).toBe(400);
+      expect(apiErrorSchema.parse(await save.json()).fields).toEqual({
+        'mailboxes.0.authCode': '请填写客户端授权码',
+      });
+      const port = await admin.put(
+        `/api/channel/stores/${AUTO.id}`,
+        await autoUpdate(admin, [{ ...QIYE_ROW, imapPort: 143 }]),
+      );
+      expect(port.status).toBe(400);
+      const calls = imap.faults.calls.length;
+      const test = await admin.post('/api/channel/mailbox-tests', {
+        address: ADDRESS,
+        imapHost: 'imap.attacker.example',
+        imapPort: 993,
+        storeId: AUTO.id,
+      });
+      expect(test.status).toBe(400);
+      expect(apiErrorSchema.parse(await test.json()).fields).toEqual({
+        authCode: '请填写客户端授权码',
+      });
+      // 没有登录任何主机
+      expect(imap.faults.calls.slice(calls)).toEqual([]);
+    });
+
     it('改成 Gmail 或删掉：保存时一并删掉授权码；再改回 163 企业邮箱必须重新填写', async () => {
       const toGmail = await admin.put(
         `/api/channel/stores/${AUTO.id}`,
@@ -630,7 +668,9 @@ describe('163 企业邮箱收信（Fake IMAP）', () => {
         '登录被拒：网易企业邮箱限制了登录 IP，请管理员在网易后台放行本系统服务器的出口 IP',
       );
       imap.rejectLogin(ADDRESS, 'unreachable');
-      expect(await failure({ ...row, imapHost: 'imaphz.qiye.163.com' })).toMatchObject({
+      expect(
+        await failure({ ...row, imapHost: 'imaphz.qiye.163.com', authCode: 'typed' }),
+      ).toMatchObject({
         reason: 'unreachable',
         message: '连不上 imaphz.qiye.163.com:993：请检查 IMAP 服务器与端口',
       });

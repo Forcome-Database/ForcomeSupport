@@ -213,6 +213,8 @@ export async function listReplyTargets(
   reply: Pick<OutboundMessage, 'id' | 'mailbox' | 'threadId' | 'inReplyTo' | 'references'>,
 ): Promise<ReplyTarget[]> {
   const ids = [...new Set([reply.inReplyTo, ...reply.references].filter((x) => x !== null))];
+  // 没有 In-Reply-To / References 也没有线程（163 企业邮箱）：没有候选（条件全空时不能去查，否则会取出范围内的全部邮件）
+  if (ids.length === 0 && reply.threadId === null) return [];
   const rows = await db
     .select({
       id: message.id,

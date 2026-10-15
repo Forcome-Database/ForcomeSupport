@@ -206,12 +206,16 @@ describe('163 企业邮箱 IMAP 的真实现（imapflow）', () => {
     ).rejects.toBeInstanceOf(ClientNotConfiguredError);
   });
 
-  it('文件夹一律只读 EXAMINE；位置为 UIDVALIDITY 与 UIDNEXT；按 UID 取游标之后的信（UID FETCH n:* 多给的最后一封筛掉）', async () => {
+  it('文件夹一律只读 EXAMINE；位置为 UIDVALIDITY 与 UIDNEXT；按 UID 列游标之后的信（只取到达时间，UID FETCH n:* 多给的最后一封筛掉），原文按 UID 取', async () => {
     const session = await createRealImap(context().ctx).connect(ACCOUNT);
     expect(await session.position('inbox')).toEqual({ uidValidity: '1700000001', uidNext: 4 });
     const after = await session.fetchAfter('inbox', { uidValidity: '1700000001', uid: 1 });
-    expect(after.map((m) => m.uid)).toEqual([2, 3]);
-    expect(new TextDecoder().decode(after[0]!.raw)).toContain('inbox 2');
+    expect(after).toEqual([
+      { uid: 2, internalDate: new Date(Date.UTC(2026, 8, 11, 2)) },
+      { uid: 3, internalDate: new Date(Date.UTC(2026, 8, 12, 2)) },
+    ]);
+    const [raw] = await session.fetch('inbox', '1700000001', [2]);
+    expect(new TextDecoder().decode(raw!.raw)).toContain('inbox 2');
     // 没有新信：不发 FETCH
     expect(await session.fetchAfter('inbox', { uidValidity: '1700000001', uid: 3 })).toEqual([]);
     expect(flow.calls.filter((c) => c.startsWith('open:'))).toEqual(

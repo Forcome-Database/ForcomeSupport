@@ -329,7 +329,13 @@ async function replayImapMail(
     runtime,
     target,
     rules,
-    { role: parsed.role, uidValidity: parsed.uidValidity, message },
+    {
+      role: parsed.role,
+      uidValidity: parsed.uidValidity,
+      uid: message.uid,
+      internalDate: message.internalDate,
+      load: () => Promise.resolve(message),
+    },
     logger,
   );
 }

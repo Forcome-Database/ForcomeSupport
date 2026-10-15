@@ -39,12 +39,14 @@ import {
   type ImapClient,
   type ImapFolderRole,
   type ImapIdle,
+  type ImapMessageInfo,
   type ImapRawMessage,
   type ImapSession,
   type IntegrationClients,
 } from '../integration';
 import { liveMailOpen } from './mail-cutover';
 import {
+  firstMailbox,
   ingestMessage,
   isStored,
   mailboxTarget,
@@ -58,6 +60,7 @@ import {
 import { mailboxHealths, recordMailboxSuccess } from './mailbox-health';
 import type { SenderRule } from './recognition';
 import { mailboxSync, message, store, storeMailbox, type ImapCursor } from './schema';
+import { reusesSavedAuthCode } from './stores';
 import { loadSenderRules } from './sender-rules';
 
 /*
@@ -211,11 +214,33 @@ export async function pollImapMailboxes(runtime: Runtime, logger: Logger): Promi
   logger.debug({ mailboxes: targets.length }, '已排同步（163 企业邮箱每 5 分钟检查）');
 }
 
-/** 一封取到的信：从哪个文件夹（决定方向与消息标识） */
-interface FetchedImapMail {
+/**
+ * 一封要入库的信：从哪个文件夹（决定方向与消息标识）、UID 与到达时间；原文到入库前才取（load），已入库的不取，
+ * 长时间断线后一次取到几千封也不会把原文都读进内存
+ */
+export interface ImapMailRef {
   readonly role: ImapFolderRole;
   readonly uidValidity: string;
-  readonly message: ImapRawMessage;
+  readonly uid: number;
+  readonly internalDate: Date;
+  /** 取原文；已不在服务端（期间被删）为 null */
+  readonly load: () => Promise<ImapRawMessage | null>;
+}
+
+/** 会话里按 UID 取一封的原文 */
+function refsOf(
+  session: ImapSession,
+  role: ImapFolderRole,
+  uidValidity: string,
+  messages: readonly ImapMessageInfo[],
+): ImapMailRef[] {
+  return messages.map((m) => ({
+    role,
+    uidValidity,
+    uid: m.uid,
+    internalDate: m.internalDate,
+    load: async () => (await session.fetch(role, uidValidity, [m.uid]))[0] ?? null,
+  }));
 }
 
 const DIRECTION: Record<ImapFolderRole, MessageDirection> = {
@@ -235,7 +260,6 @@ async function receivedBefore(
   internalDate: Date,
 ): Promise<boolean> {
   const rfcMessageId = messageIdOf(parsed.messageId);
-  const from = (parsed.from?.group?.[0] ?? parsed.from)?.address?.trim().toLowerCase() ?? '';
   const [found] = await runtime.db
     .select({ id: message.id })
     .from(message)
@@ -248,7 +272,7 @@ async function receivedBefore(
           : and(
               isNull(message.rfcMessageId),
               eq(message.receivedAt, internalDate),
-              eq(message.fromAddress, from),
+              eq(message.fromAddress, firstMailbox(parsed.from).address),
               eq(message.subject, parsed.subject?.trim() ?? ''),
             ),
       ),
@@ -262,17 +286,22 @@ export async function ingestImapMail(
   runtime: Runtime,
   target: MailboxTarget,
   rules: readonly SenderRule[],
-  mail: FetchedImapMail,
+  mail: ImapMailRef,
   logger: Logger,
 ): Promise<MailOutcome> {
-  const providerMessageId = imapMessageId(mail.role, mail.uidValidity, mail.message.uid);
+  const providerMessageId = imapMessageId(mail.role, mail.uidValidity, mail.uid);
   if (await isStored(runtime.db, target.address, providerMessageId)) {
     logger.info({ mailbox: target.address, providerMessageId }, '重复消息，已丢弃（E-15）');
     return { result: 'stored' };
   }
+  const raw = await mail.load();
+  if (!raw) {
+    logger.info({ mailbox: target.address, providerMessageId }, '邮件已不存在，跳过');
+    return { result: 'gone' };
+  }
   const direction = DIRECTION[mail.role];
-  const parsed = await PostalMime.parse(mail.message.raw);
-  if (await receivedBefore(runtime, target.address, direction, parsed, mail.message.internalDate)) {
+  const parsed = await PostalMime.parse(raw.raw);
+  if (await receivedBefore(runtime, target.address, direction, parsed, raw.internalDate)) {
     logger.info(
       { mailbox: target.address, providerMessageId },
       '同一封信已经收过（UIDVALIDITY 变化后重新取到），跳过',
@@ -283,27 +312,27 @@ export async function ingestImapMail(
     runtime,
     target,
     rules,
-    { providerMessageId, threadId: null, internalDate: mail.message.internalDate },
+    { providerMessageId, threadId: null, internalDate: raw.internalDate },
     parsed,
     direction,
     logger,
   );
-  return { result, direction, internalDate: mail.message.internalDate };
+  return { result, direction, internalDate: raw.internalDate };
 }
 
 /** 逐封入库（按到达时间先后，同一时刻收件箱在前），返回这次新入库的来信 */
 async function ingestAll(
   runtime: Runtime,
   target: MailboxTarget,
-  mails: readonly FetchedImapMail[],
+  mails: readonly ImapMailRef[],
   logger: Logger,
 ) {
   const rules = await loadSenderRules(runtime.db);
   const tally = new SyncedMailTally();
   const ordered = [...mails].sort(
     (a, b) =>
-      a.message.internalDate.getTime() - b.message.internalDate.getTime() ||
-      (a.role === b.role ? a.message.uid - b.message.uid : a.role === 'inbox' ? -1 : 1),
+      a.internalDate.getTime() - b.internalDate.getTime() ||
+      (a.role === b.role ? a.uid - b.uid : a.role === 'inbox' ? -1 : 1),
   );
   for (const mail of ordered) tally.add(await ingestImapMail(runtime, target, rules, mail, logger));
   return tally.synced;
@@ -312,15 +341,17 @@ async function ingestAll(
 /** 位置失效后从上次成功同步前多久起补拉（同 Gmail：INTERNALDATE 与同步时刻有先后差，多拉一段由去重兜住） */
 const BACKFILL_MARGIN_MS = 60 * 60_000;
 
-/** 按 UID 取信一次最多取几封 */
-const FETCH_BATCH = 50;
-
 interface ImapSyncState {
   readonly imapCursor: ImapCursor;
   readonly lastSuccessAt: Date | null;
   readonly createdAt: Date;
   readonly backfillFrom: Date | null;
   readonly imapBackfillCursor: ImapCursor | null;
+}
+
+/** 补拉期间又遇到 UIDVALIDITY 变化：重新记位置再补一次也没补成，不算连接失败（任务稍后重试） */
+class BackfillRestartedError extends Error {
+  override name = 'BackfillRestartedError';
 }
 
 /**
@@ -350,8 +381,9 @@ async function startBackfill(
 }
 
 /**
- * 区间补拉：两个文件夹各按日期搜索起点之后到达的信、逐封入库，全部完成后才换上新游标、清掉补拉记录并记同步成功。
- * 补拉中途 UIDVALIDITY 又变了：重新记下位置再补一次
+ * 区间补拉：UIDVALIDITY 变了的文件夹按日期搜索起点之后到达的信（只取新游标之前的 UID，之后的留给增量）；没变的文件夹照常按旧游标取增量，
+ * 免得漏掉 UID 在游标之后、到达时间却早于起点的信（例如客户端离线后补存进「已发送」的回信）。逐封入库，全部完成后才换上新游标、
+ * 清掉补拉记录并记同步成功。补拉中途 UIDVALIDITY 又变了：重新记下位置再补一次
  */
 async function backfill(
   runtime: Runtime,
@@ -363,26 +395,36 @@ async function backfill(
   retried = false,
 ): Promise<void> {
   const listedAt = runtime.clock.now();
-  const mails: FetchedImapMail[] = [];
+  const mails: ImapMailRef[] = [];
+  const cursor = { ...range.cursor };
   try {
     for (const role of ['inbox', 'sent'] as const) {
       const expected = range.cursor[role];
       if (!expected || (role === 'sent' && session.sentFolder !== range.cursor.sentFolder)) {
         continue;
       }
+      const old = state.imapCursor[role];
+      const sameFolder =
+        role === 'inbox' || state.imapCursor.sentFolder === range.cursor.sentFolder;
+      if (old && sameFolder && old.uidValidity === expected.uidValidity) {
+        const found = await session.fetchAfter(role, old);
+        mails.push(...refsOf(session, role, old.uidValidity, found));
+        cursor[role] = {
+          uidValidity: old.uidValidity,
+          uid: Math.max(expected.uid, old.uid, ...found.map((m) => m.uid)),
+        };
+        continue;
+      }
       const found = await session.search(role, { since: range.from });
       if (found.uidValidity !== expected.uidValidity) {
         throw new CursorExpiredError('qiye163', `search:${role}`);
       }
-      // 新游标之后到的信留给增量（同一封两边都取到也由去重兜住）
-      const uids = found.messages.map((m) => m.uid).filter((uid) => uid <= expected.uid);
-      for (let i = 0; i < uids.length; i += FETCH_BATCH) {
-        const batch = await session.fetch(role, found.uidValidity, uids.slice(i, i + FETCH_BATCH));
-        mails.push(...batch.map((m) => ({ role, uidValidity: found.uidValidity, message: m })));
-      }
+      const messages = found.messages.filter((m) => m.uid <= expected.uid);
+      mails.push(...refsOf(session, role, found.uidValidity, messages));
     }
   } catch (error) {
-    if (!(error instanceof CursorExpiredError) || retried) throw error;
+    if (!(error instanceof CursorExpiredError)) throw error;
+    if (retried) throw new BackfillRestartedError('补拉期间 UIDVALIDITY 又变了，稍后重试');
     const again = await startBackfill(
       runtime,
       session,
@@ -397,12 +439,7 @@ async function backfill(
   await transaction(runtime, async (tx) => {
     await tx.db
       .update(mailboxSync)
-      .set({
-        imapCursor: range.cursor,
-        backfillFrom: null,
-        imapBackfillCursor: null,
-        updatedAt: tx.now,
-      })
+      .set({ imapCursor: cursor, backfillFrom: null, imapBackfillCursor: null, updatedAt: tx.now })
       .where(eq(mailboxSync.address, target.address));
     await recordMailboxSuccess(tx, target.address, 'qiye163', synced, listedAt);
   });
@@ -470,18 +507,12 @@ export async function syncImapMailbox(
       }
       const listedAt = runtime.clock.now();
       const before = state.imapCursor;
-      const mails: FetchedImapMail[] = [];
+      const mails: ImapMailRef[] = [];
       let sent = before.sent;
       let sentFolder = before.sentFolder;
       try {
         const inbox = await session.fetchAfter('inbox', before.inbox);
-        mails.push(
-          ...inbox.map((m) => ({
-            role: 'inbox' as const,
-            uidValidity: before.inbox.uidValidity,
-            message: m,
-          })),
-        );
+        mails.push(...refsOf(session, 'inbox', before.inbox.uidValidity, inbox));
         if (!session.sentFolder) {
           logger.warn(
             { mailbox: address },
@@ -495,10 +526,7 @@ export async function syncImapMailbox(
           logger.info({ mailbox: address, sentFolder }, '找到「已发送」文件夹，从此刻起收');
         } else {
           const sentMails = await session.fetchAfter('sent', before.sent);
-          const validity = before.sent.uidValidity;
-          mails.push(
-            ...sentMails.map((m) => ({ role: 'sent' as const, uidValidity: validity, message: m })),
-          );
+          mails.push(...refsOf(session, 'sent', before.sent.uidValidity, sentMails));
         }
       } catch (error) {
         if (!(error instanceof CursorExpiredError)) throw error;
@@ -508,7 +536,7 @@ export async function syncImapMailbox(
       }
       const synced = await ingestAll(runtime, target, mails, logger);
       const maxUid = (role: ImapFolderRole) =>
-        Math.max(-1, ...mails.filter((m) => m.role === role).map((m) => m.message.uid));
+        Math.max(-1, ...mails.filter((m) => m.role === role).map((m) => m.uid));
       const next: ImapCursor = {
         inbox: forward(before.inbox, {
           uidValidity: before.inbox.uidValidity,
@@ -521,11 +549,16 @@ export async function syncImapMailbox(
         sentFolder,
       };
       await transaction(runtime, async (tx) => {
-        // 比较旧值再写（同一邮箱的同步不会并行，仍按旧值兜一次）
-        await tx.db
+        // 比较旧值再写：游标在这期间被改过（服务商改了、同步记录被重置）就不记这次同步成功，下一次重新取
+        const advanced = await tx.db
           .update(mailboxSync)
           .set({ imapCursor: next, updatedAt: tx.now })
-          .where(and(eq(mailboxSync.address, address), eq(mailboxSync.imapCursor, before)));
+          .where(and(eq(mailboxSync.address, address), eq(mailboxSync.imapCursor, before)))
+          .returning({ id: mailboxSync.id });
+        if (advanced.length === 0) {
+          logger.warn({ mailbox: address }, '同步期间游标被改过，这次不记同步成功');
+          return;
+        }
         await recordMailboxSuccess(tx, address, 'qiye163', synced, listedAt);
       });
     });
@@ -535,7 +568,9 @@ export async function syncImapMailbox(
       logger.debug({ err: error, mailbox: address }, '没有可用的客户端授权码，不同步');
       return;
     }
-    await noteFailure(runtime, target, error, logger);
+    // 补拉期间 UIDVALIDITY 接连变化不是连接问题：不记失败，任务稍后重试
+    if (!(error instanceof BackfillRestartedError))
+      await noteFailure(runtime, target, error, logger);
     // 授权码错、客户端登录被关、登录 IP 受限：不按任务重试连环登录，等下一次轮询
     if (needsAdmin(error)) return;
     throw error;
@@ -712,12 +747,14 @@ export function createImapIdleFeed(clients: IntegrationClients, appEnv: AppEnv):
       }
       if (signaled.size === 0 && waitSeconds > 0) {
         await new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, waitSeconds * 1000);
-          wake = () => {
+          const done = () => {
             clearTimeout(timer);
+            abort.removeEventListener('abort', done);
             resolve();
           };
-          abort.addEventListener('abort', () => wake?.(), { once: true });
+          const timer = setTimeout(done, waitSeconds * 1000);
+          wake = done;
+          abort.addEventListener('abort', done, { once: true });
         });
         wake = null;
       }
@@ -817,8 +854,8 @@ function failureReason(error: unknown): MailboxTestFailureReason | null {
 
 /**
  * 店铺抽屉里按行「测试连接」（K8，PRD P18，D-28）：用这一行当前填的地址、服务器、端口与授权码登录，看收件箱与「已发送」能否访问。
- * 不保存、不记同步记录、不改连接状态。没带授权码时用该地址已保存的——只认 storeId 给出的店铺里这个地址已登记为 163 企业邮箱且保存过的
- * （新店铺、新加的行、从 Gmail 改来的行都要带）。填错（地址、服务器、端口、授权码）抛 FieldValidationError（接口 400）。
+ * 不保存、不记同步记录、不改连接状态。没带授权码时用该地址已保存的——只认 storeId 给出的店铺里这个地址已登记为 163 企业邮箱、保存过、
+ * 服务器与端口也没改的（新店铺、新加的行、从 Gmail 改来的、改了服务器或端口的都要带，reusesSavedAuthCode）。填错（地址、服务器、端口、授权码）抛 FieldValidationError（接口 400）。
  * 数据来源：生产环境一律真实接口；其余按抽屉当前的选择，不给时按店铺，新店铺为模拟数据
  */
 export async function testMailboxRow(
@@ -836,20 +873,6 @@ export async function testMailboxRow(
   const addressError = mailboxError(address, []);
   if (addressError) errors.address = addressError;
   Object.assign(errors, imapServerErrors({ imapHost: host, imapPort: port }));
-  const [owner] = input.storeId
-    ? await runtime.db
-        .select({ provider: storeMailbox.provider, adapterMode: store.adapterMode })
-        .from(storeMailbox)
-        .innerJoin(store, eq(store.id, storeMailbox.storeId))
-        .where(and(eq(storeMailbox.storeId, input.storeId), eq(storeMailbox.address, address)))
-        .limit(1)
-    : [];
-  const savedUsable =
-    owner?.provider === 'qiye163' &&
-    (await savedMailboxAuthCodes(runtime.db, [address])).has(address);
-  if (!authCode && !savedUsable) errors.authCode = qiyeMailboxMessages.authCodeMissing;
-  if (Object.keys(errors).length > 0) throw new FieldValidationError(errors);
-
   const [storeRow] = input.storeId
     ? await runtime.db
         .select({ adapterMode: store.adapterMode })
@@ -857,6 +880,25 @@ export async function testMailboxRow(
         .where(eq(store.id, input.storeId))
         .limit(1)
     : [];
+  const [owner] = input.storeId
+    ? await runtime.db
+        .select({
+          provider: storeMailbox.provider,
+          imapHost: storeMailbox.imapHost,
+          imapPort: storeMailbox.imapPort,
+        })
+        .from(storeMailbox)
+        .where(and(eq(storeMailbox.storeId, input.storeId), eq(storeMailbox.address, address)))
+        .limit(1)
+    : [];
+  // 沿用已保存的授权码只限这一行的地址、服务器、端口都没改（同保存时的规则，免得把授权码发到别的主机）
+  const savedUsable = reusesSavedAuthCode(
+    owner,
+    { imapHost: host, imapPort: port },
+    (await savedMailboxAuthCodes(runtime.db, [address])).has(address),
+  );
+  if (!authCode && !savedUsable) errors.authCode = qiyeMailboxMessages.authCodeMissing;
+  if (Object.keys(errors).length > 0) throw new FieldValidationError(errors);
   const adapterMode: AdapterMode =
     appEnv === 'production' ? 'real' : (input.adapterMode ?? storeRow?.adapterMode ?? 'fake');
   const imap = clients.forStore(imapClient, { id: input.storeId ?? null, adapterMode });

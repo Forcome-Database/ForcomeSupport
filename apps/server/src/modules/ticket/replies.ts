@@ -243,7 +243,7 @@ export async function attributeReply(
 
 /**
  * 一封来信归并后（同一事务里，调用方已按它取了 lockReplyLinks）：找等着它的我方回复——回复的 In-Reply-To / References
- * 里有它的 Message-ID，或在同一邮箱的同一 Gmail 线程里——排任务重新识别
+ * 里有它的 Message-ID，或在同一邮箱的同一 Gmail 线程里（163 企业邮箱没有线程）——排任务重新识别
  */
 export async function retryWaitingReplies(
   tx: Tx,
@@ -253,6 +253,8 @@ export async function retryWaitingReplies(
     readonly rfcMessageId: string | null;
   },
 ): Promise<void> {
+  // 没有线程（163 企业邮箱）也没有 Message-ID 的来信：没有回复能指向它（条件全空时不能去查，否则会取出整张等待表）
+  if (inbound.threadId === null && !inbound.rfcMessageId) return;
   const waiting = await tx.db
     .select({ channelMessageId: pendingReply.channelMessageId })
     .from(pendingReply)

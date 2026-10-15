@@ -254,7 +254,7 @@ test('P18 页头「查看审计日志」进入 P27；店铺编号点进 P18 并�
         platform: 'shopify',
         sites: ['US'],
         defaultSite: 'US',
-        mailboxes: [`audit-${Date.now()}@forcome-e2e.com`],
+        mailboxes: [{ address: `audit-${Date.now()}@forcome-e2e.com`, provider: 'gmail' }],
         platformId: `audit-${Date.now()}.myshopify.com`,
       }),
     });
