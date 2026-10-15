@@ -8,7 +8,7 @@
 
 /** 页头（原型 p17_p1()：标题「报表」，说明「数据来源：…· 更新于 10:12」，其下两条注） */
 export const PAGE_TITLE = '报表';
-export const SOURCES = '数据来源：工单（Gmail）、平台订单、登记台账';
+export const SOURCES = '数据来源：工单（店铺邮箱）、平台订单、登记台账';
 export const UPDATED = {
   /** 「更新于 10:12」（今天写时分，跨天「09-10 10:12」，不在今年带年份；从没同步成功过写「—」，Q6） */
   at: (time: string) => `更新于 ${time}`,

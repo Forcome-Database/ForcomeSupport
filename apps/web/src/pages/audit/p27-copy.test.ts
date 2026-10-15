@@ -157,7 +157,7 @@ describe('K18 补充小样（待办 30，10-05 用户确认）', () => {
       STATES_ADMIN,
       rangeHead({ period: 'custom', from: '2026-09-01', to: '2026-09-11' }, '2026-09-11'),
     );
-    expectIn(STATES_ADMIN, LIST_HEAD.count(5, 1));
+    expectIn(STATES_ADMIN, LIST_HEAD.count(6, 1));
     expectText(STATES_ADMIN, EMPTY.title);
     expectIn(
       STATES_ADMIN,

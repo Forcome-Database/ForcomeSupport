@@ -35,7 +35,9 @@ test('管理员打开 P18：渠道卡与示例数据的 4 个店铺', async ({ p
 
   await expect(page.getByRole('heading', { name: '渠道与店铺' })).toBeVisible();
   await expect(
-    page.getByText('订单由平台直读；客户来信统一经 Gmail 收取。店铺决定订单匹配与数据权限。'),
+    page.getByText(
+      '订单由平台直读；客户来信经店铺进线邮箱（Gmail 或 163 企业邮箱）收取。店铺决定订单匹配与数据权限。',
+    ),
   ).toBeVisible();
   for (const card of ['amazon', 'shopify', 'gmail', 'dingtalk']) {
     // 开发测试环境接的是模拟数据，卡头另标「模拟数据」（K20）

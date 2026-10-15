@@ -48,7 +48,7 @@ test('客服主管：标题下数据来源与「更新于」、两条注，三�
   await page.goto('/reports');
   await expect(page.getByRole('heading', { name: '报表' })).toBeVisible();
   await expect(page.getByTestId('report-sources')).toHaveText(
-    /^数据来源：工单（Gmail）、平台订单、登记台账 · 更新于 /,
+    /^数据来源：工单（店铺邮箱）、平台订单、登记台账 · 更新于 /,
   );
   await expect(page.getByText('只统计经店铺邮箱发出的回复')).toBeVisible();
   if (data.shopifyBackfillDays) {

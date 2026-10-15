@@ -188,7 +188,7 @@ describe('Shopify 卡（待办 11，套用 Gmail 的写法、按店铺）', () =
     expect(channelCardLines(failed, STORES)).toEqual([
       'forcome.com 访问失败（10:05 起连续 5 次）：请检查 Admin API 应用凭据与授权范围',
       'forcome.mx 访问失败（10:12 起连续 3 次）：请检查 Admin API 应用凭据与授权范围',
-      '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
+      '该店铺订单暂停同步，恢复后自动补拉；来信照常收取',
     ]);
     expect(needsRecheck(failed)).toBe(true);
     const mixed = shopify({
@@ -200,7 +200,7 @@ describe('Shopify 卡（待办 11，套用 Gmail 的写法、按店铺）', () =
     });
     expect(channelCardLines(mixed, STORES)).toEqual([
       'forcome.mx 访问失败（10:05 起连续 3 次）：请检查 Admin API 应用凭据与授权范围',
-      '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
+      '该店铺订单暂停同步，恢复后自动补拉；来信照常收取',
       'forcome.com 10:04 后未同步成功，超过 10 分钟',
     ]);
   });
@@ -240,7 +240,7 @@ describe('亚马逊卡（待办 12 Q1、Q2，套用 Shopify 的写法、按店�
     });
     expect(channelCardLines(failed, STORES)).toEqual([
       'Forcome Auto 访问失败（10:05 起连续 3 次）：请检查 SP-API 应用凭据与卖家授权',
-      '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
+      '该店铺订单暂停同步，恢复后自动补拉；来信照常收取',
       'Forcome Direct 10:04 后未同步成功，超过 10 分钟',
     ]);
     expect(needsRecheck(failed)).toBe(true);

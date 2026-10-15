@@ -800,9 +800,10 @@ def k20():
         ('钉钉连接异常 · 只提醒管理员、不出横幅', BS.dingtalk_card(err=True)),
         ('Gmail 几个邮箱同时异常、一个延迟（横幅同 G4）', BS.gmail_card_p1('异常与延迟')),
         ('钉钉从没同步成功过 · 连续 3 次失败', BS.dingtalk_card(err='never'))]), 3, 12)
-    tests = row(toast('success', '连接正常', 'Gmail：4 个邮箱均可访问') + toast('success', '连接正常', '钉钉：通讯录可访问') +
+    n_mail = lambda p: sum(1 for s_ in STORES if s_['provider'] == p)  # 测试连接浮层的邮箱数按示例数据（D-28 后 Gmail 3 个、163 企业邮箱 1 个）
+    tests = row(toast('success', '连接正常', 'Gmail：%d 个邮箱均可访问' % n_mail('Gmail')) + toast('success', '连接正常', '钉钉：通讯录可访问') +
                 toast('error', '测试连接失败：support@forcome.mx 无法访问', GMAIL_GUIDE) +
-                toast('success', '连接正常', '163 企业邮箱：1 个邮箱均可访问') +
+                toast('success', '连接正常', '163 企业邮箱：%d 个邮箱均可访问' % n_mail(QIYE)) +
                 toast('error', '测试连接失败：%s 无法访问' % QIYE_ISSUE['mailbox'], QIYE_GUIDE) +
                 toast('error', '测试连接失败：钉钉通讯录无法访问', '请检查应用凭据与通讯录权限') +
                 toast('success', '连接正常', 'Shopify：2 个店铺均可访问') +

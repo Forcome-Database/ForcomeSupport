@@ -182,7 +182,7 @@ test('亚马逊卡连接异常：每个异常的店铺一行原因与恢复指�
   await expect(amazon).toContainText('连接异常');
   await expect(amazon.getByTestId('channel-card-lines').locator('> div')).toHaveText([
     'Forcome Auto 访问失败（10:05 起连续 3 次）：请检查 SP-API 应用凭据与卖家授权',
-    '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
+    '该店铺订单暂停同步，恢复后自动补拉；来信照常收取',
     'Forcome Direct 10:04 后未同步成功，超过 10 分钟',
     '订单通知队列（SQS）正常 · 积压 0',
   ]);
@@ -389,7 +389,7 @@ test('Shopify 卡连接异常：每个异常的店铺一行原因与恢复指引
   await expect(shopify).toContainText('连接异常');
   await expect(shopify.getByTestId('channel-card-lines').locator('> div')).toHaveText([
     'forcome.mx 访问失败（10:05 起连续 4 次）：请检查 Admin API 应用凭据与授权范围',
-    '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
+    '该店铺订单暂停同步，恢复后自动补拉；来信照常收取',
     'forcome.com 10:04 后未同步成功，超过 10 分钟',
   ]);
   // 第一阶段没有「重新授权」与错误日志页

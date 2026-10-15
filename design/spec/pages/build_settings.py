@@ -305,9 +305,9 @@ def phase2_card(ic, name, desc):
 
 def p18_channels_p1():
     """第一阶段渠道卡（K20）：订单同步、回补与来信收取（Gmail、163 企业邮箱各一张）；不显示 17TRACK。
-    积加与易仓第二阶段接入，合成一张灰色虚线卡（加了 163 企业邮箱卡后仍是 3 × 2，待办 34）。"""
+    积加与易仓第二阶段接入，合成一张灰色虚线卡（加了 163 企业邮箱卡后仍是 3 × 2，待办 34）；说明沿用原来两张卡的两句。"""
     return grid3([amazon_card_p1(), shopify_card_p1(), gmail_card_p1(), qiye_card_p1(), dingtalk_card(late=True),
-                  phase2_card('link', '积加 ERP · 易仓海外仓', '亚马逊订单收件人、库存、售后出库单、单号与运费；易仓经积加读写，本系统不直连易仓接口。')])
+                  phase2_card('link', '积加 ERP · 易仓海外仓', '亚马逊订单收件人、库存、售后出库单、单号与运费。库存与售后出库单经积加读写，本系统不直连易仓接口。')])
 
 
 def copy_val(v):

@@ -10,7 +10,7 @@ import { adapterModeLabels, ORDER_QUEUE_NAME } from '@forcome/contracts';
 /** 页头标题与说明（P18「第一阶段」） */
 export const PAGE_TITLE = '渠道与店铺';
 export const PAGE_DESCRIPTION =
-  '订单由平台直读；客户来信统一经 Gmail 收取。店铺决定订单匹配与数据权限。';
+  '订单由平台直读；客户来信经店铺进线邮箱（Gmail 或 163 企业邮箱）收取。店铺决定订单匹配与数据权限。';
 
 /** 设置菜单的标题与底注（第一阶段；菜单项的名字取 lib/pages.ts 的页面名） */
 export const MENU_TITLE = '设置';
@@ -22,7 +22,7 @@ export const CHANNEL_SECTION = { label: '渠道连接', ruleLabel: '卡片状态
 /** 「渠道连接」旁 ⓘ 的说明 */
 export const RULE_CARD_STATE =
   '卡片显示该渠道下最差的状态，并列出异常的邮箱或店铺；店铺表「状态」列显示该店铺各连接的状态。' +
-  '同步延迟按数据源阈值：Gmail、订单 10 分钟，钉钉 2 小时；连续 3 次失败为连接异常。' +
+  '同步延迟按数据源阈值：邮箱、订单 10 分钟，钉钉 2 小时；连续 3 次失败为连接异常。' +
   '钉钉例外：异常只在钉钉卡显示、只提醒管理员，不出全站横幅（6.9）。';
 
 /** 店铺表「进线识别」ⓘ 的说明（第一阶段版，与 PRD D-26 一致；10-05 用户确认） */
@@ -30,7 +30,7 @@ export const RULE_ROUTE =
   '亚马逊按买家消息的收件邮箱与发件域名（amazon.com / .ca / .com.mx）识别店铺和站点；Shopify 按客服邮箱。' +
   '一个店铺可以登记多个进线邮箱（含别名）。识别不出的来信进入「未归属店铺」队列，由客服主管指定店铺。';
 
-/** 渠道卡的卡名与按数据写的说明行（K20：「2 个店铺 · 订单经 SP-API 准实时同步」「4 个邮箱：2 个亚马逊买家消息、2 个 Shopify 客服」） */
+/** 渠道卡的卡名与按数据写的说明行（K20：「2 个店铺 · 订单经 SP-API 准实时同步」「3 个邮箱：1 个亚马逊买家消息、2 个 Shopify 客服」） */
 export const CHANNEL_CARDS = {
   amazon: {
     name: '亚马逊 SP-API',
@@ -82,7 +82,7 @@ export const GMAIL_ISSUE_LINES = {
 export const SHOPIFY_ISSUE_LINES = {
   failed: (store: string, since: string, failures: number) =>
     `${store} 访问失败（${since} 起连续 ${failures} 次）：请检查 Admin API 应用凭据与授权范围`,
-  held: '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
+  held: '该店铺订单暂停同步，恢复后自动补拉；来信照常收取',
   delayed: (store: string, last: string) => `${store} ${last} 后未同步成功，超过 10 分钟`,
 } as const;
 
@@ -94,7 +94,7 @@ export const SHOPIFY_ISSUE_LINES = {
 export const AMAZON_ISSUE_LINES = {
   failed: (store: string, since: string, failures: number) =>
     `${store} 访问失败（${since} 起连续 ${failures} 次）：请检查 SP-API 应用凭据与卖家授权`,
-  held: '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取',
+  held: '该店铺订单暂停同步，恢复后自动补拉；来信照常收取',
   delayed: (store: string, last: string) => `${store} ${last} 后未同步成功，超过 10 分钟`,
 } as const;
 

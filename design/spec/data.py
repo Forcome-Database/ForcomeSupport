@@ -746,7 +746,7 @@ QIYE_ROW_TESTS = [
     ('success', '连接正常：收件箱与「已发送」均可访问'),
     ('danger', '登录失败：%s' % QIYE_GUIDE),
     ('danger', '登录被拒：网易企业邮箱限制了登录 IP，请管理员在网易后台放行本系统服务器的出口 IP'),
-    ('danger', '连不上 imap.qiye.163.com:993：请检查 IMAP 服务器与端口'),
+    ('danger', '连不上 %s:%s：请检查 IMAP 服务器与端口' % (QIYE_DEFAULTS['imap_host'], QIYE_DEFAULTS['imap_port'])),
     ('danger', '找不到「已发送」文件夹：请在网易企业邮箱里确认有「已发送」'),
 ]
 # Shopify 订单同步（待办 11 · 协调者 10-06 决定，套用 Gmail 已确认的写法）：某个店铺的连接异常与同步延迟示例（店铺、连续失败从几点起与次数、
@@ -1170,7 +1170,8 @@ MODEL_BREAKER_DEMO = {'use': 'summarize', 'at': '10:05', 'why': '5 分钟内失�
 HEALTH = {
     'checked': '10:20', 'heartbeat': '10:20:05', 'backup': '03:10', 'wal': '10:19', 'drill': '07-15',
     # 数据源：(名称, 最近同步, 阈值, 状态)
-    'sources': [('Gmail · 3 个邮箱', CHANNEL_SYNC['Gmail'], '10 分钟', '已连接'), ('163 企业邮箱 · 1 个邮箱', CHANNEL_SYNC['163 企业邮箱'], '10 分钟', '已连接'),
+    'sources': [('Gmail · %d 个邮箱' % sum(s['provider'] == 'Gmail' for s in STORES), CHANNEL_SYNC['Gmail'], '10 分钟', '已连接'),
+                ('163 企业邮箱 · %d 个邮箱' % sum(s['provider'] == QIYE for s in STORES), CHANNEL_SYNC['163 企业邮箱'], '10 分钟', '已连接'),
                 ('亚马逊订单 · SQS', CHANNEL_SYNC['SP-API'], '10 分钟', '已连接'),
                 ('Shopify 订单', CHANNEL_SYNC['Shopify'], '10 分钟', '已连接'), ('积加', CHANNEL_SYNC['积加'], '10 分钟', '已连接'),
                 ('17TRACK', '10:10', '5 小时', '已连接'), ('钉钉通讯录', CHANNEL_SYNC['钉钉'], '2 小时', '已连接'), ('汇率', '09-11 06:00', '1 天', '已连接')],

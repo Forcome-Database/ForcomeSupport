@@ -98,7 +98,7 @@ describe('P18 第一期参照页', () => {
     for (const card of Object.values(CHANNEL_CARDS)) expectIn(P18, card.name);
     expectIn(P18, CHANNEL_CARDS.amazon.stores(2));
     expectIn(P18, CHANNEL_CARDS.shopify.stores(2));
-    expectIn(P18, CHANNEL_CARDS.gmail.mailboxes(2, 2));
+    expectIn(P18, CHANNEL_CARDS.gmail.mailboxes(1, 2));
     expectIn(P18, CARD_LINES.gmailSent);
     expectIn(P18, LAST_SYNC('10:12'));
     expectIn(P18, connectionStatusLabels.connected);
@@ -219,7 +219,7 @@ describe('K20 补充小样：卡片的异常写法与「测试连接」（待办
     expectText(STATES_ADMIN, GMAIL_ISSUE_LINES.held);
     expectText(STATES_ADMIN, GMAIL_ISSUE_LINES.recheck);
     // 几个邮箱同时异常、另有一个延迟（E2、E3 协调者决定）：次数为实际的连续失败次数
-    expectText(STATES_ADMIN, GMAIL_ISSUE_LINES.failed('amz-auto@forcome.com', '10:12', 3));
+    expectText(STATES_ADMIN, GMAIL_ISSUE_LINES.failed('amz-direct@forcome.com', '10:12', 3));
     expectText(STATES_ADMIN, GMAIL_ISSUE_LINES.failed('support@forcome.mx', '10:05', 5));
     expectText(STATES_ADMIN, GMAIL_ISSUE_LINES.delayed('support@forcome.com', '10:06'));
   });
@@ -235,7 +235,7 @@ describe('K20 补充小样：卡片的异常写法与「测试连接」（待办
   it('「测试连接」按钮与结果浮层（Q4 用户确认）', () => {
     expectText(P18, CONNECTION_TEST.button);
     expectText(STATES_ADMIN, CONNECTION_TEST.okTitle);
-    expectText(STATES_ADMIN, CONNECTION_TEST.ok.gmail(4));
+    expectText(STATES_ADMIN, CONNECTION_TEST.ok.gmail(3));
     expectText(STATES_ADMIN, CONNECTION_TEST.ok.dingtalk);
     expectText(STATES_ADMIN, `${CONNECTION_TEST.failedAction}失败：support@forcome.mx 无法访问`);
     expectText(STATES_ADMIN, `${CONNECTION_TEST.failedAction}失败：钉钉通讯录无法访问`);
