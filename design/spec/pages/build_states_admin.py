@@ -111,16 +111,18 @@ def k6():
 
 # ---------------------------------------------------------------- K7 渠道断开
 def k7():
-    # 横幅同 G4（data.G4_BANNER，待办 09 Q1 · 10-06 用户确认）；本图为管理员视角，有「查看渠道状态」
-    top = banner('danger', *G4_BANNER, action=btn('查看渠道状态', 'secondary', 'sm'))
+    # 横幅同 G4（data.G4_BANNER，待办 09 Q1 · 10-06 用户确认）；本图为管理员视角，有「查看渠道状态」。
+    # Gmail 与 163 企业邮箱同时异常：横幅各一条，恢复指引按服务商（D-28，待办 34）
+    top = col(banner('danger', *G4_BANNER, action=btn('查看渠道状态', 'secondary', 'sm')) +
+              banner('danger', *G4_BANNER_QIYE, action=btn('查看渠道状态', 'secondary', 'sm')), 8)
     im = BS.ch_card('users', '钉钉', state('已连接'), ['通讯录同步 · 工作通知 · 登录'], '', 'ok')
     cards = '<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: stretch;">%s%s%s</div>' % (
-        BS.amazon_card(), BS.gmail_card(err=True), im)
+        BS.gmail_card(err=True), BS.qiye_card(err=True), im)
     return frame(top + cards)
 
 
 # ---------------------------------------------------------------- K8 新增店铺校验
-K8_H = 860
+K8_H = 940
 
 
 def multi_select(values):
@@ -130,24 +132,61 @@ def multi_select(values):
         T['line_strong'], row(chips, 4), icon('chev_d', 14, T['ink4']))
 
 
-def err_chip(t):
-    """填错的进线邮箱小标签：描边小标签换成红色边线与红字（抽屉里已加入的邮箱被其他店铺占用时）。"""
-    return chip(t, 'outline', 11).replace('color: %s; background: #ffffff; border: 1px solid %s;' % TONES['outline'][0::2], 'color: %s; background: #ffffff; border: 1px solid %s;' % (T['bad'], T['bad_solid']))
+def mb_test(tone, t):
+    """「测试连接」的行内结果：成功绿勾，失败红色并写原因与处理（data.QIYE_ROW_TESTS）。"""
+    c, ic = (T['ok'], 'check_c') if tone == 'success' else (T['bad'], 'alert')
+    return row(icon(ic, 13, c, 2) + text(t, 12, c), 4, 'flex-start')
 
 
-def err_lines(lines):
-    """字段下方的多条错误（进线邮箱每个地址一条）。"""
-    return col(''.join('<div style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: %s;">%s%s</div>' % (T['bad'], icon('alert', 13, T['bad'], 2), t) for t in lines), 4)
+def mb_row(addr, provider='Gmail', st='default', error=None, qiye=None):
+    """进线邮箱的一行（D-28，待办 34）：地址 + 服务商（Gmail / 163 企业邮箱）+ 移除。服务商为 163 企业邮箱时下方展开一块：
+    客户端授权码（只写不显：新填时为密码框，已保存时写「已保存」+「重新填写」）、IMAP 服务器与端口（默认 imap.qiye.163.com:993）、
+    第二阶段起另有 SMTP 服务器与端口，以及「测试连接」与行内结果。
+    qiye: {'code': 'new' | 'saved' | 'empty', 'test': None | 'testing' | (色调, 写法), 'smtp': bool, 'code_st': 输入框状态}"""
+    top = row('<div style="flex: 1; min-width: 0px;">%s</div>' % input_box(addr, '例如 support@forcome.mx', st) +
+              select_box(provider, width='132px') + icon_btn('x', size=32, title='移除这个邮箱'), 6)
+    err = '<div style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: %s;">%s%s</div>' % (T['bad'], icon('alert', 13, T['bad'], 2), error) if error else ''
+    if not qiye:
+        return col(top + err, 6)
+    q = QIYE_DEFAULTS
+    code = qiye.get('code', 'new')
+    code_hint = '不是登录密码：管理员在网易企业邮箱开启 IMAP 与客户端登录后，为这个邮箱生成；保存后不再显示'
+    if code == 'saved':
+        code_f = field('客户端授权码', row('<div style="flex: 1; min-width: 0px;">%s</div>' % input_box('已保存', st='readonly', icon_name='lock') + link('重新填写', 12), 10), True)
+    elif code == 'empty':
+        code_f = field('客户端授权码', input_box(None, '粘贴客户端授权码', 'error'), True, error='请填写客户端授权码')
+    else:
+        code_f = field('客户端授权码', input_box('••••••••••••••••', st=qiye.get('code_st', 'default')), True, hint=code_hint)
+    srv = lambda name, host, port: grid(field('%s 服务器' % name, input_box(host), True) + field('端口', input_box(port, mono=True), True), 2, 8, '1fr 84px')
+    servers = srv('IMAP', q['imap_host'], q['imap_port']) + (srv('SMTP', q['smtp_host'], q['smtp_port']) if qiye.get('smtp') else '')
+    t = qiye.get('test')
+    if t == 'testing':
+        test = row(btn('测试中', 'secondary', 'sm', loading=True) + nowrap('正在登录并检查收件箱与「已发送」', 12, T['ink3']), 8)
+    else:
+        test = row(btn('测试连接', 'secondary', 'sm') + (mb_test(*t) if t else nowrap('不保存也能测，用这一行当前填的内容', 12, T['ink4'])), 8, 'flex-start')
+    panel_ = '<div style="border: 1px solid %s; border-radius: 8px; background: %s; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px;">%s%s%s</div>' % (
+        T['line'], T['subtle'], code_f, servers, test)
+    return col(top + err + panel_, 6)
+
+
+def mb_field(rows_html, hint='每个地址都用来识别店铺；寄到这些地址的未归属来信保存后自动归位'):
+    """「进线邮箱」字段：逐行登记，末尾「添加进线邮箱」，字段下方写提示。"""
+    return field('进线邮箱（可填多个，含别名）', col(rows_html + '<div style="display: flex;">%s</div>' % link('添加进线邮箱', 12, 'plus'), 8), True, hint=hint)
 
 
 def k8_more():
     """K8 的补充小样（第一阶段实现时确认，10-05）：进线邮箱的提示、亚马逊店铺的平台标识、进线邮箱重复、必填项、编辑抽屉、保存结果、店铺表为空、新增时的未保存离开。"""
     amz = field('平台标识 · 亚马逊卖家 ID', input_box(None, '例如 A1FD7Q2M9XK3LC', 'error'), True, error='请填写卖家 ID')
-    hint = field('进线邮箱（可填多个，含别名）', col(row(chip('support@forcome.mx', 'outline', 11) + chip('ventas@forcome.mx', 'outline', 11), 6) + input_box(), 6), True,
-                 hint='每个地址都用来识别店铺；寄到这些地址的未归属来信保存后自动归位')
-    mails = ('<div style="display: flex; flex-direction: column; gap: 6px;"><div style="font-size: 12px; font-weight: 600; color: %s;">进线邮箱（可填多个，含别名）<span style="color: %s; margin-left: 2px;">*</span></div>%s%s%s</div>' % (
-        T['ink2'], T['bad'], row(err_chip('support@forcome.mx') + chip('ventas@forcome.mx', 'outline', 11), 6), input_box('ventas@forcome.mx', st='error'),
-        err_lines(['ventas@forcome.mx 已经填过', 'support@forcome.mx 已是 forcome.mx 的进线邮箱'])))
+    narrow = lambda h: '<div style="width: 400px;">%s</div>' % h  # 抽屉内容区宽 400
+    hint = narrow(mb_field(mb_row('support@forcome.mx') + mb_row('ventas@forcome.mx')))
+    mails = narrow(mb_field(mb_row('support@forcome.mx', st='error', error='support@forcome.mx 已是 forcome.mx 的进线邮箱') +
+                            mb_row('ventas@forcome.mx') + mb_row('ventas@forcome.mx', st='error', error='ventas@forcome.mx 已经填过'), hint=None))
+    # 163 企业邮箱的行（D-28，待办 34；示例为 Forcome Auto 的 amz-auto@forcome.com）
+    q_new = narrow(mb_field(mb_row('amz-auto@forcome.com', QIYE, qiye={'code': 'empty'}), hint=None))
+    q_saved = narrow(mb_field(mb_row('amz-auto@forcome.com', QIYE, qiye={'code': 'saved', 'test': QIYE_ROW_TESTS[0]})))
+    q_testing = narrow(mb_row('amz-auto@forcome.com', QIYE, qiye={'code': 'new', 'test': 'testing'}))
+    q_tests = col(''.join(mb_test(*t) for t in QIYE_ROW_TESTS), 8)
+    q_full = narrow(mb_row('amz-auto@forcome.com', QIYE, qiye={'code': 'saved', 'smtp': True}))
     empty_selects = grid(field('平台', select_box(st='error'), True, error='请选择平台') +
                          field('默认站点', select_box(st='error'), True, error='请选择默认站点'), 2, 12, extra='align-items: start;')
     required = empty_selects + col(''.join(row(icon('alert', 13, T['bad'], 2) + nowrap(t, 12, T['bad']), 4) for t in
@@ -161,9 +200,14 @@ def k8_more():
     none = card(empty('store', '还没有店铺', '新增店铺并登记进线邮箱后，来信才能识别店铺、匹配订单。', btn('新增店铺', 'secondary', 'md', 'plus')), pad='0px')
     leave = dialog('离开前保存修改？', muted('「新增店铺」填写的内容还没保存，放弃后不保留。', 13),
                    btn('继续编辑', 'secondary', st='focus') + btn('放弃修改', 'danger_outline') + btn('保存并离开', 'primary'), 460, 'warning')
-    return frame(cap('进线邮箱 · 没有错误时字段下方写提示') + hint +
+    return frame(cap('进线邮箱 · 逐行登记地址与服务商（新加的行默认 Gmail），没有错误时字段下方写提示') + hint +
                  cap('亚马逊店铺 · 平台标识为空') + amz +
-                 cap('进线邮箱重复 · 输入框里的与已填的重复、已加入的被其他店铺占用') + mails +
+                 cap('进线邮箱重复 · 同一个地址填了两行、已被其他店铺占用（每个地址一条错误，写在该行下方）') + mails +
+                 cap('163 企业邮箱 · 新加的行或从 Gmail 改为 163 企业邮箱：授权码必填，IMAP 服务器与端口预填默认值、可改（不同机房的地址不同）') +
+                 grid(q_new + q_testing, 2, 24, extra='align-items: start;') +
+                 cap('163 企业邮箱 · 已保存：授权码只写不显，写「已保存」，点「重新填写」清空后重填（不改就沿用原来的）；测试连接通过') + q_saved +
+                 cap('163 企业邮箱 · 「测试连接」的行内结果（成功、授权码或客户端登录、登录 IP 限制、服务器与端口、找不到「已发送」）；测试不保存、不改连接状态') + q_tests +
+                 cap('163 企业邮箱 · 第二阶段起另有 SMTP 服务器与端口（默认 smtp.qiye.163.com:465），第一阶段不显示') + q_full +
                  cap('其余必填项为空：下拉没选时写占位「请选择」（未选平台时平台标识写「平台标识」）') + required +
                  cap('编辑店铺 · 抽屉标题') + edit_head +
                  cap('保存结果') + grid(ok + fail, 2, 12, extra='align-items: start;') +
@@ -180,8 +224,7 @@ def k8():
                       muted('生产环境不显示此项；接模拟数据时渠道卡头标「模拟数据」。', 12), '10px 12px', 8)
     body = (grid(field('平台', select_box('Shopify'), True) + field('店铺名', input_box('forcome.com', st='error'), True, error='店铺名已存在，请换一个'), 2, 12, extra='align-items: start;') +
             grid(field('站点（多选）', multi_select(['MX']), True) + field('默认站点', select_box('MX'), True, hint='无订单的来信按它归站点'), 2, 12, extra='align-items: start;') +
-            field('进线邮箱（可填多个，含别名）', col(row(chip('support@forcome.mx', 'outline', 11) + chip('ventas@forcome.mx', 'outline', 11), 6) + input_box('info@forcome', st='error'), 6), True,
-                  error='邮箱格式不正确，例如 info@forcome.mx', hint='每个地址都用来识别店铺；寄到这些地址的未归属来信保存后自动归位') +
+            mb_field(mb_row('support@forcome.mx') + mb_row('ventas@forcome.mx') + mb_row('info@forcome', st='error', error='邮箱格式不正确，例如 info@forcome.mx'), hint=None) +
             field('平台标识 · Shopify 店铺域名', input_box(None, '例如 forcome-mx.myshopify.com', 'error'), True, error='请填写店铺域名') +
             field('签名', input_box('Forcome México'), hint='回复末尾使用') +
             field('覆盖项', over, hint='可覆盖签名、政策口径、模板、素材与链接白名单、SLA 内部目标') + dev)
@@ -661,7 +704,7 @@ def p17_p1_notes():
 
 def p17_p1(P):
     """第一阶段 P17（周敏）：筛选去掉标签；3 个指标；每日工单量 + 售后成本按责任类型；标题下两条注（prd_c P17「第一阶段」）。"""
-    desc = col(nowrap('数据来源：工单（Gmail）、平台订单、登记台账 · 更新于 %s' % report_updated(), 13, T['ink3']) + p17_p1_notes(), 6)
+    desc = col(nowrap('数据来源：工单（店铺邮箱）、平台订单、登记台账 · 更新于 %s' % report_updated(), 13, T['ink3']) + p17_p1_notes(), 6)
     head = page_head('报表', desc, btn('导出', 'secondary', 'md', 'download'))
     # 指标数字为示例；界面不显示「指标为示例数据」（图注，待办 24 协调者 10-14 决定 Q1）
     filt = row(seg(['近 7 天', '本月', '自定义'], '近 7 天') + nowrap('09-05 至 09-11', 12, T['ink3']) + divider(True, 16) +
@@ -717,7 +760,7 @@ def k19_more(P):
                         'P13 没有「未登记」的责任筛选，这一条不可点，悬停不写下钻。成本卡随店铺筛选（下钻带店铺），不随时间与站点') +
                     p17_p1_cost(P, extra=[R_COST_UNREGISTERED], hover=4, tip=plain_tip('%s · %s' % (un, money(uv)), ['%d 单 · 责任类型未登记' % uc])), w=half)
     cost_none = frame(cap('⑦ 本月还没有登记的售后成本（不含待确认）：卡头 $0.00 · 0 单，没有条；「查看明细」照常进 P13 本月') + p17_p1_cost_empty(P), w=half)
-    busy = page_head('报表', nowrap('数据来源：工单（Gmail）、平台订单、登记台账 · 更新于 %s' % report_updated(), 13, T['ink3']),
+    busy = page_head('报表', nowrap('数据来源：工单（店铺邮箱）、平台订单、登记台账 · 更新于 %s' % report_updated(), 13, T['ink3']),
                      btn('正在生成，约 3 秒', 'secondary', 'md', loading=True))
     done = '<div style="display: flex; justify-content: flex-end;">%s</div>' % toast('success', '已导出 ' + EXPORT_FILE, '已记入审计日志')
     export = frame(cap('⑧ 导出（K5）：按当前筛选（期间、店铺、站点）与字段权限同步生成一个 xlsx——「指标」（条件与三个指标的本期、上一周期、对比）、「每日工单量」、'
@@ -747,6 +790,7 @@ def k20():
     ]
     strip = grid(''.join(col(c + nowrap(t, 11, T['ink3'], 600), 6) for t, c in samples), 5, 12)
     st_col = row(nowrap('店铺表「状态」列的写法：', 12, T['ink3']) + BS.store_status(S) + BS.store_status(S, ('Gmail', '同步延迟')) + BS.store_status(S, ('SP-API', '连接异常')) +
+                 BS.store_status(STORES[1], (QIYE, '连接异常')) +
                  muted('（店铺任一连接异常时，所属渠道卡同时显示最差状态）', 12), 14)
     ding = '<div style="width: 470px;">%s</div>' % BS.dingtalk_card(phase1=True)
     # 补充小样（待办 09 Q2–Q4、Q6 · 10-06 用户确认）：Gmail 卡同步延迟与连接异常、钉钉卡连接异常的第一阶段写法；「测试连接」的结果浮层
@@ -757,7 +801,9 @@ def k20():
         ('Gmail 几个邮箱同时异常、一个延迟（横幅同 G4）', BS.gmail_card_p1('异常与延迟')),
         ('钉钉从没同步成功过 · 连续 3 次失败', BS.dingtalk_card(err='never'))]), 3, 12)
     tests = row(toast('success', '连接正常', 'Gmail：4 个邮箱均可访问') + toast('success', '连接正常', '钉钉：通讯录可访问') +
-                toast('error', '测试连接失败：support@forcome.mx 无法访问', '请检查全域委派范围与邮箱状态') +
+                toast('error', '测试连接失败：support@forcome.mx 无法访问', GMAIL_GUIDE) +
+                toast('success', '连接正常', '163 企业邮箱：1 个邮箱均可访问') +
+                toast('error', '测试连接失败：%s 无法访问' % QIYE_ISSUE['mailbox'], QIYE_GUIDE) +
                 toast('error', '测试连接失败：钉钉通讯录无法访问', '请检查应用凭据与通讯录权限') +
                 toast('success', '连接正常', 'Shopify：2 个店铺均可访问') +
                 toast('error', '测试连接失败：forcome.mx 无法访问', '请检查 Admin API 应用凭据与授权范围') +
@@ -798,6 +844,19 @@ def k20():
                   col(nowrap(SHOPIFY_AUDIT['object'] + ' · 恢复连接', 13, T['ink'], 600) + nowrap(SHOPIFY_AUDIT['summary'], 12, T['ink3']) +
                       nowrap('补拉：' + SHOPIFY_AUDIT['backfilled'], 12, T['ink3']), 2,
                       'padding: 8px 12px; border: 1px solid %s; border-radius: 8px; background: #ffffff;' % T['line']), 12, 'flex-start')
+    # 补充小样（D-28，待办 34）：163 企业邮箱卡同步延迟与连接异常（写法套用 Gmail 卡，恢复指引按服务商）；Gmail 与 163 企业邮箱同时异常时横幅各一条、
+    # 从上到下 Gmail、163 企业邮箱、亚马逊、Shopify；163 企业邮箱连接异常与恢复的站内通知、P27 的对象与「补拉」
+    qiye_cards = grid(''.join(col(c + nowrap(t, 11, T['ink3'], 600), 6) for t, c in [
+        ('163 企业邮箱同步延迟 · 超过 10 分钟没同步成功', BS.qiye_card_p1('同步延迟')),
+        ('163 企业邮箱连接异常 · 连续 3 次失败（全站横幅同 G4）', BS.qiye_card_p1('连接异常'))]), 3, 12)
+    qiye_banners = col(banner('danger', *G4_BANNER, action=btn('查看渠道状态', 'secondary', 'sm')) +
+                       banner('danger', *G4_BANNER_QIYE, action=btn('查看渠道状态', 'secondary', 'sm')), 8, 'width: 1100px;')
+    qiye_notices = row(''.join(col(nowrap(title, 13, T['ink'], 600) + nowrap(body, 12, T['ink3']) + nowrap('P18 · 163 企业邮箱', 11, T['ink4']), 2,
+                                   'padding: 8px 12px; border: 1px solid %s; border-radius: 8px; background: #ffffff;' % T['line'])
+                               for title, body in QIYE_NOTICES) +
+                       col(nowrap(QIYE_AUDIT['object'] + ' · 恢复连接', 13, T['ink'], 600) + nowrap(QIYE_AUDIT['summary'], 12, T['ink3']) +
+                           nowrap('补拉：' + QIYE_AUDIT['backfilled'], 12, T['ink3']), 2,
+                           'padding: 8px 12px; border: 1px solid %s; border-radius: 8px; background: #ffffff;' % T['line']), 12, 'flex-start')
     return frame(BS.p18(phase1=True) + cap('卡头小样 · 卡片状态的五种写法') + strip + cap('店铺表状态列') + st_col +
                  cap('钉钉卡 · 第一阶段已连接') + ding +
                  cap('补充小样 · 第一阶段 Gmail 卡同步延迟与连接异常、钉钉卡连接异常（下一行为边界：几个邮箱同时异常、钉钉从没同步成功过）') + cards +
@@ -812,7 +871,10 @@ def k20():
                      '天数取各店铺回补窗口中最短的；该平台没有连接上的店铺或卡片连接异常时不显示，部分店铺未连接时照写；管理员用部署子命令 order-backfill 开始，'
                      '上线后新加的店铺、改了平台、平台标识或数据来源的店铺回到未开始，再执行一次）') + backfill_rows +
                  cap('补充小样 · Gmail、亚马逊、Shopify 同时连接异常：全站横幅各一条，从上到下 Gmail、亚马逊、Shopify（G4 写法）') + amz_banners +
-                 cap('补充小样 · 亚马逊连接异常与恢复的站内通知（G10 写法）、P27 的对象与「补拉」') + amz_notices, w=1472, gap=12)
+                 cap('补充小样 · 亚马逊连接异常与恢复的站内通知（G10 写法）、P27 的对象与「补拉」') + amz_notices +
+                 cap('补充小样 · 第一阶段 163 企业邮箱卡同步延迟与连接异常（按邮箱，写法同 Gmail 卡；恢复指引为检查客户端授权码与网易后台的 IMAP、客户端登录设置）') + qiye_cards +
+                 cap('补充小样 · Gmail 与 163 企业邮箱同时连接异常：全站横幅各一条，从上到下 Gmail、163 企业邮箱、亚马逊、Shopify（G4 写法）') + qiye_banners +
+                 cap('补充小样 · 163 企业邮箱连接异常与恢复的站内通知（G10 写法）、P27 的对象与「补拉」') + qiye_notices, w=1472, gap=12)
 
 
 # ---------------------------------------------------------------- K22–K24 客服主管的设置页「SLA」「标签库」「模板」（局部 1:1）
@@ -878,12 +940,12 @@ def k24():
 
 SPEC = {
     'K5': '服务端按当前筛选与字段权限同步生成：生成中按钮转圈并写「正在生成，约 3 秒」；完成后浏览器直接下载，浮层「已导出 %s · 已记入审计日志」；不留存文件、没有导出记录页。' % EXPORT_FILE,
-    'K8': 'P18 点「新增店铺」或行尾「编辑」从右侧滑出抽屉（页面保持可见）：店铺名、平台、站点（多选）、默认站点、进线邮箱、平台标识、签名与覆盖项；开发测试环境另有「数据来源：真实接口 / 模拟数据」（新建时默认模拟数据），生产环境不显示也不接受。店铺名重复、平台标识为空、邮箱格式错误在字段下方报错，多个错误一次列全；保存按钮保持可点，点击后定位到第一个错误（AC-ST-01）。保存记入审计日志，未归属队列中收件地址匹配的来信自动归位。下方补充小样：进线邮箱没有错误时的提示、亚马逊店铺的平台标识、进线邮箱重复（每个地址一条错误）、其余必填项、编辑抽屉标题、保存结果浮层（成功 3 秒消失；失败保留输入、可立即重试）、店铺表为空、新增时的未保存离开（G8）。',
+    'K8': 'P18 点「新增店铺」或行尾「编辑」从右侧滑出抽屉（页面保持可见）：店铺名、平台、站点（多选）、默认站点、进线邮箱（逐行登记地址与服务商 Gmail / 163 企业邮箱，163 企业邮箱的行另填客户端授权码、IMAP 服务器与端口并可测试连接，D-28）、平台标识、签名与覆盖项；开发测试环境另有「数据来源：真实接口 / 模拟数据」（新建时默认模拟数据），生产环境不显示也不接受。店铺名重复、平台标识为空、邮箱格式错误在字段下方报错，多个错误一次列全；保存按钮保持可点，点击后定位到第一个错误（AC-ST-01）。保存记入审计日志，未归属队列中收件地址匹配的来信自动归位。下方补充小样：进线邮箱没有错误时的提示、亚马逊店铺的平台标识、进线邮箱重复（每个地址一条错误）、其余必填项、编辑抽屉标题、保存结果浮层（成功 3 秒消失；失败保留输入、可立即重试）、店铺表为空、新增时的未保存离开（G8）；163 企业邮箱的行（待办 34）：授权码必填（新加或从 Gmail 改来时）、已保存时只写「已保存」可重新填写、测试连接中与行内结果、第二阶段起的 SMTP 服务器与端口。授权码加密保存，抽屉与接口都不回显；改授权码记审计只写「客户端授权码已重新填写」。',
     'K10': '二次确认弹窗列出该成员的未关闭工单与进行中售后单，分别选接手人：工单选坐席或客服主管，售后单只列有该店铺范围的售后负责人；选齐后「改派并停用」，变更记审计（AC-ST-02）。成员在钉钉离职后自动停用，其未关闭工单与进行中售后单进入客服主管改派队列（AC-ST-05）。示例：停用李婷，未关闭工单按 data.TICKETS 计 → 接手人陈晨，进行中售后单 0 张；另一张小图（完整版）：停用王磊，4 张进行中售后单但没有其他售后负责人，「改派并停用」置灰并写原因。下方为第一阶段补充小样（待办 23，协调者 2026-10-14 决定）：只检查进行中售后单（没有「未关闭工单」区块），一个「接手人」下拉（必要时按店铺分组），不可用的两种写法，P20 行尾「更多」与停用结果。',
     'K15': '页签「风险信号 · 7」，7 条风险信号命中即转人工（data.RISK_SIGNALS）。安全事故、平台风险与疑似提示注入（D-21）为硬规则：开关锁定并写「硬规则，不可关闭」。重复联系、高价值行内写明关闭影响「关闭需二次确认：近 30 天约少转人工 N 封」（data.RISK_OFF_IMPACT）；关闭任一可关的信号都是危险开关，二次确认并写明影响（关闭后命中的来信不再转人工，可能自动发送），确认后进入吸底保存栏。「发送方式与阈值」页签名旁圆点表示该页签有未保存修改。',
     'K17': '权限矩阵一张表全部展开（不折叠），按 工单 / 审批 / 售后 / 知识 / 报表 / 设置 / 工厂 分组，能力行照 prd_d 10.1（含第一阶段的标记无需回复、新建与编辑登记、设为已完成，以及指定店铺、补登与汇率、改派售后单负责人、查看成本与结算金额、查看审计日志）；● 有权限、○ 只能看自己发起或负责的（「○ 自己登记的」写明范围）、「—」无权限、文字为部分能力。只读，按角色固定；第一阶段只显示已上线的能力行。下方为 P20 第一阶段的补充小样（待办 06，10-06 用户确认）：格内修改角色与数据范围、改过的格与吸底保存栏（K6）、保存结果与断网、保存时的报错（含至少一位在职管理员）、已停用的成员、并发（G7）、离开（G8）、「从钉钉添加」抽屉与成员下拉、添加结果。',
     'K18': '两张小图：① 李婷（坐席）视角：页头提示「你只能看到自己的操作记录」，操作人筛选锁定为本人，列表只有李婷的记录；② 刘洋（管理员，没有财务权限）视角：展开 S-20260909-0016 的记录（data.AUDIT_EXPAND_DEMO），展开列出该单前后任一侧有值的全部字段、变化的标出，产品成本、运费、额外赔偿、其他、承担比例的前后值显示灰色「已隐藏」，其他字段照常显示；摘要「等 N 项」的 N 是变化的字段数；管理员打不开 P13，售后单编号不可点（10.2、D-24）。示例为完整版，第一阶段只有 P27「第一阶段」列出的对象类型。下方为补充小样（待办 30，10-05 用户确认）：第一阶段几种记录的写法、列表为空、导出、自定义时间。',
-    'K19': '周敏视角，第一阶段外壳（导航 工单 · 售后 · 报表，无店铺范围与搜索）：筛选 近 7 天 · 本月 · 自定义 · 店铺 · 站点；标题下「数据来源：工单（Gmail）、平台订单、登记台账 · 更新于 %s」（取 Gmail、亚马逊订单、Shopify 订单中最旧的同步）与两条注；指标 3 个；图表 每日工单量 + 售后成本按责任类型（卡头总额即售后成本）。右为管理员视角局部：没有售后成本卡，每日工单量不可点、没有「查看明细」（三张指标同样不可点）。导出同步生成后直接下载，记入审计（K5）。'
+    'K19': '周敏视角，第一阶段外壳（导航 工单 · 售后 · 报表，无店铺范围与搜索）：筛选 近 7 天 · 本月 · 自定义 · 店铺 · 站点；标题下「数据来源：工单（店铺邮箱）、平台订单、登记台账 · 更新于 %s」（取各进线邮箱（Gmail、163 企业邮箱）、亚马逊订单、Shopify 订单中最旧的同步）与两条注；指标 3 个；图表 每日工单量 + 售后成本按责任类型（卡头总额即售后成本）。右为管理员视角局部：没有售后成本卡，每日工单量不可点、没有「查看明细」（三张指标同样不可点）。导出同步生成后直接下载，记入审计（K5）。'
            '「更新于」今天写时分，不是今天写「09-10 10:12」，不在今年写全年份，从没同步成功过写「更新于 —」；取全部已连接的数据源，不随店铺筛选变化。'
            '对比：近 7 天「较前 7 天」、本月「较上月同期」、自定义「较前 N 天」；工单量写相对变化取整（持平写「持平」）、一律中性色，首响写差值（缩短绿色、变长红色），'
            'SLA 写差值「个百分点」保留一位（升高绿色、降低红色）；上一周期没有可比的值或本期为「—」时不写。随期间变化的副标题写「近 7 天」「本月」或起止。'
@@ -892,7 +954,7 @@ SPEC = {
            '售后成本卡（待办 25 协调者 10-14 决定 Q1–Q5，补充小样⑥–⑧）：本月（费用发生日本月 1 日至今天）、随店铺筛选（下钻带店铺），不随时间与站点；条按金额从大到小，金额为 0 的不出条，'
            '责任类型为空的单列「未登记责任」排在最后、不可点；单数与 P13 合计行「合计 · N 单」同口径；点条进 P13（本月 + 该责任 + 店铺），「查看明细」不带责任；本月没有时卡头 $0.00 · 0 单。'
            '导出一个 xlsx：「指标」「每日工单量」与（有财务权限时）「售后成本按责任类型」三张表，没有财务权限时文件里没有任何成本字段。' % report_updated(),
-    'K20': '刘洋视角，第一阶段外壳：亚马逊 SP-API（订单同步与 SQS 状态、订单回补 %d 天已完成）、Shopify Admin API（回补 %d 天 · 未开通 read_all_orders）、Gmail（4 个邮箱，收件与「已发送」）、钉钉（同步延迟 · 最近同步 %s，超过 2 小时，只提醒管理员、不出全站横幅；通讯录每个整点全量对账一次、失败不重试，每次失败算一次：上次成功超过 2 小时为同步延迟，连续 3 次失败为连接异常，待办 05 · 10-06）；积加、易仓为灰色虚线卡「第二阶段接入」，没有同步时间与测试连接；不显示 17TRACK。店铺表没有覆盖项列，没有吸底保存栏。下方为卡头小样（已连接 · 同步延迟 · 连接异常 · 未连接 · 模拟数据）、店铺表状态列写法与钉钉卡第一阶段已连接时的说明行（没有钉钉内免登）；补充小样（待办 09，10-06 用户确认）：Gmail 卡同步延迟（每个延迟的邮箱一行，其余说明行照常）与连接异常（每个异常的邮箱一行原因与恢复指引、来信暂存、「重新检测」；第一阶段不发信、没有错误日志页）、钉钉卡连接异常（从没同步成功过写「通讯录尚未同步成功」）、几个邮箱同时异常（每个一行、次数为实际的连续失败次数，暂存说明只写一次，延迟行在后；协调者 10-06 决定），以及 Gmail、钉钉两张卡「测试连接」的结果浮层（测试连接不改状态，Gmail 测完立即同步一次）。卡片状态按各邮箱的同步记录：Gmail 卡取各邮箱中最差的状态、最近同步取各邮箱中最旧的一次。补充小样（待办 11、12，协调者 10-06 决定，套用 Gmail 已确认的写法、按店铺）：Shopify 与亚马逊卡同步延迟与连接异常、「测试连接」浮层、几个渠道同时异常时的横幅叠放（Gmail、亚马逊、Shopify）、连接异常与恢复的站内通知与 P27 写法；亚马逊卡另有「订单通知队列（SQS）」一行的四种写法（正常 · 积压 N / 积压 N 条 / 拉取失败 / 未连接），只影响这一行。补充小样（待办 13，协调者 10-06 决定）：订单回补行的四种写法（未开始 / 进行中 · 已回补 N 笔 / 已完成 / 未开通 read_all_orders），只汇总连接上的店铺、天数取最短的；该平台没有连接上的店铺、卡片连接异常时不显示，部分店铺未连接时照写；新加的店铺、改了平台、平台标识或数据来源的店铺回到未开始。' % (BS.AMZ_BACKFILL_DAYS, SHOPIFY_BACKFILL_DAYS, BS.DINGTALK_LATE_SYNC),
+    'K20': '刘洋视角，第一阶段外壳：亚马逊 SP-API（订单同步与 SQS 状态、订单回补 %d 天已完成）、Shopify Admin API（回补 %d 天 · 未开通 read_all_orders）、Gmail（3 个邮箱，收件与「已发送」）、163 企业邮箱（1 个邮箱，收件与「已发送」，D-28）、钉钉（同步延迟 · 最近同步 %s，超过 2 小时，只提醒管理员、不出全站横幅；通讯录每个整点全量对账一次、失败不重试，每次失败算一次：上次成功超过 2 小时为同步延迟，连续 3 次失败为连接异常，待办 05 · 10-06）；积加与易仓合为一张灰色虚线卡「第二阶段接入」，没有同步时间与测试连接；不显示 17TRACK。店铺表没有覆盖项列，进线邮箱下一行写用途与服务商，没有吸底保存栏。下方为卡头小样（已连接 · 同步延迟 · 连接异常 · 未连接 · 模拟数据）、店铺表状态列写法与钉钉卡第一阶段已连接时的说明行（没有钉钉内免登）；补充小样（待办 09，10-06 用户确认）：Gmail 卡同步延迟（每个延迟的邮箱一行，其余说明行照常）与连接异常（每个异常的邮箱一行原因与恢复指引、来信暂存、「重新检测」；第一阶段不发信、没有错误日志页）、钉钉卡连接异常（从没同步成功过写「通讯录尚未同步成功」）、几个邮箱同时异常（每个一行、次数为实际的连续失败次数，暂存说明只写一次，延迟行在后；协调者 10-06 决定），以及 Gmail、钉钉两张卡「测试连接」的结果浮层（测试连接不改状态，Gmail 测完立即同步一次）。卡片状态按各邮箱的同步记录：Gmail 卡取各邮箱中最差的状态、最近同步取各邮箱中最旧的一次。补充小样（待办 11、12，协调者 10-06 决定，套用 Gmail 已确认的写法、按店铺）：Shopify 与亚马逊卡同步延迟与连接异常、「测试连接」浮层、几个渠道同时异常时的横幅叠放（Gmail、亚马逊、Shopify）、连接异常与恢复的站内通知与 P27 写法；亚马逊卡另有「订单通知队列（SQS）」一行的四种写法（正常 · 积压 N / 积压 N 条 / 拉取失败 / 未连接），只影响这一行。补充小样（待办 13，协调者 10-06 决定）：订单回补行的四种写法（未开始 / 进行中 · 已回补 N 笔 / 已完成 / 未开通 read_all_orders），只汇总连接上的店铺、天数取最短的；该平台没有连接上的店铺、卡片连接异常时不显示，部分店铺未连接时照写；新加的店铺、改了平台、平台标识或数据来源的店铺回到未开始。补充小样（待办 34，D-28）：163 企业邮箱卡同步延迟与连接异常（写法同 Gmail 卡，恢复指引为检查客户端授权码与网易后台的 IMAP、客户端登录设置）、「测试连接」浮层、Gmail 与 163 企业邮箱同时异常的横幅叠放（Gmail、163 企业邮箱、亚马逊、Shopify）、连接异常与恢复的站内通知与 P27 写法。' % (BS.AMZ_BACKFILL_DAYS, SHOPIFY_BACKFILL_DAYS, BS.DINGTALK_LATE_SYNC),
     'K21': '左侧 12 个意图（每项写发布版本，「未收到与异常」选中并标「草稿 v5 未发布」）；上方「发布版本 v4 · 09-08 周敏 · 草稿 v5（未发布）」与店铺下拉；中间四段说明，「何时给哪种方案」一段标「Forcome Direct 覆盖」；右栏结构化部分（只读，代码执行）与回归结果「v5 草稿：18 / 20 通过」，展开 1 条未通过样例（期望「先补发」，实际「先查件」）；「发布 v5」置灰，悬停「还有 2 条回归样例未通过，全部通过后才能发布」。每次发布记入审计，可查看历史版本与对比（D-21）。',
     'K22': '首次回复时限：亚马逊 24 小时（自然小时，平台考核，锁定只读）；Shopify 与邮件内部目标 24 小时（1–72 的整数小时）+ 店铺覆盖表（继承 / 覆盖值，示例 forcome.mx 覆盖为 12 小时，data.SLA_OVERRIDES）。工作时间：周一至周五 09:00–18:00（北京时间），不扣节假日，1 个工作日 = 9 个工作小时，算例「周五 16:00 起 4 个工作小时 → 下周一 11:00」（R-CL-01、R-CL-02）。修改进吸底保存栏，记审计。',
     'K23': '表格：标签 · 说明 · 近 30 天使用 · 状态 · 操作（data.TAG_LIBRARY 4 个）；「新增标签」右侧抽屉，名称不重复、说明必填，保存时校验；停用而不删除（已打在工单上的保留）；表下注「一张工单最多 5 个标签，坐席只能选用；报表可按标签筛选」。',
@@ -910,7 +972,7 @@ def build():
              V('K4 报表无数据', '所选范围无数据时指标显示「—」，主区给出调整筛选与清除筛选。画面为报表页局部 1:1。', k4(), '筛选组合没有任何工单或售后单（AC-RP-03）'), 2, 32) +
         grid(V('K5 导出', SPEC['K5'], k5(), '报表、台账或审计日志点「导出」') +
              V('K6 设置保存', '修改后显示未保存计数与「保存修改」；成功浮层并记审计日志。断网时保留修改，黄色浮层说明「恢复后自动重试」，不要求用户手动重试；恢复后自动重试并用浮层提示结果（成功为中性灰「已自动重试并保存」，仍失败为红色并保留修改）。修改阈值需二次确认。', k6(), '在设置页修改后点「保存修改」；本例保存时网络断开，10:26 恢复'), 2, 32) +
-        grid(V('K7 渠道断开', '全站顶部红色横幅（写法同 G4：「查看渠道状态」只对管理员显示，本图为管理员视角）；渠道卡转「连接异常」并写明原因与暂存情况，提供重新授权（Gmail 为服务账号，写恢复指引并「重新检测」）。第一阶段形态见 K20 补充小样。', k7(), 'Gmail、积加、SP-API 或 Shopify 连续 3 次失败，或授权失效') +
+        grid(V('K7 渠道断开', '全站顶部红色横幅（写法同 G4：「查看渠道状态」只对管理员显示，本图为管理员视角）；渠道卡转「连接异常」并写明原因与暂存情况，提供重新授权（店铺邮箱写按服务商的恢复指引并「重新检测」：Gmail 为服务账号，检查全域委派范围与邮箱状态；163 企业邮箱检查客户端授权码与网易后台的 IMAP、客户端登录设置，D-28）。本图为 Gmail 与 163 企业邮箱同时异常，横幅各一条。第一阶段形态见 K20 补充小样。', k7(), 'Gmail、163 企业邮箱、积加、SP-API 或 Shopify 连续 3 次失败，或授权失效') +
              V('K8 新增店铺抽屉与校验', SPEC['K8'], k8(), '管理员在 P18 点「新增店铺」或行尾「编辑」并保存'), 2, 32) +
         grid(V('K9 放开自动发送不可用', '两类禁用分开表达：暂不满足为黄色 + 进度（「采纳率 78% / 90%」「样本 38 / 50」），悬停写明差距，满足后开关自动可用（R-SD-02、AC-AI-11）；硬规则（含高风险动作、规则为转人工）为灰色 + 锁，不可放开。', k9(), '某意图近 30 天采纳率不高于 90% 或样本少于 50；或意图含高风险动作') +
              V('K10 停用成员', SPEC['K10'], k10(), '管理员在 P20 成员行「更多」中点「停用」'), 2, 32) +

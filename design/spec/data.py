@@ -66,11 +66,12 @@ NAV_BY_ROLE_P1 = {
 
 # ---------------------------------------------------------------- 店铺
 STORES = [
-    # 亚马逊：买家消息走亚马逊官方邮件中转，收发都在该店铺绑定的邮箱（Gmail API）；订单、物流、库存走积加，退款与取消走 SP-API。Shopify：客服邮箱（Gmail API）+ Admin API 写动作。
-    {'id': 'amz-direct', 'name': 'Forcome Direct', 'platform': '亚马逊', 'sites': ['US', 'CA', 'MX'], 'mailbox': 'amz-direct@forcome.com', 'api': 'SP-API', 'sid': '卖家 ID A1FD7Q2M9XK3LC', 'signature': 'Forcome Support', 'default_site': 'US'},
-    {'id': 'amz-auto',   'name': 'Forcome Auto',   'platform': '亚马逊', 'sites': ['US'],             'mailbox': 'amz-auto@forcome.com',   'api': 'SP-API', 'sid': '卖家 ID A3KA8V1T6RW2NB', 'signature': 'Forcome Auto Care', 'default_site': 'US'},
-    {'id': 'shop-com',   'name': 'forcome.com',    'platform': 'Shopify', 'sites': ['US', 'CA'],      'mailbox': 'support@forcome.com',    'api': 'Admin API', 'sid': 'forcome-com.myshopify.com', 'signature': 'Forcome Support', 'default_site': 'US'},
-    {'id': 'shop-mx',    'name': 'forcome.mx',     'platform': 'Shopify', 'sites': ['MX'],            'mailbox': 'support@forcome.mx',     'api': 'Admin API', 'sid': 'forcome-mx.myshopify.com', 'signature': 'Forcome México', 'default_site': 'MX'},
+    # 亚马逊：买家消息走亚马逊官方邮件中转，收发都在该店铺绑定的邮箱；订单经 SP-API 直读，退款与取消走 SP-API。Shopify：客服邮箱 + Admin API 写动作。
+    # provider：进线邮箱的服务商（D-28，用户 2026-10-15）——每个邮箱各自选 Gmail 或 163 企业邮箱，收发都经该邮箱；示例里 Forcome Auto 的买家消息邮箱在网易企业邮箱。
+    {'id': 'amz-direct', 'name': 'Forcome Direct', 'platform': '亚马逊', 'sites': ['US', 'CA', 'MX'], 'mailbox': 'amz-direct@forcome.com', 'api': 'SP-API', 'sid': '卖家 ID A1FD7Q2M9XK3LC', 'signature': 'Forcome Support', 'default_site': 'US', 'provider': 'Gmail'},
+    {'id': 'amz-auto',   'name': 'Forcome Auto',   'platform': '亚马逊', 'sites': ['US'],             'mailbox': 'amz-auto@forcome.com',   'api': 'SP-API', 'sid': '卖家 ID A3KA8V1T6RW2NB', 'signature': 'Forcome Auto Care', 'default_site': 'US', 'provider': '163 企业邮箱'},
+    {'id': 'shop-com',   'name': 'forcome.com',    'platform': 'Shopify', 'sites': ['US', 'CA'],      'mailbox': 'support@forcome.com',    'api': 'Admin API', 'sid': 'forcome-com.myshopify.com', 'signature': 'Forcome Support', 'default_site': 'US', 'provider': 'Gmail'},
+    {'id': 'shop-mx',    'name': 'forcome.mx',     'platform': 'Shopify', 'sites': ['MX'],            'mailbox': 'support@forcome.mx',     'api': 'Admin API', 'sid': 'forcome-mx.myshopify.com', 'signature': 'Forcome México', 'default_site': 'MX', 'provider': 'Gmail'},
 ]
 # 店铺默认站点（来信无订单时用，D-23；P18 站点列加粗、K8）
 STORE_DEFAULT_SITE = {s['id']: s['default_site'] for s in STORES}
@@ -715,16 +716,39 @@ def intent_counts(total_n, intents):
 # ---------------------------------------------------------------- 设置示例（P18–P20 与 StatesAdmin）
 # 渠道卡「最近同步」时刻（P18）；「异常」为 K7 连接异常画面里的最后一次成功同步
 CHANNEL_SYNC = {'SP-API': '10:12', 'SP-API 异常': '10:02', 'Shopify': '10:15', '积加': '10:16', 'Gmail': '10:18', 'Gmail 异常': '10:04',
+                '163 企业邮箱': '10:17', '163 企业邮箱 异常': '10:04',
                 '钉钉': '10:00', '易仓': '10:16', '钉钉 延迟': '08:00', '17TRACK': '10:10'}  # 「钉钉 延迟」为 K20 同步延迟示例的最近同步
 DINGTALK_LATE_SYNC = CHANNEL_SYNC['钉钉 延迟']
 # Gmail 某个邮箱的连接异常与同步延迟示例（K7、K20 补充小样，待办 09 · 10-06 用户确认）：邮箱、连续失败从几点起与次数、最近同步成功
 GMAIL_ISSUE = {'mailbox': 'support@forcome.mx', 'since': '10:05', 'failures': 3, 'last': CHANNEL_SYNC['Gmail 异常']}
 GMAIL_DELAYED = {'mailbox': 'support@forcome.mx', 'last': '10:05'}  # 演示时刻 10:20，超过 10 分钟没同步成功
 # 几个邮箱同时异常、另有一个延迟（E3，协调者 10-06 决定）：(邮箱, 连续失败从几点起, 次数)；延迟的 (邮箱, 最近同步成功)
-GMAIL_ISSUES_MIXED = [('amz-auto@forcome.com', '10:12', 3), ('support@forcome.mx', '10:05', 5)]
+# （amz-auto@forcome.com 改用 163 企业邮箱后换成 amz-direct@forcome.com，待办 34）
+GMAIL_ISSUES_MIXED = [('amz-direct@forcome.com', '10:12', 3), ('support@forcome.mx', '10:05', 5)]
 GMAIL_DELAYED_MIXED = ('support@forcome.com', '10:06')
 # G4 集成中断横幅（全站，所有角色；「查看渠道状态」只对管理员显示）。K7 统一用这一写法（待办 09 Q1，10-06 用户确认）
 G4_BANNER = ('Gmail 连接中断，来信暂存队列', '09-11 %s 起未收取。恢复后自动补收，按到达顺序处理，SLA 从原到达时间计算。管理员、客服主管已收到通知。' % GMAIL_ISSUE['since'])
+# 163 企业邮箱（D-28，待办 34）：店铺进线邮箱的另一个服务商，按邮箱用客户端授权码经 IMAP 收信（第二阶段起 SMTP 发信）；
+# 连接状态、横幅、通知与 P27 的写法套用 Gmail（6.9、11.4），恢复指引按服务商：检查客户端授权码与网易后台的 IMAP、客户端登录设置
+QIYE = '163 企业邮箱'
+QIYE_DEFAULTS = {'imap_host': 'imap.qiye.163.com', 'imap_port': '993', 'smtp_host': 'smtp.qiye.163.com', 'smtp_port': '465'}
+QIYE_GUIDE = '请检查客户端授权码，以及网易企业邮箱是否开启 IMAP 与客户端登录'
+GMAIL_GUIDE = '请检查全域委派范围与邮箱状态'
+QIYE_ISSUE = {'mailbox': 'amz-auto@forcome.com', 'since': '10:05', 'failures': 3, 'last': CHANNEL_SYNC['163 企业邮箱 异常']}
+QIYE_DELAYED = {'mailbox': 'amz-auto@forcome.com', 'last': '10:05'}
+G4_BANNER_QIYE = ('163 企业邮箱连接中断，来信暂存队列', '09-11 %s 起未收取。恢复后自动补收，按到达顺序处理，SLA 从原到达时间计算。管理员、客服主管已收到通知。' % QIYE_ISSUE['since'])
+QIYE_NOTICES = [('163 企业邮箱连接异常', '%s 连续 3 次失败，来信暂存' % QIYE_ISSUE['mailbox']),
+                ('163 企业邮箱已恢复', '%s 已重新连接，补拉 2 封来信' % QIYE_ISSUE['mailbox'])]
+QIYE_AUDIT = {'object': '163 企业邮箱 · %s' % QIYE_ISSUE['mailbox'], 'summary': '状态：连接异常 → 已连接（补拉 2 封来信）',
+              'backfilled': '2 封来信（10:05–10:13 到达，SLA 按原到达时间）'}
+# K8 进线邮箱逐行「测试连接」的结果（不保存也能测，用这一行当前填的地址、授权码、服务器与端口；不改连接状态）：(色调, 写法)
+QIYE_ROW_TESTS = [
+    ('success', '连接正常：收件箱与「已发送」均可访问'),
+    ('danger', '登录失败：%s' % QIYE_GUIDE),
+    ('danger', '登录被拒：网易企业邮箱限制了登录 IP，请管理员在网易后台放行本系统服务器的出口 IP'),
+    ('danger', '连不上 imap.qiye.163.com:993：请检查 IMAP 服务器与端口'),
+    ('danger', '找不到「已发送」文件夹：请在网易企业邮箱里确认有「已发送」'),
+]
 # Shopify 订单同步（待办 11 · 协调者 10-06 决定，套用 Gmail 已确认的写法）：某个店铺的连接异常与同步延迟示例（店铺、连续失败从几点起与次数、
 # 最近同步成功），全站横幅（Gmail 与 Shopify 同时异常时各一条、Gmail 在上），连接异常与恢复的站内通知、P27 的对象与「补拉」写法
 SHOPIFY_ISSUE = {'store': 'forcome.mx', 'since': '10:05', 'failures': 3, 'last': '10:04'}
@@ -787,7 +811,7 @@ ACTION_MAP = [
     ('查订单', '只读', ('SP-API（订单镜像）', 'accent'), ('Admin API（订单镜像）', 'accent')),  # 订单平台直读（D-21）
     ('查物流', '只读', ('17TRACK', 'accent'), ('17TRACK', 'accent')),  # 物流轨迹经 17TRACK（D-21）
     ('查库存', '只读', ('积加（易仓）', 'accent'), ('积加（易仓）', 'accent')),
-    ('回复客户', '按发送方式', ('Gmail 中转', 'accent'), ('Gmail', 'accent')),
+    ('回复客户', '按发送方式', ('店铺邮箱 · 中转', 'accent'), ('店铺邮箱', 'accent')),  # 按进线邮箱的服务商经 Gmail 或 163 企业邮箱发出（D-28）
     ('创建售后出库单', '高风险', ('积加（易仓）', 'accent'), ('积加（易仓）', 'accent')),
     ('订单备注', '低风险', ('系统内备注', 'neutral'), ('Admin API', 'accent')),
     ('退款', '高风险', ('SP-API', 'accent'), ('Admin API', 'accent')),
@@ -1043,7 +1067,7 @@ LEDGER_DONE_DEMO = 'S-20260911-0018'   # 设为已完成：缺寄出日期、快
 LEDGER_CANCEL_DEMO = 'S-20260911-0021'
 
 # ---------------------------------------------------------------- 报表「更新于」（prd_c P17、AC-P1-11）
-REPORT_SOURCES = ('Gmail', 'SP-API', 'Shopify')  # 工单来自 Gmail；站点与订单关联用平台订单；台账为手工登记，不参与
+REPORT_SOURCES = ('Gmail', '163 企业邮箱', 'SP-API', 'Shopify')  # 工单来自店铺邮箱（Gmail、163 企业邮箱，D-28）；站点与订单关联用平台订单；台账为手工登记，不参与
 
 
 def report_updated():
@@ -1095,6 +1119,8 @@ AUDIT_P1_MORE = [
     ('09-09 14:02', '王磊', '售后负责人', '售后单', 'S-20260909-0016', '新建登记', '状态：— → 进行中', '10.20.2.18', False, 21),
     ('09-08 16:40', '陈晨', '坐席', '店铺', 'forcome.com', '越权访问被拒', '店铺 forcome.com 不在授权范围内（R-ST-06）', '10.20.3.33', True, 0),
     ('09-07 11:05', '刘洋', '管理员', '店铺', 'forcome.mx', '编辑店铺', '进线邮箱：support@forcome.mx → support@forcome.mx、ventas@forcome.mx', '10.20.1.12', False, 0),
+    # 改 163 企业邮箱的客户端授权码只记「已重新填写」，不记内容（D-28，待办 34）
+    ('09-07 10:32', '刘洋', '管理员', '店铺', 'Forcome Auto', '编辑店铺', '进线邮箱 amz-auto@forcome.com：客户端授权码已重新填写', '10.20.1.12', False, 0),
 ]
 # P27 导出的文件名（K5 的写法；今天、近 7 天、自定义分别为「审计日志_今天_0911」「审计日志_近7天_0905-0911」「审计日志_0901-0911」）
 AUDIT_EXPORT_FILE = '审计日志_今天_0911.xlsx'
@@ -1144,7 +1170,8 @@ MODEL_BREAKER_DEMO = {'use': 'summarize', 'at': '10:05', 'why': '5 分钟内失�
 HEALTH = {
     'checked': '10:20', 'heartbeat': '10:20:05', 'backup': '03:10', 'wal': '10:19', 'drill': '07-15',
     # 数据源：(名称, 最近同步, 阈值, 状态)
-    'sources': [('Gmail · 4 个邮箱', CHANNEL_SYNC['Gmail'], '10 分钟', '已连接'), ('亚马逊订单 · SQS', CHANNEL_SYNC['SP-API'], '10 分钟', '已连接'),
+    'sources': [('Gmail · 3 个邮箱', CHANNEL_SYNC['Gmail'], '10 分钟', '已连接'), ('163 企业邮箱 · 1 个邮箱', CHANNEL_SYNC['163 企业邮箱'], '10 分钟', '已连接'),
+                ('亚马逊订单 · SQS', CHANNEL_SYNC['SP-API'], '10 分钟', '已连接'),
                 ('Shopify 订单', CHANNEL_SYNC['Shopify'], '10 分钟', '已连接'), ('积加', CHANNEL_SYNC['积加'], '10 分钟', '已连接'),
                 ('17TRACK', '10:10', '5 小时', '已连接'), ('钉钉通讯录', CHANNEL_SYNC['钉钉'], '2 小时', '已连接'), ('汇率', '09-11 06:00', '1 天', '已连接')],
     # 队列：(任务, 等待, 进行中, 近 24h 失败, 最久等待)

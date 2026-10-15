@@ -73,10 +73,11 @@ def drawer_over(inner, drw, w, h):
 
 # ================================================================ P18 渠道与店铺
 
-P18_DESC = '订单由平台直读；库存、易仓出库单与运费经积加；物流轨迹经 17TRACK；退款、改地址、取消走平台官方接口；客户来信统一经 Gmail 收发。店铺决定订单匹配、回复身份、签名与数据权限。'
-P18_DESC_P1 = '订单由平台直读；客户来信统一经 Gmail 收取。店铺决定订单匹配与数据权限。'
+# 客户来信经店铺进线邮箱收发，每个邮箱各自选服务商 Gmail 或 163 企业邮箱（D-28，待办 34）
+P18_DESC = '订单由平台直读；库存、易仓出库单与运费经积加；物流轨迹经 17TRACK；退款、改地址、取消走平台官方接口；客户来信经店铺进线邮箱（Gmail 或 163 企业邮箱）收发。店铺决定订单匹配、回复身份、签名与数据权限。'
+P18_DESC_P1 = '订单由平台直读；客户来信经店铺进线邮箱（Gmail 或 163 企业邮箱）收取。店铺决定订单匹配与数据权限。'
 RULE_CARD_STATE = ('卡片显示该渠道下最差的状态，并列出异常的邮箱或店铺；店铺表「状态」列显示该店铺各连接的状态。'
-                   '同步延迟按数据源阈值：Gmail、订单 10 分钟，钉钉 2 小时；连续 3 次失败为连接异常。'
+                   '同步延迟按数据源阈值：邮箱、订单 10 分钟，钉钉 2 小时；连续 3 次失败为连接异常。'
                    '钉钉例外：异常只在钉钉卡显示、只提醒管理员，不出全站横幅（6.9）。')
 
 
@@ -112,7 +113,7 @@ def sqs_line(st=SQS_STATE):
 def amazon_card(err=False):
     if err:
         return ch_card('store', '亚马逊 SP-API', state('连接异常'),
-                       ['10:05 起连续 3 次调用失败：授权令牌已过期', '退款、取消与订单同步暂停，恢复后自动补执行与补拉；买家消息走 Gmail，不受影响'],
+                       ['10:05 起连续 3 次调用失败：授权令牌已过期', '退款、取消与订单同步暂停，恢复后自动补执行与补拉；买家消息经店铺邮箱收取，不受影响'],
                        row(btn('重新授权', 'primary', 'sm', 'refresh') + btn('查看错误日志', 'ghost', 'sm'), 6), 'bad', 'danger', sync=CHANNEL_SYNC['SP-API 异常'])
     return ch_card('store', '亚马逊 SP-API', state('已连接'), ['2 个店铺 · 退款、取消（审批后执行）', '订单经 SP-API 准实时同步', sqs_line()], '', 'ok', sync=CHANNEL_SYNC['SP-API'])
 
@@ -130,12 +131,31 @@ def jijia_card():
     return ch_card('link', '积加 ERP', state('已连接'), ['亚马逊订单收件人', '库存、售后出库单、单号与运费（积加对接易仓）'], '', 'ok', sync=CHANNEL_SYNC['积加'])
 
 
+def mailbox_count_line(provider):
+    """邮箱卡的第一行：该服务商的进线邮箱数，按亚马逊买家消息、Shopify 客服分列（取 STORES 的 provider，D-28）。"""
+    mine = [s_ for s_ in STORES if s_['provider'] == provider]
+    amz = sum(1 for s_ in mine if s_['platform'] == '亚马逊')
+    parts = (['%d 个亚马逊买家消息' % amz] if amz else []) + (['%d 个 Shopify 客服' % (len(mine) - amz)] if len(mine) > amz else [])
+    return '%d 个邮箱：%s' % (len(mine), '、'.join(parts))
+
+
 def gmail_card(err=False):
     if err:
         return ch_card('message', 'Gmail', state('连接异常'),
-                       ['support@forcome.mx 访问失败（10:05 起连续 3 次）：请检查全域委派范围与邮箱状态', '该邮箱来信暂存，恢复后自动补拉；回复进入待发队列'],
+                       ['support@forcome.mx 访问失败（10:05 起连续 3 次）：' + GMAIL_GUIDE, '该邮箱来信暂存，恢复后自动补拉；回复进入待发队列'],
                        row(btn('重新检测', 'primary', 'sm', 'refresh') + btn('查看错误日志', 'ghost', 'sm'), 6), 'bad', 'danger', sync=CHANNEL_SYNC['Gmail 异常'])
-    return ch_card('message', 'Gmail', state('已连接'), ['4 个邮箱：2 个亚马逊买家消息、2 个 Shopify 客服', '新邮件推送，实时收取'], '', 'ok', sync=CHANNEL_SYNC['Gmail'])
+    return ch_card('message', 'Gmail', state('已连接'), [mailbox_count_line('Gmail'), '新邮件推送，实时收取'], '', 'ok', sync=CHANNEL_SYNC['Gmail'])
+
+
+def qiye_card(err=False):
+    """163 企业邮箱卡（D-28，待办 34）：结构同 Gmail 卡；按邮箱用客户端授权码经 IMAP 收信（常驻连接 + 每 5 分钟检查）、SMTP 发信（第二阶段起）。
+    连接异常的恢复指引按服务商写：检查客户端授权码与网易后台的 IMAP、客户端登录设置（Gmail 为全域委派）。"""
+    e = QIYE_ISSUE
+    if err:
+        return ch_card('inbox', QIYE, state('连接异常'),
+                       ['%s 访问失败（%s 起连续 %d 次）：%s' % (e['mailbox'], e['since'], e['failures'], QIYE_GUIDE), '该邮箱来信暂存，恢复后自动补拉；回复进入待发队列'],
+                       row(btn('重新检测', 'primary', 'sm', 'refresh') + btn('查看错误日志', 'ghost', 'sm'), 6), 'bad', 'danger', sync=e['last'])
+    return ch_card('inbox', QIYE, state('已连接'), [mailbox_count_line(QIYE), 'IMAP 常驻连接，新邮件实时收取；SMTP 发送回复'], '', 'ok', sync=CHANNEL_SYNC[QIYE])
 
 
 DINGTALK_LINES_P1 = ['通讯录：成员与部门每小时同步', '工作通知推送；扫码登录']  # 第一阶段已连接时的说明行（钉钉内免登随第二阶段）
@@ -159,7 +179,8 @@ def dingtalk_card(late=False, phase1=False, err=False):
     return ch_card('users', '钉钉', state('已连接'), lines, '', 'ok', sync=CHANNEL_SYNC['钉钉'])
 
 
-GMAIL_LINES_P1 = ['4 个邮箱：2 个亚马逊买家消息、2 个 Shopify 客服', '收件与「已发送」：识别到我方回复即转等客户']  # 第一阶段已连接时的说明行
+GMAIL_LINES_P1 = [mailbox_count_line('Gmail'), '收件与「已发送」：识别到我方回复即转等客户']  # 第一阶段已连接时的说明行
+QIYE_LINES_P1 = [mailbox_count_line(QIYE), '收件与「已发送」：识别到我方回复即转等客户']  # 163 企业邮箱卡同 Gmail 卡（D-28）
 
 
 def gmail_card_p1(st='已连接'):
@@ -173,16 +194,31 @@ def gmail_card_p1(st='已连接'):
     if st == '异常与延迟':
         # 几个邮箱同时异常、另有一个延迟（E3，协调者 10-06 决定）：每个异常的邮箱一行（次数为实际的连续失败次数），暂存说明只写一次，延迟行在后；
         # 卡上的最近同步取各邮箱中最旧的一次
-        lines = ['%s 访问失败（%s 起连续 %d 次）：请检查全域委派范围与邮箱状态' % i for i in GMAIL_ISSUES_MIXED] + ['该邮箱来信暂存，恢复后自动补拉'] + \
+        lines = ['%s 访问失败（%s 起连续 %d 次）：' % i + GMAIL_GUIDE for i in GMAIL_ISSUES_MIXED] + ['该邮箱来信暂存，恢复后自动补拉'] + \
                 ['%s %s 后未同步成功，超过 10 分钟' % GMAIL_DELAYED_MIXED]
         return ch_card('message', 'Gmail', state('连接异常'), lines, row(btn('重新检测', 'primary', 'sm', 'refresh'), 6), 'bad', 'danger',
                        sync=GMAIL_ISSUE['last'])
     if st == '连接异常':
         e = GMAIL_ISSUE
         return ch_card('message', 'Gmail', state('连接异常'),
-                       ['%s 访问失败（%s 起连续 %d 次）：请检查全域委派范围与邮箱状态' % (e['mailbox'], e['since'], e['failures']), '该邮箱来信暂存，恢复后自动补拉'],
+                       ['%s 访问失败（%s 起连续 %d 次）：%s' % (e['mailbox'], e['since'], e['failures'], GMAIL_GUIDE), '该邮箱来信暂存，恢复后自动补拉'],
                        row(btn('重新检测', 'primary', 'sm', 'refresh'), 6), 'bad', 'danger', sync=e['last'])
     return ch_card('message', 'Gmail', state('已连接'), GMAIL_LINES_P1, '', 'ok', sync=CHANNEL_SYNC['Gmail'])
+
+
+def qiye_card_p1(st='已连接'):
+    """第一阶段 163 企业邮箱卡（K20，D-28，待办 34）：写法套用 Gmail 卡（gmail_card_p1）——同步延迟每个延迟的邮箱一行；连接异常每个异常的邮箱一行原因与
+    恢复指引（检查客户端授权码与网易后台的 IMAP、客户端登录设置）、来信暂存、「重新检测」；第一阶段不发信，不写「回复进入待发队列」。"""
+    if st == '同步延迟':
+        d = QIYE_DELAYED
+        return ch_card('inbox', QIYE, state('同步延迟'), ['%s %s 后未同步成功，超过 10 分钟' % (d['mailbox'], d['last'])] + QIYE_LINES_P1,
+                       '', 'warn', 'warning', sync=d['last'])
+    if st == '连接异常':
+        e = QIYE_ISSUE
+        return ch_card('inbox', QIYE, state('连接异常'),
+                       ['%s 访问失败（%s 起连续 %d 次）：%s' % (e['mailbox'], e['since'], e['failures'], QIYE_GUIDE), '该邮箱来信暂存，恢复后自动补拉'],
+                       row(btn('重新检测', 'primary', 'sm', 'refresh'), 6), 'bad', 'danger', sync=e['last'])
+    return ch_card('inbox', QIYE, state('已连接'), QIYE_LINES_P1, '', 'ok', sync=CHANNEL_SYNC[QIYE])
 
 
 SHOPIFY_LINES_P1 = ['2 个店铺 · 订单经 Admin API 准实时同步']  # 第一阶段 Shopify 卡的店铺行（回补窗口行另画）
@@ -220,7 +256,7 @@ def shopify_card_p1(st='已连接'):
         e = SHOPIFY_ISSUE
         return ch_card('store', 'Shopify Admin API', state('连接异常'),
                        ['%s 访问失败（%s 起连续 %d 次）：请检查 Admin API 应用凭据与授权范围' % (e['store'], e['since'], e['failures']),
-                        '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取'],
+                        '该店铺订单暂停同步，恢复后自动补拉；来信照常收取'],
                        row(btn('重新检测', 'primary', 'sm', 'refresh'), 6), 'bad', 'danger', sync=e['last'])
     return ch_card('store', 'Shopify Admin API', state('已连接'), SHOPIFY_LINES_P1 + [shopify_backfill_line()], '', 'ok', sync=CHANNEL_SYNC['Shopify'])
 
@@ -245,7 +281,7 @@ def amazon_card_p1(st='已连接', sqs=SQS_STATE):
         e = AMAZON_ISSUE
         return ch_card('store', '亚马逊 SP-API', state('连接异常'),
                        ['%s 访问失败（%s 起连续 %d 次）：请检查 SP-API 应用凭据与卖家授权' % (e['store'], e['since'], e['failures']),
-                        '该店铺订单暂停同步，恢复后自动补拉；来信经 Gmail 照常收取', sqs_line(sqs)],
+                        '该店铺订单暂停同步，恢复后自动补拉；来信照常收取', sqs_line(sqs)],
                        row(btn('重新检测', 'primary', 'sm', 'refresh'), 6), 'bad', 'danger', sync=e['last'])
     return ch_card('store', '亚马逊 SP-API', state('已连接'), AMAZON_LINES_P1 + [sqs_line(sqs), amazon_backfill_line()], '', 'ok', sync=CHANNEL_SYNC['SP-API'])
 
@@ -258,7 +294,7 @@ def p18_channels():
     lc_head = between(row(tile('box', 'muted') + col(nowrap('易仓海外仓', 14, T['ink2'], 600) + nowrap('最近同步 %s · 经积加' % CHANNEL_SYNC['易仓'], 11, T['ink4']), 0), 10),
                       row(chip('经积加对接', 'neutral', 11) + test_btn(), 6))
     lc = dashed_card(lc_head + muted('库存、售后出库单、单号与实际运费都经积加读写，本系统不直连易仓接口；测试连接走积加。', 12), '10px 14px', 8)
-    return grid3([amazon_card(), shopify_card(), gmail_card(), jijia_card(), track_card(), dingtalk_card(), lc])
+    return grid3([amazon_card(), shopify_card(), gmail_card(), qiye_card(), jijia_card(), track_card(), dingtalk_card(), lc])
 
 
 def phase2_card(ic, name, desc):
@@ -268,13 +304,10 @@ def phase2_card(ic, name, desc):
 
 
 def p18_channels_p1():
-    """第一阶段渠道卡（K20）：订单同步、回补与来信收取；积加、易仓第二阶段接入，不显示 17TRACK。"""
-    amz = amazon_card_p1()
-    shp = shopify_card_p1()
-    gm = gmail_card_p1()
-    return grid3([amz, shp, gm, dingtalk_card(late=True),
-                  phase2_card('link', '积加 ERP', '亚马逊订单收件人、库存、售后出库单、单号与运费。'),
-                  phase2_card('box', '易仓海外仓', '库存与售后出库单经积加读写，本系统不直连易仓接口。')])
+    """第一阶段渠道卡（K20）：订单同步、回补与来信收取（Gmail、163 企业邮箱各一张）；不显示 17TRACK。
+    积加与易仓第二阶段接入，合成一张灰色虚线卡（加了 163 企业邮箱卡后仍是 3 × 2，待办 34）。"""
+    return grid3([amazon_card_p1(), shopify_card_p1(), gmail_card_p1(), qiye_card_p1(), dingtalk_card(late=True),
+                  phase2_card('link', '积加 ERP · 易仓海外仓', '亚马逊订单收件人、库存、售后出库单、单号与运费；易仓经积加读写，本系统不直连易仓接口。')])
 
 
 def copy_val(v):
@@ -301,7 +334,8 @@ def site_cell(s_):
 
 
 def store_conns(s_):
-    return ['Gmail', 'SP-API' if s_['platform'] == '亚马逊' else 'Admin API']
+    """店铺的连接：进线邮箱的服务商（Gmail 或 163 企业邮箱，D-28）+ 订单接口。"""
+    return [s_['provider'], 'SP-API' if s_['platform'] == '亚马逊' else 'Admin API']
 
 
 def store_status(s_, issue=None):
@@ -319,7 +353,8 @@ def p18_stores(phase1=False, issues=None):
     rows = []
     for s_ in STORES:
         amz = s_['platform'] == '亚马逊'
-        e = col(nowrap(s_['mailbox'], 13, T['ink'], 600) + nowrap('亚马逊买家消息' if amz else 'Shopify 客服邮箱', 11, T['ink4']), 2)
+        # 进线邮箱下一行写用途与服务商（D-28）
+        e = col(nowrap(s_['mailbox'], 13, T['ink'], 600) + nowrap('%s · %s' % ('亚马逊买家消息' if amz else 'Shopify 客服邮箱', s_['provider']), 11, T['ink4']), 2)
         k, v = s_['sid'].rsplit(' ', 1) if amz else ('店铺域名', s_['sid'])
         sid = col(nowrap(k, 11, T['ink4']) + copy_val(v), 2)
         over = [row(''.join(chip(o, 'outline', 11) for o in STORE_OVERRIDES[s_['id']]), 4)] if not phase1 else []

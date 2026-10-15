@@ -30,7 +30,7 @@ def fbox(title, body):
 
 
 D_BOUNDARY = fbox('系统边界', frow(
-    '<div class="fcol">%s%s%s</div>' % (frow(n('客户', 'src', '亚马逊买家消息'), a(), n('亚马逊邮件中转', 'sys', '店铺绑定邮箱')), frow(n('客户', 'src', 'Shopify 邮件'), a(), n('Gmail', 'sys', 'Gmail API 收发')), frow(n('生产厂', 'src', 'FQD、FZJ'), a(), n('工厂工作台', 'sys', '同一系统内'))),
+    '<div class="fcol">%s%s%s</div>' % (frow(n('客户', 'src', '亚马逊买家消息'), a(), n('亚马逊邮件中转', 'sys', '店铺绑定邮箱')), frow(n('客户', 'src', 'Shopify 邮件'), a(), n('店铺邮箱', 'sys', 'Gmail 或 163 企业邮箱收发')), frow(n('生产厂', 'src', 'FQD、FZJ'), a(), n('工厂工作台', 'sys', '同一系统内'))),
     a(), n('Forcome Support', 'hub', '工单 · 售后单 · 审批单 · 台账'), a(),
     '<div class="fcol">%s%s%s%s</div>' % (frow(n('统一动作接口', 'sys', '订单 · 退款 · 改地址 · 取消'), a(), n('SP-API · Shopify Admin API', 'out', '订单平台直读；写动作审批后执行，人工操作清单兜底')), frow(n('统一动作接口', 'sys', '库存 · 出库单'), a(), n('积加', 'out', '易仓库存 · 售后出库单 · 单号与运费 · 亚马逊收件人')), frow(n('轨迹服务', 'sys', '第二阶段'), a(), n('17TRACK', 'out', '物流轨迹')), frow(n('钉钉', 'sys', '通讯录 · 工作通知 · 登录'), a(), n('审批人 · 生产厂对接人', 'out')))))
 
