@@ -1,6 +1,7 @@
 // 部署环境文件（deploy/.env.<环境>，模板 deploy/.env.example）：读取、校验与第一次部署时生成。
 // 解析用 Node 内置的 util.parseEnv（与 Compose 的 --env-file 同一种写法：注释、引号、行内注释）。
 // 这里只校验部署脚本与 Compose 直接用到的变量；应用自己的变量（LOG_LEVEL、发信白名单等）由 api 启动时校验。
+import { isIP } from 'node:net';
 import { parseEnv } from 'node:util';
 
 /** 模板里口令的占位值；生成环境文件时换成随机值 */
@@ -42,6 +43,9 @@ export function readDeployEnv(text, environment) {
   }
   if (!HOSTNAME.test(vars.SITE_HOST ?? '')) {
     problems.push('SITE_HOST：只填域名（如 support-dev.forcome.internal），不带协议与端口');
+  }
+  if (vars.SITE_IP && isIP(vars.SITE_IP) === 0) {
+    problems.push('SITE_IP：只填一个 IP 地址（如 10.0.8.21），不带协议与端口；不按 IP 访问时留空');
   }
   const httpsBind = vars.HTTPS_BIND || '127.0.0.1';
   const httpsPort = port(vars, 'HTTPS_PORT', problems);

@@ -3,6 +3,8 @@
 {
 	# 容器里没有要装根证书的系统证书库；根证书由部署脚本导出、发给员工浏览器安装
 	skip_install_trust
+	# 浏览器按 IP 访问时不发 SNI，容器里也拿不到外部 IP：没有 SNI 的握手用这个名字选证书（Compose 给出：SITE_IP，没填时 SITE_HOST）
+	default_sni {$SITE_DEFAULT_SNI}
 	pki {
 		ca local {
 			name "Forcome Support"
@@ -18,7 +20,8 @@
 	tls internal
 }
 
-{$SITE_HOST} {
+# SITE_IP（可选）：另外直接按 IP 访问，内部 CA 给这个 IP 签证书（没有内网域名与 DNS 时验证用）
+{$SITE_HOST} {$SITE_IP} {
 	import tls_{$TLS_MODE:internal}
 	# 实时推送（/api/live，SSE，待办 18）不压缩：压缩要攒够字节才写出，推送会被压着不发
 	@compressible not path /api/live

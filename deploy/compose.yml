@@ -257,6 +257,8 @@ services:
     logging: *logging
     environment:
       SITE_HOST: ${SITE_HOST:?}
+      SITE_IP: ${SITE_IP:-}
+      SITE_DEFAULT_SNI: ${SITE_IP:-${SITE_HOST:?}}
       TLS_MODE: ${TLS_MODE:-internal}
     ports:
       - '${HTTPS_BIND:-127.0.0.1}:${HTTPS_PORT:?}:443'
