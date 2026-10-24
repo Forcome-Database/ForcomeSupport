@@ -8,6 +8,9 @@ import { AMAZON_ORDER_NUMBER_PATTERN, type Platform } from '@forcome/contracts';
  * - Shopify：订单名的规范写法 #数字（Shopify 默认的订单名，从 #1001 起），来信里常写成「#1063」「order 1063」「Order No. 1063」，
  *   墨西哥站的客户写西班牙语「pedido 1063」「orden 1063」「número de pedido: 1063」；不到 4 位的数字不算（「Apt #305」「#1 fan」
  *   「order 12 times」）。带「order / pedido / orden」字样的候选排在只写 # 的前面（「Ticket #4521 … order 1063」先试 #1063）。
+ *   店铺改过订单名的前缀时（Shopify「订单 ID 格式」，如 #Y22283），数字前可带 1–3 个字母（可再带连字符）：#Y22283、order Y22283、
+ *   #YE-22283；后缀不用管（#1001-US 抽到 1001）。候选一律写成 #订单号（#22283），由 order 按订单号在店铺内比对（找得到 #Y22283）；
+ *   不带 # 也没有「订单」字样的「Y22283」不算（型号、SKU 也长这样）。
  * 没有文本正文的来信从 HTML 里抽：去掉 head、style、script 的内容与全部标签（样式里的 #333333 之类不当订单名），
  * 数字字符实体（&#35;、&#x23;、&#8217; 等）一律解码成字符，免得「&#8217;」被当成订单名 #8217。
  * 候选最多取前 MAX_ORDER_NUMBER_CANDIDATES 个：每个候选在镜像里没有时都可能要去平台补拉一次。
@@ -20,14 +23,15 @@ const AMAZON_ORDER_NUMBER = new RegExp(
   'g',
 );
 
-/** #1063、# 1063；紧跟在 & 后面的不算（没解码的字符实体：双重转义的 &amp;#8217;、不带分号的 &#8217） */
-const SHOPIFY_HASH_NAME = /(?<!&)#\s?(\d{4,})(?!\d)/g;
+/** #1063、# 1063、#Y22283、#YE-22283；紧跟在 & 后面的不算（没解码的字符实体：双重转义的 &amp;#8217;、不带分号的 &#8217） */
+const SHOPIFY_HASH_NAME = /(?<!&)#\s?(?:[a-z]{1,3}-?)?(\d{4,})(?!\d)/gi;
 /**
  * 「订单」后面跟数字：order 1063、Order No. 1063、order number: 1063、Order #: 1066、Order ID 1067、pedido 1068、orden 1068、
- * número de pedido: 1069（「pedido / orden」前的「número de」可有可无，所以只要认出 pedido、orden）
+ * número de pedido: 1069（「pedido / orden」前的「número de」可有可无，所以只要认出 pedido、orden）；数字前可带订单名的字母前缀
+ * （order Y22283、order #Y22283）
  */
 const SHOPIFY_KEYWORD_NAME =
-  /\b(?:order|pedido|orden)\b\s*(?:number|num\.?|no\.?|nr\.?|id|n[úu]mero)?\s*[:#]?\s*:?\s*#?\s*(\d{4,})(?!\d)/gi;
+  /\b(?:order|pedido|orden)\b\s*(?:number|num\.?|no\.?|nr\.?|id|n[úu]mero)?\s*[:#]?\s*:?\s*#?\s*(?:[a-z]{1,3}-?)?(\d{4,})(?!\d)/gi;
 
 /** 数字字符实体对应的字符；码位不合法的换成空格 */
 function codePointText(code: number): string {

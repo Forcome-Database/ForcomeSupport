@@ -101,6 +101,7 @@ export {
   type ShopifyOrderPage,
   type ShopifyTracking,
 } from './shopify';
+export { sameShopifyOrder, shopifyOrderNumber } from './shopify-order-name';
 export {
   AMAZON_MARKETPLACES,
   amazonOrdersClient,

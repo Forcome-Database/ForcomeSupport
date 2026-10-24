@@ -258,6 +258,40 @@ describe('Shopify 订单镜像', () => {
     expect(shopify.faultsOf(DIRECT.id).calls).toEqual([]);
   });
 
+  it('店铺改了订单名前缀（#Y7001）：来信里写的 #7001、7001、Y7001 按订单号找到；补拉后镜像里同样按订单号找，不再调平台；后缀同理', async () => {
+    const old = shopify.put(COM.id, {
+      name: '#Y7001',
+      email: 'prefixed@example.com',
+      updatedAt: new Date('2026-08-10T08:00:00Z'),
+    });
+    const calls = () => shopify.faultsOf(COM.id).calls.filter((c) => c === 'order_by_name').length;
+    const before = calls();
+    // 镜像里还没有：按订单号去平台补拉，工单上写平台的订单名
+    expect(await t.findOrder(COM.id, { name: '#7001' })).toMatchObject({
+      platformOrderId: old.id,
+      name: '#Y7001',
+    });
+    expect(calls()).toBe(before + 1);
+    for (const written of ['7001', 'Y7001', '#Y7001']) {
+      expect(await t.findOrder(COM.id, { name: written }), written).toMatchObject({
+        platformOrderId: old.id,
+      });
+    }
+    expect(calls()).toBe(before + 1);
+    // 订单号不同的不算；别的店铺没有这笔
+    expect(await t.findOrder(COM.id, { name: '#70010' })).toBeNull();
+    expect(await t.findOrder(MX.id, { name: '#7001' })).toBeNull();
+
+    t.clock.advance({ minutes: 1 });
+    const suffixed = shopify.put(COM.id, order({ name: '#7002-US' }));
+    t.clock.advance({ minutes: 1 });
+    await pollShopify();
+    expect(await t.findOrder(COM.id, { name: '#7002' })).toMatchObject({
+      platformOrderId: suffixed.id,
+      name: '#7002-US',
+    });
+  });
+
   it('邮箱反查只在指定店铺内匹配，不分大小写（R-ST-03）', async () => {
     const email = 'same.buyer@example.com';
     t.clock.advance({ minutes: 1 });

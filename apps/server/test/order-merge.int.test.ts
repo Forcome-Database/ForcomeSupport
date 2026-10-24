@@ -523,6 +523,26 @@ describe('按订单归并（R-TK-01）', () => {
       ]);
     });
 
+    it('店铺改了订单名前缀（#Y2101）：来信写 #Y2101 或少写前缀都按订单号关联，工单上写平台的订单名', async () => {
+      const ZOE = { name: 'Zoe Park', address: 'zoe.park@example.com' };
+      const LEO = { name: 'Leo Hart', address: 'leo.hart@example.com' };
+      // 订单的客户邮箱与发件人不同：关联只能靠订单号，不是邮箱反查
+      shopifyOrder('#Y2101', 'someone.else@example.com');
+      shopifyOrder('#Y2102', 'another.one@example.com');
+      gmail.deliver(
+        contactForm(ZOE, 'My order #Y2101 arrived broken', '2026-09-10T15:00:00+08:00'),
+      );
+      gmail.deliver(contactForm(LEO, 'Where is order 2102?', '2026-09-10T15:10:00+08:00'));
+      await t.runJobs();
+
+      expect(await ticketsOf(agent, 'Zoe Park')).toEqual([
+        expect.objectContaining({ orderNumber: '#Y2101', channel: 'shopify' }),
+      ]);
+      expect(await ticketsOf(agent, 'Leo Hart')).toEqual([
+        expect.objectContaining({ orderNumber: '#Y2102', channel: 'shopify' }),
+      ]);
+    });
+
     it('Shopify 工单按订单收件国家定站点：收件国家为 CA 时工单站点为 CA（R-ST-02）', async () => {
       shopifyOrder('#2002', SAM.address, 'CA');
       gmail.deliver(

@@ -1,8 +1,8 @@
 import type { Currency, FulfillmentChannel, Platform } from '@forcome/contracts';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, or, sql } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { storeScopeCondition, type DbExecutor, type StoreScope, type Tx } from '../core';
-import type { AmazonOrder, ShopifyOrder } from '../integration';
+import { shopifyOrderNumber, type AmazonOrder, type ShopifyOrder } from '../integration';
 import {
   platformOrder,
   type MirroredAddress,
@@ -269,7 +269,20 @@ export async function mirrorAmazonOrders(
   }
 }
 
-/** 镜像里按订单名或平台订单号找一笔（店铺范围外的店铺找不到；同名的取平台更新时间最新的一笔） */
+/**
+ * 按订单名找：订单名一致，或订单号相同（Shopify 订单名带店铺设的前缀与后缀，来信里常少写，#22283 找得到 #Y22283，见
+ * integration 的 shopify-order-name.ts）
+ */
+function nameCondition(name: string) {
+  const number = shopifyOrderNumber(name);
+  return number === null
+    ? eq(platformOrder.name, name)
+    : or(eq(platformOrder.name, name), sql`${platformOrder.name} ~ ${`^\\D*${number}\\D*$`}`);
+}
+
+/**
+ * 镜像里按订单名或平台订单号找一笔（店铺范围外的店铺找不到；订单名完全一致的优先，同名的取平台更新时间最新的一笔）
+ */
 export async function mirroredOrder(
   db: DbExecutor,
   scope: StoreScope,
@@ -284,11 +297,14 @@ export async function mirroredOrder(
         eq(platformOrder.storeId, storeId),
         storeScopeCondition(scope, platformOrder.storeId),
         'name' in ref
-          ? eq(platformOrder.name, ref.name)
+          ? nameCondition(ref.name)
           : eq(platformOrder.platformOrderId, ref.platformOrderId),
       ),
     )
-    .orderBy(desc(platformOrder.platformUpdatedAt))
+    .orderBy(
+      ...('name' in ref ? [desc(sql`${platformOrder.name} = ${ref.name}`)] : []),
+      desc(platformOrder.platformUpdatedAt),
+    )
     .limit(1);
   return row ? toMirrored(row) : null;
 }

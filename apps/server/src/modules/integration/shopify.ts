@@ -6,6 +6,7 @@ import { defineClient, type FakeClient } from './definition';
 import { FakeQuota } from './fake-quota';
 import { FaultInjector, HistoryLimitedError } from './faults';
 import { fixtureCustomerAddress } from './fixture-customers';
+import { sameShopifyOrder } from './shopify-order-name';
 import { createRealShopify } from './shopify-real';
 
 /*
@@ -98,7 +99,7 @@ export interface ShopifyClient {
       readonly priority?: CallPriority;
     },
   ): Promise<ShopifyOrderPage>;
-  /** 按订单名取一笔（名字要完全一致，如 #1063）；没有为 null */
+  /** 按订单名取一笔（订单名一致或订单号相同：#22283 取到 #Y22283，见 shopify-order-name.ts）；没有为 null */
   findOrderByName(name: string): Promise<ShopifyOrder | null>;
   /** 店铺能不能访问（shop 查询）：「测试连接」用，返回店铺名 */
   shop(): Promise<{ readonly name: string }>;
@@ -243,7 +244,7 @@ export class FakeShopify implements FakeClient<ShopifyClient> {
       findOrderByName: async (name) => {
         await this.quota.acquire('high');
         await this.#check(storeId, 'order_by_name');
-        return this.orders(storeId).find((o) => o.name === name) ?? null;
+        return this.orders(storeId).find((o) => sameShopifyOrder(o.name, name)) ?? null;
       },
       shop: async () => {
         await this.#check(storeId, 'shop');

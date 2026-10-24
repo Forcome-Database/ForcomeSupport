@@ -7,6 +7,7 @@ import type { RealClientContext } from './definition';
 import { ClientNotConfiguredError, ExternalCallFailedError, HistoryLimitedError } from './faults';
 import { createHttpClient, type HttpClient, type RateLimit } from './http';
 import { SHOPIFY_RECENT_ORDER_DAYS, type ShopifyClient, type ShopifyOrder } from './shopify';
+import { sameShopifyOrder } from './shopify-order-name';
 import { ShopifyQuota, type ShopifyOperation } from './shopify-quota';
 
 /*
@@ -355,13 +356,13 @@ export function createRealShopifyClient(
       };
     },
     async findOrderByName(name) {
-      // 搜索按词匹配，可能带出相近的，只认名字完全一致的那笔
+      // 搜索认不带店铺前缀的订单号（#22283 找得到 #Y22283），也可能带出相近的：只认同一订单号的那笔
       const page = await orders('order_by_name', {
         query: `name:${JSON.stringify(name)}`,
         first: 5,
         after: null,
       });
-      const node = page.nodes.find((o) => o.name === name);
+      const node = page.nodes.find((o) => sameShopifyOrder(o.name, name));
       return node ? toOrder(node) : null;
     },
     async shop() {

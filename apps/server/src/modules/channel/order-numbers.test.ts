@@ -118,6 +118,27 @@ describe('Shopify 订单名（规范写法 #数字）', () => {
     ).toEqual(['#1063', '#4521', '#2001']);
   });
 
+  it('店铺改了订单名前缀（#Y22283）：数字前带 1–3 个字母（可带连字符）也算，候选写成 #订单号；后缀不用管', () => {
+    const cases: [string, string][] = [
+      ['Hi, my order #Y22283 arrived yesterday', '#22283'],
+      ['Ref #y22284', '#22284'],
+      ['About #YE-22285', '#22285'],
+      ['My order Y22286 is late', '#22286'],
+      ['Order No. #Y22287', '#22287'],
+      ['Mi pedido Y22288 no llegó', '#22288'],
+      ['Where is #1001-US?', '#1001'],
+    ];
+    for (const [text, expected] of cases) {
+      expect(extractOrderNumbers('shopify', mail('', text)), text).toEqual([expected]);
+    }
+  });
+
+  it('不带 # 也没有「订单」字样的字母加数字不算（型号、SKU）；字母超过 3 个的不算', () => {
+    expect(
+      extractOrderNumbers('shopify', mail('Y22283 not working', 'Model V12345, SKU #ABCD12345')),
+    ).toEqual([]);
+  });
+
   it('同一订单的几种写法只算一次', () => {
     expect(extractOrderNumbers('shopify', mail('#1063', 'order 1063, pedido #1063'))).toEqual([
       '#1063',
