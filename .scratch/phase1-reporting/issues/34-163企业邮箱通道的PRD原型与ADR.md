@@ -32,7 +32,7 @@ Blocked by: None (can start immediately)
   - `EmailFlow`、`Architecture` 画板的「客服邮箱 Gmail」改为 Gmail / 163 企业邮箱。
   - `build_canvas.py --seed` 需要 design 技能的环境，本机跑不了的话在 Comments 写明，留给用户。
 - **ADR**：新开 ADR 0015「邮箱服务商抽象与 163 企业邮箱 IMAP 收信」（上面的技术方向）；修订 0002（来信收发的记账方）、0003（网易直连、`NO_PROXY`）、0008（同步记录、游标、区间补拉、回放与服务商无关的说法）、0009（邮箱客户端按邮箱选服务商、凭据按邮箱保管）。
-- **规格**：第一期规格补「163 企业邮箱收信」的实现契约（模块职责与接口、数据约定、测试接缝：Fake IMAP 与 Fake Gmail 同一套示例回放）；第二期规格（`.scratch/phase2-aftersales/spec.md`）补 163 发信走 SMTP、「已发送」是否自动留存（不留存时 IMAP APPEND）、结果不明时按 Message-ID 在「已发送」搜索确认。`CONTEXT.md` 的同步记录、区间补拉、水位、游标等术语改成与服务商无关。`docs/agents/prototype.md` 若对照有变一并改。
+- **规格**：第一期规格补「163 企业邮箱收信」的实现契约（模块职责与接口、数据约定、测试接缝：Fake IMAP 与 Fake Gmail 同一套示例回放）；第二期规格（`.scratch/phase2-delivery/spec.md`）补 163 发信走 SMTP、「已发送」是否自动留存（不留存时 IMAP APPEND）、结果不明时按 Message-ID 在「已发送」搜索确认。`CONTEXT.md` 的同步记录、区间补拉、水位、游标等术语改成与服务商无关。`docs/agents/prototype.md` 若对照有变一并改。
 - **衔接待办**：32 号补「163 企业邮箱：管理员开启 IMAP/SMTP 与客户端登录、各进线邮箱生成客户端授权码、确认服务器机房地址、IP 登录限制放行服务器出口 IP」；29 号补真实环境核对点（IDLE 是否可用与掉线重连、「已发送」文件夹识别、Delivered-To 与别名落箱、授权码失效时的连接异常与恢复、近 90 天历史回放）。
 
 - [x] PRD 按上面各处改完，新增决策记下用户口径，版本号 +1，`build_prd.py` 生成无误

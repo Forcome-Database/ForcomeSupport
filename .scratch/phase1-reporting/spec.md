@@ -243,7 +243,7 @@ P04、P05 第一期版本的列、筛选、排序、取值与隐藏项见 PRD P0
 - 渠道连接状态（6.9）：已连接 / 同步延迟（邮箱、订单 10 分钟，钉钉 2 小时）/ 连接异常（连续 3 次失败）/ 未连接；按店铺计算，渠道卡取最差状态并列出异常的邮箱或店铺。连接异常触发全站横幅（不可关闭，恢复后自动消失）与通知；钉钉例外：只更新卡片状态并给管理员站内提醒，不出横幅（E-32）。SQS 状态（亚马逊卡上的一行，协调者 2026-10-06 决定 Q7）：正常 · 积压 N（等待拉取的通知少于 10 条）/ 积压 N 条（≥ 10 条，每分钟检查一次）/ 拉取失败（连续 3 次）/ 未连接（没配置 SQS）；只影响这一行，不改卡片与店铺的连接状态、不出横幅、不发通知。
 
 **163 企业邮箱收信**（PRD D-28，ADR 0015；契约由待办 34 定，后端 35、P18 界面 36，实现中调整写回 ADR 0015 与本节）
-- **范围**：进线邮箱各自选服务商 `gmail` / `qiye163`（`contracts` 的 `MailProvider`）；第一期 163 企业邮箱只收收件箱与「已发送」，口径与 Gmail 相同——去重、识别、归并、回复识别（只按 `In-Reply-To`、`References`）、SLA（到达时间取 `INTERNALDATE`）、同步记录与连接状态（6.9）、通知与横幅（11.4、G4，标题按服务商）、P27 记录、按时关闭的同步前提（ADR 0008「待办 33 落地」）、历史回放与 T0。发信随第二期（`.scratch/phase2-aftersales/spec.md`）。已有的 Gmail 行为不变。
+- **范围**：进线邮箱各自选服务商 `gmail` / `qiye163`（`contracts` 的 `MailProvider`）；第一期 163 企业邮箱只收收件箱与「已发送」，口径与 Gmail 相同——去重、识别、归并、回复识别（只按 `In-Reply-To`、`References`）、SLA（到达时间取 `INTERNALDATE`）、同步记录与连接状态（6.9）、通知与横幅（11.4、G4，标题按服务商）、P27 记录、按时关闭的同步前提（ADR 0008「待办 33 落地」）、历史回放与 T0。发信随第二期（`.scratch/phase2-delivery/spec.md`）。已有的 Gmail 行为不变。
 - **`integration`**：店铺级 IMAP 客户端（`defineClient`，真实现 `imapflow`、按店铺 `adapterMode` 选 Fake，生产拒绝 Fake）。接口按收信要的定（名字由 35 定）：探测（登录、找出「已发送」文件夹，返回可读的失败原因 `auth_failed` / `login_denied_ip` / `unreachable` / `timeout` / `no_sent_folder`）、取文件夹的 `UIDVALIDITY` 与 `UIDNEXT`、按 UID 取之后的信（`INTERNALDATE` + 原文，`BODY.PEEK[]`，只读 `EXAMINE`）、按日期区间搜索（`SEARCH SINCE/BEFORE`）、按 UID 取指定的信、在收件箱上等待新信（`IDLE`，可取消）。登录发 IMAP `ID`（`clientInfo`）。授权码按邮箱地址加密保管（`CREDENTIAL_MASTER_KEY`，`sealSecret`，附加数据「qiye163:地址」），只有真实现读明文。
 - **`channel`**：收信按服务商分派（Gmail 现有实现与 IMAP 实现），两者只到「取信」为止，取到的原文都走现有的入库路径（解析、去重、识别、「来信已接收」/「我方发信已同步」事件）。IMAP 的任务：独占的常驻拉取（咨询锁选主）给每个 163 企业邮箱在收件箱上 IDLE，新信排该邮箱的同步任务（stately + `singletonKey` 邮箱）；每 5 分钟给每个 163 企业邮箱排一次同步（兜底、让最近同步成功前进）；同步取收件箱与「已发送」各自位置之后的信，全部入库后在一个事务里推进两组位置并记同步成功（`synced_through` 取列清单之前的时刻）；`UIDVALIDITY` 变化按到达时间区间补拉。认证失败与 IP 限制不在常驻连接里重试，只靠轮询；店铺保存后（授权码、服务器、端口变了）立即重连。连接异常 / 恢复的通知与审计写法按服务商（`gmail-copy.ts` 改为按服务商取名称）。
 - **P18 接口**（只有管理员，店铺范围与审计照现有写法）：店铺的进线邮箱从地址数组改为对象数组——读：`{ address, provider, imapHost, imapPort, authCodeSaved }`（Gmail 的服务器与端口为空，**不返回授权码**）；写：`{ address, provider, imapHost?, imapPort?, authCode? }`，`authCode` 不带就沿用已保存的，163 企业邮箱新加或从 Gmail 改来时必须带；校验照 PRD P18「校验」（授权码必填、IMAP 服务器必填、端口 1–65535），错误按行返回（`mailboxes.<序号>.<字段>`）。测试连接：渠道卡 `POST /api/channel/connection-tests/qiye163`（测全部 163 企业邮箱，同 Gmail）；抽屉里按行 `POST /api/channel/mailbox-tests`（请求为这一行当前填的地址、服务器、端口、可选的授权码与店铺 id——没带授权码时用该地址已保存的），成功 200（「已发送」文件夹名），失败 502 `connection_test_failed` 带原因与可读的 message（写法照 data.QIYE_ROW_TESTS）；测试不保存、不记同步记录、不改连接状态，同一个地址同时只跑一个。渠道卡数据加 `qiye163`（邮箱数、最差状态、最旧的最近同步、异常与延迟的邮箱）。
@@ -469,6 +469,6 @@ P04、P05 第一期版本的列、筛选、排序、取值与隐藏项见 PRD P0
 - 台账的简化状态（进行中 / 已完成 / 已取消）映射到售后单正式状态；创建路径「手工登记」「历史导入」保留。
 - 来源规则表保留，第三期由 `triage` 接手后作兜底。
 - 能力矩阵每项能力带上线阶段，第二期开启新能力时只改常量的阶段标记，K17 随之显示。
-- 第二期的实现契约（工单全量、审批、售后流程、工厂工作台、积加与 17TRACK、模型接入层、P25、P26）写在 `.scratch/phase2-aftersales/spec.md`，第二期待办等第一期做到后半段再拆。
+- 第二期的实现契约（工单全量、审批、售后流程、工厂工作台、积加与 17TRACK、模型接入层、P25、P26）写在 `.scratch/phase2-delivery/spec.md`，第二期待办等第一期做到后半段再拆。
 
 ## Comments

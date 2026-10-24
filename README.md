@@ -13,7 +13,7 @@ docs/技术方案.md                     技术方案总文档（v1.2；口径�
 docs/部署说明.md                     部署与运维清单：开发测试环境、根证书、放行域名与 NO_PROXY、迁移到服务器
 docs/adr/                            技术决策记录 0001–0014（后续修订写在各篇末尾）
 apps/、packages/                     生产系统代码（pnpm 工作区，见「开发」）；.github/ 为 CI，scripts/ 为仓库级检查脚本，deploy/ 为部署
-.scratch/                            本地问题跟踪：各期规格与待办（phase1-reporting、phase2-aftersales、phase3-ai-reply），技术方案阶段的过程记录（tech-plan，历史）
+.scratch/                            本地问题跟踪：各期规格与待办（phase1-reporting、phase2-delivery、phase3-ai-reply），技术方案阶段的过程记录（tech-plan，历史）
 design/
 ├── *.dc.html                        画板（生成物，不要手改；5 张流程图例外，见下）
 ├── canvas.json                      画布布局（build_canvas.py 生成）
