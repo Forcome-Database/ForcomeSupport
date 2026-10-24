@@ -76,7 +76,7 @@ python build_canvas.py --seed
 python shot_phase1.py
 ```
 
-依赖：Python 3.11、`playwright`（使用本机 Chrome）。`build_canvas.py --seed` 还依赖 Claude Code 的 design 技能脚本 `seed-canvas.mjs`，路径写在脚本的 `SKILL` 常量里，技能版本更新后需要同步改这个路径。
+依赖：Python 3.11 及以上、`playwright`（使用本机 Chrome）、`markdown`（合成 PRD）、`pillow`（检查截图）。`build_canvas.py --seed` 还依赖 Claude Code 的 design 技能脚本 `seed-canvas.mjs`，路径写在脚本的 `SKILL` 常量里，技能版本更新后需要同步改这个路径。
 
 ## 开发
 
